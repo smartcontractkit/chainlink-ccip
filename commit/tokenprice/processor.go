@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -29,6 +30,7 @@ type processor struct {
 	metricsReporter  plugincommon.MetricsReporter
 	fRoleDON         int
 	obs              observer
+	runner           *asynclib.Runner
 }
 
 func NewProcessor(
@@ -71,6 +73,7 @@ func NewProcessor(
 		fRoleDON:         fRoleDON,
 		metricsReporter:  metricsReporter,
 		obs:              obs,
+		runner:           asynclib.NewRunner(),
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorsLabel, metricsReporter)
 }

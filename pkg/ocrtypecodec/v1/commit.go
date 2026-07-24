@@ -180,12 +180,16 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 	if err != nil {
 		return committypes.Outcome{}, fmt.Errorf("merkle roots from proto: %w", err)
 	}
+	rangesSelectedForReport, err := c.tr.chainRangeFromProto(
+		pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport(),
+	)
+	if err != nil {
+		return committypes.Outcome{}, fmt.Errorf("chain ranges from proto: %w", err)
+	}
 	return committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
-			OutcomeType: merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
-			RangesSelectedForReport: c.tr.chainRangeFromProto(
-				pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport(),
-			),
+			OutcomeType:                     merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
+			RangesSelectedForReport:         rangesSelectedForReport,
 			RootsToReport:                   rootsToReport,
 			OffRampNextSeqNums:              c.tr.seqNumChainFromProto(pbOutcome.GetMerkleRootOutcome().GetOffRampNextSeqNums()),
 			ReportTransmissionCheckAttempts: uint(pbOutcome.GetMerkleRootOutcome().GetReportTransmissionCheckAttempts()),

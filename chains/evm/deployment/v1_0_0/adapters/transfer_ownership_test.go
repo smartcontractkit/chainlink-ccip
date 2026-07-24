@@ -30,6 +30,157 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
+// TestTransferOwnershipAddressOnlyRef verifies that TransferOwnershipChangeset and
+// AcceptOwnershipChangeset succeed when ContractRef contains only an Address with no
+// Type/Version/Qualifier, and the contract is not present in the datastore. This exercises
+// the best-effort DS enrichment path: DS miss is tolerated as long as Address is set.
+func TestTransferOwnershipAddressOnlyRef(t *testing.T) {
+	t.Parallel()
+	selector := chainsel.TEST_90000001.Selector
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{selector}),
+	)
+	require.NoError(t, err)
+	env.Logger = logger.Test(t)
+
+	evmDeployer := &adapters.EVMDeployer{}
+	dReg := deploy.GetRegistry()
+	dReg.RegisterDeployer(chainsel.FamilyEVM, deploy.MCMSVersion, evmDeployer)
+	deployMCMS := deploy.DeployMCMS(dReg, nil)
+
+	// Deploy CLL MCMS set (used for the initial transfer).
+	output, err := deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
+		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.CLLQualifier),
+			},
+		},
+	})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	ds := output.DataStore
+	require.NoError(t, ds.Merge(env.DataStore))
+	env.DataStore = ds.Seal()
+
+	// Deploy RMN MCMS set. The per-chain contracts carry the RMN qualifier, but the MCMS input
+	// uses CLLQualifier because the MCM multisigs are owned by the CLL timelock.
+	output, err = deployMCMS.Apply(*env, deploy.MCMSDeploymentConfig{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS:           testhelpers.MCMSInputForQualifier(deploymentutils.CLLQualifier),
+		Chains: map[uint64]deploy.MCMSDeploymentConfigPerChain{
+			selector: {
+				Canceller:        testhelpers.SingleGroupMCMS(),
+				Bypasser:         testhelpers.SingleGroupMCMS(),
+				Proposer:         testhelpers.SingleGroupMCMS(),
+				TimelockMinDelay: big.NewInt(1),
+				Qualifier:        deploymentutils.StringPtr(deploymentutils.RMNTimelockQualifier),
+			},
+		},
+	})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	require.NoError(t, ds.Merge(output.DataStore.Seal()))
+	env.DataStore = ds.Seal()
+
+	// Deploy a router but intentionally do NOT add it to the datastore.
+	evmChain := env.BlockChains.EVMChains()[selector]
+	deployRouterOp, err := cldf_ops.ExecuteOperation(env.OperationsBundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
+		ChainSelector:  evmChain.Selector,
+		TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
+		Args: routerops1_2.ConstructorArgs{
+			WrappedNative: utils.RandomAddress(),
+			RMNProxy:      utils.RandomAddress(),
+		},
+	})
+	require.NoError(t, err)
+	routerAddr := common.HexToAddress(deployRouterOp.Output.Address)
+
+	cllTimelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(deploymentutils.RBACTimelock),
+		Qualifier:     deploymentutils.CLLQualifier,
+		Version:       semver.MustParse("1.0.0"),
+	}, selector, datastore_utils.FullRef)
+	require.NoError(t, err)
+
+	rmnTimelockRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(deploymentutils.RBACTimelock),
+		Qualifier:     deploymentutils.RMNTimelockQualifier,
+		Version:       semver.MustParse("1.0.0"),
+	}, selector, datastore_utils.FullRef)
+	require.NoError(t, err)
+
+	cr := deploy.GetTransferOwnershipRegistry()
+	evmAdapter := &adapters.EVMTransferOwnershipAdapter{}
+	cr.RegisterAdapter(chainsel.FamilyEVM, semver.MustParse("1.0.0"), evmAdapter)
+	mcmsRegistry := changesets.GetRegistry()
+	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, &adapters.EVMMCMSReader{})
+
+	addrOnlyRef := []datastore.AddressRef{{Address: routerAddr.Hex()}}
+
+	// TransferOwnershipChangeset: transfer from deployer to CLL timelock using address-only ref.
+	transferOutput, err := deploy.TransferOwnershipChangeset(cr, mcmsRegistry).Apply(*env, deploy.TransferOwnershipInput{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS: mcms.Input{
+			ValidUntil: 3759765795, TimelockAction: mcms_types.TimelockActionSchedule,
+			Qualifier: deploymentutils.CLLQualifier, Description: "transfer to CLL timelock",
+		},
+		ChainInputs: []deploy.TransferOwnershipPerChainInput{
+			{ChainSelector: selector, ContractRef: addrOnlyRef, ProposedOwner: cllTimelockRef.Address},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(transferOutput.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, transferOutput.MCMSTimelockProposals, false)
+
+	r, err := router.NewRouter(routerAddr, evmChain.Client)
+	require.NoError(t, err)
+	owner, err := r.Owner(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(cllTimelockRef.Address), owner)
+
+	// Transfer ownership from CLL timelock to RMN timelock (sets up the pending transfer).
+	transferOutput, err = deploy.TransferOwnershipChangeset(cr, mcmsRegistry).Apply(*env, deploy.TransferOwnershipInput{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS: mcms.Input{
+			ValidUntil: 3759765795, TimelockAction: mcms_types.TimelockActionSchedule,
+			Qualifier: deploymentutils.CLLQualifier, Description: "transfer to RMN timelock",
+		},
+		ChainInputs: []deploy.TransferOwnershipPerChainInput{
+			{ChainSelector: selector, ContractRef: addrOnlyRef, ProposedOwner: rmnTimelockRef.Address},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(transferOutput.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, transferOutput.MCMSTimelockProposals, false)
+
+	// AcceptOwnershipChangeset: accept from RMN timelock using address-only ref.
+	acceptOutput, err := deploy.AcceptOwnershipChangeset(cr, mcmsRegistry).Apply(*env, deploy.TransferOwnershipInput{
+		AdapterVersion: semver.MustParse("1.0.0"),
+		MCMS: mcms.Input{
+			ValidUntil: 3759765795, TimelockAction: mcms_types.TimelockActionSchedule,
+			Qualifier: deploymentutils.RMNTimelockQualifier, Description: "accept from RMN timelock",
+		},
+		ChainInputs: []deploy.TransferOwnershipPerChainInput{
+			{ChainSelector: selector, ContractRef: addrOnlyRef, ProposedOwner: rmnTimelockRef.Address},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(acceptOutput.MCMSTimelockProposals))
+	testhelpers.ProcessTimelockProposals(t, *env, acceptOutput.MCMSTimelockProposals, false)
+
+	owner, err = r.Owner(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(rmnTimelockRef.Address), owner)
+}
+
 // TestTransferOwnership tests transferring ownership of deployed contracts via MCMS timelocks.
 // It deploys MCMS contracts on two EVM chains, deploys routers, transfers ownership of routers from deployer key to the timelock,
 // then transfers ownership from the first timelock to a second timelock.

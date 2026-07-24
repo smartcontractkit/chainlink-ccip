@@ -157,7 +157,7 @@ func ConfigureChainsForLanesFromTopology(
 		// JD calls that could fail if those NOPs don't exist in the node registry.
 		targetFamilies := deriveFamiliesFromChains(chains)
 		committeeNOPs := filterNOPsToCommitteeMembers(cfg.Topology.NOPTopology, chains)
-		signingKeysByNOP, rawPubKeyByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, targetFamilies)
+		signingKeysByNOP, err := fetchSigningKeysForNOPsByFamilies(e, committeeNOPs, targetFamilies)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch signing keys: %w", err)
 		}
@@ -186,7 +186,6 @@ func ConfigureChainsForLanesFromTopology(
 						chainCfg.ChainSelector,
 						remoteSelector,
 						signingKeysByNOP,
-						rawPubKeyByNOP,
 					)
 					if err != nil {
 						return deployment.ChangesetOutput{}, fmt.Errorf("failed to get signature config for lane local chain %d -> remote chain %d: %w", chainCfg.ChainSelector, remoteSelector, err)

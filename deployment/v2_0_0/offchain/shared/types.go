@@ -16,6 +16,7 @@ var ProtoChainTypeToFamily = map[nodev1.ChainType]string{
 	nodev1.ChainType_CHAIN_TYPE_SOLANA:   chainsel.FamilySolana,
 	nodev1.ChainType_CHAIN_TYPE_STARKNET: chainsel.FamilyStarknet,
 	nodev1.ChainType_CHAIN_TYPE_APTOS:    chainsel.FamilyAptos,
+	nodev1.ChainType_CHAIN_TYPE_STELLAR:  chainsel.FamilyStellar,
 	nodev1.ChainType_CHAIN_TYPE_CANTON:   chainsel.FamilyCanton,
 }
 

@@ -36,29 +36,26 @@ func (p *processor) Observation(
 		p.obs.invalidateCaches(ctx, lggr)
 	}
 
-	var (
-		feeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents
-		nativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt
-		chainFeeUpdates   map[cciptypes.ChainSelector]Update
-		fChain            map[cciptypes.ChainSelector]int
-	)
-
 	operations := asynclib.AsyncNoErrOperationsMap{
-		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) {
-			feeComponents = p.obs.getChainsFeeComponents(ctx, l)
+		"getChainsFeeComponents": func(ctx context.Context, l logger.Logger) any {
+			return p.obs.getChainsFeeComponents(ctx, l)
 		},
-		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) {
-			nativeTokenPrices = p.obs.getNativeTokenPrices(ctx, l)
+		"getNativeTokenPrices": func(ctx context.Context, l logger.Logger) any {
+			return p.obs.getNativeTokenPrices(ctx, l)
 		},
-		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) {
-			chainFeeUpdates = p.obs.getChainFeePriceUpdates(ctx, l)
+		"getChainFeePriceUpdates": func(ctx context.Context, l logger.Logger) any {
+			return p.obs.getChainFeePriceUpdates(ctx, l)
 		},
-		"observeFChain": func(_ context.Context, l logger.Logger) {
-			fChain = p.observeFChain(l)
+		"observeFChain": func(_ context.Context, l logger.Logger) any {
+			return p.observeFChain(l)
 		},
 	}
 
-	asynclib.WaitForAllNoErrOperations(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
+	results := p.runner.WaitForAll(ctx, p.cfg.ChainFeeAsyncObserverSyncTimeout, operations, lggr)
+	feeComponents, _ := results["getChainsFeeComponents"].(map[cciptypes.ChainSelector]types.ChainFeeComponents)
+	nativeTokenPrices, _ := results["getNativeTokenPrices"].(map[cciptypes.ChainSelector]cciptypes.BigInt)
+	chainFeeUpdates, _ := results["getChainFeePriceUpdates"].(map[cciptypes.ChainSelector]Update)
+	fChain, _ := results["observeFChain"].(map[cciptypes.ChainSelector]int)
 	now := time.Now().UTC()
 
 	chainsWithNativeTokenPrices := mapset.NewSet(slices.Collect(maps.Keys(feeComponents))...).
