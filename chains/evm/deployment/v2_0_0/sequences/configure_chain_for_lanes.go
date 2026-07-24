@@ -108,7 +108,8 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		gasPriceUpdates := make([]fee_quoter.GasPriceUpdate, 0, len(input.RemoteChains))
 		onRampAdds := make([]router.OnRamp, 0, len(input.RemoteChains))
 		offRampAdds := make([]router.OffRamp, 0, len(input.RemoteChains))
-		destChainSelectorsPerExecutor := make(map[common.Address][]ExecutorRemoteChainConfigArgs)
+		destChainSelectorsToAddPerExecutor := make(map[common.Address][]ExecutorRemoteChainConfigArgs)
+		destChainSelectorsToRemovePerExecutor := make(map[common.Address][]uint64)
 
 		feeQContract, err := fqc.NewFeeQuoter(feeQuoterAddr, chain.Client)
 		if err != nil {
@@ -179,10 +180,14 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
 			}
-			destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
-				DestChainSelector: remoteSelector,
-				Config:            remoteConfig.ExecutorDestChainConfig,
-			})
+			if remoteConfig.ExecutorDestChainConfig.Enabled {
+				destChainSelectorsToAddPerExecutor[getTargetReport.Output] = append(destChainSelectorsToAddPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
+					DestChainSelector: remoteSelector,
+					Config:            remoteConfig.ExecutorDestChainConfig,
+				})
+			} else {
+				destChainSelectorsToRemovePerExecutor[getTargetReport.Output] = append(destChainSelectorsToRemovePerExecutor[getTargetReport.Output], remoteSelector)
+			}
 
 			// FeeQuoter dest chain config: when OverrideExistingConfig is false, we skip
 			// chains that already have an enabled config to avoid accidentally overwriting
@@ -214,7 +219,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return seqtypes.OnChainOutput{}, err
 		}
 
-		destChainSelectorsPerExecutor, err = FilterExecutorDestChains(b, chain, destChainSelectorsPerExecutor)
+		destChainSelectorsToAddPerExecutor, err = FilterExecutorDestChains(b, chain, destChainSelectorsToAddPerExecutor)
 		if err != nil {
 			return seqtypes.OnChainOutput{}, err
 		}
@@ -245,15 +250,26 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			writes = append(writes, onRampReport.Output)
 		}
 
-		for executorAddr, toAdd := range destChainSelectorsPerExecutor {
-			if len(toAdd) == 0 {
+		// Collect executor addresses from both additions and removals.
+		executorAddrs := make(map[common.Address]struct{}, len(destChainSelectorsToAddPerExecutor)+len(destChainSelectorsToRemovePerExecutor))
+		for executorAddr := range destChainSelectorsToAddPerExecutor {
+			executorAddrs[executorAddr] = struct{}{}
+		}
+		for executorAddr := range destChainSelectorsToRemovePerExecutor {
+			executorAddrs[executorAddr] = struct{}{}
+		}
+		for executorAddr := range executorAddrs {
+			toAdd := destChainSelectorsToAddPerExecutor[executorAddr]
+			toRemove := destChainSelectorsToRemovePerExecutor[executorAddr]
+			if len(toAdd) == 0 && len(toRemove) == 0 {
 				continue
 			}
 			executorReport, err := cldf_ops.ExecuteOperation(b, ExecutorApplyDestChainUpdates, chain, contract.FunctionInput[ExecutorApplyDestChainUpdatesArgs]{
 				ChainSelector: chain.Selector,
 				Address:       executorAddr,
 				Args: ExecutorApplyDestChainUpdatesArgs{
-					DestChainSelectorsToAdd: toAdd,
+					DestChainSelectorsToAdd:    toAdd,
+					DestChainSelectorsToRemove: toRemove,
 				},
 			})
 			if err != nil {

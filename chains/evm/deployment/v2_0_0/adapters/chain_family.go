@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
@@ -164,6 +165,19 @@ func (a *ChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte
 // evmFamilySelector is bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c.
 var evmFamilySelector = [4]byte{0x28, 0x12, 0xd5, 0x2c}
 
+// cantonNoExecExecutor is the sentinel EVM executor address used for Canton lanes.
+// It disables execution on the EVM side while still satisfying the OnRamp
+// default-executor field.
+const cantonNoExecExecutor = "0xEBa517d200000000000000000000000000000000"
+
+func isCantonRemote(remoteChainSelector uint64) bool {
+	family, err := chainsel.GetSelectorFamily(remoteChainSelector)
+	if err != nil {
+		return false
+	}
+	return family == chainsel.FamilyCanton
+}
+
 func (a *ChainFamilyAdapter) GetAddressBytesLength() uint8 {
 	return 20
 }
@@ -173,6 +187,25 @@ func (a *ChainFamilyAdapter) GetChainFamilySelector() [4]byte {
 }
 
 func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(chainSelector uint64, remoteChainSelector uint64, chainFamilySelector [4]byte) ccvadapters.FeeQuoterDestChainConfigOverrides {
+	if isCantonRemote(remoteChainSelector) {
+		// Canton hardening: v2 pool fee model, no default token fee, $0.50 network fee,
+		// zero gas overheads, minimal tx gas limit.
+		return ccvadapters.FeeQuoterDestChainConfigOverrides{
+			IsEnabled:                   new(true),
+			MaxDataBytes:                new(uint32(32_000)),
+			MaxPerMsgGasLimit:           new(sequences.GetMaxMsgPerGasLimit(remoteChainSelector)),
+			DestGasPerPayloadByteBase:   new(sequences.GetdestGasPerPayloadByteBase(remoteChainSelector)),
+			DestGasOverhead:             new(uint32(0)),
+			ChainFamilySelector:         chainFamilySelector,
+			DefaultTokenFeeUSDCents:     new(uint16(0)),
+			DefaultTokenDestGasOverhead: new(uint32(0)),
+			DefaultTxGasLimit:           new(uint32(1)),
+			NetworkFeeUSDCents:          new(uint16(50)),
+			LinkFeeMultiplierPercent:    new(uint8(90)),
+			// USDPerUnitGas is not set here to avoid doing a gas price update by default
+		}
+	}
+
 	return ccvadapters.FeeQuoterDestChainConfigOverrides{
 		IsEnabled:                   new(true),
 		MaxDataBytes:                new(uint32(32_000)),
@@ -211,6 +244,22 @@ func (a *ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestCh
 }
 
 func (a *ChainFamilyAdapter) GetDefaultRemoteChainConfig(sourceChainSelector, remoteChainSelector uint64) ccvadapters.RemoteChainDefaults {
+	if isCantonRemote(remoteChainSelector) {
+		// Canton hardening: no execution on EVM side, $0.50 network fees, no-exec executor.
+		return ccvadapters.RemoteChainDefaults{
+			AllowTrafficFrom: true,
+			ExecutorDestChainConfig: ccvadapters.ExecutorDestChainConfig{
+				USDCentsFee: 0,
+				Enabled:     false,
+			},
+			BaseExecutionGasCost:      200_000,
+			TokenReceiverAllowed:      false,
+			MessageNetworkFeeUSDCents: 50,
+			TokenNetworkFeeUSDCents:   50,
+			DefaultExecutor:           cantonNoExecExecutor,
+		}
+	}
+
 	return ccvadapters.RemoteChainDefaults{
 		AllowTrafficFrom: true,
 		ExecutorDestChainConfig: ccvadapters.ExecutorDestChainConfig{

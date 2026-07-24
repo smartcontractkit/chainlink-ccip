@@ -62,6 +62,11 @@ type RemoteChainDefaults struct {
 	TokenReceiverAllowed      bool
 	MessageNetworkFeeUSDCents uint16
 	TokenNetworkFeeUSDCents   uint16
+	// DefaultExecutor is an optional address override returned by an adapter. When
+	// non-empty, it is used directly as the OnRamp default executor instead of
+	// resolving a datastore executor ref via ResolveExecutor. This lets adapters
+	// supply family-specific executor addresses (e.g. a no-exec executor for Canton).
+	DefaultExecutor string
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.
