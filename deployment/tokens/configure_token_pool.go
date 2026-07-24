@@ -10,6 +10,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -68,7 +69,7 @@ func ConfigureTokenPool() cldf.ChangeSetV2[ConfigureTokenPoolInput] {
 }
 
 func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) error {
-	return func(e cldf.Environment, cfg ConfigureTokenPoolInput) error {
+	return func(_ cldf.Environment, cfg ConfigureTokenPoolInput) error {
 		if len(cfg.Chains) == 0 {
 			return errors.New("input must contain at least one chain entry")
 		}
@@ -120,7 +121,11 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 						return fmt.Errorf("destBytesOverhead must be at least 32 for remote %d on chain selector %d, got %d", remote.RemoteChainSelector, chainCfg.ChainSelector, v)
 					}
 				}
-				key := chainConfigKey{poolRef: pool.TokenPoolRef.Key(), selector: chainCfg.ChainSelector}
+				normalizedRef, err := deploy.TryNormalizeAddressRef(chainCfg.ChainSelector, pool.TokenPoolRef)
+				if err != nil {
+					return fmt.Errorf("pool entry %s on chain selector %d has an unnormalizable ref: %w", datastore_utils.SprintRef(pool.TokenPoolRef), chainCfg.ChainSelector, err)
+				}
+				key := chainConfigKey{poolRef: normalizedRef.Key(), selector: chainCfg.ChainSelector}
 				if _, dup := seenPools[key]; dup {
 					return fmt.Errorf("duplicate pool entry for chain selector %d and ref %s", chainCfg.ChainSelector, datastore_utils.SprintRef(pool.TokenPoolRef))
 				}
