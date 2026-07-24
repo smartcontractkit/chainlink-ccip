@@ -116,8 +116,8 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
 				TokenPoolRef: poolRef,
 				Remotes: []tokensapi.RemoteConfigUpdate{
-					{RemoteChainSelector: dst, TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(320))}},
-					{RemoteChainSelector: dst, TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(320))}},
+					{RemoteChainSelector: dst, TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{IsEnabled: cciputils.NewOptional(true), DestBytesOverhead: cciputils.NewOptional(uint32(320))}},
+					{RemoteChainSelector: dst, TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{IsEnabled: cciputils.NewOptional(true), DestBytesOverhead: cciputils.NewOptional(uint32(320))}},
 				},
 			}),
 			errors: []string{"duplicate remote chain selector"},
@@ -145,15 +145,15 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			errors: []string{"finality config is empty"},
 		},
 		{
-			name: "rejects_low_dest_bytes_overhead",
+			name: "rejects_missing_is_enabled",
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
 				TokenPoolRef: poolRef,
 				Remotes: []tokensapi.RemoteConfigUpdate{{
 					RemoteChainSelector:    dst,
-					TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(16))},
+					TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(320))},
 				}},
 			}),
-			errors: []string{"destBytesOverhead must be at least 32"},
+			errors: []string{"must specify isEnabled"},
 		},
 	}
 
@@ -433,6 +433,7 @@ func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	// Second apply: change ONLY destGasOverhead. All other fields must be preserved
 	// from on-chain state (merge-with-on-chain, not merge-with-defaults).
 	input.Chains[0].Pools[0].Remotes[0].TokenTransferFeeConfig = &tokensapi.PartialTokenTransferFeeConfig{
+		IsEnabled:       cciputils.NewOptional(true),
 		DestGasOverhead: cciputils.NewOptional(uint32(31_000)),
 	}
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)

@@ -114,8 +114,13 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 						return fmt.Errorf("duplicate remote chain selector %d for pool on chain selector %d", remote.RemoteChainSelector, chainCfg.ChainSelector)
 					}
 					seenRemotes[remote.RemoteChainSelector] = struct{}{}
-					if remote.TokenTransferFeeConfig != nil && remote.TokenTransferFeeConfig.IsEmpty() {
-						return fmt.Errorf("remote entry %d for pool on chain selector %d has nothing to update", remote.RemoteChainSelector, chainCfg.ChainSelector)
+					if remote.TokenTransferFeeConfig != nil {
+						if remote.TokenTransferFeeConfig.IsEmpty() {
+							return fmt.Errorf("remote entry %d for pool on chain selector %d has nothing to update", remote.RemoteChainSelector, chainCfg.ChainSelector)
+						}
+						if !remote.TokenTransferFeeConfig.IsEnabled.IsPresent() {
+							return fmt.Errorf("remote entry %d for pool on chain selector %d must specify isEnabled", remote.RemoteChainSelector, chainCfg.ChainSelector)
+						}
 					}
 				}
 				normalizedRef, err := deploy.TryNormalizeAddressRef(chainCfg.ChainSelector, pool.TokenPoolRef)
