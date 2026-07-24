@@ -134,8 +134,8 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 }
 
 // validatePoolConfigUpdate performs structural (non-resolving) validation of one pool entry.
-// Address-format validation for the fee admin is chain-specific and handled by the EVM
-// SetTokenPoolFeeAdmin sequence, keeping this top-level check chain-agnostic.
+// Address-format validation for admin roles is chain-specific and handled by the EVM
+// SetTokenPoolAdmins sequence, keeping this top-level check chain-agnostic.
 func validatePoolConfigUpdate(chainSelector uint64, pool PoolConfigUpdate) error {
 	if pool.isEmpty() {
 		return fmt.Errorf("pool entry %s on chain selector %d has no fields to update", datastore_utils.SprintRef(pool.TokenPoolRef), chainSelector)
@@ -230,14 +230,14 @@ func applyPoolConfigUpdate(
 	}
 
 	if pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
-		adminAdapter, ok := adapter.(TokenPoolFeeAdminAdapter)
+		adminAdapter, ok := adapter.(TokenPoolAdminAdapter)
 		if !ok {
 			return nil, nil, fmt.Errorf(
 				"adapter for chain selector %d (family %s, version %s) does not support admin role updates",
 				selector, family, fullPoolRef.Version,
 			)
 		}
-		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolFeeAdmin(), e.BlockChains, SetTokenPoolFeeAdminSequenceInput{
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
 			Selector:       selector,
 			PoolAddress:    fullPoolRef.Address,
 			RateLimitAdmin: pool.RateLimitAdmin,

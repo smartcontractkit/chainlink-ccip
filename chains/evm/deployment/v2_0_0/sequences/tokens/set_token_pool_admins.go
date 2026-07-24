@@ -16,11 +16,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-var SetTokenPoolFeeAdmin = operations.NewSequence(
-	"set-token-pool-fee-admin",
+var SetTokenPoolAdmins = operations.NewSequence(
+	"set-token-pool-admins",
 	utils.Version_2_0_0,
 	"Updates the rate limit admin and/or fee admin on a v2 token pool; no-op when values already match",
-	func(b operations.Bundle, chains cldf_chain.BlockChains, input tokens.SetTokenPoolFeeAdminSequenceInput) (sequences.OnChainOutput, error) {
+	func(b operations.Bundle, chains cldf_chain.BlockChains, input tokens.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.Selector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
