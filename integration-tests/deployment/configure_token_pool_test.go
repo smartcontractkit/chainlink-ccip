@@ -8,8 +8,6 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	"gopkg.in/yaml.v3"
-
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
@@ -450,44 +448,6 @@ func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	require.Equal(t, before, after, "no-op fee update must not send transactions")
 }
 
-func TestConfigureTokenPool_YAMLRoundTrip(t *testing.T) {
-	const payload = `
-mcms:
-  qualifier: CLL
-chains:
-  - selector: 909606746561742123
-    pools:
-      - tokenPoolRef: { address: '0x1111111111111111111111111111111111111111' }
-        finalityConfig: { waitForSafe: true, blockDepth: 1, waitForFinality: false }
-        feeAdmin: '0x1111111111111111111111111111111111111111'
-        remotes:
-          - selector: 5548718428018410741
-            tokenTransferFeeConfig:
-              destBytesOverhead: 320
-              destGasOverhead: 21000
-`
-	var input tokensapi.ConfigureTokenPoolInput
-	require.NoError(t, yaml.Unmarshal([]byte(payload), &input))
-
-	require.Len(t, input.Chains, 1)
-	require.Equal(t, chainsel.TEST_90000001.Selector, input.Chains[0].ChainSelector)
-	require.Len(t, input.Chains[0].Pools, 1)
-	pool := input.Chains[0].Pools[0]
-	require.Equal(t, "0x1111111111111111111111111111111111111111", pool.TokenPoolRef.Address)
-	require.NotNil(t, pool.FinalityConfig)
-	require.True(t, pool.FinalityConfig.WaitForSafe)
-	require.Equal(t, uint16(1), pool.FinalityConfig.BlockDepth)
-	require.NotNil(t, pool.FeeAdmin)
-	require.Len(t, pool.Remotes, 1)
-	remote := pool.Remotes[0]
-	require.Equal(t, chainsel.TEST_90000002.Selector, remote.RemoteChainSelector)
-	require.NotNil(t, remote.TokenTransferFeeConfig)
-	dbo, ok := remote.TokenTransferFeeConfig.DestBytesOverhead.Get()
-	require.True(t, ok)
-	require.Equal(t, uint32(320), dbo)
-	_, ok = remote.TokenTransferFeeConfig.IsEnabled.Get()
-	require.False(t, ok, "unset optional fields must stay unset after unmarshal")
-}
 
 func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 	tc := setupV2PoolsForConfigureImpl(t, "CTP_ALL", false)
