@@ -19,7 +19,7 @@ import (
 var SetTokenPoolFeeAdmin = operations.NewSequence(
 	"set-token-pool-fee-admin",
 	utils.Version_2_0_0,
-	"Updates the fee admin on a v2 token pool; no-op when the value already matches",
+	"Updates the rate limit admin and/or fee admin on a v2 token pool; no-op when values already match",
 	func(b operations.Bundle, chains cldf_chain.BlockChains, input tokens.SetTokenPoolFeeAdminSequenceInput) (sequences.OnChainOutput, error) {
 		chain, ok := chains.EVMChains()[input.Selector]
 		if !ok {
@@ -41,6 +41,13 @@ var SetTokenPoolFeeAdmin = operations.NewSequence(
 		}
 		current := currentReport.Output
 
+		desiredRateLimitAdmin := current.RateLimitAdmin
+		if input.RateLimitAdmin != nil {
+			if !common.IsHexAddress(*input.RateLimitAdmin) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s", input.Selector, *input.RateLimitAdmin)
+			}
+			desiredRateLimitAdmin = common.HexToAddress(*input.RateLimitAdmin)
+		}
 		desiredFeeAdmin := current.FeeAdmin
 		if input.FeeAdmin != nil {
 			if !common.IsHexAddress(*input.FeeAdmin) {
@@ -49,8 +56,8 @@ var SetTokenPoolFeeAdmin = operations.NewSequence(
 			desiredFeeAdmin = common.HexToAddress(*input.FeeAdmin)
 		}
 
-		if desiredFeeAdmin == current.FeeAdmin {
-			b.Logger.Infof("Token pool fee admin already matches desired value for pool %s on chain %d; skipping", poolAddr.Hex(), input.Selector)
+		if desiredRateLimitAdmin == current.RateLimitAdmin && desiredFeeAdmin == current.FeeAdmin {
+			b.Logger.Infof("Token pool admins already match desired values for pool %s on chain %d; skipping", poolAddr.Hex(), input.Selector)
 			return sequences.OnChainOutput{}, nil
 		}
 
@@ -59,7 +66,7 @@ var SetTokenPoolFeeAdmin = operations.NewSequence(
 			Address:       poolAddr,
 			Args: token_pool.SetDynamicConfigArgs{
 				Router:         current.Router,
-				RateLimitAdmin: current.RateLimitAdmin,
+				RateLimitAdmin: desiredRateLimitAdmin,
 				FeeAdmin:       desiredFeeAdmin,
 			},
 		})

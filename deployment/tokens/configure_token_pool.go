@@ -45,6 +45,8 @@ type PoolConfigUpdate struct {
 	TokenPoolRef datastore.AddressRef `yaml:"tokenPoolRef" json:"tokenPoolRef"`
 	// FinalityConfig, if set, is the allowed finality config to set on the pool (v2+ only).
 	FinalityConfig *finality.Config `yaml:"finalityConfig,omitempty" json:"finalityConfig,omitempty"`
+	// RateLimitAdmin, if set, is the desired rate limit admin address.
+	RateLimitAdmin *string `yaml:"rateLimitAdmin,omitempty" json:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if set, is the desired fee admin address (v2+ only).
 	FeeAdmin *string `yaml:"feeAdmin,omitempty" json:"feeAdmin,omitempty"`
 	// Remotes lists per-lane configuration updates.
@@ -63,7 +65,7 @@ type RemoteConfigUpdate struct {
 // isEmpty reports whether the pool entry has nothing to apply. Empty entries are rejected in
 // verify as probable YAML mistakes (e.g. indentation errors silently dropping fields).
 func (p PoolConfigUpdate) isEmpty() bool {
-	return p.FinalityConfig == nil && p.FeeAdmin == nil && len(p.Remotes) == 0
+	return p.FinalityConfig == nil && p.RateLimitAdmin == nil && p.FeeAdmin == nil && len(p.Remotes) == 0
 }
 
 // ConfigureTokenPool returns a changeset that applies partial configuration updates to
@@ -227,21 +229,22 @@ func applyPoolConfigUpdate(
 		reports = append(reports, report.ExecutionReports...)
 	}
 
-	if pool.FeeAdmin != nil {
+	if pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
 		adminAdapter, ok := adapter.(TokenPoolFeeAdminAdapter)
 		if !ok {
 			return nil, nil, fmt.Errorf(
-				"adapter for chain selector %d (family %s, version %s) does not support fee admin updates",
+				"adapter for chain selector %d (family %s, version %s) does not support admin role updates",
 				selector, family, fullPoolRef.Version,
 			)
 		}
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolFeeAdmin(), e.BlockChains, SetTokenPoolFeeAdminSequenceInput{
-			Selector:    selector,
-			PoolAddress: fullPoolRef.Address,
-			FeeAdmin:    pool.FeeAdmin,
+			Selector:       selector,
+			PoolAddress:    fullPoolRef.Address,
+			RateLimitAdmin: pool.RateLimitAdmin,
+			FeeAdmin:       pool.FeeAdmin,
 		})
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to set fee admin on pool %s: %w", fullPoolRef.Address, err)
+			return nil, nil, fmt.Errorf("failed to set admin roles on pool %s: %w", fullPoolRef.Address, err)
 		}
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
