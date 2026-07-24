@@ -43,7 +43,6 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 
 	cs := tokensapi.ConfigureTokenPool()
 	poolRef := datastore.AddressRef{Address: "0x1111111111111111111111111111111111111111"}
-	enabled := tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100}
 
 	singlePoolInput := func(pool tokensapi.PoolConfigUpdate) tokensapi.ConfigureTokenPoolInput {
 		return tokensapi.ConfigureTokenPoolInput{
@@ -90,8 +89,8 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
 				TokenPoolRef: poolRef,
 				Remotes: []tokensapi.RemoteConfigUpdate{{
-					RemoteChainSelector: sel,
-					RateLimits:          []tokensapi.RateLimitBucketInput{{Outbound: enabled, Inbound: enabled}},
+					RemoteChainSelector:    sel,
+					TokenTransferFeeConfig: feeCfgWithDestBytesOverhead(320),
 				}},
 			}),
 			errors: []string{"must not equal the pool's own chain selector"},
@@ -101,8 +100,8 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
 				TokenPoolRef: poolRef,
 				Remotes: []tokensapi.RemoteConfigUpdate{
-					{RemoteChainSelector: dst, RateLimits: []tokensapi.RateLimitBucketInput{{Outbound: enabled, Inbound: enabled}}},
-					{RemoteChainSelector: dst, RateLimits: []tokensapi.RateLimitBucketInput{{Outbound: enabled, Inbound: enabled}}},
+					{RemoteChainSelector: dst, TokenTransferFeeConfig: feeCfgWithDestBytesOverhead(320)},
+					{RemoteChainSelector: dst, TokenTransferFeeConfig: feeCfgWithDestBytesOverhead(320)},
 				},
 			}),
 			errors: []string{"duplicate remote chain selector"},
@@ -114,69 +113,12 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
 					ChainSelector: sel,
 					Pools: []tokensapi.PoolConfigUpdate{
-						{TokenPoolRef: poolRef, RateLimitAdmin: ptrTo("0x2222222222222222222222222222222222222222")},
 						{TokenPoolRef: poolRef, FeeAdmin: ptrTo("0x2222222222222222222222222222222222222222")},
+						{TokenPoolRef: poolRef, FinalityConfig: &finality.Config{WaitForFinality: true}},
 					},
 				}},
 			},
 			errors: []string{"duplicate pool entry"},
-		},
-		{
-			name: "rejects_three_rate_limit_buckets",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				Remotes: []tokensapi.RemoteConfigUpdate{{
-					RemoteChainSelector: dst,
-					RateLimits: []tokensapi.RateLimitBucketInput{
-						{FastFinality: false, Outbound: enabled, Inbound: enabled},
-						{FastFinality: true, Outbound: enabled, Inbound: enabled},
-						{FastFinality: false, Outbound: enabled, Inbound: enabled},
-					},
-				}},
-			}),
-			errors: []string{"at most two rate limit buckets allowed"},
-		},
-		{
-			name: "rejects_duplicate_default_buckets",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				Remotes: []tokensapi.RemoteConfigUpdate{{
-					RemoteChainSelector: dst,
-					RateLimits: []tokensapi.RateLimitBucketInput{
-						{FastFinality: false, Outbound: enabled, Inbound: enabled},
-						{FastFinality: false, Outbound: enabled, Inbound: enabled},
-					},
-				}},
-			}),
-			errors: []string{"multiple rate limit buckets with fastFinality=false"},
-		},
-		{
-			name: "rejects_rate_greater_than_capacity",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				Remotes: []tokensapi.RemoteConfigUpdate{{
-					RemoteChainSelector: dst,
-					RateLimits: []tokensapi.RateLimitBucketInput{{
-						Outbound: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 10, Rate: 100},
-						Inbound:  enabled,
-					}},
-				}},
-			}),
-			errors: []string{"rate greater than capacity"},
-		},
-		{
-			name: "rejects_disabled_with_nonzero_values",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				Remotes: []tokensapi.RemoteConfigUpdate{{
-					RemoteChainSelector: dst,
-					RateLimits: []tokensapi.RateLimitBucketInput{{
-						Outbound: enabled,
-						Inbound:  tokensapi.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 5},
-					}},
-				}},
-			}),
-			errors: []string{"disabled but capacity or rate is non-zero"},
 		},
 		{
 			name: "rejects_zero_finality_config",
@@ -200,8 +142,8 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 		{
 			name: "rejects_unresolvable_pool_ref",
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef:   poolRef,
-				RateLimitAdmin: ptrTo("0x2222222222222222222222222222222222222222"),
+				TokenPoolRef: poolRef,
+				FeeAdmin:     ptrTo("0x2222222222222222222222222222222222222222"),
 			}),
 			errors: []string{"failed to resolve token pool ref"},
 		},
@@ -404,10 +346,9 @@ func refreshBundle(tc *configureTestEnv) {
 func TestConfigureTokenPool_Admins(t *testing.T) {
 	tc := setupV2PoolsForConfigure(t, "CTP_ADM")
 
-	newRateLimitAdmin := "0x1111111111111111111111111111111111111111"
 	newFeeAdmin := "0x2222222222222222222222222222222222222222"
 
-	// Set only the rate limit admin; feeAdmin and router must be untouched.
+	// Set only the fee admin; the rate limit admin and router must be untouched.
 	pool, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
 	require.NoError(t, err)
 	preCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
@@ -418,8 +359,8 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
 			ChainSelector: tc.selA,
 			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
-				RateLimitAdmin: ptrTo(newRateLimitAdmin),
+				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+				FeeAdmin:     ptrTo(newFeeAdmin),
 			}},
 		}},
 	}
@@ -429,28 +370,11 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 
 	postCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
 	require.NoError(t, err)
-	require.Equal(t, common.HexToAddress(newRateLimitAdmin), postCfg.RateLimitAdmin)
-	require.Equal(t, preCfg.FeeAdmin, postCfg.FeeAdmin, "feeAdmin must be preserved")
+	require.Equal(t, common.HexToAddress(newFeeAdmin), postCfg.FeeAdmin)
+	require.Equal(t, preCfg.RateLimitAdmin, postCfg.RateLimitAdmin, "rateLimitAdmin must be preserved")
 	require.Equal(t, preCfg.Router, postCfg.Router, "router must be preserved")
 
-	// Now set only the fee admin; the rate limit admin we just set must survive.
-	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
-		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
-		FeeAdmin:     ptrTo(newFeeAdmin),
-	}
-	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
-	require.NoError(t, err)
-	postCfg, err = pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
-	require.NoError(t, err)
-	require.Equal(t, common.HexToAddress(newFeeAdmin), postCfg.FeeAdmin)
-	require.Equal(t, common.HexToAddress(newRateLimitAdmin), postCfg.RateLimitAdmin, "rateLimitAdmin must be preserved")
-
-	// Idempotency: setting both to their current values sends no transactions.
-	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
-		TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
-		RateLimitAdmin: ptrTo(newRateLimitAdmin),
-		FeeAdmin:       ptrTo(newFeeAdmin),
-	}
+	// Idempotency: setting the fee admin to its current value sends no transactions.
 	refreshBundle(&tc)
 	before := currentBlock(t, tc, tc.selA)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
@@ -461,13 +385,13 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 	// Invalid admin address formats are validated by the EVM SetTokenPoolAdmins sequence at
 	// apply time; the top-level changeset stays chain-agnostic and no longer checks formats.
 	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
-		TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
-		RateLimitAdmin: ptrTo("not-an-address"),
+		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+		FeeAdmin:     ptrTo("not-an-address"),
 	}
 	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
 	refreshBundle(&tc)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
-	require.ErrorContains(t, err, "invalid rate limit admin address")
+	require.ErrorContains(t, err, "invalid fee admin address")
 }
 
 func TestConfigureTokenPool_FeeConfig(t *testing.T) {
@@ -531,74 +455,6 @@ func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	require.Equal(t, before, after, "no-op fee update must not send transactions")
 }
 
-func TestConfigureTokenPool_RateLimits(t *testing.T) {
-	tc := setupV2PoolsForConfigure(t, "CTP_RL")
-
-	// Unidirectional: configure only pool A's view of the A→B lane. Pool B gets no entry.
-	buckets := []tokensapi.RateLimitBucketInput{
-		{
-			FastFinality: false,
-			Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100},
-			Inbound:      tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 2000, Rate: 200},
-		},
-		{
-			FastFinality: true,
-			Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 500, Rate: 50},
-			Inbound:      tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 600, Rate: 60},
-		},
-	}
-	input := tokensapi.ConfigureTokenPoolInput{
-		MCMS: mcms.Input{},
-		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
-			ChainSelector: tc.selA,
-			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
-				Remotes: []tokensapi.RemoteConfigUpdate{{
-					RemoteChainSelector: tc.selB,
-					RateLimits:          buckets,
-				}},
-			}},
-		}},
-	}
-	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
-	_, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
-	require.NoError(t, err)
-
-	// Pool A: outbound scaled by local decimals (no bump), inbound scaled with +10% bump.
-	defaultA, ffA := getRateLimits(t, cciputils.Version_2_0_0, tc.poolA, tc.clientA, tc.selB)
-	validateScaledTPRLBucket(t, "default poolA", tc.decimalsA, defaultA, buckets[0].Outbound, buckets[0].Inbound)
-	validateScaledTPRLBucket(t, "fast_finality poolA", tc.decimalsA, ffA, buckets[1].Outbound, buckets[1].Inbound)
-
-	// Pool B: untouched (unidirectional update).
-	defaultB, ffB := getRateLimits(t, cciputils.Version_2_0_0, tc.poolB, tc.clientB, tc.selA)
-	require.False(t, defaultB.OutboundRateLimiterConfig.IsEnabled, "pool B default outbound must remain disabled")
-	require.False(t, ffB.OutboundRateLimiterConfig.IsEnabled, "pool B FF outbound must remain disabled")
-
-	// Idempotency: identical second apply sends no transactions.
-	refreshBundle(&tc)
-	before := currentBlock(t, tc, tc.selA)
-	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
-	require.NoError(t, err)
-	after := currentBlock(t, tc, tc.selA)
-	require.Equal(t, before, after, "no-op rate limit update must not send transactions")
-
-	// Partial change: modify only the default bucket; the FF bucket write must be skipped
-	// (single-bucket setRateLimitConfig call) and FF state preserved.
-	input.Chains[0].Pools[0].Remotes[0].RateLimits = []tokensapi.RateLimitBucketInput{
-		{
-			FastFinality: false,
-			Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 3000, Rate: 300},
-			Inbound:      buckets[0].Inbound,
-		},
-	}
-	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
-	require.NoError(t, err)
-	defaultA2, ffA2 := getRateLimits(t, cciputils.Version_2_0_0, tc.poolA, tc.clientA, tc.selB)
-	validateScaledTPRLBucket(t, "default poolA after partial", tc.decimalsA, defaultA2,
-		tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 3000, Rate: 300}, buckets[0].Inbound)
-	validateScaledTPRLBucket(t, "fast_finality poolA preserved", tc.decimalsA, ffA2, buckets[1].Outbound, buckets[1].Inbound)
-}
-
 func TestConfigureTokenPool_YAMLRoundTrip(t *testing.T) {
 	const payload = `
 mcms:
@@ -608,20 +464,12 @@ input:
     pools:
       - tokenPoolRef: { address: '0x1111111111111111111111111111111111111111' }
         finalityConfig: { waitForSafe: true, blockDepth: 1, waitForFinality: false }
-        rateLimitAdmin: '0x1111111111111111111111111111111111111111'
         feeAdmin: '0x1111111111111111111111111111111111111111'
         remotes:
           - selector: "5548718428018410741"
             tokenTransferFeeConfig:
               destBytesOverhead: 320
               destGasOverhead: 21000
-            rateLimits:
-              - fastFinality: false
-                outbound: { isEnabled: true, capacity: 1000, rate: 100 }
-                inbound: { isEnabled: true, capacity: 1000, rate: 100 }
-              - fastFinality: true
-                outbound: { isEnabled: true, capacity: 1000, rate: 100 }
-                inbound: { isEnabled: true, capacity: 1000, rate: 100 }
 `
 	var input tokensapi.ConfigureTokenPoolInput
 	require.NoError(t, yaml.Unmarshal([]byte(payload), &input))
@@ -634,7 +482,6 @@ input:
 	require.NotNil(t, pool.FinalityConfig)
 	require.True(t, pool.FinalityConfig.WaitForSafe)
 	require.Equal(t, uint16(1), pool.FinalityConfig.BlockDepth)
-	require.NotNil(t, pool.RateLimitAdmin)
 	require.NotNil(t, pool.FeeAdmin)
 	require.Len(t, pool.Remotes, 1)
 	remote := pool.Remotes[0]
@@ -645,10 +492,6 @@ input:
 	require.Equal(t, uint32(320), dbo)
 	_, ok = remote.TokenTransferFeeConfig.IsEnabled.Get()
 	require.False(t, ok, "unset optional fields must stay unset after unmarshal")
-	require.Len(t, remote.RateLimits, 2)
-	require.False(t, remote.RateLimits[0].FastFinality)
-	require.True(t, remote.RateLimits[1].FastFinality)
-	require.Equal(t, float64(1000), remote.RateLimits[0].Outbound.Capacity)
 }
 
 func TestConfigureTokenPool_RejectsPreV2Pools(t *testing.T) {
@@ -672,8 +515,8 @@ func TestConfigureTokenPool_RejectsPreV2Pools(t *testing.T) {
 		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
 			ChainSelector: tc.selA,
 			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef:   datastore.AddressRef{Address: preV2Pool},
-				RateLimitAdmin: ptrTo("0x2222222222222222222222222222222222222222"),
+				TokenPoolRef: datastore.AddressRef{Address: preV2Pool},
+				FeeAdmin:     ptrTo("0x2222222222222222222222222222222222222222"),
 			}},
 		}},
 	}
@@ -687,11 +530,6 @@ func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 
 	admin := "0x3333333333333333333333333333333333333333"
 	newFinality := finality.Config{BlockDepth: 7}
-	rl := []tokensapi.RateLimitBucketInput{{
-		FastFinality: false,
-		Outbound:     tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100},
-		Inbound:      tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1000, Rate: 100},
-	}}
 	fee := &tokensapi.PartialTokenTransferFeeConfig{
 		IsEnabled:         cciputils.NewOptional(true),
 		DestBytesOverhead: cciputils.NewOptional(uint32(320)),
@@ -706,12 +544,10 @@ func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 				Pools: []tokensapi.PoolConfigUpdate{{
 					TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
 					FinalityConfig: &newFinality,
-					RateLimitAdmin: ptrTo(admin),
 					FeeAdmin:       ptrTo(admin),
 					Remotes: []tokensapi.RemoteConfigUpdate{{
 						RemoteChainSelector:    tc.selB,
 						TokenTransferFeeConfig: fee,
-						RateLimits:             rl,
 					}},
 				}},
 			},
@@ -720,8 +556,8 @@ func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 				Pools: []tokensapi.PoolConfigUpdate{{
 					TokenPoolRef: datastore.AddressRef{Address: tc.poolB.Hex()},
 					Remotes: []tokensapi.RemoteConfigUpdate{{
-						RemoteChainSelector: tc.selA,
-						RateLimits:          rl,
+						RemoteChainSelector:    tc.selA,
+						TokenTransferFeeConfig: fee,
 					}},
 				}},
 			},
@@ -738,12 +574,15 @@ func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 	require.NoError(t, err)
 	dynCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
 	require.NoError(t, err)
-	require.Equal(t, common.HexToAddress(admin), dynCfg.RateLimitAdmin)
 	require.Equal(t, common.HexToAddress(admin), dynCfg.FeeAdmin)
-	defaultA, _ := getRateLimits(t, cciputils.Version_2_0_0, tc.poolA, tc.clientA, tc.selB)
-	validateScaledTPRLBucket(t, "combined default poolA", tc.decimalsA, defaultA, rl[0].Outbound, rl[0].Inbound)
-	defaultB, _ := getRateLimits(t, cciputils.Version_2_0_0, tc.poolB, tc.clientB, tc.selA)
-	validateScaledTPRLBucket(t, "combined default poolB", tc.decimalsB, defaultB, rl[0].Outbound, rl[0].Inbound)
+	feeCfgA, err := pool.GetTokenTransferFeeConfig(&bind.CallOpts{Context: t.Context()}, common.Address{}, tc.selB, [4]byte{}, nil)
+	require.NoError(t, err)
+	require.True(t, feeCfgA.IsEnabled, "combined fee config poolA A→B must be enabled")
+	poolBContract, err := tokenpoolV2_0_0.NewTokenPool(tc.poolB, tc.clientB)
+	require.NoError(t, err)
+	feeCfgB, err := poolBContract.GetTokenTransferFeeConfig(&bind.CallOpts{Context: t.Context()}, common.Address{}, tc.selA, [4]byte{}, nil)
+	require.NoError(t, err)
+	require.True(t, feeCfgB.IsEnabled, "combined fee config poolB B→A must be enabled")
 
 	// Full idempotency across every feature at once.
 	refreshBundle(&tc)

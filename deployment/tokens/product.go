@@ -35,22 +35,20 @@ type TokenFeeAdapter interface {
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
 }
 
-// TokenPoolAdminAdapter is an optional interface for adapters that support updating a token
-// pool's admin roles. Implementations must read the current on-chain values and emit no
-// writes when the desired values already match (idempotent apply).
-type TokenPoolAdminAdapter interface {
-	SetTokenPoolAdmins() *cldf_ops.Sequence[SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+// TokenPoolFeeAdminAdapter is an optional interface for adapters that support updating a token
+// pool's fee admin. Implementations must read the current on-chain value and emit no
+// writes when the desired value already matches (idempotent apply).
+type TokenPoolFeeAdminAdapter interface {
+	SetTokenPoolFeeAdmin() *cldf_ops.Sequence[SetTokenPoolFeeAdminSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
-// SetTokenPoolAdminsSequenceInput defines the input for updating a token pool's admin roles.
-// Nil fields are left unchanged on-chain.
-type SetTokenPoolAdminsSequenceInput struct {
+// SetTokenPoolFeeAdminSequenceInput defines the input for updating a token pool's fee admin.
+// A nil FeeAdmin is left unchanged on-chain.
+type SetTokenPoolFeeAdminSequenceInput struct {
 	// Selector is the chain selector for the chain on which the pool lives.
 	Selector uint64 `json:"selector" yaml:"selector"`
 	// PoolAddress is the token pool address (family-specific string form).
 	PoolAddress string `json:"poolAddress" yaml:"poolAddress"`
-	// RateLimitAdmin, if non-nil, is the desired rate limit admin.
-	RateLimitAdmin *string `json:"rateLimitAdmin,omitempty" yaml:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if non-nil, is the desired fee admin.
 	FeeAdmin *string `json:"feeAdmin,omitempty" yaml:"feeAdmin,omitempty"`
 }
@@ -174,29 +172,6 @@ type RateLimiterConfig struct {
 	Capacity *big.Int
 	// Rate is the rate at which the rate limiter bucket refills, in tokens per second.
 	Rate *big.Int
-}
-
-// Equal compares two RateLimiterConfigs treating nil big.Ints as zero.
-func (a RateLimiterConfig) Equal(b RateLimiterConfig) bool {
-	if a.IsEnabled != b.IsEnabled {
-		return false
-	}
-
-	zero, aCap, bCap, aRate, bRate := big.NewInt(0), a.Capacity, b.Capacity, a.Rate, b.Rate
-	if aCap == nil {
-		aCap = zero
-	}
-	if bCap == nil {
-		bCap = zero
-	}
-	if aRate == nil {
-		aRate = zero
-	}
-	if bRate == nil {
-		bRate = zero
-	}
-
-	return aCap.Cmp(bCap) == 0 && aRate.Cmp(bRate) == 0
 }
 
 // OnchainRateLimits is the outbound/inbound rate limiter pair stored on-chain for a remote lane.
