@@ -120,6 +120,14 @@ func (c *OnRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicC
 	return c.contract.Transact(opts, "setDynamicConfig", args)
 }
 
+func (c *OnRampContract) TransferOwnership(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "transferOwnership", args)
+}
+
+func (c *OnRampContract) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "acceptOwnership")
+}
+
 type AllowlistConfigArgs struct {
 	DestChainSelector         uint64
 	AllowlistEnabled          bool
@@ -276,5 +284,41 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *On
 		args DynamicConfig,
 	) (*types.Transaction, error) {
 		return c.SetDynamicConfig(opts, args)
+	},
+})
+
+var TransferOwnership = contract.NewWrite(contract.WriteParams[common.Address, *OnRampContract]{
+	Name:            "onramp:transfer-ownership",
+	Version:         Version,
+	Description:     "Calls transferOwnership on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OnRampABI,
+	NewContract:     NewOnRampContract,
+	IsAllowedCaller: contract.OnlyOwner[*OnRampContract, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args common.Address,
+	) (*types.Transaction, error) {
+		return c.TransferOwnership(opts, args)
+	},
+})
+
+var AcceptOwnership = contract.NewWrite(contract.WriteParams[struct{}, *OnRampContract]{
+	Name:            "onramp:accept-ownership",
+	Version:         Version,
+	Description:     "Calls acceptOwnership on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OnRampABI,
+	NewContract:     NewOnRampContract,
+	IsAllowedCaller: contract.AllCallersAllowed[*OnRampContract, struct{}],
+	Validate:        func(struct{}) error { return nil },
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args struct{},
+	) (*types.Transaction, error) {
+		return c.AcceptOwnership(opts)
 	},
 })
