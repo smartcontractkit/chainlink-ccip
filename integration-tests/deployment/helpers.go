@@ -624,3 +624,13 @@ func DeployBurnMintTokenEVM(t *testing.T, env *cldf_deployment.Environment, sele
 
 	return token
 }
+
+// CurrentBlockEVM returns the latest block number on the given EVM chain. The simulated backend
+// mines exactly one block per transaction, so an unchanged block number across an Apply
+// proves no transaction was sent.
+func CurrentBlockEVM(t *testing.T, e *cldf_deployment.Environment, sel uint64) uint64 {
+	t.Helper()
+	header, err := e.BlockChains.EVMChains()[sel].Client.HeaderByNumber(t.Context(), nil)
+	require.NoError(t, err)
+	return header.Number.Uint64()
+}

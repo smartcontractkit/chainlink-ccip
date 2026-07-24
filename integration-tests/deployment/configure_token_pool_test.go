@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
+
 	// sigs.k8s.io/yaml decodes YAML by converting to JSON and using encoding/json, which
 	// honors the json `,string` selector tags. This mirrors how the migrations framework
 	// ultimately populates changeset inputs (YAML node -> JSON -> struct). Plain gopkg.in/yaml.v3
@@ -89,7 +90,7 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 				TokenPoolRef: poolRef,
 				Remotes: []tokensapi.RemoteConfigUpdate{{
 					RemoteChainSelector:    sel,
-					TokenTransferFeeConfig: feeCfgWithDestBytesOverhead(320),
+					TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(320))},
 				}},
 			}),
 			errors: []string{"must not equal the pool's own chain selector"},
@@ -99,8 +100,8 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
 				TokenPoolRef: poolRef,
 				Remotes: []tokensapi.RemoteConfigUpdate{
-					{RemoteChainSelector: dst, TokenTransferFeeConfig: feeCfgWithDestBytesOverhead(320)},
-					{RemoteChainSelector: dst, TokenTransferFeeConfig: feeCfgWithDestBytesOverhead(320)},
+					{RemoteChainSelector: dst, TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(320))}},
+					{RemoteChainSelector: dst, TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(320))}},
 				},
 			}),
 			errors: []string{"duplicate remote chain selector"},
@@ -112,7 +113,7 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
 					ChainSelector: sel,
 					Pools: []tokensapi.PoolConfigUpdate{
-						{TokenPoolRef: poolRef, FeeAdmin: ptrTo("0x2222222222222222222222222222222222222222")},
+						{TokenPoolRef: poolRef, FeeAdmin: new("0x2222222222222222222222222222222222222222")},
 						{TokenPoolRef: poolRef, FinalityConfig: &finality.Config{WaitForFinality: true}},
 					},
 				}},
@@ -133,7 +134,7 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 				TokenPoolRef: poolRef,
 				Remotes: []tokensapi.RemoteConfigUpdate{{
 					RemoteChainSelector:    dst,
-					TokenTransferFeeConfig: feeCfgWithDestBytesOverhead(16),
+					TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(uint32(16))},
 				}},
 			}),
 			errors: []string{"destBytesOverhead must be at least 32"},
@@ -151,12 +152,6 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 	}
 }
 
-func ptrTo[T any](v T) *T { return &v }
-
-func feeCfgWithDestBytesOverhead(v uint32) *tokensapi.PartialTokenTransferFeeConfig {
-	return &tokensapi.PartialTokenTransferFeeConfig{DestBytesOverhead: cciputils.NewOptional(v)}
-}
-
 type configureTestEnv struct {
 	env          *cldf_deployment.Environment
 	selA, selB   uint64
@@ -166,18 +161,6 @@ type configureTestEnv struct {
 	tokenSymb    string
 	decimalsA    uint8
 	decimalsB    uint8
-}
-
-// setupV2PoolsForConfigure deploys v2.0.0 chain contracts plus a connected v2 burn-mint
-// token/pool pair on two simulated chains, owned by the deployer key (no MCMS).
-func setupV2PoolsForConfigure(t *testing.T, tokenSymb string) configureTestEnv {
-	return setupV2PoolsForConfigureImpl(t, tokenSymb, false)
-}
-
-// setupV2PoolsForConfigureMCMS is like setupV2PoolsForConfigure but deploys MCMS/timelock and
-// transfers pool ownership to the timelock, so ConfigureTokenPool produces MCMS proposals.
-func setupV2PoolsForConfigureMCMS(t *testing.T, tokenSymb string) configureTestEnv {
-	return setupV2PoolsForConfigureImpl(t, tokenSymb, true)
 }
 
 func setupV2PoolsForConfigureImpl(t *testing.T, tokenSymb string, useMCMS bool) configureTestEnv {
@@ -282,7 +265,7 @@ func setupV2PoolsForConfigureImpl(t *testing.T, tokenSymb string, useMCMS bool) 
 }
 
 func TestConfigureTokenPool_FinalityConfig(t *testing.T) {
-	tc := setupV2PoolsForConfigure(t, "CTP_FIN")
+	tc := setupV2PoolsForConfigureImpl(t, "CTP_FIN", false)
 
 	// Sanity: initial finality config comes from deployment.
 	validateFinalityConfigV2_0_0(t, tc.poolA, tc.clientA, finality.Config{WaitForFinality: true})
@@ -307,39 +290,21 @@ func TestConfigureTokenPool_FinalityConfig(t *testing.T) {
 	validateFinalityConfigV2_0_0(t, tc.poolB, tc.clientB, finality.Config{WaitForFinality: true})
 
 	// Idempotency: identical second apply sends no transactions (no new blocks mined).
-	refreshBundle(&tc)
-	before := currentBlock(t, tc, tc.selA)
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	before := CurrentBlockEVM(t, tc.env, tc.selA)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
-	after := currentBlock(t, tc, tc.selA)
+	after := CurrentBlockEVM(t, tc.env, tc.selA)
 	require.Equal(t, before, after, "second identical apply must not send transactions")
 }
 
-// currentBlock returns the latest block number on the given chain. The simulated backend
-// mines exactly one block per transaction, so an unchanged block number across an Apply
-// proves no transaction was sent.
-func currentBlock(t *testing.T, tc configureTestEnv, sel uint64) uint64 {
-	t.Helper()
-	header, err := tc.env.BlockChains.EVMChains()[sel].Client.HeaderByNumber(t.Context(), nil)
-	require.NoError(t, err)
-	return header.Number.Uint64()
-}
-
-// refreshBundle swaps in a fresh operations reporter, mirroring production where every migration
-// run applies a changeset against a fresh bundle. Idempotency re-applies must use this so they
-// exercise the changeset's read-compare-skip against live on-chain state instead of replaying a
-// memoized sequence report from the prior apply (operations.ExecuteSequence reuses prior successful
-// reports on identical input, which would mask a redundant write/proposal).
-func refreshBundle(tc *configureTestEnv) {
-	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
-}
-
 func TestConfigureTokenPool_Admins(t *testing.T) {
-	tc := setupV2PoolsForConfigure(t, "CTP_ADM")
+	tc := setupV2PoolsForConfigureImpl(t, "CTP_ADM", false)
 
+	newRateLimitAdmin := "0x1111111111111111111111111111111111111111"
 	newFeeAdmin := "0x2222222222222222222222222222222222222222"
 
-	// Set only the fee admin; the rate limit admin and router must be untouched.
+	// Set only the rate limit admin; feeAdmin and router must be untouched.
 	pool, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
 	require.NoError(t, err)
 	preCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
@@ -350,8 +315,8 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
 			ChainSelector: tc.selA,
 			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
-				FeeAdmin:     ptrTo(newFeeAdmin),
+				TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+				RateLimitAdmin: new(newRateLimitAdmin),
 			}},
 		}},
 	}
@@ -361,32 +326,58 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 
 	postCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
 	require.NoError(t, err)
-	require.Equal(t, common.HexToAddress(newFeeAdmin), postCfg.FeeAdmin)
-	require.Equal(t, preCfg.RateLimitAdmin, postCfg.RateLimitAdmin, "rateLimitAdmin must be preserved")
+	require.Equal(t, common.HexToAddress(newRateLimitAdmin), postCfg.RateLimitAdmin)
+	require.Equal(t, preCfg.FeeAdmin, postCfg.FeeAdmin, "feeAdmin must be preserved")
 	require.Equal(t, preCfg.Router, postCfg.Router, "router must be preserved")
 
-	// Idempotency: setting the fee admin to its current value sends no transactions.
-	refreshBundle(&tc)
-	before := currentBlock(t, tc, tc.selA)
+	// Now set only the fee admin; the rate limit admin we just set must survive.
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+		FeeAdmin:     new(newFeeAdmin),
+	}
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
-	after := currentBlock(t, tc, tc.selA)
+	postCfg, err = pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(newFeeAdmin), postCfg.FeeAdmin)
+	require.Equal(t, common.HexToAddress(newRateLimitAdmin), postCfg.RateLimitAdmin, "rateLimitAdmin must be preserved")
+
+	// Idempotency: setting both to their current values sends no transactions.
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+		RateLimitAdmin: new(newRateLimitAdmin),
+		FeeAdmin:       new(newFeeAdmin),
+	}
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	before := CurrentBlockEVM(t, tc.env, tc.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	after := CurrentBlockEVM(t, tc.env, tc.selA)
 	require.Equal(t, before, after, "no-op admin update must not send transactions")
 
 	// Invalid admin address formats are validated by the EVM SetTokenPoolAdmins sequence at
 	// apply time; the top-level changeset stays chain-agnostic and no longer checks formats.
 	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
-		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
-		FeeAdmin:     ptrTo("not-an-address"),
+		TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
+		RateLimitAdmin: new("not-an-address"),
 	}
 	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
-	refreshBundle(&tc)
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.ErrorContains(t, err, "invalid rate limit admin address")
+
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+		FeeAdmin:     new("not-an-address"),
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.ErrorContains(t, err, "invalid fee admin address")
 }
 
 func TestConfigureTokenPool_FeeConfig(t *testing.T) {
-	tc := setupV2PoolsForConfigure(t, "CTP_FEE")
+	tc := setupV2PoolsForConfigureImpl(t, "CTP_FEE", false)
 
 	// First apply: enable a fee config on the A→B lane. On-chain config starts disabled
 	// (all-zero), so every field we care about must be provided explicitly here.
@@ -438,11 +429,11 @@ func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	require.Equal(t, uint32(50), cfg.FinalityFeeUSDCents, "minFee must be preserved from on-chain")
 
 	// Idempotency: identical partial re-apply sends no transactions.
-	refreshBundle(&tc)
-	before := currentBlock(t, tc, tc.selA)
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	before := CurrentBlockEVM(t, tc.env, tc.selA)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
-	after := currentBlock(t, tc, tc.selA)
+	after := CurrentBlockEVM(t, tc.env, tc.selA)
 	require.Equal(t, before, after, "no-op fee update must not send transactions")
 }
 
@@ -486,7 +477,7 @@ chains:
 }
 
 func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
-	tc := setupV2PoolsForConfigure(t, "CTP_ALL")
+	tc := setupV2PoolsForConfigureImpl(t, "CTP_ALL", false)
 
 	admin := "0x3333333333333333333333333333333333333333"
 	newFinality := finality.Config{BlockDepth: 7}
@@ -504,7 +495,7 @@ func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 				Pools: []tokensapi.PoolConfigUpdate{{
 					TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
 					FinalityConfig: &newFinality,
-					FeeAdmin:       ptrTo(admin),
+					FeeAdmin:       new(admin),
 					Remotes: []tokensapi.RemoteConfigUpdate{{
 						RemoteChainSelector:    tc.selB,
 						TokenTransferFeeConfig: fee,
@@ -545,20 +536,20 @@ func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 	require.True(t, feeCfgB.IsEnabled, "combined fee config poolB B→A must be enabled")
 
 	// Full idempotency across every feature at once.
-	refreshBundle(&tc)
-	beforeA := currentBlock(t, tc, tc.selA)
-	beforeB := currentBlock(t, tc, tc.selB)
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	beforeA := CurrentBlockEVM(t, tc.env, tc.selA)
+	beforeB := CurrentBlockEVM(t, tc.env, tc.selB)
 	out, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
 	require.Empty(t, out.MCMSTimelockProposals, "combined no-op must not emit proposals")
-	afterA := currentBlock(t, tc, tc.selA)
-	afterB := currentBlock(t, tc, tc.selB)
+	afterA := CurrentBlockEVM(t, tc.env, tc.selA)
+	afterB := CurrentBlockEVM(t, tc.env, tc.selB)
 	require.Equal(t, beforeA, afterA, "combined no-op must not send transactions on chain A")
 	require.Equal(t, beforeB, afterB, "combined no-op must not send transactions on chain B")
 }
 
 func TestConfigureTokenPool_MCMSOwnedPool(t *testing.T) {
-	tc := setupV2PoolsForConfigureMCMS(t, "CTP_MCMS")
+	tc := setupV2PoolsForConfigureImpl(t, "CTP_MCMS", true)
 
 	newCfg := finality.Config{BlockDepth: 9}
 	input := tokensapi.ConfigureTokenPoolInput{
@@ -586,7 +577,7 @@ func TestConfigureTokenPool_MCMSOwnedPool(t *testing.T) {
 	// Idempotency (the design's core guarantee, asserted on the output not just block height):
 	// re-applying the now-satisfied config against a fresh bundle must emit ZERO proposals, so
 	// no redundant timelock op / MCMS predecessor conflict is produced.
-	refreshBundle(&tc)
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
 	out2, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
 	require.Empty(t, out2.MCMSTimelockProposals, "no-op re-apply must not emit an MCMS proposal")
