@@ -630,7 +630,9 @@ func DeployBurnMintTokenEVM(t *testing.T, env *cldf_deployment.Environment, sele
 // proves no transaction was sent.
 func CurrentBlockEVM(t *testing.T, e *cldf_deployment.Environment, sel uint64) uint64 {
 	t.Helper()
-	header, err := e.BlockChains.EVMChains()[sel].Client.HeaderByNumber(t.Context(), nil)
+	chain, ok := e.BlockChains.EVMChains()[sel]
+	require.True(t, ok, "chain selector %d not found in environment", sel)
+	header, err := chain.Client.HeaderByNumber(t.Context(), nil)
 	require.NoError(t, err)
 	return header.Number.Uint64()
 }

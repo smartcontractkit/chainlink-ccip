@@ -90,10 +90,13 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			errors: []string{"no fields to update"},
 		},
 		{
-			name: "rejects_empty_remote_update",
+			name: "rejects_all_unset_fee_config",
 			input: singlePoolInput(tokensapi.PoolConfigUpdate{
 				TokenPoolRef: poolRef,
-				Remotes:      []tokensapi.RemoteConfigUpdate{{RemoteChainSelector: dst}},
+				Remotes: []tokensapi.RemoteConfigUpdate{{
+					RemoteChainSelector:    dst,
+					TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{},
+				}},
 			}),
 			errors: []string{"nothing to update"},
 		},

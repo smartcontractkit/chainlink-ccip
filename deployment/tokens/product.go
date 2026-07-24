@@ -209,6 +209,17 @@ func (cfg PartialTokenTransferFeeConfig) Populate(input TokenTransferFeeConfig) 
 	}
 }
 
+// IsEmpty reports whether no fields have been explicitly set.
+func (cfg PartialTokenTransferFeeConfig) IsEmpty() bool {
+	return !cfg.DefaultFinalityTransferFeeBps.IsPresent() &&
+		!cfg.CustomFinalityTransferFeeBps.IsPresent() &&
+		!cfg.DefaultFinalityFeeUSDCents.IsPresent() &&
+		!cfg.CustomFinalityFeeUSDCents.IsPresent() &&
+		!cfg.DestBytesOverhead.IsPresent() &&
+		!cfg.DestGasOverhead.IsPresent() &&
+		!cfg.IsEnabled.IsPresent()
+}
+
 // MergeWith fills in the missing fields in the PartialTokenTransferFeeConfig with values from
 // the provided fallbacks TokenTransferFeeConfig and returns a complete TokenTransferFeeConfig.
 func (cfg PartialTokenTransferFeeConfig) MergeWith(fallbacks TokenTransferFeeConfig) TokenTransferFeeConfig {
