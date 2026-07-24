@@ -129,13 +129,13 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 	return func(e cldf.Environment, cfg ConfigureTokenPoolInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
-		registry := GetTokenAdapterRegistry()
+		tokenRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 
 		for _, chainCfg := range cfg.Chains {
 			selector := chainCfg.ChainSelector
 			for _, pool := range chainCfg.Pools {
-				adapter, family, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, registry, selector, pool.TokenPoolRef, datastore.AddressRef{})
+				adapter, family, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, selector, pool.TokenPoolRef, datastore.AddressRef{})
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.TokenPoolRef), selector, err)
 				}
