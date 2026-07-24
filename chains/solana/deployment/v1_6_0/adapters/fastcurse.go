@@ -179,8 +179,10 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 		"Cursing subjects with RMNRemote",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in api.CurseInput) (output sequences.OnChainOutput, err error) {
 			for _, subject := range in.Subjects {
-				// Solana uses little endian to encode the subject so we expect the last 8 bytes to be 0
-				if !api.IfSubjectEqual(subject, api.GlobalCurseSubject()) && !bytes.Equal(subject[8:], []byte{0, 0, 0, 0, 0, 0, 0, 0}) {
+				if !api.IfSubjectEqual(subject, api.GlobalCurseSubject()) &&
+					!api.IfSubjectEqual(subject, api.FiredrillSubject()) &&
+					// Solana uses little endian to encode the subject so we expect the last 8 bytes to be 0
+					!bytes.Equal(subject[8:], []byte{0, 0, 0, 0, 0, 0, 0, 0}) {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid subject format for Solana RMNRemote curse: %v", subject)
 				}
 			}
@@ -209,8 +211,10 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 		"Cursing subjects with RMNRemote",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, in api.CurseInput) (output sequences.OnChainOutput, err error) {
 			for _, subject := range in.Subjects {
-				// Solana uses little endian to encode the subject so we expect the last 8 bytes to be 0
-				if !api.IfSubjectEqual(subject, api.GlobalCurseSubject()) && !bytes.Equal(subject[8:], []byte{0, 0, 0, 0, 0, 0, 0, 0}) {
+				if !api.IfSubjectEqual(subject, api.GlobalCurseSubject()) &&
+					!api.IfSubjectEqual(subject, api.FiredrillSubject()) &&
+					// Solana uses little endian to encode the subject so we expect the last 8 bytes to be 0
+					!bytes.Equal(subject[8:], []byte{0, 0, 0, 0, 0, 0, 0, 0}) {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid subject format for Solana RMNRemote curse: %v", subject)
 				}
 			}
