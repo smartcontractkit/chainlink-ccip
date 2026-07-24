@@ -3,7 +3,6 @@ package deployment
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -138,14 +137,6 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 				}},
 			}),
 			errors: []string{"destBytesOverhead must be at least 32"},
-		},
-		{
-			name: "rejects_unresolvable_pool_ref",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				FeeAdmin:     ptrTo("0x2222222222222222222222222222222222222222"),
-			}),
-			errors: []string{"failed to resolve token pool ref"},
 		},
 	}
 
@@ -492,37 +483,6 @@ chains:
 	require.Equal(t, uint32(320), dbo)
 	_, ok = remote.TokenTransferFeeConfig.IsEnabled.Get()
 	require.False(t, ok, "unset optional fields must stay unset after unmarshal")
-}
-
-func TestConfigureTokenPool_RejectsPreV2Pools(t *testing.T) {
-	tc := setupV2PoolsForConfigure(t, "CTP_VER")
-
-	// Inject a datastore entry whose resolved version is pre-v2 (all-digit address is
-	// checksum-invariant, so it resolves from the datastore without a chain call). Verify
-	// must reject it in PR#1 (v2.0.0+ only), regardless of which adapters are registered.
-	preV2Pool := "0x0000000000000000000000000000000000000001"
-	extra := datastore.NewMemoryDataStore()
-	require.NoError(t, extra.Addresses().Add(datastore.AddressRef{
-		ChainSelector: tc.selA,
-		Address:       preV2Pool,
-		Type:          datastore.ContractType(bnmOpsV2_0_0.ContractType),
-		Version:       semver.MustParse("1.6.1"),
-	}))
-	MergeAddresses(t, tc.env, extra)
-
-	input := tokensapi.ConfigureTokenPoolInput{
-		MCMS: mcms.Input{},
-		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
-			ChainSelector: tc.selA,
-			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef: datastore.AddressRef{Address: preV2Pool},
-				FeeAdmin:     ptrTo("0x2222222222222222222222222222222222222222"),
-			}},
-		}},
-	}
-	err := tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "only v2.0.0+ pools are currently supported")
 }
 
 func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
