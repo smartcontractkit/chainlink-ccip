@@ -30,10 +30,10 @@ import (
 )
 
 var (
+	_ tokens.TokenPoolAdminAdapter = &TokenAdapter{}
 	_ tokens.TokenPoolMigrator     = &TokenAdapter{}
 	_ tokens.TokenFeeAdapter       = &TokenAdapter{}
 	_ tokens.TokenAdapter          = &TokenAdapter{}
-	_ tokens.TokenPoolAdminAdapter = &TokenAdapter{}
 )
 
 // TokenAdapter handles EVM token pools at version 2.0.0.

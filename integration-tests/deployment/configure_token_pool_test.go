@@ -459,7 +459,7 @@ func TestConfigureTokenPool_YAMLRoundTrip(t *testing.T) {
 	const payload = `
 mcms:
   qualifier: CLL
-input:
+chains:
   - selector: "909606746561742123"
     pools:
       - tokenPoolRef: { address: '0x1111111111111111111111111111111111111111' }
