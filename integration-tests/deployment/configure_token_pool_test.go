@@ -8,11 +8,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	// sigs.k8s.io/yaml decodes YAML by converting to JSON and using encoding/json, which
-	// honors the json `,string` selector tags. This mirrors how the migrations framework
-	// ultimately populates changeset inputs (YAML node -> JSON -> struct). Plain gopkg.in/yaml.v3
-	// panics on the style-guide-mandated `,string` tag, so it cannot be used here.
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
@@ -459,13 +455,13 @@ func TestConfigureTokenPool_YAMLRoundTrip(t *testing.T) {
 mcms:
   qualifier: CLL
 chains:
-  - selector: "909606746561742123"
+  - selector: 909606746561742123
     pools:
       - tokenPoolRef: { address: '0x1111111111111111111111111111111111111111' }
         finalityConfig: { waitForSafe: true, blockDepth: 1, waitForFinality: false }
         feeAdmin: '0x1111111111111111111111111111111111111111'
         remotes:
-          - selector: "5548718428018410741"
+          - selector: 5548718428018410741
             tokenTransferFeeConfig:
               destBytesOverhead: 320
               destGasOverhead: 21000
