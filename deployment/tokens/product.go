@@ -35,6 +35,24 @@ type TokenFeeAdapter interface {
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
 }
 
+// TokenPoolFeeAdminAdapter is an optional interface for adapters that support updating a token
+// pool's fee admin. Implementations must read the current on-chain value and emit no
+// writes when the desired value already matches (idempotent apply).
+type TokenPoolFeeAdminAdapter interface {
+	SetTokenPoolFeeAdmin() *cldf_ops.Sequence[SetTokenPoolFeeAdminSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// SetTokenPoolFeeAdminSequenceInput defines the input for updating a token pool's fee admin.
+// A nil FeeAdmin is left unchanged on-chain.
+type SetTokenPoolFeeAdminSequenceInput struct {
+	// Selector is the chain selector for the chain on which the pool lives.
+	Selector uint64 `json:"selector" yaml:"selector"`
+	// PoolAddress is the token pool address (family-specific string form).
+	PoolAddress string `json:"poolAddress" yaml:"poolAddress"`
+	// FeeAdmin, if non-nil, is the desired fee admin.
+	FeeAdmin *string `json:"feeAdmin,omitempty" yaml:"feeAdmin,omitempty"`
+}
+
 // TokenAdminRoleAdapter is an optional interface for chain families that support token admin role management.
 type TokenAdminRoleAdapter interface {
 	RevokeTokenAdminRole() *cldf_ops.Sequence[RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
