@@ -893,7 +893,7 @@ func computeConsensusObservation(
 		dt.Observation{},
 		computeMessageHashesConsensus(lggr, observations, fChain),
 	)
-
+	//TODo logs over 1MB
 	lggr.Debugw("computeConsensusObservation has finished computing the consensus observation",
 		"fChain", fChain,
 		"observations", observations,
