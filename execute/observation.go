@@ -26,6 +26,10 @@ var (
 	errOffRampConfigMismatch = errors.New("offramp config digest mismatch")
 )
 
+// GotObservation is the milestone carrying a single oracle's observation for the
+// round (via ToLogFormat, message data omitted); used by the participation lens.
+const GotObservation = "execute plugin got observation"
+
 // Observation collects data across two phases which happen in separate rounds.
 // These phases happen continuously so that except for the first round, every
 // subsequent round can have a new execution report.
@@ -147,7 +151,7 @@ func (p *Plugin) Observation(
 	for _, reports := range observation.CommitReports {
 		numCommitReports += len(reports)
 	}
-	lggr.Infow("execute plugin got observation",
+	lggr.Infow(GotObservation,
 		"observationWithoutMsgDataAndDiscoveryObs", observation.ToLogFormat(),
 		"duration", time.Since(tStart),
 		"state", state,

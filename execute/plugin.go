@@ -517,7 +517,7 @@ func selectReports(
 		commitReports[i], err = builder.Add(ctx, commitReport)
 		if err != nil {
 			pendingReports++
-			lggr.Errorw("unable to add report to builder", "err", err)
+			lggr.Errorw(UnableToAddReportToBuilder, "err", err)
 			continue
 		}
 
@@ -571,6 +571,20 @@ func extractReportInfo(report exectypes.Outcome) ([]cciptypes.ExecuteReportInfo,
 	return ri, nil
 }
 
+// Milestone log messages emitted in the report/accept/transmit phases. Stable
+// identifiers the log-analysis tooling keys on; msg equals the constant exactly.
+const (
+	// UnableToAddReportToBuilder: a commit report could not be added to the exec report builder.
+	UnableToAddReportToBuilder = "unable to add report to builder"
+
+	// EmptyReport: the Reports phase produced no execution reports (nothing to transmit this round).
+	EmptyReport = "empty report"
+
+	// ReportAccepted / ReportWillTransmit: the report passed ShouldAccept / ShouldTransmit checks.
+	ReportAccepted     = "ShouldAcceptAttestedReport returns true, report accepted"
+	ReportWillTransmit = "ShouldTransmitAcceptedReport returns true, report will be transmitted"
+)
+
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcome ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
@@ -589,7 +603,7 @@ func (p *Plugin) Reports(
 	}
 
 	if len(decodedOutcome.Reports) == 0 {
-		lggr.Warnw("empty report", "outcome", decodedOutcome)
+		lggr.Warnw(EmptyReport, "outcome", decodedOutcome)
 		return nil, nil
 	}
 
@@ -859,7 +873,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	lggr.Infow("ShouldAcceptAttestedReport returns true, report accepted",
+	lggr.Infow(ReportAccepted,
 		"seqNr", seqNr,
 		"reports", decodedReport.ChainReports,
 	)
@@ -881,7 +895,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
-	lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",
+	lggr.Infow(ReportWillTransmit,
 		"reports", decodedReport.ChainReports,
 	)
 	return true, nil

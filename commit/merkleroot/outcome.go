@@ -18,7 +18,34 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
-const SendingOutcome = "Sending Outcome"
+// Milestone log messages for the merkleroot processor. These are the stable
+// log-message identifiers the log-analysis tooling keys on; keep them and their
+// call sites in sync. SendingOutcome carries outcomeType + nextState, from which
+// the full state machine (including the three ReportEmpty paths) is reconstructable.
+const (
+	SendingOutcome = "Sending Outcome"
+
+	// ConsensusObservationFailed: the round produced an empty (OutcomeType=0) outcome
+	// because consensus over observations could not be reached. Explains a progress stall.
+	ConsensusObservationFailed = "get consensus observation failed, empty outcome"
+
+	// ReportTransmissionGaveUp: a built report was not observed on-chain within
+	// MaxReportTransmissionCheckAttempts; the processor abandons it (ReportTransmissionFailed).
+	ReportTransmissionGaveUp = "report not transmitted, max check attempts reached, moving to next state"
+
+	// ImpossibleSeqNumsOnOffRamp / ImpossibleOffRampNextSeqNums: invariant violations
+	// (offRamp ahead of onRamp; offRampNextSeqNum going backwards).
+	ImpossibleSeqNumsOnOffRamp   = "sequence numbers between offRamp and onRamp reached an impossible state"
+	ImpossibleOffRampNextSeqNums = "OffRampNextSeqNums reached an impossible state"
+
+	// OnRampMaxSeqNumZero: onRamp max seq num observed as 0. Not itself an error, but a
+	// surfaced signal worth investigating if it persists without progress.
+	OnRampMaxSeqNumZero = "onRamp max sequence numbers consensus = 0"
+
+	// InsufficientOffRampConsensus: fewer than 2f+1 observations for a chain's
+	// offRampNextSeqNums; that chain is skipped this round. Surfaced signal.
+	InsufficientOffRampConsensus = "not enough observations for OffRampNextSeqNums consensus on chain"
+)
 
 // Outcome depending on the current state, either:
 // - chooses the seq num ranges for the next round
@@ -54,7 +81,7 @@ func (p *Processor) getOutcome(
 
 	consObservation, err := getConsensusObservation(lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
-		lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
+		lggr.Warnw(ConsensusObservationFailed, "err", err)
 		return Outcome{}, nextState, nil
 	}
 
@@ -102,11 +129,11 @@ func reportRangesOutcome(
 
 		if onRampMaxSeqNum < offRampNextSeqNum-1 {
 			if onRampMaxSeqNum == 0 {
-				lggr.Infow("OnRamp max sequence numbers consensus = 0. This might not indicate an issue" +
-					" but if it persists without progress on the commit plugin, investigate why oracles observe 0")
+				lggr.Infow(OnRampMaxSeqNumZero,
+					"note", "not necessarily an issue, but if it persists without progress investigate why oracles observe 0")
 			} else {
-				lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
-					"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
+				lggr.Errorw(ImpossibleSeqNumsOnOffRamp,
+					"detail", "offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
 					"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
 			}
 		}
@@ -206,8 +233,8 @@ func checkForReportTransmission(
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {
-				lggr.Errorw("OffRampNextSeqNums reached an impossible state, "+
-					"previous offRampNextSeqNum is greater than current offRampNextSeqNum",
+				lggr.Errorw(ImpossibleOffRampNextSeqNums,
+					"detail", "previous offRampNextSeqNum is greater than current offRampNextSeqNum",
 					"chain", previousSeqNumChain.ChainSel,
 					"previousSeqNum", previousSeqNumChain.SeqNum,
 					"currentSeqNum", currentSeqNum,
@@ -224,7 +251,7 @@ func checkForReportTransmission(
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
-		lggr.Warnw("report not transmitted, max check attempts reached, moving to next state")
+		lggr.Warnw(ReportTransmissionGaveUp)
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
 		}
@@ -298,7 +325,7 @@ func getOffRampNextSequenceNumbersConsensus(
 	offRampNextSeqNumsConsensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 	for sourceChain, observedNextSeqNums := range observationsPerChain {
 		if uint(len(observedNextSeqNums)) < 2*fDestChain+1 {
-			lggr.Warnw("not enough observations for OffRampNextSeqNums consensus on chain",
+			lggr.Warnw(InsufficientOffRampConsensus,
 				"sourceChain", sourceChain, "observedNextSeqNums", observedNextSeqNums,
 			)
 			continue

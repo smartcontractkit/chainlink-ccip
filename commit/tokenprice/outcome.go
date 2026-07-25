@@ -13,6 +13,22 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 )
 
+// Milestone log messages for the tokenprice processor. Stable identifiers the
+// log-analysis tooling keys on; msg equals the constant exactly, detail in fields.
+const (
+	// TokenPriceUpdateNeeded*: the round decided a token-price write is due, and why.
+	// TokenPriceUpdateNeededHeartbeat is the staleness signal (BatchWriteFrequency elapsed).
+	TokenPriceUpdateNeededNoPrevious = "token price update needed: no previous update exists"
+	TokenPriceUpdateNeededHeartbeat  = "token price update needed: heartbeat time passed"
+	TokenPriceUpdateNeededDeviation  = "token price update needed: deviation threshold exceeded"
+
+	// TokenPriceUpdateNotNeeded: price fresh and within deviation — healthy no-op.
+	TokenPriceUpdateNotNeeded = "token price update not needed: within deviation threshold"
+
+	// TokenInfoNotFound: a feed price was observed for a token with no configured TokenInfo.
+	TokenInfoNotFound = "could not find token info for token"
+)
+
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *processor) getConsensusObservation(
 	lggr logger.Logger,
@@ -96,14 +112,14 @@ func (p *processor) selectTokensForUpdate(
 			"consensusTimestamp", obs.Timestamp,
 		)
 		if !exists {
-			lggr.Infow("token price update needed: no previous update exists")
+			lggr.Infow(TokenPriceUpdateNeededNoPrevious)
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 			continue
 		}
 
 		ti, ok := tokenInfo[token]
 		if !ok {
-			lggr.Warnf("could not find token info for token %s", token)
+			lggr.Warnw(TokenInfoNotFound)
 			continue
 		}
 
@@ -112,16 +128,16 @@ func (p *processor) selectTokensForUpdate(
 		heartbeatPassed := obs.Timestamp.After(nextUpdateTime)
 
 		if heartbeatPassed {
-			lggr.Infow("token price update needed: heartbeat time passed",
+			lggr.Infow(TokenPriceUpdateNeededHeartbeat,
 				"nextUpdateTime", nextUpdateTime,
 				"heartbeatInterval", cfg.TokenPriceBatchWriteFrequency)
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 		} else if priceDeviates {
-			lggr.Infow("token price update needed: deviation threshold exceeded",
+			lggr.Infow(TokenPriceUpdateNeededDeviation,
 				"deviationPPB", ti.DeviationPPB)
 			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 		} else {
-			lggr.Debugw("token price update not needed: within deviation threshold",
+			lggr.Infow(TokenPriceUpdateNotNeeded,
 				"deviationPPB", ti.DeviationPPB)
 		}
 	}
