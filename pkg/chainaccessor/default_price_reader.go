@@ -35,8 +35,6 @@ const (
 	MsgAnswerNilOrNonPositive = "latestRoundData.Answer is nil or non positive"
 	// MsgMissingTokenInfo: a token was skipped because its token info was absent.
 	MsgMissingTokenInfo = "missing token info, token skipped"
-	// MsgEmptyFeeQuoterUpdate: a token price was not available on the fee quoter.
-	MsgEmptyFeeQuoterUpdate = "empty fee quoter update found"
 )
 
 // ContractTokenMap maps contracts to their token indices
@@ -164,7 +162,7 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 
 		// token not available on fee quoter
 		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
-			lggr.Debugw(MsgEmptyFeeQuoterUpdate, logutil.FieldChain, l.chainSelector, logutil.FieldToken, tokenAddressStr)
+			lggr.Debugw("empty fee quoter update found", logutil.FieldChain, l.chainSelector, logutil.FieldToken, tokenAddressStr)
 			continue
 		}
 		updateMap[ccipocr3.UnknownEncodedAddress(tokenAddressStr)] = updates[i]

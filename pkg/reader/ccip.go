@@ -284,8 +284,6 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	return messages, nil
 }
 
-// MsgLatestOnRampSeqNum is logged after the latest OnRamp sequence number is read from a source chain.
-const MsgLatestOnRampSeqNum = "chain reader returning latest onramp sequence number"
 
 // LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
 func (r *ccipChainReader) LatestMsgSeqNum(
@@ -302,13 +300,11 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 			chain, r.destChain, err)
 	}
 
-	lggr.Debugw(MsgLatestOnRampSeqNum,
+	lggr.Debugw("chain reader returning latest onramp sequence number",
 		logutil.FieldSeqNum, seqNum, logutil.FieldSourceChain, chain)
 	return seqNum, nil
 }
 
-// MsgExpectedNextSeqNum is logged after the expected next sequence number is read from a source chain OnRamp.
-const MsgExpectedNextSeqNum = "chain accessor returning expected next sequence number"
 
 // GetExpectedNextSequenceNumber queries the next expected sequence number from the source
 // chain OnRamp
@@ -328,7 +324,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 			sourceChainSelector, r.destChain, err)
 	}
 
-	lggr.Debugw(MsgExpectedNextSeqNum,
+	lggr.Debugw("chain accessor returning expected next sequence number",
 		logutil.FieldSeqNum, expectedNextSeqNum, logutil.FieldSourceChain, sourceChainSelector)
 	return expectedNextSeqNum, nil
 }

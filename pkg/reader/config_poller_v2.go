@@ -22,8 +22,6 @@ const (
 	// MsgNoChainAccessorForDestChain indicates the dest chain accessor is missing so source configs
 	// cannot be tracked or refreshed.
 	MsgNoChainAccessorForDestChain = "no chain accessor for dest chain; cannot track or refresh source configs"
-	// MsgBatchRefreshedConfigs is a data-access milestone logged after configs are batch fetched.
-	MsgBatchRefreshedConfigs = "Batch refreshed configs via chainAccessor"
 )
 
 // refreshAllKnownChains refreshes all known chains in background using batched requests where possible
@@ -477,7 +475,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 			"sourceChainSelectors", sourceChainSelectors,
 		)
 	}
-	c.lggr.Debugw(MsgBatchRefreshedConfigs,
+	c.lggr.Debugw("Batch refreshed configs via chainAccessor",
 		logutil.FieldChain, chainSel,
 		"latency", time.Since(start),
 		"chainConfigSnapshot", chainConfigSnapshot,

@@ -27,12 +27,6 @@ import (
 const (
 	// MsgQueriedMessages: messages read between sequence numbers.
 	MsgQueriedMessages = "queried messages between sequence numbers"
-	// MsgQueriedLatestMessage: latest message read from a source chain.
-	MsgQueriedLatestMessage = "queried latest message from source"
-	// MsgQueriedCommitReports: commit reports read from the offramp.
-	MsgQueriedCommitReports = "queried commit reports"
-	// MsgDecodedExecutedMessages: executed message sequence numbers read from the offramp.
-	MsgDecodedExecutedMessages = "decoded executed message sequence numbers"
 	// MsgUnexpectedNumNonces: a nonce batch returned an unexpected number of results.
 	MsgUnexpectedNumNonces = "unexpected number of nonces"
 	// MsgInvalidNonceValue: a nonce value could not be interpreted.
@@ -439,7 +433,7 @@ func (l *DefaultAccessor) LatestMessageTo(
 		return 0, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
-	lggr.Infow(MsgQueriedLatestMessage,
+	lggr.Debugw("queried latest message from source",
 		"numMsgs", len(seq),
 		logutil.FieldSourceChain, l.chainSelector,
 		logutil.FieldDestChain, destChainSelector,
@@ -561,7 +555,7 @@ func (l *DefaultAccessor) CommitReportsGTETimestamp(
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
 
-	lggr.Infow(MsgQueriedCommitReports, "numReports", len(iter), "internalLimit", internalLimit)
+	lggr.Debugw("queried commit reports", "numReports", len(iter), "internalLimit", internalLimit)
 
 	reports := l.processCommitReports(lggr, iter, ts, limit)
 	return reports, nil
@@ -623,7 +617,7 @@ func (l *DefaultAccessor) ExecutedMessages(
 			append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
 	}
 
-	lggr.Infow(MsgDecodedExecutedMessages, "executed", executed)
+	lggr.Debugw("decoded executed message sequence numbers", "executed", executed)
 	return executed, nil
 }
 

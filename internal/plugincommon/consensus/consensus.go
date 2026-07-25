@@ -13,18 +13,11 @@ import (
 
 // Analyzer-relevant log messages (consensus-not-reached signals). These are kept as
 // exported package-level constants so the log-analysis tooling can match them exactly.
-const (
-	// MsgConsensusNotReachedMinObservations is logged when a key's observations do not
-	// meet the minimum-observation threshold, so no consensus value is produced for it.
-	MsgConsensusNotReachedMinObservations = "could not reach consensus due to not enough " +
-		"observations meeting the minimum threshold"
-	// MsgConsensusNotReachedAggregator is logged when the aggregator has fewer values than
-	// the threshold for a key, so no consensus value is produced for it.
-	MsgConsensusNotReachedAggregator = "could not reach consensus in consensusMapAggregator"
-	// MsgInsufficientObservationsForConsensus is logged when there are fewer than 2f+1 items
-	// for a key, so ordered consensus cannot be reached.
-	MsgInsufficientObservationsForConsensus = "insufficient items to reach consensus"
-)
+// MsgInsufficientObservationsForConsensus is logged (at Error) when there are fewer than 2f+1 items
+// for a key, so ordered consensus cannot be reached. Exported so the log-analysis tooling can match
+// it exactly. The other consensus-not-reached signals are Debug-level and intentionally left as
+// literals (the analyzer reads prod logs, where Debug is off).
+const MsgInsufficientObservationsForConsensus = "insufficient items to reach consensus"
 
 // GetConsensusMap takes a mapping from chains to a list of items,
 // return a mapping from chains to a single consensus item.
@@ -47,7 +40,7 @@ func GetConsensusMap[K comparable, T any](
 			items = minObservations.GetValid()
 			if len(items) != 1 {
 				// TODO: metrics
-				lggr.Debugw(MsgConsensusNotReachedMinObservations,
+				lggr.Debugw("could not reach consensus due to not enough observations meeting the minimum threshold",
 					"objectName", objectName,
 					"key", key,
 					"minThreshold", minThresh,
@@ -77,7 +70,7 @@ func GetConsensusMapAggregator[K comparable, T any](
 
 	for key, values := range items {
 		if thresh, ok := f.Get(key); !ok || len(values) < int(thresh) {
-			lggr.Debugw(MsgConsensusNotReachedAggregator,
+			lggr.Debugw("could not reach consensus in consensusMapAggregator",
 				"objectName", objectName,
 				"key", key)
 			continue
