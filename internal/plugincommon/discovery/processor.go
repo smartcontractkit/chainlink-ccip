@@ -29,6 +29,20 @@ var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &Cont
 const syncTimeout = 5 * time.Second
 const logFrequency = 30 * time.Minute // how often to log discovery progress
 
+// Analyzer-relevant log messages (discovery/consensus failure signals explaining why a
+// contract was not discovered). Kept as exported package-level constants so the
+// log-analysis tooling can match them exactly.
+const (
+	MsgNoConsensusOnRamp       = "No consensus on onramps, onrampConsensus map is empty"
+	MsgNoConsensusNonceManager = "No consensus on nonce manager, nonceManagerConsensus map is empty"
+	MsgNoConsensusRMNRemote    = "No consensus on RMNRemote, rmnRemoteConsensus map is empty"
+	MsgNoConsensusFeeQuoter    = "No consensus on fee quoters, feeQuoterConsensus map is empty"
+	MsgNoConsensusRouter       = "No consensus on router, routerConsensus map is empty"
+	MsgMissingFChainForDest    = "missing fChain for dest, skipping onramp address lookup"
+	MsgUnableToSyncContracts   = "unable to sync contracts - this is usually due to RPC issues," +
+		" please check your RPC endpoints and their health!"
+)
+
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
 	lggr            logger.Logger
@@ -286,7 +300,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 
 	// We read onramp addresses from destChain offramp configs
 	if _, exists := fChain[cdp.dest]; !exists {
-		lggr.Warnf("missing fChain for dest (fChain[%d]), skipping onramp address lookup", cdp.dest)
+		lggr.Warnw(MsgMissingFChainForDest, logutil.FieldDestChain, cdp.dest)
 	} else {
 		destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fChain[cdp.dest]))
 
@@ -305,7 +319,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 				)
 			})
 		if len(onrampConsensus) == 0 {
-			lggr.Warnw("No consensus on onramps, onrampConsensus map is empty")
+			lggr.Warnw(MsgNoConsensusOnRamp)
 		}
 		contracts[consts.ContractNameOnRamp] = onrampConsensus
 	}
@@ -322,7 +336,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"fChainThresh", fChainThresh,
 	)
 	if len(nonceManagerConsensus) == 0 {
-		lggr.Warnw("No consensus on nonce manager, nonceManagerConsensus map is empty")
+		lggr.Warnw(MsgNoConsensusNonceManager)
 	}
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
@@ -342,7 +356,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			)
 		})
 	if len(rmnRemoteConsensus) == 0 {
-		lggr.Warnw("No consensus on RMNRemote, rmnRemoteConsensus map is empty")
+		lggr.Warnw(MsgNoConsensusRMNRemote)
 	}
 	contracts[consts.ContractNameRMNRemote] = rmnRemoteConsensus
 
@@ -361,7 +375,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			)
 		})
 	if len(feeQuoterConsensus) == 0 {
-		lggr.Warnw("No consensus on fee quoters, feeQuoterConsensus map is empty")
+		lggr.Warnw(MsgNoConsensusFeeQuoter)
 	}
 	contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
 
@@ -381,7 +395,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			)
 		})
 	if len(routerConsensus) == 0 {
-		lggr.Warnw("No consensus on router, routerConsensus map is empty")
+		lggr.Warnw(MsgNoConsensusRouter)
 	}
 	contracts[consts.ContractNameRouter] = routerConsensus
 
@@ -400,10 +414,7 @@ func (cdp *ContractDiscoveryProcessor) syncContracts(lggr logger.Logger, contrac
 	defer cancel()
 	alreadySyncing, err := cdp.syncer.Sync(ctx, contracts)
 	if err != nil {
-		lggr.Errorw(
-			"unable to sync contracts - this is usually due to RPC issues,"+
-				" please check your RPC endpoints and their health!",
-			"err", err)
+		lggr.Errorw(MsgUnableToSyncContracts, "err", err)
 	} else if alreadySyncing {
 		lggr.Debugw("discovery syncer is already syncing, skipping sync until its done or it times out")
 	} else {

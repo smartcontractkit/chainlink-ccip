@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 // Milestone log messages for the tokenprice processor. Stable identifiers the
@@ -106,7 +107,7 @@ func (p *processor) selectTokensForUpdate(
 	for token, feedPrice := range obs.FeedTokenPrices {
 		lastUpdate, exists := obs.FeeQuoterTokenUpdates[token]
 		lggr := logger.With(lggr,
-			"token", token,
+			logutil.FieldToken, token,
 			"feedPrice", feedPrice,
 			"lastUpdate", lastUpdate,
 			"consensusTimestamp", obs.Timestamp,

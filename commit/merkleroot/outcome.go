@@ -130,11 +130,12 @@ func reportRangesOutcome(
 		if onRampMaxSeqNum < offRampNextSeqNum-1 {
 			if onRampMaxSeqNum == 0 {
 				lggr.Infow(OnRampMaxSeqNumZero,
+					logutil.FieldChain, chainSel,
 					"note", "not necessarily an issue, but if it persists without progress investigate why oracles observe 0")
 			} else {
 				lggr.Errorw(ImpossibleSeqNumsOnOffRamp,
 					"detail", "offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
-					"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+					logutil.FieldChain, chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
 			}
 		}
 
@@ -235,8 +236,8 @@ func checkForReportTransmission(
 			if previousSeqNumChain.SeqNum > currentSeqNum {
 				lggr.Errorw(ImpossibleOffRampNextSeqNums,
 					"detail", "previous offRampNextSeqNum is greater than current offRampNextSeqNum",
-					"chain", previousSeqNumChain.ChainSel,
-					"previousSeqNum", previousSeqNumChain.SeqNum,
+					logutil.FieldChain, previousSeqNumChain.ChainSel,
+					logutil.FieldSeqNum, previousSeqNumChain.SeqNum,
 					"currentSeqNum", currentSeqNum,
 				)
 			}
@@ -254,6 +255,7 @@ func checkForReportTransmission(
 		lggr.Warnw(
 			ReportTransmissionGaveUp,
 			"maxReportTransmissionCheckAttempts", maxReportTransmissionCheckAttempts,
+			"abandonedSourceChains", slices.Collect(maps.Keys(pendingSources)),
 		)
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
@@ -329,7 +331,7 @@ func getOffRampNextSequenceNumbersConsensus(
 	for sourceChain, observedNextSeqNums := range observationsPerChain {
 		if uint(len(observedNextSeqNums)) < 2*fDestChain+1 {
 			lggr.Warnw(InsufficientOffRampConsensus,
-				"sourceChain", sourceChain,
+				logutil.FieldSourceChain, sourceChain,
 				"observedNextSeqNums", observedNextSeqNums,
 				"numObservations", len(observedNextSeqNums),
 				"requiredObservations", 2*fDestChain+1,

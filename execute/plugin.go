@@ -874,7 +874,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	lggr.Infow(ReportAccepted,
-		"seqNr", seqNr,
 		"reports", decodedReport.ChainReports,
 	)
 	return true, nil

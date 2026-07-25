@@ -10,6 +10,20 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+)
+
+// Analyzer-relevant log messages emitted by the config poller.
+const (
+	// MsgNoChainAccessor indicates a chain has no accessor configured; a root cause of a chain
+	// appearing unobserved.
+	MsgNoChainAccessor = "No chain accessor for chain"
+	// MsgNoChainAccessorForDestChain indicates the dest chain accessor is missing so source configs
+	// cannot be tracked or refreshed.
+	MsgNoChainAccessorForDestChain = "no chain accessor for dest chain; cannot track or refresh source configs"
+	// MsgBatchRefreshedConfigs is a data-access milestone logged after configs are batch fetched.
+	MsgBatchRefreshedConfigs = "Batch refreshed configs via chainAccessor"
 )
 
 // refreshAllKnownChains refreshes all known chains in background using batched requests where possible
@@ -201,7 +215,7 @@ func (c *configPollerV2) GetChainConfig(
 	// Confirm we have an accessor for this chain
 	_, err := getChainAccessor(c.chainAccessors, chainSel)
 	if err != nil {
-		c.lggr.Errorw("No chain accessor for chain", "chain", chainSel, "error", err)
+		c.lggr.Errorw(MsgNoChainAccessor, logutil.FieldChain, chainSel, "error", err)
 		return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("no chain accessor for %s: %w", chainSel, err)
 	}
 
@@ -216,7 +230,7 @@ func (c *configPollerV2) GetChainConfig(
 	if !cache.chainConfigRefresh.IsZero() {
 		defer cache.chainConfigMu.RUnlock()
 		c.lggr.Debugw("Returning cached chain config",
-			"chain", chainSel,
+			logutil.FieldChain, chainSel,
 			"cacheAge", time.Since(cache.chainConfigRefresh))
 		return cache.chainConfigData, nil
 	}
@@ -268,8 +282,8 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 
 	_, err := getChainAccessor(c.chainAccessors, c.destChainSelector)
 	if err != nil {
-		c.lggr.Errorw("no chain accessor for dest chain; cannot track or refresh source configs",
-			"destChain", c.destChainSelector)
+		c.lggr.Errorw(MsgNoChainAccessorForDestChain,
+			logutil.FieldDestChain, c.destChainSelector)
 		return nil, fmt.Errorf("no chain accessor for dest chain %s", c.destChainSelector)
 	}
 
@@ -310,7 +324,7 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 	if len(missingChains) == 0 {
 		destChainCache.sourceChainMu.RUnlock()
 		c.lggr.Debugw("All source chain configs found in cache",
-			"destChain", c.destChainSelector,
+			logutil.FieldDestChain, c.destChainSelector,
 			"sourceChains", filteredSourceChains)
 		return cachedSourceConfigs, nil
 	}
@@ -351,7 +365,7 @@ func (c *configPollerV2) getOrCreateChainCache(chainSel cciptypes.ChainSelector)
 	// Verify we have an accessor for this chain
 	_, err := getChainAccessor(c.chainAccessors, chainSel)
 	if err != nil {
-		c.lggr.Errorw("No chain accessor for chain", "chain", chainSel, "error", err)
+		c.lggr.Errorw(MsgNoChainAccessor, logutil.FieldChain, chainSel, "error", err)
 		return nil
 	}
 
@@ -380,10 +394,10 @@ func (c *configPollerV2) refreshAllKnownChains() {
 	for _, chain := range chainsToRefresh {
 		ctx, cancel := context.WithTimeout(context.Background(), bgRefreshTimeout)
 		c.lggr.Debugw("Issuing background refresh for known chain",
-			"chain", chain, "destChain", c.destChainSelector)
+			logutil.FieldChain, chain, logutil.FieldDestChain, c.destChainSelector)
 		if err := c.batchRefreshChainAndSourceConfigs(ctx, chain); err != nil {
 			refreshFailed = true
-			c.lggr.Warnw("Failed to batch refresh configs", "chain", chain, "error", err)
+			c.lggr.Warnw("Failed to batch refresh configs", logutil.FieldChain, chain, "error", err)
 		}
 		cancel()
 	}
@@ -432,7 +446,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 		sourceChainSelectors,
 	)
 	if err != nil {
-		c.lggr.Errorw("Failed batch fetch via chainAccessor", "chain", chainSel, "error", err)
+		c.lggr.Errorw("Failed batch fetch via chainAccessor", logutil.FieldChain, chainSel, "error", err)
 		return err
 	}
 
@@ -458,13 +472,13 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	} else if !fetchingForDestChain && len(sourceChainConfigs) > 0 {
 		c.lggr.Errorw("OffRamp SourceChainConfigs were returned when fetching configs from a source chain, "+
 			"this is not expected",
-			"destChainSelector", c.destChainSelector,
-			"chainSel", chainSel,
+			logutil.FieldDestChain, c.destChainSelector,
+			logutil.FieldSourceChain, chainSel,
 			"sourceChainSelectors", sourceChainSelectors,
 		)
 	}
-	c.lggr.Debugw("Batch refreshed configs via chainAccessor",
-		"chain", chainSel,
+	c.lggr.Debugw(MsgBatchRefreshedConfigs,
+		logutil.FieldChain, chainSel,
 		"latency", time.Since(start),
 		"chainConfigSnapshot", chainConfigSnapshot,
 		"sourceChainConfigs", sourceChainConfigs,
@@ -509,8 +523,8 @@ func (c *configPollerV2) getChainsToRefresh() []cciptypes.ChainSelector {
 func (c *configPollerV2) trackSourceChainForDest(sourceChain cciptypes.ChainSelector) {
 	if c.destChainSelector == sourceChain {
 		c.lggr.Debugw("Skipping tracking source chain - destination chain is the same as source chain",
-			"destChain", c.destChainSelector,
-			"sourceChain", sourceChain)
+			logutil.FieldDestChain, c.destChainSelector,
+			logutil.FieldSourceChain, sourceChain)
 		return
 	}
 

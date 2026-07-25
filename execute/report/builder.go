@@ -10,6 +10,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 var _ ExecReportBuilder = &execReportBuilder{}
@@ -321,8 +322,8 @@ func (b *execReportBuilder) validateNoncesForMultipleReports(commitReport execty
 	for _, msg := range commitReport.Messages {
 		if msg.Header.Nonce > 0 {
 			b.lggr.Errorw("Found message with non-zero nonce when multiple reports are enabled",
-				"sourceChain", msg.Header.SourceChainSelector,
-				"messageID", msg.Header.MessageID,
+				logutil.FieldSourceChain, msg.Header.SourceChainSelector,
+				logutil.FieldMessageID, msg.Header.MessageID,
 				"nonce", msg.Header.Nonce)
 
 			return fmt.Errorf("messages with non-zero nonces detected")

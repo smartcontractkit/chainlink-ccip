@@ -451,9 +451,9 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
 				} else if errors.Is(err, context.DeadlineExceeded) {
-					lggr.Warnw("timed out getting latest msg seq num for source chain", "sourceChain", sourceChain)
+					lggr.Warnw("timed out getting latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain)
 				} else {
-					lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
+					lggr.Errorw("failed to get latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain, "err", err)
 				}
 				return
 			}
@@ -500,8 +500,8 @@ func (o observerImpl) ObserveMerkleRoots(
 				if err != nil {
 					if errors.Is(err, context.DeadlineExceeded) {
 						lggr.Warnw("timed out getting messages for source chain",
-							"sourceChain", chainRange.ChainSel,
-							"range", chainRange.SeqNumRange,
+							logutil.FieldSourceChain, chainRange.ChainSel,
+							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
 					} else {
 						lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
@@ -511,8 +511,8 @@ func (o observerImpl) ObserveMerkleRoots(
 
 				if uint64(len(msgs)) != uint64(chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1) {
 					lggr.Warnw("call to MsgsBetweenSeqNums returned unexpected number of messages, chain skipped",
-						"chain", chainRange.ChainSel,
-						"range", chainRange.SeqNumRange,
+						logutil.FieldSourceChain, chainRange.ChainSel,
+						logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
 						"actual", len(msgs),
 					)
@@ -526,10 +526,10 @@ func (o observerImpl) ObserveMerkleRoots(
 					msgSeqNum := msgs[msgIdx].Header.SequenceNumber
 					if msgSeqNum != seqNum {
 						lggr.Warnw("message sequence number does not match seqNum range, chain skipped",
-							"chain", chainRange.ChainSel,
-							"seqNum", seqNum,
+							logutil.FieldSourceChain, chainRange.ChainSel,
+							logutil.FieldSeqNum, seqNum,
 							"msgSeqNum", msgSeqNum,
-							"range", chainRange.SeqNumRange,
+							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
 						return
 					}
@@ -545,9 +545,9 @@ func (o observerImpl) ObserveMerkleRoots(
 				onRampAddress, err := o.ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainRange.ChainSel)
 				if err != nil {
 					lggr.Warnw(
-						fmt.Sprintf("getting onramp contract address failed for selector %d", chainRange.ChainSel),
+						"getting onramp contract address failed",
 						"err", err,
-						"chainSelector", chainRange.ChainSel,
+						logutil.FieldSourceChain, chainRange.ChainSel,
 					)
 					return
 				}
@@ -615,7 +615,7 @@ func (o observerImpl) computeMerkleRoot(
 	}
 
 	root := tree.Root()
-	lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
+	lggr.Infow("Computed merkle root", "hashes", hashesStr, logutil.FieldMerkleRoot, cciptypes.Bytes32(root).String())
 	return root, nil
 }
 

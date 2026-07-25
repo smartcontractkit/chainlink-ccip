@@ -12,7 +12,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
+
+// MsgMessageNotFoundInSourceChain is logged when an expected CCTP message is absent from the source
+// chain query results; a root cause of a message appearing unobserved. Shared by the EVM and Solana
+// USDC readers.
+const MsgMessageNotFoundInSourceChain = "Message not found in the source chain"
 
 type evmUSDCMessageReader struct {
 	lggr           logger.Logger
@@ -93,10 +99,10 @@ func (u evmUSDCMessageReader) MessagesByTokenID(
 		message, ok1 := messageSentEvents[messageID]
 		if !ok1 {
 			// Token not available in the source chain, it should never happen at this stage
-			u.lggr.Warnw("Message not found in the source chain",
-				"seqNr", tokenID.SeqNr,
+			u.lggr.Warnw(MsgMessageNotFoundInSourceChain,
+				logutil.FieldSeqNum, tokenID.SeqNr,
 				"tokenIndex", tokenID.Index,
-				"chainSelector", source,
+				logutil.FieldSourceChain, source,
 			)
 			continue
 		}

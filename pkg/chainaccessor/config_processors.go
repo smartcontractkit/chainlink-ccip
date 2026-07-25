@@ -14,6 +14,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 func processConfigResults(
@@ -44,7 +45,8 @@ func processConfigResults(
 				config.Router, err = processRouterResults(results)
 			}
 		default:
-			lggr.Warnw("Unhandled contract in batch results", "chain", resultsChainSelector, "contract", contract.Name)
+			lggr.Warnw("Unhandled contract in batch results",
+				logutil.FieldChain, resultsChainSelector, "contract", contract.Name)
 		}
 		if err != nil {
 			return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("process %s results: %w", contract.Name, err)
@@ -84,11 +86,11 @@ func processSourceChainConfigResults(
 					if err != nil {
 						if isNoBindingsError(err) {
 							lggr.Debugw("no bindings for source chain config, ignore if chain is disabled",
-								"chain", chain,
+								logutil.FieldSourceChain, chain,
 								"error", err)
 						} else {
 							lggr.Errorw("Failed to get source chain config from result",
-								"chain", chain,
+								logutil.FieldSourceChain, chain,
 								"error", err)
 						}
 						continue
@@ -97,7 +99,7 @@ func processSourceChainConfigResults(
 					cfg, ok := v.(*cciptypes.SourceChainConfig)
 					if !ok {
 						lggr.Errorw("Invalid result type from GetSourceChainConfig",
-							"chain", chain,
+							logutil.FieldSourceChain, chain,
 							"type", fmt.Sprintf("%T", v))
 						continue
 					}

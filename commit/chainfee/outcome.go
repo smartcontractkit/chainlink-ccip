@@ -83,7 +83,7 @@ func (p *processor) Outcome(
 			missingNativeTokenPriceChains = append(missingNativeTokenPriceChains, chain)
 			continue
 		}
-		lggr.Debugw("USD per fee token", "chain", chain, "usdPerFeeToken", usdPerFeeToken)
+		lggr.Debugw("USD per fee token", logutil.FieldChain, chain, "usdPerFeeToken", usdPerFeeToken)
 
 		// Example with Wei as the lowest denominator and Eth as the Fee token
 		// usdPerEthToken = Xe18USD18
@@ -92,12 +92,12 @@ func (p *processor) Outcome(
 		// execFee = 30 Gwei = 30e9 wei = 30e9 * XUSD18
 		execFee, err := mathslib.CalculateUsdPerUnitGas(chain, feeComp.ExecutionFee, usdPerFeeToken.Int)
 		if err != nil {
-			lggr.Errorw("error calculating USD per unit gas", "chain", chain, "err", err)
+			lggr.Errorw("error calculating USD per unit gas", logutil.FieldChain, chain, "err", err)
 			continue
 		}
 		daFee, err := mathslib.CalculateUsdPerUnitGas(chain, feeComp.DataAvailabilityFee, usdPerFeeToken.Int)
 		if err != nil {
-			lggr.Errorw("error calculating USD per unit gas", "chain", chain, "err", err)
+			lggr.Errorw("error calculating USD per unit gas", logutil.FieldChain, chain, "err", err)
 			continue
 		}
 		chainFeeUsd := ComponentsUSDPrices{
@@ -258,7 +258,7 @@ func (p *processor) getGasPricesToUpdate(
 
 	destChainCfg, err := p.homeChain.GetChainConfig(p.destChain)
 	if err != nil {
-		lggr.Errorw("error getting dest chain config", "chain", p.destChain, "err", err)
+		lggr.Errorw("error getting dest chain config", logutil.FieldChain, p.destChain, "err", err)
 		return gasPrices
 	}
 	execGasPriceDeviation := destChainCfg.Config.GasPriceDeviationPPB.Int64()
@@ -267,7 +267,7 @@ func (p *processor) getGasPricesToUpdate(
 	for chain, currentChainFee := range currentChainUSDFees {
 		chainCfg, err := p.homeChain.GetChainConfig(chain)
 		if err != nil {
-			lggr.Errorw("error getting chain config", "chain", chain, "err", err)
+			lggr.Errorw("error getting chain config", logutil.FieldChain, chain, "err", err)
 			continue
 		}
 
@@ -275,7 +275,7 @@ func (p *processor) getGasPricesToUpdate(
 		packedFee := cciptypes.NewBigInt(FeeComponentsToPackedFee(currentChainFee))
 		lastUpdate, exists := latestUpdates[chain]
 		lggr := logger.With(lggr,
-			"chain", chain,
+			logutil.FieldChain, chain,
 			"consensusTimestamp", consensusTimestamp,
 			"currentChainFee", currentChainFee,
 			"packedFee", packedFee,
@@ -309,8 +309,8 @@ func (p *processor) getGasPricesToUpdate(
 		}
 
 		// Validating later as chain can be updated even if the config is invalid when write frequency is reached
-		if feeConfig.Validate() != nil {
-			lggr.Errorw("invalid fee config for chain", "err", err)
+		if valErr := feeConfig.Validate(); valErr != nil {
+			lggr.Errorw("invalid fee config for chain", logutil.FieldChain, chain, "err", valErr)
 			continue
 		}
 
@@ -340,7 +340,7 @@ func (p *processor) getGasPricesToUpdate(
 		}
 
 		lggr.Infow(ChainFeeUpdateNotNeeded,
-			"chain", chain,
+			logutil.FieldChain, chain,
 			"currentChainFee", currentChainFee,
 			"lastUpdateTimestamp", lastUpdate.Timestamp,
 			"currentTimestamp", consensusTimestamp,

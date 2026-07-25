@@ -284,6 +284,9 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	return messages, nil
 }
 
+// MsgLatestOnRampSeqNum is logged after the latest OnRamp sequence number is read from a source chain.
+const MsgLatestOnRampSeqNum = "chain reader returning latest onramp sequence number"
+
 // LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
 func (r *ccipChainReader) LatestMsgSeqNum(
 	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
@@ -299,10 +302,13 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 			chain, r.destChain, err)
 	}
 
-	lggr.Debugw("chain reader returning latest onramp sequence number",
-		"seqNum", seqNum, "sourceChainSelector", chain)
+	lggr.Debugw(MsgLatestOnRampSeqNum,
+		logutil.FieldSeqNum, seqNum, logutil.FieldSourceChain, chain)
 	return seqNum, nil
 }
+
+// MsgExpectedNextSeqNum is logged after the expected next sequence number is read from a source chain OnRamp.
+const MsgExpectedNextSeqNum = "chain accessor returning expected next sequence number"
 
 // GetExpectedNextSequenceNumber queries the next expected sequence number from the source
 // chain OnRamp
@@ -322,8 +328,8 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 			sourceChainSelector, r.destChain, err)
 	}
 
-	lggr.Debugw("chain accessor returning expected next sequence number",
-		"seqNum", expectedNextSeqNum, "sourceChainSelector", sourceChainSelector)
+	lggr.Debugw(MsgExpectedNextSeqNum,
+		logutil.FieldSeqNum, expectedNextSeqNum, logutil.FieldSourceChain, sourceChainSelector)
 	return expectedNextSeqNum, nil
 }
 
@@ -335,6 +341,10 @@ var (
 	wrappedNativeTokenPriceAccessorLastLog    atomic.Pointer[time.Time]
 	wrappedNativeTokenPriceChainConfigLastLog atomic.Pointer[time.Time]
 )
+
+// MsgMisconfiguredSourceChainsSkipped is logged when source chains are skipped in NextSeqNum due to
+// missing OnRamp/Router/MinSeqNr, a root cause of a plugin looking falsely idle for those chains.
+const MsgMisconfiguredSourceChainsSkipped = "misconfigured source chains skipped in NextSeqNum"
 
 // NextSeqNum returns the current sequence numbers for chains.
 // This always fetches fresh data directly from contracts to ensure accuracy.
@@ -396,7 +406,7 @@ func (r *ccipChainReader) NextSeqNum(
 			lggr.Debugw("source chains disabled, chains skipped", "chains", disabledChains)
 		}
 		if len(onRampMissing) > 0 || len(routerMissing) > 0 || len(minSeqNrMissing) > 0 {
-			lggr.Errorw("misconfigured source chains skipped in NextSeqNum",
+			lggr.Errorw(MsgMisconfiguredSourceChainsSkipped,
 				"onRampMissing", onRampMissing,
 				"routerMissing", routerMissing,
 				"minSeqNrMissing", minSeqNrMissing,
@@ -445,7 +455,7 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
 				logutil.LogWhenExceedFrequency(&getChainsFeeComponentsAccessorLastLog, readerLogFrequency, func() {
-					lggr.Debugw("failed to get chain accessor", "chain", chain, "err", err)
+					lggr.Debugw("failed to get chain accessor", logutil.FieldChain, chain, "err", err)
 				})
 				return
 			}
@@ -455,19 +465,19 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			feeComponent, err := chainAccessor.GetChainFeeComponents(chainCtx)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
-					lggr.Warnw("timed out getting chain fee components", "chain", chain)
+					lggr.Warnw("timed out getting chain fee components", logutil.FieldChain, chain)
 				} else {
-					lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
+					lggr.Errorw("failed to get chain fee components", logutil.FieldChain, chain, "err", err)
 				}
 				return
 			}
 
 			if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
-				lggr.Errorw("execution fee is nil or non positive", "chain", chain)
+				lggr.Errorw("execution fee is nil or non positive", logutil.FieldChain, chain)
 				return
 			}
 			if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
-				lggr.Errorw("data availability fee is nil or negative", "chain", chain)
+				lggr.Errorw("data availability fee is nil or negative", logutil.FieldChain, chain)
 				return
 			}
 
@@ -479,6 +489,14 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 	}
 	return feeComponents
 }
+
+// Native-token-price retrieval failures/absences that drive chainfee/tokenprice staleness.
+const (
+	MsgTimedOutGettingNativeTokenPrice  = "timed out getting native token price"
+	MsgFailedToGetNativeTokenPrice      = "failed to get native token price"
+	MsgNoNativeTokenPriceAvailable      = "no native token price available"
+	MsgNativeTokenPriceNilOrNonPositive = "native token price is nil or non-positive"
+)
 
 func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
@@ -505,7 +523,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
 				logutil.LogWhenExceedFrequency(&wrappedNativeTokenPriceAccessorLastLog, readerLogFrequency, func() {
-					lggr.Debugw("chain accessor not found, chain native price skipped", "chain", chain, "err", err)
+					lggr.Debugw("chain accessor not found, chain native price skipped", logutil.FieldChain, chain, "err", err)
 				})
 				return
 			}
@@ -513,10 +531,10 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			config, err := r.configPoller.GetChainConfig(chainCtx, chain)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
-					lggr.Warnw("timed out getting chain config for native token address", "chain", chain)
+					lggr.Warnw("timed out getting chain config for native token address", logutil.FieldChain, chain)
 				} else {
 					logutil.LogWhenExceedFrequency(&wrappedNativeTokenPriceChainConfigLastLog, readerLogFrequency, func() {
-						lggr.Debugw("failed to get chain config for native token address", "chain", chain, "err", err)
+						lggr.Debugw("failed to get chain config for native token address", logutil.FieldChain, chain, "err", err)
 					})
 				}
 				return
@@ -532,19 +550,20 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			price, err := chainAccessor.GetTokenPriceUSD(chainCtx, cciptypes.UnknownAddress(nativeTokenAddress))
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
-					lggr.Warnw("timed out getting native token price", "chain", chain, "address", nativeTokenAddress.String())
+					lggr.Warnw(MsgTimedOutGettingNativeTokenPrice, logutil.FieldChain, chain, "address", nativeTokenAddress.String())
 				} else {
-					lggr.Errorw("failed to get native token price", "chain", chain, "address", nativeTokenAddress.String(), "err", err)
+					lggr.Errorw(MsgFailedToGetNativeTokenPrice,
+						logutil.FieldChain, chain, "address", nativeTokenAddress.String(), "err", err)
 				}
 				return
 			}
 
 			if price.Timestamp == 0 {
-				lggr.Warnw("no native token price available", "chain", chain)
+				lggr.Warnw(MsgNoNativeTokenPriceAvailable, logutil.FieldChain, chain)
 				return
 			}
 			if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
-				lggr.Errorw("native token price is nil or non-positive", "chain", chain)
+				lggr.Errorw(MsgNativeTokenPriceNilOrNonPositive, logutil.FieldChain, chain)
 				return
 			}
 
@@ -568,7 +587,7 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	destChainAccessor, err := getChainAccessor(r.accessors, r.destChain)
 	if err != nil {
-		lggr.Errorw("failed to getChainAccessor", "chain", r.destChain, "err", err)
+		lggr.Errorw("failed to getChainAccessor", logutil.FieldDestChain, r.destChain, "err", err)
 		return nil
 	}
 
@@ -578,7 +597,7 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 
 	updates, err := destChainAccessor.GetChainFeePriceUpdate(ctx, selectors)
 	if err != nil {
-		lggr.Errorw("failed to get chain fee price updates", "chain", r.destChain, "err", err)
+		lggr.Errorw("failed to get chain fee price updates", logutil.FieldDestChain, r.destChain, "err", err)
 		return nil
 	}
 
@@ -675,7 +694,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	if len(config.Offramp.StaticConfig.RmnRemote) > 0 {
 		lggr.Infow("appending RMN remote contract address",
 			"address", hex.EncodeToString(config.Offramp.StaticConfig.RmnRemote),
-			"chain", r.destChain)
+			logutil.FieldDestChain, r.destChain)
 		resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, config.Offramp.StaticConfig.RmnRemote)
 	}
 
@@ -687,7 +706,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	if len(config.Offramp.DynamicConfig.FeeQuoter) > 0 {
 		lggr.Infow("appending fee quoter contract address",
 			"address", hex.EncodeToString(config.Offramp.DynamicConfig.FeeQuoter),
-			"chain", r.destChain)
+			logutil.FieldDestChain, r.destChain)
 		resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, config.Offramp.DynamicConfig.FeeQuoter)
 	}
 
@@ -728,7 +747,8 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 		_, crExists := r.contractReaders[chain]
 		_, caExists := r.accessors[chain]
 		if !crExists && !caExists {
-			lggr.Errorw("Both Contract reader and chain accessor not found for a supported chain", "chain", chain)
+			lggr.Errorw("Both Contract reader and chain accessor not found for a supported chain",
+				logutil.FieldSourceChain, chain)
 			continue
 		}
 
@@ -741,7 +761,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			config, err := r.configPoller.GetChainConfig(ctx, chainSel)
 			if err != nil {
 				lggr.Errorw("Failed to get chain config",
-					"chain", chainSel,
+					logutil.FieldSourceChain, chainSel,
 					"err", err)
 				return
 			}
@@ -813,7 +833,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts cciptypes.Contract
 				if len(boundContract.address) == 0 {
 					lggr.Warnw("skipping binding empty address for contract",
 						"contractName", boundContract.name,
-						"chainSel", chainSelector,
+						logutil.FieldChain, chainSelector,
 					)
 					return nil
 				}
@@ -907,7 +927,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 			}
 			if !enabled {
 				lggr.Debugw("Filtering out disabled source chain",
-					"chain", chain,
+					logutil.FieldSourceChain, chain,
 					"error", err,
 					"enabled", enabled)
 				delete(configs, chain)
@@ -917,6 +937,10 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 
 	return configs, nil
 }
+
+// MsgNoFreshSourceChainConfigs is logged when no fresh source chain configs are returned for the
+// destination chain, a root cause of a plugin looking falsely idle.
+const MsgNoFreshSourceChainConfigs = "No fresh source chain configs found for destination chain"
 
 func (r *ccipChainReader) fetchFreshSourceChainConfigsViaAccessor(
 	ctx context.Context,
@@ -946,14 +970,14 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigsViaAccessor(
 	}
 
 	if len(sourceChainConfigsMap) == 0 {
-		lggr.Infow("No fresh source chain configs found for destination chain", "destChain", destChain)
+		lggr.Infow(MsgNoFreshSourceChainConfigs, logutil.FieldDestChain, destChain)
 	}
 
 	if len(sourceChainConfigsMap) != len(filteredSourceChains) {
 		lggr.Infow("fetched source chain configs count mismatch",
 			"expected", len(filteredSourceChains),
 			"actual", len(sourceChainConfigsMap),
-			"destChain", destChain)
+			logutil.FieldDestChain, destChain)
 	}
 
 	return sourceChainConfigsMap, nil

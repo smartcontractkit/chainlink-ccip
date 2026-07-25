@@ -11,6 +11,21 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
+// Analyzer-relevant log messages (consensus-not-reached signals). These are kept as
+// exported package-level constants so the log-analysis tooling can match them exactly.
+const (
+	// MsgConsensusNotReachedMinObservations is logged when a key's observations do not
+	// meet the minimum-observation threshold, so no consensus value is produced for it.
+	MsgConsensusNotReachedMinObservations = "could not reach consensus due to not enough " +
+		"observations meeting the minimum threshold"
+	// MsgConsensusNotReachedAggregator is logged when the aggregator has fewer values than
+	// the threshold for a key, so no consensus value is produced for it.
+	MsgConsensusNotReachedAggregator = "could not reach consensus in consensusMapAggregator"
+	// MsgInsufficientObservationsForConsensus is logged when there are fewer than 2f+1 items
+	// for a key, so ordered consensus cannot be reached.
+	MsgInsufficientObservationsForConsensus = "insufficient items to reach consensus"
+)
+
 // GetConsensusMap takes a mapping from chains to a list of items,
 // return a mapping from chains to a single consensus item.
 // The consensus item for a given chain is the item with the
@@ -32,7 +47,7 @@ func GetConsensusMap[K comparable, T any](
 			items = minObservations.GetValid()
 			if len(items) != 1 {
 				// TODO: metrics
-				lggr.Debugw("could not reach consensus due to not enough observations meeting the minimum threshold",
+				lggr.Debugw(MsgConsensusNotReachedMinObservations,
 					"objectName", objectName,
 					"key", key,
 					"minThreshold", minThresh,
@@ -62,7 +77,7 @@ func GetConsensusMapAggregator[K comparable, T any](
 
 	for key, values := range items {
 		if thresh, ok := f.Get(key); !ok || len(values) < int(thresh) {
-			lggr.Debugw("could not reach consensus in consensusMapAggregator",
+			lggr.Debugw(MsgConsensusNotReachedAggregator,
 				"objectName", objectName,
 				"key", key)
 			continue
@@ -125,7 +140,7 @@ func GetOrderedConsensus[K comparable, T cmp.Ordered](
 		}
 
 		if len(items) < 2*int(minThresh)+1 {
-			lggr.Errorw("insufficient items to reach consensus",
+			lggr.Errorw(MsgInsufficientObservationsForConsensus,
 				"objectName", objectName,
 				"key", key,
 				"minThresh", minThresh,
