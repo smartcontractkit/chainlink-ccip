@@ -251,7 +251,10 @@ func checkForReportTransmission(
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
-		lggr.Warnw(ReportTransmissionGaveUp)
+		lggr.Warnw(
+			ReportTransmissionGaveUp,
+			"maxReportTransmissionCheckAttempts", maxReportTransmissionCheckAttempts,
+		)
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
 		}
@@ -326,7 +329,10 @@ func getOffRampNextSequenceNumbersConsensus(
 	for sourceChain, observedNextSeqNums := range observationsPerChain {
 		if uint(len(observedNextSeqNums)) < 2*fDestChain+1 {
 			lggr.Warnw(InsufficientOffRampConsensus,
-				"sourceChain", sourceChain, "observedNextSeqNums", observedNextSeqNums,
+				"sourceChain", sourceChain,
+				"observedNextSeqNums", observedNextSeqNums,
+				"numObservations", len(observedNextSeqNums),
+				"requiredObservations", 2*fDestChain+1,
 			)
 			continue
 		}

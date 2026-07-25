@@ -28,9 +28,6 @@ const (
 	// NoConsensusOnFeeComponents: consensus over observed fee components failed this round.
 	NoConsensusOnFeeComponents = "no consensus on fee components, nothing to update"
 
-	// MissingNativeTokenPrice: a chain's fee can't be computed because its native token price is absent.
-	MissingNativeTokenPrice = "missing native token price for chain, chain fee will not be updated"
-
 	// ChainFeeUpdateNeeded*: the round decided a fee write is due, and why.
 	// ChainFeeUpdateNeededHeartbeat is the staleness signal (BatchWriteFrequency elapsed).
 	ChainFeeUpdateNeededNoPrevious = "chain fee update needed: no previous update exists"
@@ -66,6 +63,7 @@ func (p *processor) Outcome(
 	}
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
+	var missingNativeTokenPriceChains []cciptypes.ChainSelector
 	// We need to report a packed GasPrice
 	// The packed GasPrice is a 224-bit integer with the following format:
 	// (dataAvFeePriceUSD) << 112 | (executionFeePriceUSD)
@@ -82,9 +80,7 @@ func (p *processor) Outcome(
 		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 		usdPerFeeToken, ok := consensusObs.NativeTokenPrices[chain]
 		if !ok {
-			lggr.Warnw(MissingNativeTokenPrice,
-				"chain", chain,
-			)
+			missingNativeTokenPriceChains = append(missingNativeTokenPriceChains, chain)
 			continue
 		}
 		lggr.Debugw("USD per fee token", "chain", chain, "usdPerFeeToken", usdPerFeeToken)
@@ -127,6 +123,7 @@ func (p *processor) Outcome(
 	lggr.Infow(GasPricesOutcome,
 		"gasPrices", gasPrices,
 		"consensusTimestamp", consensusObs.TimestampNow,
+		"missingNativeTokenPriceChains", missingNativeTokenPriceChains,
 	)
 
 	out := Outcome{GasPrices: gasPrices}
