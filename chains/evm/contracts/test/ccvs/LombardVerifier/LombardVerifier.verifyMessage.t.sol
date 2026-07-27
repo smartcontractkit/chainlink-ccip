@@ -134,17 +134,30 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData("", ""));
   }
 
+  function test_verifyMessage_RevertWhen_MustTransferTokens() public {
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(LombardVerifier.MustTransferTokens.selector);
+    s_lombardVerifier.verifyMessage(_createBasicMessageV1(SOURCE_CHAIN_SELECTOR), bytes32(0), "");
+  }
+
   function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForPayloadLengthField() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
     vm.startPrank(s_offRamp);
 
     // ccvData with only 5 bytes (needs at least 6: 4 for version tag + 2 for rawPayloadLength).
     bytes memory tooShortCcvData = bytes.concat(VERSION_TAG_V2_0_0, bytes1(0x00));
 
     vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
-    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), tooShortCcvData);
+    s_lombardVerifier.verifyMessage(message, messageId, tooShortCcvData);
   }
 
   function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForProofLengthField() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
     vm.startPrank(s_offRamp);
 
     // ccvData with version tag (4) + rawPayloadLength (2) claiming 10 bytes of raw payload,
@@ -157,7 +170,29 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     );
 
     vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
-    s_lombardVerifier.verifyMessage(_createBasicMessageV1(DEST_CHAIN_SELECTOR), bytes32(0), tooShortCcvData);
+    s_lombardVerifier.verifyMessage(message, messageId, tooShortCcvData);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidVerifierResults_MessageBodyTooShort() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+
+    bytes memory rawPayload = abi.encodePacked(
+      bytes4(0x01000000),
+      abi.encode(
+        bytes32(LOMBARD_CHAIN_ID),
+        uint256(1),
+        REMOTE_BRIDGE_SENDER,
+        address(s_mockBridge),
+        address(s_lombardVerifier),
+        bytes("\x00")
+      )
+    );
+
+    vm.startPrank(s_offRamp);
+
+    vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
+    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
   function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForProof() public {

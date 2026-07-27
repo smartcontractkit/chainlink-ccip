@@ -44,7 +44,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
-  /// @param allowedCaller The address of TokenPool on destination chain allowed to handle GMP message.
+  /// @param allowedCaller The address that's allowed to call the bridge on the destination chain.
   /// @param remoteBridgeSender The address of the BridgeV2/AssetRouter on the remote chain expected to have
   /// originated inbound GMP messages from that chain.
   event PathSet(
@@ -247,6 +247,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
+    if (message.tokenTransfer.length == 0) {
+      revert MustTransferTokens();
+    }
+
     {
       bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
       if (versionPrefix != versionTag()) {
@@ -354,6 +358,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     uint256 amount;
     {
       bytes memory msgBody = _validateEnvelope(rawPayload, sourceChainSelector);
+      if (msgBody.length < 128) {
+        revert InvalidVerifierResults();
+      }
+
       assembly {
         rawToToken := mload(add(msgBody, 0x21)) // bytes 1..32
         rawSender := mload(add(msgBody, 0x41)) // bytes 33..64

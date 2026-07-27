@@ -408,7 +408,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   function _setDynamicConfig(
     DynamicConfig memory dynamicConfig
   ) private {
-    if (dynamicConfig.fastFinalityBps == 0 || dynamicConfig.fastFinalityBps > BPS_DIVIDER) {
+    if (dynamicConfig.fastFinalityBps == 0 || dynamicConfig.fastFinalityBps >= BPS_DIVIDER) {
       revert InvalidFastFinalityBps(dynamicConfig.fastFinalityBps);
     }
 
