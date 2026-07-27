@@ -18,7 +18,7 @@ require (
 	github.com/smartcontractkit/mcms v0.51.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.22.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 )
