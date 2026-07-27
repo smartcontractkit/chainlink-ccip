@@ -284,7 +284,6 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	return messages, nil
 }
 
-
 // LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
 func (r *ccipChainReader) LatestMsgSeqNum(
 	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
@@ -304,7 +303,6 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 		logutil.FieldSeqNum, seqNum, logutil.FieldSourceChain, chain)
 	return seqNum, nil
 }
-
 
 // GetExpectedNextSequenceNumber queries the next expected sequence number from the source
 // chain OnRamp

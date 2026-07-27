@@ -162,7 +162,11 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 
 		// token not available on fee quoter
 		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
-			lggr.Debugw("empty fee quoter update found", logutil.FieldChain, l.chainSelector, logutil.FieldToken, tokenAddressStr)
+			lggr.Debugw(
+				"empty fee quoter update found",
+				logutil.FieldChain, l.chainSelector,
+				logutil.FieldToken, tokenAddressStr,
+			)
 			continue
 		}
 		updateMap[ccipocr3.UnknownEncodedAddress(tokenAddressStr)] = updates[i]
