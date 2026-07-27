@@ -31,6 +31,10 @@ func (testCurseSubjectAdapter) DeriveCurseAdapterVersion(_ cldf.Environment, _ u
 
 type testCurseAdapter struct {
 	subjectsAreCursed bool
+	// disconnected, when true, makes IsChainConnectedToTargetChain report false for
+	// every target chain, so tests can verify that a literal Subject bypasses the
+	// connectivity check entirely.
+	disconnected bool
 }
 
 func (a *testCurseAdapter) Initialize(_ cldf.Environment, _ uint64) error {
@@ -45,7 +49,7 @@ func (a *testCurseAdapter) IsSubjectCursedOnChain(_ cldf.Environment, _ uint64, 
 }
 
 func (a *testCurseAdapter) IsChainConnectedToTargetChain(_ cldf.Environment, _, _ uint64) (bool, error) {
-	return true, nil
+	return !a.disconnected, nil
 }
 
 func (a *testCurseAdapter) IsCurseEnabledForChain(_ cldf.Environment, _ uint64) (bool, error) {
@@ -80,11 +84,15 @@ func testCurseSequence() *cldf_ops.Sequence[CurseInput, sequences.OnChainOutput,
 }
 
 func newTestCurseRegistry(subjectsAreCursed bool) *CurseRegistry {
+	return newTestCurseRegistryWithAdapter(&testCurseAdapter{subjectsAreCursed: subjectsAreCursed})
+}
+
+func newTestCurseRegistryWithAdapter(adapter *testCurseAdapter) *CurseRegistry {
 	cr := newCurseRegistry()
 	cr.RegisterNewCurse(CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
 		CursingVersion:      semver.MustParse("1.6.0"),
-		CurseAdapter:        &testCurseAdapter{subjectsAreCursed: subjectsAreCursed},
+		CurseAdapter:        adapter,
 		CurseSubjectAdapter: testCurseSubjectAdapter{},
 	})
 	return cr
