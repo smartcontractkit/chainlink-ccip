@@ -1,10 +1,10 @@
 module github.com/smartcontractkit/chainlink-ccip
 
-go 1.26.2
+go 1.26.5
 
 require (
 	github.com/deckarep/golang-set/v2 v2.8.0
-	github.com/ethereum/go-ethereum v1.17.4
+	github.com/ethereum/go-ethereum v1.17.5
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2

@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment
 
-go 1.26.2
+go 1.26.5
 
 replace (
 	// Taken from CLDF go.mod: https://github.com/smartcontractkit/chainlink-deployments-framework/blob/main/go.mod
@@ -19,7 +19,7 @@ replace (
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/ethereum/go-ethereum v1.17.4
+	github.com/ethereum/go-ethereum v1.17.5
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/rs/zerolog v1.35.1
@@ -92,7 +92,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.6 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.8 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect

@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip/devenv
 
-go 1.26.4
+go 1.26.5
 
 replace (
 	github.com/grafana/loki/v3 => github.com/grafana/loki/v3 v3.7.3
@@ -28,14 +28,14 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v28.5.3-0.20260325154711-31a1689cb0a1+incompatible
 	github.com/docker/go-connections v0.7.0 // indirect
-	github.com/ethereum/go-ethereum v1.17.4
+	github.com/ethereum/go-ethereum v1.17.5
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/google/uuid v1.6.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
-	github.com/smartcontractkit/chain-selectors v1.0.103
+	github.com/smartcontractkit/chain-selectors v1.0.107
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260624154507-ea7ff77a0ddb
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260608180601-efa81bfdfda9
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139
@@ -46,7 +46,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.116.1
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260710181111-6417709a55ee // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260710181111-6417709a55ee
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.5
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260520103847-15ca4de9dba9
 	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260415120434-cecc380f8d87
@@ -77,6 +77,8 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20260416073033-7c2071eaa8d4 // indirect
+	github.com/RaduBerinde/axisds v0.1.0 // indirect
+	github.com/RaduBerinde/btreemap v0.0.0-20250419174037-3d62b7205d54 // indirect
 	github.com/TyphonHill/go-mermaid v1.0.0 // indirect
 	github.com/VictoriaMetrics/fastcache v1.13.0 // indirect
 	github.com/XSAM/otelsql v0.42.0 // indirect
@@ -126,11 +128,14 @@ require (
 	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.16.2 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.16.2 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
+	github.com/cockroachdb/crlib v0.0.0-20241112164430-1264a2edc35b // indirect
 	github.com/cockroachdb/errors v1.12.0 // indirect
 	github.com/cockroachdb/fifo v0.0.0-20240816210425-c5d0cb0b6fc0 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20241215232642-bb51bb14a506 // indirect
 	github.com/cockroachdb/pebble v1.1.5 // indirect
+	github.com/cockroachdb/pebble/v2 v2.1.4 // indirect
 	github.com/cockroachdb/redact v1.1.6 // indirect
+	github.com/cockroachdb/swiss v0.0.0-20251224182025-b0f6560f979b // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20250429170803-42689b6311bb // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/consensys/gnark-crypto v0.20.1 // indirect
@@ -159,7 +164,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.7 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.8 // indirect
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb // indirect
 	github.com/fatih/color v1.19.0 // indirect
@@ -216,7 +221,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/golang/snappy v1.0.0 // indirect
+	github.com/golang/snappy v1.0.1-0.20260716114414-9ae09f520e93 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -297,6 +302,7 @@ require (
 	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/mdlayher/vsock v1.2.1 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
+	github.com/minio/minlz v1.0.1-0.20250507153514-87eb42fe8882 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -484,7 +490,7 @@ require (
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20260508232706-74f9aab9d74a // indirect
 	golang.org/x/mod v0.37.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
