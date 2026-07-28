@@ -18,6 +18,7 @@ import (
 	tokenpoolV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -466,6 +467,56 @@ func getRateLimitAdminPreV2(t *testing.T, version *semver.Version, address commo
 		t.Fatalf("unsupported pre-2.0 pool version for fetching rate limit admin: %s", version.String())
 		return common.Address{}
 	}
+}
+
+func TestConfigureTokenPool_FeeConfig_PreV2(t *testing.T) {
+	t.Run("v1_5_1", func(t *testing.T) { testConfigureTokenPoolFeeConfigPreV2(t, cciputils.Version_1_5_1) })
+	t.Run("v1_6_1", func(t *testing.T) { testConfigureTokenPoolFeeConfigPreV2(t, cciputils.Version_1_6_1) })
+}
+
+func testConfigureTokenPoolFeeConfigPreV2(t *testing.T, version *semver.Version) {
+	pair := setupLegacyConnectedBnMPair(t, version)
+
+	// ConnectChains + token expansion may have cached pre-lane router reads; refresh before fee I/O
+	// (same pattern as runAutoMigrateUpgrade in token_expansion_migration_test.go).
+	pair.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(pair.env.OperationsBundle)
+
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: pair.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef: datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+				Remotes: []tokensapi.RemoteConfigUpdate{{
+					RemoteChainSelector: pair.selB,
+					TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{
+						IsEnabled:         cciputils.NewOptional(true),
+						DestBytesOverhead: cciputils.NewOptional(uint32(320)),
+						DestGasOverhead:   cciputils.NewOptional(uint32(21_000)),
+					},
+				}},
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, input))
+	_, err := tokensapi.ConfigureTokenPool().Apply(*pair.env, input)
+	require.NoError(t, err)
+
+	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(pair.env.OperationsBundle, pair.env.BlockChains, pair.env.DataStore, pair.selA, pair.selB)
+	require.NoError(t, err)
+	onChainFee, err := feeAdapter.GetOnchainTokenTransferFeeConfig(pair.env.OperationsBundle, pair.env.BlockChains, fqRef, pair.selA, pair.selB, pair.tokAddrA.Hex())
+	require.NoError(t, err)
+	require.True(t, onChainFee.IsEnabled)
+	require.Equal(t, uint32(320), onChainFee.DestBytesOverhead)
+	require.Equal(t, uint32(21_000), onChainFee.DestGasOverhead)
+
+	// Idempotency: re-applying the same config sends no transaction.
+	pair.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(pair.env.OperationsBundle)
+	before := CurrentBlockEVM(t, pair.env, pair.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*pair.env, input)
+	require.NoError(t, err)
+	after := CurrentBlockEVM(t, pair.env, pair.selA)
+	require.Equal(t, before, after, "no-op fee config update must not send a transaction")
 }
 
 func TestConfigureTokenPool_FeeConfig(t *testing.T) {
