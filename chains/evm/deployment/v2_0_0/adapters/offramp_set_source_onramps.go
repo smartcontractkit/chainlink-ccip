@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -87,6 +88,10 @@ func (a *ChainFamilyAdapter) SetOffRampSourceOnRamps(
 	return &batchOp, false, nil
 }
 
+// parseOffRampSourceOnRampAddresses decodes the operator-supplied onramps into the bytes
+// stored on the OffRamp. The source chain may be of any family, so the bytes are taken
+// exactly as given: the OffRamp matches an incoming message by hashing the onramp bytes it
+// carries, and only the source family knows how it encodes them.
 func parseOffRampSourceOnRampAddresses(addrs []string) ([][]byte, error) {
 	out := make([][]byte, 0, len(addrs))
 	seen := make(map[string]struct{}, len(addrs))
@@ -95,17 +100,12 @@ func parseOffRampSourceOnRampAddresses(addrs []string) ([][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("onRamps[%d]: %w", i, err)
 		}
-		// Operators may enter a source onramp either as the encoded 32 bytes the source
-		// chain sends or, for an EVM source, as the plain 20-byte address. Left-padding
-		// normalises the latter into abi.encode(address) and leaves an already-32-byte
-		// value (an EVM encoded address, a Solana pubkey) untouched.
-		encoded := common.LeftPadBytes(raw, 32)
-		key := string(encoded)
+		key := string(raw)
 		if _, ok := seen[key]; ok {
 			continue
 		}
 		seen[key] = struct{}{}
-		out = append(out, encoded)
+		out = append(out, raw)
 	}
 	if len(out) == 0 {
 		return nil, errors.New("no valid onRamp addresses after parsing")
@@ -113,21 +113,16 @@ func parseOffRampSourceOnRampAddresses(addrs []string) ([][]byte, error) {
 	return out, nil
 }
 
-// decodeOffRampOnRampHex follows the parseRemoteAdapter pattern (20-byte IsHexAddress or hexutil.Decode).
+// decodeOffRampOnRampHex decodes a 0x-prefixed hex string into the raw onramp bytes. The
+// only bound is the wire format's: MessageV1 length-prefixes the onramp address with a
+// uint8, so it cannot exceed 255 bytes.
 func decodeOffRampOnRampHex(addr string) ([]byte, error) {
-	trimmed := strings.TrimSpace(addr)
-	if common.IsHexAddress(trimmed) {
-		return common.HexToAddress(trimmed).Bytes(), nil
-	}
-	raw, err := hexutil.Decode(trimmed)
+	raw, err := hexutil.Decode(strings.TrimSpace(addr))
 	if err != nil {
 		return nil, fmt.Errorf("invalid hex address %q: %w", addr, err)
 	}
-	if len(raw) == 0 || len(raw) > 32 {
-		return nil, fmt.Errorf("address %q must be 1-32 bytes, got %d", addr, len(raw))
-	}
-	if len(raw) != common.AddressLength && len(raw) != 32 {
-		return nil, fmt.Errorf("address %q must be 20 or 32 bytes, got %d", addr, len(raw))
+	if len(raw) == 0 || len(raw) > math.MaxUint8 {
+		return nil, fmt.Errorf("address %q must be 1-%d bytes, got %d", addr, math.MaxUint8, len(raw))
 	}
 	return raw, nil
 }
