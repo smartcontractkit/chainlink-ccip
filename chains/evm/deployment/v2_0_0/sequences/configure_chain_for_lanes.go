@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -59,7 +60,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return seqtypes.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		if err := validateEVMAddresses(input.Router, input.OnRamp, input.FeeQuoter, input.OffRamp); err != nil {
+		if err := validateEVMAddresses(input.Router, input.FeeQuoter, input.OffRamp); err != nil {
+			return seqtypes.OnChainOutput{}, err
+		}
+		// The OnRamp arrives abi-encoded because that is the form it goes on the wire in
+		// (see the EVM adapter's GetOnRampAddress); the address is decoded from it below.
+		if err := validateEVMOnRampAddress(input.OnRamp); err != nil {
 			return seqtypes.OnChainOutput{}, err
 		}
 
@@ -361,9 +367,14 @@ func maybeAddSourceChainConfigArgOnLocalChain(
 	for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
 		laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, common.HexToAddress(ccv))
 	}
-	onRamps := make([][]byte, 0, len(remoteConfig.OnRamps))
-	for _, onRampAddress := range remoteConfig.OnRamps {
-		onRamps = append(onRamps, common.LeftPadBytes(onRampAddress, 32))
+	// Source onramps are stored exactly as the source chain writes them into the
+	// message, because the OffRamp matches an incoming message by hashing those bytes.
+	// The encoding is the source family's to decide (EVM abi-encodes to 32 bytes,
+	// Solana sends a 32-byte pubkey), so the caller resolves it through the source
+	// chain's adapter and we store the result verbatim.
+	onRamps, err := checkedSourceOnRamps(remoteSelector, remoteConfig.OnRamps)
+	if err != nil {
+		return nil, err
 	}
 
 	offRampAddr := common.BytesToAddress(input.OffRamp)
@@ -867,10 +878,51 @@ func adapterDestChainConfigToFeeQuoterV2(cfg changesetadapters.FeeQuoterDestChai
 	}
 }
 
+// checkedSourceOnRamps returns the source chain's onramp addresses to store on the local
+// OffRamp, rejecting values that cannot match what that chain puts in its messages. An
+// EVM source abi-encodes its onramp address into every message it sends, so a 20-byte
+// value here is the native contract address rather than the encoded one; storing it
+// leaves the lane enabled but rejecting every message with InvalidOnRamp.
+func checkedSourceOnRamps(sourceChainSelector uint64, onRamps [][]byte) ([][]byte, error) {
+	sourceFamily, err := chainsel.GetSelectorFamily(sourceChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain family for source chain %d: %w", sourceChainSelector, err)
+	}
+	for _, onRamp := range onRamps {
+		if len(onRamp) == 0 {
+			return nil, fmt.Errorf("onRamp address for source chain %d is empty", sourceChainSelector)
+		}
+		if sourceFamily == chainsel.FamilyEVM && len(onRamp) != 32 {
+			return nil, fmt.Errorf(
+				"onRamp address for EVM source chain %d must be abi-encoded to 32 bytes, got %d bytes; "+
+					"resolve it with the source chain adapter's GetOnRampAddress",
+				sourceChainSelector, len(onRamp),
+			)
+		}
+	}
+	return onRamps, nil
+}
+
 func validateEVMAddresses(addrs ...[]byte) error {
 	for _, addr := range addrs {
 		if len(addr) != common.AddressLength {
 			return fmt.Errorf("invalid EVM address: expected %d bytes, got %d", common.AddressLength, len(addr))
+		}
+	}
+	return nil
+}
+
+// validateEVMOnRampAddress checks the OnRamp is abi.encode(address): 32 bytes whose top
+// 12 are zero. Unlike the other contracts on the input, the OnRamp is carried in the form
+// it takes inside messages, so a plain 20-byte address here means the caller bypassed the
+// adapter and would go on to whitelist a value no message can match.
+func validateEVMOnRampAddress(addr []byte) error {
+	if len(addr) != 32 {
+		return fmt.Errorf("invalid EVM onRamp address: expected 32 abi-encoded bytes, got %d", len(addr))
+	}
+	for _, b := range addr[:32-common.AddressLength] {
+		if b != 0 {
+			return fmt.Errorf("invalid EVM onRamp address: expected abi.encode(address) with a zero 12-byte prefix, got %x", addr)
 		}
 	}
 	return nil

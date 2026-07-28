@@ -4,16 +4,13 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -34,14 +31,6 @@ func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegis
 			if err := validateChainDefinition(lane.ChainB); err != nil {
 				return fmt.Errorf("lane %d dest: %w", i, err)
 			}
-			if !lane.Version.LessThan(common_utils.Version_2_0_0) {
-				if err := validateV2ChainDefinition(lane.ChainA, cfg.CommitteePopulator); err != nil {
-					return fmt.Errorf("lane %d src: %w", i, err)
-				}
-				if err := validateV2ChainDefinition(lane.ChainB, cfg.CommitteePopulator); err != nil {
-					return fmt.Errorf("lane %d dest: %w", i, err)
-				}
-			}
 			for _, sel := range []uint64{lane.ChainA.Selector, lane.ChainB.Selector} {
 				family, err := chain_selectors.GetSelectorFamily(sel)
 				if err != nil {
@@ -54,54 +43,6 @@ func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegis
 		}
 		return nil
 	}
-}
-
-// validateV2ChainDefinition checks that v2.0-required fields are properly
-// configured. For chains that participate in committee verification, either
-// resolved CommitteeVerifiers or resolvable CommitteeVerifierInputs (with a
-// CommitteePopulator) must be provided.
-func validateV2ChainDefinition(def ChainDefinition, populator CommitteeConfigPopulator) error {
-	hasResolved := len(def.CommitteeVerifiers) > 0
-	hasInputs := len(def.CommitteeVerifierInputs) > 0
-	hasCommitteeConfig := hasResolved || hasInputs
-
-	if hasResolved && hasInputs {
-		return fmt.Errorf("CommitteeVerifiers and CommitteeVerifierInputs are mutually exclusive")
-	}
-
-	if hasInputs && populator == nil {
-		return fmt.Errorf("CommitteeVerifierInputs provided but no CommitteePopulator on config")
-	}
-
-	// For v2.0 lanes, allowlist fields are managed at the committee verifier
-	// level (CommitteeVerifierRemoteChainInput / CommitteeVerifierRemoteChainConfig),
-	// not on ChainDefinition. Reject if the user sets them at the wrong level.
-	if hasCommitteeConfig {
-		if def.AllowListEnabled {
-			return fmt.Errorf("AllowListEnabled must not be set on ChainDefinition for v2.0 lanes; set it on CommitteeVerifierRemoteChainInput instead")
-		}
-		if len(def.AllowList) > 0 {
-			return fmt.Errorf("AllowList must not be set on ChainDefinition for v2.0 lanes; use AddedAllowlistedSenders on CommitteeVerifierRemoteChainInput instead")
-		}
-	}
-
-	if hasResolved {
-		for i, cv := range def.CommitteeVerifiers {
-			if len(cv.CommitteeVerifier) == 0 {
-				return fmt.Errorf("CommitteeVerifiers[%d] has no contracts", i)
-			}
-			for remoteChain, rc := range cv.RemoteChains {
-				if rc.SignatureConfig.Threshold == 0 {
-					return fmt.Errorf("CommitteeVerifiers[%d] remote chain %d has zero threshold", i, remoteChain)
-				}
-				if len(rc.SignatureConfig.Signers) == 0 {
-					return fmt.Errorf("CommitteeVerifiers[%d] remote chain %d has no signers", i, remoteChain)
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 // validateChainDefinition rejects input where the caller has set fields that
@@ -134,9 +75,6 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 		ds := datastore.NewMemoryDataStore()
 		for i := range cfg.Lanes {
 			lane := &cfg.Lanes[i]
-			if err := populateCommitteeInputsIfNeeded(e, lane, cfg.CommitteePopulator); err != nil {
-				return cldf.ChangesetOutput{}, err
-			}
 			chainA, chainB := &lane.ChainA, &lane.ChainB
 			chainAFamily, err := chain_selectors.GetSelectorFamily(chainA.Selector)
 			if err != nil {
@@ -154,11 +92,11 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 			if !exists {
 				return cldf.ChangesetOutput{}, fmt.Errorf("no ChainAdapter registered for chain family '%s'", chainBFamily)
 			}
-			err = populateAddresses(&e, chainA, chainAAdapter, lane.Version, lane.TestRouter)
+			err = populateAddresses(&e, chainA, chainAAdapter, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for src chain %d: %w", chainA.Selector, err)
 			}
-			err = populateAddresses(&e, chainB, chainBAdapter, lane.Version, lane.TestRouter)
+			err = populateAddresses(&e, chainB, chainBAdapter, lane.TestRouter)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error fetching address for dest chain %d: %w", chainB.Selector, err)
 			}
@@ -230,34 +168,7 @@ func makeApply(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSR
 	}
 }
 
-// populateCommitteeInputsIfNeeded calls the CommitteeConfigPopulator for each
-// chain in the lane that has CommitteeVerifierInputs, replacing them with
-// resolved CommitteeVerifiers. No-op for chains that already have resolved
-// verifiers or no committee config (e.g. 1.6 lanes).
-//
-// The expensive work (fetching signing keys from JD) is handled internally
-// by the populator's own caching (e.g. sync.Once), so calling this per-lane
-// is cheap after the first invocation — subsequent calls only do in-memory
-// topology lookups and datastore address resolution.
-func populateCommitteeInputsIfNeeded(e cldf.Environment, lane *LaneConfig, populator CommitteeConfigPopulator) error {
-	if populator == nil {
-		return nil
-	}
-	for _, def := range []*ChainDefinition{&lane.ChainA, &lane.ChainB} {
-		if len(def.CommitteeVerifierInputs) == 0 {
-			continue
-		}
-		populated, err := populator.PopulateCommitteeConfig(e, def.Selector, def.CommitteeVerifierInputs)
-		if err != nil {
-			return fmt.Errorf("failed to populate committee config for chain %d: %w", def.Selector, err)
-		}
-		def.CommitteeVerifiers = populated
-		def.CommitteeVerifierInputs = nil
-	}
-	return nil
-}
-
-func populateAddresses(e *cldf.Environment, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version, isTestRouter bool) error {
+func populateAddresses(e *cldf.Environment, chainDef *ChainDefinition, adapter LaneAdapter, isTestRouter bool) error {
 	ds := e.DataStore
 	var err error
 	chainDef.OnRamp, err = adapter.GetOnRampAddress(ds, chainDef.Selector)
@@ -313,75 +224,6 @@ func populateAddresses(e *cldf.Environment, chainDef *ChainDefinition, adapter L
 	// 	populateTokenPrices(ds, chainDef, adapter)
 	// }
 
-	return populateAddressesV2(ds, chainDef, adapter, version)
-}
-
-func populateAddressesV2(ds datastore.DataStore, chainDef *ChainDefinition, adapter LaneAdapter, version *semver.Version) error {
-	if version.LessThan(common_utils.Version_2_0_0) {
-		return nil
-	}
-	committeeVerifiers := make([]CommitteeVerifierConfig[datastore.AddressRef], len(chainDef.CommitteeVerifiers))
-	for i, verifier := range chainDef.CommitteeVerifiers {
-		contracts := make([]datastore.AddressRef, 0, len(verifier.CommitteeVerifier))
-		for _, contract := range verifier.CommitteeVerifier {
-			contract, err := datastore_utils.FindAndFormatRef(ds, contract, contract.ChainSelector, datastore_utils.FullRef)
-			if err != nil {
-				return fmt.Errorf("failed to resolve CommitteeVerifier contract ref on chain with selector %d: %w", chainDef.Selector, err)
-			}
-			contracts = append(contracts, contract)
-		}
-		committeeVerifiers[i] = CommitteeVerifierConfig[datastore.AddressRef]{
-			CommitteeVerifier: contracts,
-			RemoteChains:      verifier.RemoteChains,
-		}
-	}
-	chainDef.CommitteeVerifiers = committeeVerifiers
-
-	executor, err := datastore_utils.FindAndFormatRef(ds, chainDef.DefaultExecutor, chainDef.DefaultExecutor.ChainSelector, datastore_utils.FullRef)
-	if err != nil {
-		return fmt.Errorf("failed to resolve executor ref on chain with selector %d: %w", chainDef.Selector, err)
-	}
-	chainDef.DefaultExecutor = executor
-
-	laneMandatedInboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.LaneMandatedInboundCCVs))
-	for _, ccv := range chainDef.LaneMandatedInboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
-		}
-		laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, resolvedCCV)
-	}
-	chainDef.LaneMandatedInboundCCVs = laneMandatedInboundCCVs
-
-	laneMandatedOutboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.LaneMandatedOutboundCCVs))
-	for _, ccv := range chainDef.LaneMandatedOutboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
-		}
-		laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, resolvedCCV)
-	}
-	chainDef.LaneMandatedOutboundCCVs = laneMandatedOutboundCCVs
-
-	defaultInboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.DefaultInboundCCVs))
-	for _, ccv := range chainDef.DefaultInboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
-		}
-		defaultInboundCCVs = append(defaultInboundCCVs, resolvedCCV)
-	}
-	chainDef.DefaultInboundCCVs = defaultInboundCCVs
-
-	defaultOutboundCCVs := make([]datastore.AddressRef, 0, len(chainDef.DefaultOutboundCCVs))
-	for _, ccv := range chainDef.DefaultOutboundCCVs {
-		resolvedCCV, err := datastore_utils.FindAndFormatRef(ds, ccv, ccv.ChainSelector, datastore_utils.FullRef)
-		if err != nil {
-			return fmt.Errorf("failed to resolve ccv ref on chain with selector %d: %w", chainDef.Selector, err)
-		}
-		defaultOutboundCCVs = append(defaultOutboundCCVs, resolvedCCV)
-	}
-	chainDef.DefaultOutboundCCVs = defaultOutboundCCVs
 	return nil
 }
 

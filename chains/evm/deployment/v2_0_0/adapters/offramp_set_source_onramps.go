@@ -95,7 +95,10 @@ func parseOffRampSourceOnRampAddresses(addrs []string) ([][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("onRamps[%d]: %w", i, err)
 		}
-		// Same left-pad-to-32 used when writing OffRamp source config in configure_chain_for_lanes.
+		// Operators may enter a source onramp either as the encoded 32 bytes the source
+		// chain sends or, for an EVM source, as the plain 20-byte address. Left-padding
+		// normalises the latter into abi.encode(address) and leaves an already-32-byte
+		// value (an EVM encoded address, a Solana pubkey) untouched.
 		encoded := common.LeftPadBytes(raw, 32)
 		key := string(encoded)
 		if _, ok := seen[key]; ok {

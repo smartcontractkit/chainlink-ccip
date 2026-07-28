@@ -41,8 +41,11 @@ func ToEVMAddressBytes(ref datastore.AddressRef) (paddedAddress []byte, err erro
 	return addr.Bytes(), nil
 }
 
-// ToPaddedEVMAddress formats a datastore.AddressRef into a 32-byte padded ethereum address.
-func ToPaddedEVMAddress(ref datastore.AddressRef) (paddedAddress []byte, err error) {
+// ToABIEncodedEVMAddress formats a datastore.AddressRef the way abi.encode(address) does:
+// the 20-byte address left-padded with zeros to 32 bytes. CCIP messages carry source-side
+// EVM addresses (onRamp, sender, source pool and token) in this form; destination-side
+// addresses travel unpadded and use ToEVMAddressBytes.
+func ToABIEncodedEVMAddress(ref datastore.AddressRef) (encodedAddress []byte, err error) {
 	addr, err := ToEVMAddressBytes(ref)
 	if err != nil {
 		return nil, err
