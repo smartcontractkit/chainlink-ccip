@@ -45,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -77,7 +76,6 @@ func init() {
 	laneMigratorReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &LaneMigrator{})
 	laneMigratorReg.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2.RouterUpdater{})
 
-	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyEVM, v, &ChainFamilyAdapter{})
 	ccvadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyEVM, &ChainFamilyAdapter{})
 
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
