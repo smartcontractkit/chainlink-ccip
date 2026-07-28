@@ -72,9 +72,13 @@ var applyCommitteeVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.
 // LaneAddresses is the set of contract addresses to update on one source chain that has a
 // confirmed lane pointed at the Glamsterdam target chain.
 type LaneAddresses struct {
-	ChainSelector            uint64
-	OnRampAddress            common.Address
-	FeeQuoterAddress         common.Address
+	ChainSelector    uint64
+	OnRampAddress    common.Address
+	FeeQuoterAddress common.Address
+	// CommitteeVerifierAddress is optional. If set, CommitteeVerifier's GasForVerification (row 8)
+	// is read, resolved against its expected Prague baseline, and written back. Leave as the zero
+	// address to skip this chain's CommitteeVerifier update entirely (e.g. it isn't deployed/
+	// tracked in the datastore yet).
 	CommitteeVerifierAddress common.Address
 	// OffRampAddress is optional. If set, OffRamp's immutable gas fields are read and sanity
 	// checked against their expected Prague baseline (no write is ever made — there is no
@@ -201,31 +205,35 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			writes = append(writes, fqWrite.Output)
 
 			// --- CommitteeVerifier: GasForVerification (row 8) ---
-			cvCur, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
-				ChainSelector: lane.ChainSelector,
-				Address:       lane.CommitteeVerifierAddress,
-				Args:          input.TargetChainSelector,
-			})
-			if err != nil {
-				return UpdateGasConfigOutput{}, fmt.Errorf(
-					"failed to read CommitteeVerifier remote chain config for src %d, dst %d: %w", lane.ChainSelector, input.TargetChainSelector, err,
-				)
-			}
-			gasForVerificationResult := glamsterdamutils.Resolve(CommitteeVerifierGasForVerification, cvCur.Output.RemoteChainConfig.GasForVerification)
-			glamsterdamutils.AddField(output.Report, lane.ChainSelector, gasForVerificationResult)
+			// Optional: skipped entirely if CommitteeVerifier isn't deployed/tracked in the
+			// datastore for this chain yet.
+			if lane.CommitteeVerifierAddress != (common.Address{}) {
+				cvCur, err := cldf_ops.ExecuteOperation(b, committee_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
+					ChainSelector: lane.ChainSelector,
+					Address:       lane.CommitteeVerifierAddress,
+					Args:          input.TargetChainSelector,
+				})
+				if err != nil {
+					return UpdateGasConfigOutput{}, fmt.Errorf(
+						"failed to read CommitteeVerifier remote chain config for src %d, dst %d: %w", lane.ChainSelector, input.TargetChainSelector, err,
+					)
+				}
+				gasForVerificationResult := glamsterdamutils.Resolve(CommitteeVerifierGasForVerification, cvCur.Output.RemoteChainConfig.GasForVerification)
+				glamsterdamutils.AddField(output.Report, lane.ChainSelector, gasForVerificationResult)
 
-			newCVConfig := cvCur.Output.RemoteChainConfig
-			newCVConfig.GasForVerification = gasForVerificationResult.AppliedValue
+				newCVConfig := cvCur.Output.RemoteChainConfig
+				newCVConfig.GasForVerification = gasForVerificationResult.AppliedValue
 
-			cvWrite, err := cldf_ops.ExecuteOperation(b, applyCommitteeVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
-				ChainSelector: lane.ChainSelector,
-				Address:       lane.CommitteeVerifierAddress,
-				Args:          []committee_verifier.RemoteChainConfigArgs{newCVConfig},
-			})
-			if err != nil {
-				return UpdateGasConfigOutput{}, fmt.Errorf("failed to apply CommitteeVerifier remote chain config update for src %d: %w", lane.ChainSelector, err)
+				cvWrite, err := cldf_ops.ExecuteOperation(b, applyCommitteeVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
+					ChainSelector: lane.ChainSelector,
+					Address:       lane.CommitteeVerifierAddress,
+					Args:          []committee_verifier.RemoteChainConfigArgs{newCVConfig},
+				})
+				if err != nil {
+					return UpdateGasConfigOutput{}, fmt.Errorf("failed to apply CommitteeVerifier remote chain config update for src %d: %w", lane.ChainSelector, err)
+				}
+				writes = append(writes, cvWrite.Output)
 			}
-			writes = append(writes, cvWrite.Output)
 
 			// --- OffRamp: GasForCallExactCheck, MaxGasBufferToUpdateState (rows 6-7) ---
 			// Read-only sanity check: both fields are immutable with no setter, so no write is

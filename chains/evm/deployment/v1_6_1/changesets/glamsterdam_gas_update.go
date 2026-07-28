@@ -113,6 +113,7 @@ func UpdateGasConfigForGlamsterdamV16(mcmsRegistry *cs_core.MCMSReaderRegistry) 
 		for _, sel := range discoveryReport.Output.NoLane {
 			report.AddNoLane(sel)
 		}
+		report.Lines = append(report.Lines, discoveryReport.Output.Report.Lines...)
 
 		var (
 			lanes      []glamsterdamseq.LaneAddresses

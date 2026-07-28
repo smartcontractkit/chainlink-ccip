@@ -89,6 +89,7 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 		for _, sel := range discoveryReport.Output.NoLane {
 			report.AddNoLane(sel)
 		}
+		report.Lines = append(report.Lines, discoveryReport.Output.Report.Lines...)
 
 		var (
 			lanes        []glamsterdamseq.LaneAddresses
@@ -104,17 +105,15 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 				report.AddUnresolvedContract(sel, "OnRamp")
 				continue
 			}
-			cvRef := datastore_utils.GetAddressRef(addrs, sel, committee_verifier.ContractType, committee_verifier.Version, "")
-			if datastore_utils.IsAddressRefEmpty(cvRef) {
-				report.AddUnresolvedContract(sel, "CommitteeVerifier")
-				continue
-			}
-
 			lane := glamsterdamseq.LaneAddresses{
-				ChainSelector:            sel,
-				OnRampAddress:            common.HexToAddress(onRampRef.Address),
-				FeeQuoterAddress:         feeQuoterAddrByChain[sel],
-				CommitteeVerifierAddress: common.HexToAddress(cvRef.Address),
+				ChainSelector:    sel,
+				OnRampAddress:    common.HexToAddress(onRampRef.Address),
+				FeeQuoterAddress: feeQuoterAddrByChain[sel],
+			}
+			if cvRef := datastore_utils.GetAddressRef(addrs, sel, committee_verifier.ContractType, committee_verifier.Version, ""); !datastore_utils.IsAddressRefEmpty(cvRef) {
+				lane.CommitteeVerifierAddress = common.HexToAddress(cvRef.Address)
+			} else {
+				report.AddUnresolvedContract(sel, "CommitteeVerifier")
 			}
 			if offRampRef := datastore_utils.GetAddressRef(addrs, sel, offramp.ContractType, offramp.Version, ""); !datastore_utils.IsAddressRefEmpty(offRampRef) {
 				lane.OffRampAddress = common.HexToAddress(offRampRef.Address)

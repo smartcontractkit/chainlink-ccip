@@ -92,6 +92,47 @@ func TestDiscoverLanesToTarget(t *testing.T) {
 	require.Equal(t, []uint64{discoveryNoLaneChainSel}, report.Output.NoLane)
 }
 
+// TestDiscoverLanesToTarget_SkipsChainWithReadError confirms that a candidate chain whose
+// FeeQuoter address has no contract code there (e.g. a stale datastore entry) is skipped with a
+// report line, rather than aborting discovery for every other candidate.
+func TestDiscoverLanesToTarget_SkipsChainWithReadError(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{
+		discoveryLaneChainSelA,
+		discoveryLaneChainSelB,
+	}))
+	require.NoError(t, err)
+
+	enabledDestChainConfig := fq16ops.DestChainConfig{
+		IsEnabled:               true,
+		MaxNumberOfTokensPerMsg: 5,
+		MaxPerMsgGasLimit:       3_000_000,
+		DestGasOverhead:         300_000,
+		ChainFamilySelector:     evmFamilySelector,
+		DefaultTxGasLimit:       200_000,
+		GasMultiplierWeiPerEth:  1e18,
+	}
+	laneAAddr := deployDiscoveryFeeQuoter(t, e, discoveryLaneChainSelA, []fq16ops.DestChainConfigArgs{
+		{DestChainSelector: discoveryTargetChainSel, DestChainConfig: enabledDestChainConfig},
+	})
+
+	// discoveryLaneChainSelB is a real, loaded chain, but this address has no contract deployed
+	// there — mirrors a stale datastore entry pointing at a redeployed/decommissioned contract.
+	staleAddr := common.HexToAddress("0x0000000000000000000000000000000000dEaD")
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, glamsterdamseq.DiscoverLanesToTarget, e.BlockChains, glamsterdamseq.DiscoverLanesToTargetInput{
+		TargetChainSelector: discoveryTargetChainSel,
+		FeeQuoterAddressByChain: map[uint64]common.Address{
+			discoveryLaneChainSelA: laneAAddr,
+			discoveryLaneChainSelB: staleAddr,
+		},
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, []uint64{discoveryLaneChainSelA}, report.Output.LanesToUpdate)
+	require.Empty(t, report.Output.NoLane)
+	require.Contains(t, report.Output.Report.String(), "chain 5548718428018410741: ERROR - failed to read FeeQuoter dest chain config")
+}
+
 func TestDiscoverLanesToTarget_UnknownChain(t *testing.T) {
 	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{discoveryLaneChainSelA}))
 	require.NoError(t, err)

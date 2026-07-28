@@ -282,3 +282,49 @@ func TestUpdateGasConfig(t *testing.T) {
 // mcmsChainSelector exists purely so the test reads naturally when comparing against a
 // mcms_types.ChainSelector value.
 func mcmsChainSelector(sel uint64) uint64 { return sel }
+
+// TestUpdateGasConfig_MissingCommitteeVerifier confirms that a lane with no
+// CommitteeVerifierAddress set (e.g. CommitteeVerifier isn't deployed/tracked in the datastore for
+// that chain yet) still gets its OnRamp/FeeQuoter gas config updated, rather than being dropped
+// entirely.
+func TestUpdateGasConfig_MissingCommitteeVerifier(t *testing.T) {
+	const gasCfgNoVerifierChain = uint64(6395199058653144747)
+
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{gasCfgNoVerifierChain}))
+	require.NoError(t, err)
+
+	baselineFQConfig := fqops.DestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                1_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   20,
+		ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		LinkFeeMultiplierPercent:    100,
+	}
+
+	onRampAddr := deployGasCfgOnRamp(t, e, gasCfgNoVerifierChain, 200_000)
+	fqAddr := deployGasCfgFeeQuoter(t, e, gasCfgNoVerifierChain, baselineFQConfig)
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, glamsterdamseq.UpdateGasConfig, e.BlockChains, glamsterdamseq.UpdateGasConfigInput{
+		TargetChainSelector: gasCfgTargetChainSel,
+		Lanes: []glamsterdamseq.LaneAddresses{
+			{
+				ChainSelector:    gasCfgNoVerifierChain,
+				OnRampAddress:    onRampAddr,
+				FeeQuoterAddress: fqAddr,
+				// CommitteeVerifierAddress deliberately left as the zero address.
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, report.Output.BatchOps, 1)
+	require.Len(t, report.Output.BatchOps[0].Transactions, 2, "expected OnRamp + FeeQuoter writes only, no CommitteeVerifier write")
+
+	reportStr := report.Output.Report.String()
+	require.Contains(t, reportStr, "chain 6395199058653144747: OnRamp.DestChainConfig.BaseExecutionGasCost matched expected Prague value 200000, applying Glamsterdam value 400000")
+	require.NotContains(t, reportStr, "CommitteeVerifier.RemoteChainConfigArgs.GasForVerification")
+}

@@ -104,6 +104,16 @@ func (r *Report) AddUnresolvedContract(chainSelector uint64, contractName string
 	))
 }
 
+// AddReadError records a chain where a required on-chain read failed partway through discovery
+// or update (e.g. a stale datastore address with no contract code at that address anymore). This
+// chain is excluded from further processing, but the run continues for every other chain, per the
+// "never block the batch on a single chain" design principle.
+func (r *Report) AddReadError(chainSelector uint64, description string, err error) {
+	r.Lines = append(r.Lines, fmt.Sprintf(
+		"chain %d: ERROR - failed to %s: %v, skipping this chain", chainSelector, description, err,
+	))
+}
+
 // AddLine appends an arbitrary pre-formatted line to the report, e.g. the output of
 // FieldResultString.
 func (r *Report) AddLine(line string) {

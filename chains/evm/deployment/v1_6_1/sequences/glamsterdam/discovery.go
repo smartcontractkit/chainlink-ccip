@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
 )
 
 // DiscoverLanesToTargetInput is the input to DiscoverLanesToTarget.
@@ -34,6 +35,10 @@ type DiscoverLanesToTargetOutput struct {
 	// NoLane are candidate chain selectors that were scanned but have no lane pointed at the
 	// target chain, sorted ascending.
 	NoLane []uint64
+	// Report accumulates human-readable lines for any candidate chain whose FeeQuoter read
+	// failed (e.g. a stale datastore address with no contract code there anymore). That chain is
+	// skipped rather than aborting discovery for every other candidate.
+	Report *glamsterdamutils.Report
 }
 
 // DiscoverLanesToTarget checks, for every candidate chain in the input, whether its v1.6
@@ -45,7 +50,7 @@ var DiscoverLanesToTarget = cldf_ops.NewSequence(
 	semver.MustParse("1.6.0"),
 	"Discovers which v1.6 chains have a lane pointed at the Glamsterdam target chain",
 	func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input DiscoverLanesToTargetInput) (DiscoverLanesToTargetOutput, error) {
-		var output DiscoverLanesToTargetOutput
+		output := DiscoverLanesToTargetOutput{Report: glamsterdamutils.NewReport()}
 
 		candidates := make([]uint64, 0, len(input.FeeQuoterAddressByChain))
 		for sel := range input.FeeQuoterAddressByChain {
@@ -65,9 +70,12 @@ var DiscoverLanesToTarget = cldf_ops.NewSequence(
 				Args:          input.TargetChainSelector,
 			})
 			if err != nil {
-				return DiscoverLanesToTargetOutput{}, fmt.Errorf(
-					"failed to read FeeQuoter dest chain config for src %d, dst %d: %w", src, input.TargetChainSelector, err,
+				line := fmt.Sprintf(
+					"failed to read FeeQuoter dest chain config for src %d, dst %d: %v", src, input.TargetChainSelector, err,
 				)
+				b.Logger.Warn(line)
+				output.Report.AddReadError(src, "read FeeQuoter dest chain config", err)
+				continue
 			}
 
 			if report.Output.IsEnabled {
