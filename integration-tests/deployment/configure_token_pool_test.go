@@ -519,6 +519,43 @@ func testConfigureTokenPoolFeeConfigPreV2(t *testing.T, version *semver.Version)
 	require.Equal(t, before, after, "no-op fee config update must not send a transaction")
 }
 
+func TestConfigureTokenPool_UnsupportedFields_PreV2(t *testing.T) {
+	t.Run("v1_5_1", func(t *testing.T) { testConfigureTokenPoolUnsupportedFieldsPreV2(t, cciputils.Version_1_5_1) })
+	t.Run("v1_6_1", func(t *testing.T) { testConfigureTokenPoolUnsupportedFieldsPreV2(t, cciputils.Version_1_6_1) })
+}
+
+func testConfigureTokenPoolUnsupportedFieldsPreV2(t *testing.T, version *semver.Version) {
+	pair := setupLegacyConnectedBnMPair(t, version)
+
+	finalityInput := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: pair.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef:   datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+				FinalityConfig: &finality.Config{WaitForFinality: true},
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, finalityInput))
+	_, err := tokensapi.ConfigureTokenPool().Apply(*pair.env, finalityInput)
+	require.ErrorContains(t, err, "does not support finality config updates")
+
+	feeAdminInput := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: pair.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef: datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+				FeeAdmin:     new("0x4444444444444444444444444444444444444444"),
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, feeAdminInput))
+	_, err = tokensapi.ConfigureTokenPool().Apply(*pair.env, feeAdminInput)
+	require.ErrorContains(t, err, "fee admin is not supported")
+}
+
 func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	tc := setupV2PoolsForConfigureImpl(t, "CTP_FEE", false)
 
