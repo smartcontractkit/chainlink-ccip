@@ -527,33 +527,37 @@ func TestConfigureTokenPool_UnsupportedFields_PreV2(t *testing.T) {
 func testConfigureTokenPoolUnsupportedFieldsPreV2(t *testing.T, version *semver.Version) {
 	pair := setupLegacyConnectedBnMPair(t, version)
 
-	finalityInput := tokensapi.ConfigureTokenPoolInput{
-		MCMS: mcms.Input{},
-		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
-			ChainSelector: pair.selA,
-			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef:   datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
-				FinalityConfig: &finality.Config{WaitForFinality: true},
+	t.Run("finalityConfig", func(t *testing.T) {
+		finalityInput := tokensapi.ConfigureTokenPoolInput{
+			MCMS: mcms.Input{},
+			Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+				ChainSelector: pair.selA,
+				Pools: []tokensapi.PoolConfigUpdate{{
+					TokenPoolRef:   datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+					FinalityConfig: &finality.Config{WaitForFinality: true},
+				}},
 			}},
-		}},
-	}
-	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, finalityInput))
-	_, err := tokensapi.ConfigureTokenPool().Apply(*pair.env, finalityInput)
-	require.ErrorContains(t, err, "does not support finality config updates")
+		}
+		require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, finalityInput))
+		_, err := tokensapi.ConfigureTokenPool().Apply(*pair.env, finalityInput)
+		require.ErrorContains(t, err, "does not support finality config updates")
+	})
 
-	feeAdminInput := tokensapi.ConfigureTokenPoolInput{
-		MCMS: mcms.Input{},
-		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
-			ChainSelector: pair.selA,
-			Pools: []tokensapi.PoolConfigUpdate{{
-				TokenPoolRef: datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
-				FeeAdmin:     new("0x4444444444444444444444444444444444444444"),
+	t.Run("feeAdmin", func(t *testing.T) {
+		feeAdminInput := tokensapi.ConfigureTokenPoolInput{
+			MCMS: mcms.Input{},
+			Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+				ChainSelector: pair.selA,
+				Pools: []tokensapi.PoolConfigUpdate{{
+					TokenPoolRef: datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+					FeeAdmin:     new("0x4444444444444444444444444444444444444444"),
+				}},
 			}},
-		}},
-	}
-	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, feeAdminInput))
-	_, err = tokensapi.ConfigureTokenPool().Apply(*pair.env, feeAdminInput)
-	require.ErrorContains(t, err, "fee admin is not supported")
+		}
+		require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, feeAdminInput))
+		_, err := tokensapi.ConfigureTokenPool().Apply(*pair.env, feeAdminInput)
+		require.ErrorContains(t, err, "fee admin is not supported")
+	})
 }
 
 func TestConfigureTokenPool_FeeConfig(t *testing.T) {
