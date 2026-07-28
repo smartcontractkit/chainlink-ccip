@@ -19,13 +19,18 @@ var (
 	testChain2Selector = chainsel.TEST_90000002.Selector
 )
 
-type testCurseSubjectAdapter struct{}
+type testCurseSubjectAdapter struct {
+	deriveVersionErr error
+}
 
-func (testCurseSubjectAdapter) SelectorToSubject(selector uint64) Subject {
+func (a testCurseSubjectAdapter) SelectorToSubject(selector uint64) Subject {
 	return GenericSelectorToSubject(selector)
 }
 
-func (testCurseSubjectAdapter) DeriveCurseAdapterVersion(_ cldf.Environment, _ uint64) (*semver.Version, error) {
+func (a testCurseSubjectAdapter) DeriveCurseAdapterVersion(_ cldf.Environment, _ uint64) (*semver.Version, error) {
+	if a.deriveVersionErr != nil {
+		return nil, a.deriveVersionErr
+	}
 	return semver.MustParse("1.6.0"), nil
 }
 
@@ -35,6 +40,16 @@ type testCurseAdapter struct {
 	// every target chain, so tests can verify that a literal Subject bypasses the
 	// connectivity check entirely.
 	disconnected bool
+	// connectedChains, when non-nil, is returned by ListConnectedChains to simulate
+	// the lane discovery returning a specific set of chains.
+	connectedChains []uint64
+	// unsupportedTargets, when non-nil, makes IsChainConnectedToTargetChain report
+	// false for calls where targetSel matches an entry, simulating a router whose
+	// IsChainSupported returns false for that destination chain.
+	unsupportedTargets map[uint64]bool
+	// connectivityErr, when non-nil, makes IsChainConnectedToTargetChain return
+	// an error, simulating an unreachable router.
+	connectivityErr error
 }
 
 func (a *testCurseAdapter) Initialize(_ cldf.Environment, _ uint64) error {
@@ -48,8 +63,17 @@ func (a *testCurseAdapter) IsSubjectCursedOnChain(_ cldf.Environment, _ uint64, 
 	return a.subjectsAreCursed, nil
 }
 
-func (a *testCurseAdapter) IsChainConnectedToTargetChain(_ cldf.Environment, _, _ uint64) (bool, error) {
-	return !a.disconnected, nil
+func (a *testCurseAdapter) IsChainConnectedToTargetChain(_ cldf.Environment, _ uint64, targetSel uint64) (bool, error) {
+	if a.disconnected {
+		return false, nil
+	}
+	if a.connectivityErr != nil {
+		return false, a.connectivityErr
+	}
+	if a.unsupportedTargets != nil && a.unsupportedTargets[targetSel] {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (a *testCurseAdapter) IsCurseEnabledForChain(_ cldf.Environment, _ uint64) (bool, error) {
@@ -69,7 +93,7 @@ func (a *testCurseAdapter) Uncurse() *cldf_ops.Sequence[CurseInput, sequences.On
 }
 
 func (a *testCurseAdapter) ListConnectedChains(_ cldf.Environment, _ uint64) ([]uint64, error) {
-	return nil, nil
+	return a.connectedChains, nil
 }
 
 func testCurseSequence() *cldf_ops.Sequence[CurseInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -88,12 +112,16 @@ func newTestCurseRegistry(subjectsAreCursed bool) *CurseRegistry {
 }
 
 func newTestCurseRegistryWithAdapter(adapter *testCurseAdapter) *CurseRegistry {
+	return newTestCurseRegistryWithAdapterAndSubject(adapter, testCurseSubjectAdapter{})
+}
+
+func newTestCurseRegistryWithAdapterAndSubject(adapter *testCurseAdapter, subjectAdapter CurseSubjectAdapter) *CurseRegistry {
 	cr := newCurseRegistry()
 	cr.RegisterNewCurse(CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
 		CursingVersion:      semver.MustParse("1.6.0"),
 		CurseAdapter:        adapter,
-		CurseSubjectAdapter: testCurseSubjectAdapter{},
+		CurseSubjectAdapter: subjectAdapter,
 	})
 	return cr
 }
