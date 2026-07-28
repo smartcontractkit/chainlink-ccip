@@ -26,8 +26,9 @@ import (
 )
 
 var (
-	_ tokensapi.TokenPoolMigrator = &TokenAdapter{}
-	_ tokensapi.TokenAdapter      = &TokenAdapter{}
+	_ tokensapi.TokenPoolMigrator     = &TokenAdapter{}
+	_ tokensapi.TokenAdapter          = &TokenAdapter{}
+	_ tokensapi.TokenPoolAdminAdapter = &TokenAdapter{}
 )
 
 // TokenAdapter handles EVM token pools at version 1.5.1.

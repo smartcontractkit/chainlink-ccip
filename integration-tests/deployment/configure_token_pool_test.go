@@ -3,6 +3,7 @@ package deployment
 import (
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -13,6 +14,8 @@ import (
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evm_testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	tokenpoolV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+	tokenpoolV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -384,6 +387,85 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
 	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.ErrorContains(t, err, "invalid fee admin address")
+}
+
+func TestConfigureTokenPool_Admins_PreV2(t *testing.T) {
+	t.Run("v1_5_1", func(t *testing.T) { testConfigureTokenPoolAdminsPreV2(t, cciputils.Version_1_5_1) })
+	t.Run("v1_6_1", func(t *testing.T) { testConfigureTokenPoolAdminsPreV2(t, cciputils.Version_1_6_1) })
+}
+
+func testConfigureTokenPoolAdminsPreV2(t *testing.T, version *semver.Version) {
+	pair := setupLegacyConnectedBnMPair(t, version)
+
+	chainA := pair.env.BlockChains.EVMChains()[pair.selA]
+
+	newRateLimitAdmin := "0x1111111111111111111111111111111111111111"
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: pair.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef:   datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+				RateLimitAdmin: new(newRateLimitAdmin),
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, input))
+	_, err := tokensapi.ConfigureTokenPool().Apply(*pair.env, input)
+	require.NoError(t, err)
+
+	rlAdmin := getRateLimitAdminPreV2(t, version, pair.oldPoolAddrA, chainA.Client)
+	require.Equal(t, common.HexToAddress(newRateLimitAdmin), rlAdmin)
+
+	// Idempotency: re-applying the same value sends no transaction.
+	pair.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(pair.env.OperationsBundle)
+	before := CurrentBlockEVM(t, pair.env, pair.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*pair.env, input)
+	require.NoError(t, err)
+	after := CurrentBlockEVM(t, pair.env, pair.selA)
+	require.Equal(t, before, after, "no-op rate limit admin update must not send a transaction")
+
+	// FeeAdmin is not supported on pre-2.0 pools: the whole update must fail cleanly, and must
+	// not silently change the rate limit admin it was combined with in the same call.
+	otherRateLimitAdmin := "0x2222222222222222222222222222222222222222"
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef:   datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+		RateLimitAdmin: new(otherRateLimitAdmin),
+		FeeAdmin:       new("0x3333333333333333333333333333333333333333"),
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, input))
+	pair.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(pair.env.OperationsBundle)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*pair.env, input)
+	require.ErrorContains(t, err, "fee admin is not supported")
+
+	rlAdmin = getRateLimitAdminPreV2(t, version, pair.oldPoolAddrA, chainA.Client)
+	require.Equal(t, common.HexToAddress(newRateLimitAdmin), rlAdmin, "rate limit admin must be unchanged after a rejected combined update")
+}
+
+// getRateLimitAdminPreV2 reads the on-chain rate limit admin for a pre-2.0 EVM token pool.
+// getRateLimitAdmin is ABI-identical across 1.5.1 and 1.6.1, but the call was removed from the
+// pool ABI in 2.0 (folded into DynamicConfig), so the version-specific binding must be selected
+// explicitly here rather than reusing the v2.0 binding the rest of this file relies on.
+func getRateLimitAdminPreV2(t *testing.T, version *semver.Version, address common.Address, backend bind.ContractBackend) common.Address {
+	t.Helper()
+	opts := &bind.CallOpts{Context: t.Context()}
+	switch {
+	case cciputils.Version_1_5_1.Equal(version):
+		tp, err := tokenpoolV1_5_1.NewTokenPool(address, backend)
+		require.NoError(t, err)
+		rlAdmin, err := tp.GetRateLimitAdmin(opts)
+		require.NoError(t, err)
+		return rlAdmin
+	case cciputils.Version_1_6_1.Equal(version):
+		tp, err := tokenpoolV1_6_1.NewTokenPool(address, backend)
+		require.NoError(t, err)
+		rlAdmin, err := tp.GetRateLimitAdmin(opts)
+		require.NoError(t, err)
+		return rlAdmin
+	default:
+		t.Fatalf("unsupported pre-2.0 pool version for fetching rate limit admin: %s", version.String())
+		return common.Address{}
+	}
 }
 
 func TestConfigureTokenPool_FeeConfig(t *testing.T) {
