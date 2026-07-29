@@ -30,22 +30,18 @@ compileContract() {
   local args # base args for forge
   args="build $CONTRACTS_DIR/contracts/"$1.sol" --root $CONTRACTS_DIR"
 
-  if [ "$ZKSYNC" = "true" ]; then
-    $(dirname "$0")/forge_zksync $args --zksync
-  else
-    local command
-    command="forge $args \
-    $(getOptimizations "$1" "$contract") \
-    --sizes \
-    --build-info \
-    --build-info-path $dir/build \
-    -o $dir"
+  local command
+  command="forge $args \
+  $(getOptimizations "$1" "$contract") \
+  --sizes \
+  --build-info \
+  --build-info-path $dir/build \
+  -o $dir"
 
-    $command
+  $command
 
-    # Move the build info to an expected file name
-    mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
-  fi
+  # Move the build info to an expected file name
+  mv $(find $dir/build -type f -name '*.json' ! -name 'build.json') $dir/build/build.json
 }
 
 # Define optimization overrides in this function. Anything that is not an override will use the default value
@@ -107,10 +103,8 @@ compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
 compileContract rmn/RMN
 compileContract rmn/RMNProxy
 
-if [ "$ZKSYNC" != "true" ]; then
-  compileContract CREATE2Factory
-  compileContract TokenPoolFactory
-fi
+compileContract CREATE2Factory
+compileContract TokenPoolFactory
 
 # Pools
 compileContract pools/LockReleaseTokenPool

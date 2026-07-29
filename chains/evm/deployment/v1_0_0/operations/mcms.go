@@ -14,7 +14,6 @@ import (
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/sdk/evm/bindings"
-	zkbindings "github.com/smartcontractkit/mcms/sdk/zksync/bindings"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -100,8 +99,7 @@ var OpDeployTimelock = contract.NewDeploy(contract.DeployParams[OpDeployTimelock
 	ContractMetadata: bindings.RBACTimelockMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.RBACTimelock, *MCMSVersion).String(): {
-			EVM:      common.FromHex(bindings.RBACTimelockBin),
-			ZkSyncVM: zkbindings.RBACTimelockZkBytecode,
+			EVM: common.FromHex(bindings.RBACTimelockBin),
 		},
 	},
 	Validate: func(input OpDeployTimelockInput) error { return nil },
@@ -114,8 +112,7 @@ var OpDeployBypasserMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.BypasserManyChainMultisig, *MCMSVersion).String(): {
-			EVM:      common.FromHex(bindings.ManyChainMultiSigBin),
-			ZkSyncVM: zkbindings.ManyChainMultiSigZkBytecode,
+			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
 		},
 	},
 	Validate: func(input struct{}) error { return nil },
@@ -128,8 +125,7 @@ var OpDeployCancellerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.CancellerManyChainMultisig, *MCMSVersion).String(): {
-			EVM:      common.FromHex(bindings.ManyChainMultiSigBin),
-			ZkSyncVM: zkbindings.ManyChainMultiSigZkBytecode,
+			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
 		},
 	},
 	Validate: func(input struct{}) error { return nil },
@@ -142,8 +138,7 @@ var OpDeployProposerMCM = contract.NewDeploy(contract.DeployParams[struct{}]{
 	ContractMetadata: bindings.ManyChainMultiSigMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.ProposerManyChainMultisig, *MCMSVersion).String(): {
-			EVM:      common.FromHex(bindings.ManyChainMultiSigBin),
-			ZkSyncVM: zkbindings.ManyChainMultiSigZkBytecode,
+			EVM: common.FromHex(bindings.ManyChainMultiSigBin),
 		},
 	},
 	Validate: func(input struct{}) error { return nil },
@@ -156,8 +151,7 @@ var OpDeployCallProxy = contract.NewDeploy(contract.DeployParams[OpDeployCallPro
 	ContractMetadata: bindings.CallProxyMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(utils.CallProxy, *MCMSVersion).String(): {
-			EVM:      common.FromHex(bindings.CallProxyBin),
-			ZkSyncVM: zkbindings.CallProxyZkBytecode,
+			EVM: common.FromHex(bindings.CallProxyBin),
 		},
 	},
 	Validate: func(input OpDeployCallProxyInput) error { return nil },
