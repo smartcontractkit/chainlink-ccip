@@ -3,10 +3,29 @@ package shared
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 )
+
+// canonicalEVMAddress lowercases addr and gives it an 0x prefix, leaving an empty address empty.
+//
+// JD stores an OCR key bundle's OnchainSigningAddress as bare hex. A Chainlink node decodes the
+// signer_address of a ccvcommitteeverifier job spec with hexutil.Decode, which rejects a string
+// without the prefix, so an address that reaches a job spec unprefixed fails job creation.
+//
+// It is idempotent, so an already-canonical address passes through unchanged.
+func canonicalEVMAddress(addr string) string {
+	if addr == "" {
+		return ""
+	}
+	lower := strings.ToLower(addr)
+	if !strings.HasPrefix(lower, "0x") {
+		return "0x" + lower
+	}
+	return lower
+}
 
 // SigningIdentityReader returns the family-appropriate signer identity from a JD
 // OCRKeyBundle. Families that need OnchainSigningPubKey instead of the default
@@ -27,7 +46,7 @@ func (EVMSigningIdentityReader) FromBundle(b *nodev1.OCR2Config_OCRKeyBundle) (s
 	if b.OnchainSigningAddress == "" {
 		return "", fmt.Errorf("OnchainSigningAddress is empty")
 	}
-	return b.OnchainSigningAddress, nil
+	return canonicalEVMAddress(b.OnchainSigningAddress), nil
 }
 
 var signingIdentityReaders = map[string]SigningIdentityReader{
@@ -53,6 +72,9 @@ func SigningIdentityFromBundle(family string, bundle *nodev1.OCR2Config_OCRKeyBu
 	if bundle.OnchainSigningAddress == "" {
 		return "", fmt.Errorf("OnchainSigningAddress is empty")
 	}
+	// Deliberately not canonicalised: this branch is reached only by a family that registered no
+	// reader, and 0x-prefixing an identity that is not an EVM address would corrupt it. EVM has a
+	// reader registered by default, so the fix above covers it.
 	return bundle.OnchainSigningAddress, nil
 }
 
