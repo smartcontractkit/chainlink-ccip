@@ -1232,8 +1232,8 @@ github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 h1:RwZXxdIA
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5/go.mod h1:kHYJnZUqiPF7/xN5273prV+srrLJkS77GbBXHLKQpx0=
 github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0 h1:A9i7HCdIEA4NhYkTsmKEZjiMThiUysbSkYnZWaZRrN8=
 github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0/go.mod h1:rEDr7VMWiVTVv5/Kpg6KLxPXCfThrv7kkdRgSEne6GI=
-github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260713162202-124316cd10ff h1:a0Z9NlZLwP7wClk84lP3iZpKFKzLGkS0U0VReIThaT4=
-github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260713162202-124316cd10ff/go.mod h1:40yDOuuKaXDBWCbkJBQUeUmgpjOWHpQrs61y5Dch+zA=
+github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260723133120-84f330f77b91 h1:aUTEX30uovTgI4Ze1RDlku7Q3ht8eLlbV8Vm8h0y2S8=
+github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260723133120-84f330f77b91/go.mod h1:IaHZiTepZbDOZJA/NG5gmbe2C/FsiSZn+ee7P/iGoi0=
 github.com/smartcontractkit/chainlink-ton/cciplib v0.1.1-0.20260714130443-bb3cf7801e11 h1:2iRvjIWJaMZVcxq2wzh+byT6OX1UVKWmsyfGFb5MeSM=
 github.com/smartcontractkit/chainlink-ton/cciplib v0.1.1-0.20260714130443-bb3cf7801e11/go.mod h1:WjihFo64itMaOcaDMJ97iz0cJYO2zlLfPdUkF7/mQNo=
 github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260723133120-84f330f77b91 h1:u9Fc+FID8u1AoWG89C80v/20pZt510zQWcjpaND/SUA=
