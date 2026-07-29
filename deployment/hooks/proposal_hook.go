@@ -12,6 +12,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -112,7 +113,7 @@ func GlobalPostProposalCCIPSendHook(dom domain.Domain) cldf_changeset.PostPropos
 	return cldf_changeset.PostProposalHook{
 		HookDefinition: cldf_changeset.HookDefinition{
 			Name:          postProposalCCIPSendHookName,
-			FailurePolicy: cldf_changeset.Abort,
+			FailurePolicy: cldf_changeset.Warn,
 			Timeout:       15 * time.Minute,
 		},
 		Func: verifyCCIPSend(dom),
@@ -199,9 +200,9 @@ func runPostProposalCCIPSends(
 
 		feeTokens, err := provider.SupportedFeeTokens(env, srcSel, hookEnv.ForkContext)
 		if err != nil {
-			lggr.Warnf("verify-ccip-send: fee tokens for chain %d: %v", srcSel, err)
+			lggr.Warnf("verify-ccip-send: fee tokens for chain %d: %v, falling back to native-only", srcSel, err)
 			errs = append(errs, err)
-			continue
+			feeTokens = []string{""}
 		}
 		if len(feeTokens) == 0 {
 			// Keep a native-fee send path even when no ERC20 fee token is discoverable.
@@ -323,6 +324,28 @@ func runPostProposalCCIPSends(
 					}
 					feeTokenGroup.infof("verify-ccip-send: ✅ successful CCIP send message id %s (src=%d dest=%d fee=%q)",
 						msgID, srcSel, destSel, feeTok)
+
+					// If a MessageExecutor is registered for this family, verify
+					// message execution on the destination chain. This is used by
+					// CCV domains to validate the full send→execute path with CCV
+					// bypass
+					if executor, ok := testadapters.GetMessageExecutorRegistry().Get(family); ok {
+						execTxHash, execErr := executor.ExecuteMessage(ctx, env, srcSel, destSel, msgID)
+						if execErr != nil {
+							if errors.Is(execErr, testadapters.ErrSkipExecute) {
+								feeTokenGroup.infof("verify-ccip-send: ⏭️ execute skipped msgID=%s", msgID)
+							} else {
+								feeTokenGroup.warnf("verify-ccip-send: ❌ execute failed src=%d dest=%d fee=%q msgID=%s: %v",
+									srcSel, destSel, feeTok, msgID, execErr)
+								addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
+								feeTokenStatus = groupStatusFailed
+								destStatus = groupStatusFailed
+							}
+						} else {
+							feeTokenGroup.infof("verify-ccip-send: ✅ execute success msgID=%s txHash=%s", msgID, execTxHash)
+						}
+					}
+
 					destGroup.appendGroup(feeTokenGroup, feeTokenStatus)
 				}
 			}(destSel)

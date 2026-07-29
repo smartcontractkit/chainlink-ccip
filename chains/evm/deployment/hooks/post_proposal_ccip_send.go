@@ -125,22 +125,35 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		return nil, fmt.Errorf("chain %d not in environment EVM chains", srcSel)
 	}
 
-	rpcUrl := evmForkContext.ChainConfig.HTTPRPCs[0].External
+	// The upstream hook API passes a single ForkContext for ALL chains, so the
+	// fork context's RPC URL may belong to a different chain. Use chain.Client
+	// for all contract calls (always correct per-chain). Only use the fork
+	// context's RPC for anvil impersonation, and only when its chain ID matches.
 	client := chain.Client
-	ec, err := ethclient.Dial(rpcUrl)
-	// in case of error fallback to env chain client
-	if err != nil {
-		env.Logger.Warnf("failed to connect to eth client for chain %d at rpc %s, using env chain client instead: %v", srcSel, rpcUrl, err)
-	} else {
-		// try to query the client to make sure it's working, if not fallback to env chain client
-		// it's needed for the e2e test where full forked set up is not done
-		_, err = ec.ChainID(env.GetContext())
-		if err != nil {
-			env.Logger.Warnf("failed to connect to eth client for chain %d at rpc %s, using env chain client instead: %v", srcSel, rpcUrl, err)
-		} else {
-			defer ec.Close()
-			client = ec
+
+	var rpcUrl string
+	var ec *ethclient.Client
+	forkRpcUrl := evmForkContext.ChainConfig.HTTPRPCs[0].External
+	forkEc, dialErr := ethclient.Dial(forkRpcUrl)
+	if dialErr == nil {
+		forkChainID, idErr := forkEc.ChainID(env.GetContext())
+		if idErr == nil {
+			if chainMeta, metaOk := chain_selectors.ChainBySelector(srcSel); metaOk {
+				expectedChainID := new(big.Int).SetUint64(chainMeta.EvmChainID)
+				if forkChainID.Cmp(expectedChainID) == 0 {
+					ec = forkEc
+					rpcUrl = forkRpcUrl
+				}
+			}
 		}
+		if ec == nil {
+			forkEc.Close()
+		}
+	} else {
+		env.Logger.Warnf("failed to connect to fork eth client at rpc %s: %v", forkRpcUrl, dialErr)
+	}
+	if ec != nil {
+		defer ec.Close()
 	}
 
 	if client == nil {
@@ -166,7 +179,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	if err != nil {
 		return nil, err
 	}
-	feeTokenFundingAmount = new(big.Int).Mul(big.NewInt(int64(len(chains))), feeTokenFundingAmount)
+	fundingAmount := new(big.Int).Mul(big.NewInt(int64(len(chains))), feeTokenFundingAmount)
 	var addrs []common.Address
 	// FeeQuoter bindings differ by major version; select the matching wrapper at runtime.
 	switch fqVer.Major() {
@@ -196,9 +209,13 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	// Best-effort on forked/anvil-backed chains: try to set native balance for the deployer key
 	// so impersonated token-owner transfers can pay gas. Environments without impersonation support
 	// should not fail the entire post-proposal verification flow here.
-	err = testhelpers.SetImpersonatedBalance(rpcUrl, chain.DeployerKey.From.Hex(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
-	if err != nil {
-		env.Logger.Warnf("Failed to set impersonated balance for chain %d; continuing without fork balance setup: %v", srcSel, err)
+	if rpcUrl != "" {
+		err = testhelpers.SetImpersonatedBalance(rpcUrl, chain.DeployerKey.From.Hex(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
+		if err != nil {
+			env.Logger.Warnf("Failed to set impersonated balance for chain %d; continuing without fork balance setup: %v", srcSel, err)
+		}
+	} else {
+		env.Logger.Warnf("Skipping impersonated balance setup for chain %d; fork context RPC does not match this chain", srcSel)
 	}
 	var filteredFeeTokens []common.Address
 	// Best-effort funding: try to give the deployer fee token balances by impersonating each token owner
@@ -213,19 +230,19 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 			return nil, fmt.Errorf("failed to create burn mint erc20 instance: %w", err)
 		}
 		deployerBal, err := token.BalanceOf(nil, chain.DeployerKey.From)
-		if err == nil && deployerBal.Cmp(feeTokenFundingAmount) >= 0 {
+		if err == nil && deployerBal.Cmp(fundingAmount) >= 0 {
 			filteredFeeTokens = append(filteredFeeTokens, addr)
 			continue
 		}
 		env.Logger.Debugf("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
-		tokenOwner, err := discoverFeeTokenFundingAccount(ctx, client, token, addr, feeTokenFundingAmount)
+		tokenOwner, err := discoverFeeTokenFundingAccount(ctx, client, token, addr, fundingAmount)
 		if err != nil {
 			// in case of error continue
 			env.Logger.Warnf("Failed to discover fee token funding account for token %s on chain %d, continuing without it: %v", addr.Hex(), srcSel, err)
 			continue
 		}
-		tx, err := token.Transfer(cldf.SimTransactOpts(), chain.DeployerKey.From, feeTokenFundingAmount)
+		tx, err := token.Transfer(cldf.SimTransactOpts(), chain.DeployerKey.From, fundingAmount)
 		if err != nil {
 			// in case of error continue
 			env.Logger.Warnf("Failed to create transfer transaction for fee token %s from token owner %s to deployer %s on chain %d, "+
