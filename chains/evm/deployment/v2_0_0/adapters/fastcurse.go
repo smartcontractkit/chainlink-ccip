@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	rmnsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
@@ -186,15 +186,11 @@ func routerAddressOnChain(e cldf.Environment, selector uint64) (common.Address, 
 }
 
 func rmnAddressOnChain(e cldf.Environment, selector uint64) (common.Address, error) {
-	rmnRef := datastore.AddressRef{
-		Type:    datastore.ContractType(ops.ContractType),
-		Version: ops.Version,
-	}
-	rmnAddrRef, err := datastore_utils.FindAndFormatRef(e.DataStore, rmnRef, selector, evmds.ToEVMAddress)
+	rmnAddr, err := utils.ActiveRMNAddress(e, selector)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to resolve RMN ref on chain with selector %d: %w", selector, err)
+		return common.Address{}, fmt.Errorf("failed to resolve active RMN address on chain with selector %d: %w", selector, err)
 	}
-	return rmnAddrRef, nil
+	return rmnAddr, nil
 }
 
 func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64) ([]uint64, error) {

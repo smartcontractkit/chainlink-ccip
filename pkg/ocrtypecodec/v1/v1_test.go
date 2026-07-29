@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
 )
 
 var dataGenerators = []dataGenerator{
@@ -131,6 +133,107 @@ func TestExecOutcome(t *testing.T) {
 		results = append(results, result)
 	}
 	fmt.Println(resultDataArray(results))
+}
+
+func TestDecodeObservation_NilSeqNumsRange_ReturnsError(t *testing.T) {
+	codec := NewCommitCodecProto()
+
+	// MerkleRootChain with a valid 32-byte root but no SeqNumsRange. A missing range would decode to
+	// [0, 0], but 0 is not a valid CCIP sequence number, so this is rejected rather than zero-filled.
+	pbObs := &ocrtypecodecpb.CommitObservation{
+		MerkleRootObs: &ocrtypecodecpb.MerkleRootObservation{
+			MerkleRoots: []*ocrtypecodecpb.MerkleRootChain{
+				{
+					ChainSel:     1,
+					MerkleRoot:   make([]byte, 32),
+					SeqNumsRange: nil, // omitted nested message
+				},
+			},
+		},
+	}
+
+	data, err := proto.Marshal(pbObs)
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() {
+		_, err := codec.DecodeObservation(data)
+		require.Error(t, err)
+	})
+}
+
+func TestDecodeObservation_NilChainFee_ZeroFilled(t *testing.T) {
+	codec := NewCommitCodecProto()
+
+	// A ChainFeeUpdate with no ChainFee decodes to zero fees. Zero is a valid domain value that the
+	// chainfee processor's validateChainFeeUpdates accepts (it rejects only nil/negative), so the
+	// decoder zero-fills rather than erroring - matching what an oracle sending an explicit zero does.
+	pbObs := &ocrtypecodecpb.CommitObservation{
+		ChainFeeObs: &ocrtypecodecpb.ChainFeeObservation{
+			ChainFeeUpdates: map[uint64]*ocrtypecodecpb.ChainFeeUpdate{
+				1: {ChainFee: nil}, // omitted nested message
+			},
+		},
+	}
+
+	data, err := proto.Marshal(pbObs)
+	require.NoError(t, err)
+
+	var obs committypes.Observation
+	require.NotPanics(t, func() {
+		obs, err = codec.DecodeObservation(data)
+		require.NoError(t, err)
+	})
+	update := obs.ChainFeeObs.ChainFeeUpdates[1]
+	require.Zero(t, update.ChainFee.ExecutionFeePriceUSD.Sign())
+	require.Zero(t, update.ChainFee.DataAvFeePriceUSD.Sign())
+}
+
+func TestDecodeObservation_NilMessageHeader_DoesNotPanic(t *testing.T) {
+	codec := NewExecCodecProto()
+
+	// A Message with no Header set, nested inside the exec observation's per-chain message map.
+	pbObs := &ocrtypecodecpb.ExecObservation{
+		SeqNumsToMsgs: map[uint64]*ocrtypecodecpb.SeqNumToMessage{
+			1: {
+				Messages: map[uint64]*ocrtypecodecpb.Message{
+					1: {Header: nil}, // omitted nested message
+				},
+			},
+		},
+	}
+
+	data, err := proto.Marshal(pbObs)
+	require.NoError(t, err)
+
+	// A missing header fails the length validation and returns an error - but it must not panic.
+	require.NotPanics(t, func() {
+		_, _ = codec.DecodeObservation(data)
+	})
+}
+
+func TestDecodeOutcome_NilChainRange_ReturnsError(t *testing.T) {
+	codec := NewCommitCodecProto()
+
+	// A ChainRange with no SeqNumRange set. As with merkle roots, a missing range would decode to
+	// [0, 0]; 0 is not a valid CCIP sequence number, so this is rejected rather than zero-filled.
+	pbOutcome := &ocrtypecodecpb.CommitOutcome{
+		MerkleRootOutcome: &ocrtypecodecpb.MerkleRootOutcome{
+			RangesSelectedForReport: []*ocrtypecodecpb.ChainRange{
+				{
+					ChainSel:    1,
+					SeqNumRange: nil, // omitted nested message
+				},
+			},
+		},
+	}
+
+	data, err := proto.Marshal(pbOutcome)
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() {
+		_, err := codec.DecodeOutcome(data)
+		require.Error(t, err)
+	})
 }
 
 // ------------------------------------------------

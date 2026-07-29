@@ -171,7 +171,7 @@ func buildConfigureChainForLanesInput(
 	return changesetadapters.ConfigureChainForLanesInput{
 		ChainSelector: localSelector,
 		Router:        common.HexToAddress(local.router).Bytes(),
-		OnRamp:        common.HexToAddress(local.onRamp).Bytes(),
+		OnRamp:        common.LeftPadBytes(common.HexToAddress(local.onRamp).Bytes(), 32),
 		FeeQuoter:     common.HexToAddress(local.feeQuoter).Bytes(),
 		OffRamp:       common.HexToAddress(local.offRamp).Bytes(),
 		CommitteeVerifiers: []changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
@@ -196,7 +196,7 @@ func buildConfigureChainForLanesInput(
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
 				AllowTrafficFrom:    new(true),
-				OnRamps:             [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OnRamps:             [][]byte{common.LeftPadBytes(common.HexToAddress(remote.onRamp).Bytes(), 32)},
 				OffRamp:             common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultExecutor:     local.executor,
 				DefaultInboundCCVs:  []string{local.committeeVerifier},

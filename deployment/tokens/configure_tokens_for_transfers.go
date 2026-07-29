@@ -52,7 +52,7 @@ type TokenTransferConfig struct {
 	LiquidityMigrationAmount *big.Int `yaml:"liquidityMigrationAmount" json:"liquidityMigrationAmount"`
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with LiquidityMigrationAmount. See LiquidityMigrationAmount for ownership and entry-point requirements.
-	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
+	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints" json:"liquidityMigrationBasisPoints"`
 	// AutoMigrateRemoteChains is only applicable when migrating a pre-V2 pool to V2. When true, the changeset
 	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
 	// automatically with (token, pool, decimals, rate limits, and MigrationMetadata). Legacy lane fees are read

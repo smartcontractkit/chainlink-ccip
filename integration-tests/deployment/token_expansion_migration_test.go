@@ -18,12 +18,13 @@ import (
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	v2changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -243,13 +244,22 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 	// DeployChainContracts caches proxy GetTarget reads from before SetTarget; refresh the bundle
 	// so lane configuration observes the updated on-chain executor target.
 	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
-	connectOut, err := lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), changesets.GetRegistry()).Apply(*e, lanes.ConnectChainsConfig{
-		MCMS: mcms.Input{},
-		Lanes: []lanes.LaneConfig{
-			{
-				Version: cciputils.Version_2_0_0,
-				ChainA:  NewLaneChainDefinitionForV2(selA, selB),
-				ChainB:  NewLaneChainDefinitionForV2(selB, selA),
+	deployer := e.BlockChains.EVMChains()[selA].DeployerKey.From.Hex()
+	connectOut, err := v2changesets.ConfigureChainsForLanesFromTopology(
+		ccvadapters.GetCommitteeVerifierContractRegistry(),
+		ccvadapters.GetChainFamilyRegistry(),
+		changesets.GetRegistry(),
+	).Apply(*e, v2changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: NewLaneTopologyForV2(deployer, selA, selB),
+		BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
+			MCMS: mcms.Input{},
+			Lanes: []v2changesets.CrossFamilyLanePair{
+				{
+					ChainA:          selA,
+					ChainB:          selB,
+					ChainAOverrides: NewLaneOverridesForV2(selA),
+					ChainBOverrides: NewLaneOverridesForV2(selB),
+				},
 			},
 		},
 	})

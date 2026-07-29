@@ -36,6 +36,15 @@ func globalAction(t *testing.T, chain uint64, version string) CurseActionInput {
 	}
 }
 
+func subjectAction(t *testing.T, chain uint64, subject Subject, version string) CurseActionInput {
+	t.Helper()
+	return CurseActionInput{
+		ChainSelector: chain,
+		Subject:       &subject,
+		Version:       mustVersion(t, version),
+	}
+}
+
 func TestValidateVersions(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -135,6 +144,13 @@ func TestValidateBidirectionalCursing(t *testing.T) {
 			name: "global curse is not subject to bidirectional validation",
 			actions: []CurseActionInput{
 				globalAction(t, 1, "1.6.0"),
+			},
+			expectError: false,
+		},
+		{
+			name: "explicit Subject action is not subject to bidirectional validation",
+			actions: []CurseActionInput{
+				subjectAction(t, 1, FiredrillSubject(), "1.6.0"),
 			},
 			expectError: false,
 		},

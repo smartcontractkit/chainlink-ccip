@@ -1,9 +1,7 @@
 package adapters
 
 import (
-	"encoding/binary"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,13 +14,11 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -36,27 +32,25 @@ type ChainFamilyAdapter struct{}
 
 var _ ccvadapters.ChainFamily = (*ChainFamilyAdapter)(nil)
 
-// ConfigureLaneLegAsSource returns the sequence for configuring a chain of the EVM family as a source chain for CCIP lanes.
-func (a *ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
-	return sequences.ConfigureLaneLegAsSource
-}
-
-// ConfigureLaneLegAsDest returns the sequence for configuring a chain of the EVM family as a destination chain for CCIP lanes.
-func (a *ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
-	return sequences.ConfigureLaneLegAsDest
-}
-
 // ConfigureChainForLanes returns the sequence for configuring an EVM chain for multiple remote lanes.
 func (a *ChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence[ccvadapters.ConfigureChainForLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.ConfigureChainForLanes
 }
 
+// GetOnRampAddress returns the OnRamp address the way EVM puts it on the wire:
+// OnRamp.sol sets the message's onRampAddress to abi.encode(address(this)), so it is the
+// 20-byte address left-padded to 32. A destination chain matches an incoming message by
+// hashing those bytes, so its source-chain config has to hold this form; the plain
+// 20-byte address would never match.
+//
+// Callers that need to call the contract decode the address out of it, which
+// common.BytesToAddress does by taking the low 20 bytes.
 func (a *ChainFamilyAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
-	}, chainSelector, evm_datastore_utils.ToEVMAddressBytes)
+	}, chainSelector, evm_datastore_utils.ToABIEncodedEVMAddress)
 	return addr, err
 }
 
@@ -105,10 +99,6 @@ func (a *ChainFamilyAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSe
 		return nil, fmt.Errorf("fee quoter address is zero in onramp dynamic config for chain selector %d", chainSelector)
 	}
 	return common.Address(fqAddress).Bytes(), nil
-}
-
-func (a *ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
-	return evm_sequences.DisableRemoteChainSequence
 }
 
 func (a *ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
@@ -189,27 +179,6 @@ func (a *ChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(chainSelector ui
 	}
 }
 
-// This needs to be deprecated. use GetDefaultFeeQuoterDestChainConfig instead
-func (a *ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
-	sel := a.GetChainFamilySelector()
-	return lanes.FeeQuoterDestChainConfig{
-		IsEnabled:                   true,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
-		DestGasOverhead:             300_000,
-		DestGasPerPayloadByteBase:   16,
-		ChainFamilySelector:         binary.BigEndian.Uint32(sel[:]),
-		DefaultTokenFeeUSDCents:     25,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
-		NetworkFeeUSDCents:          10,
-		V2Params: &lanes.FeeQuoterV2Params{
-			LinkFeeMultiplierPercent: 90,
-			USDPerUnitGas:            big.NewInt(1e6),
-		},
-	}
-}
-
 func (a *ChainFamilyAdapter) GetDefaultRemoteChainConfig(sourceChainSelector, remoteChainSelector uint64) ccvadapters.RemoteChainDefaults {
 	return ccvadapters.RemoteChainDefaults{
 		AllowTrafficFrom: true,
@@ -239,10 +208,6 @@ func (a *ChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 		WaitForSafe:     false,
 		BlockDepth:      1,
 	}
-}
-
-func (a *ChainFamilyAdapter) GetDefaultGasPrice() *big.Int {
-	return big.NewInt(2e12)
 }
 
 func (a *ChainFamilyAdapter) ValidateNOPsTopology(chainSelector string, nopCount int) error {

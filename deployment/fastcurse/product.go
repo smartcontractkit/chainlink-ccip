@@ -123,6 +123,12 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 		if s.IsGlobalCurse && s.SubjectChainSelector != 0 {
 			return nil, fmt.Errorf("invalid curse action input: cannot have both IsGlobalCurse true and SubjectChainSelector set")
 		}
+		if s.Subject != nil && s.SubjectChainSelector != 0 {
+			return nil, fmt.Errorf("invalid curse action input: cannot have both Subject and SubjectChainSelector set")
+		}
+		if s.Subject != nil && s.IsGlobalCurse {
+			return nil, fmt.Errorf("invalid curse action input: cannot have both Subject and IsGlobalCurse set")
+		}
 		family, err := chain_selectors.GetSelectorFamily(s.ChainSelector)
 		if err != nil {
 			return nil, err
@@ -167,6 +173,16 @@ func (cr *CurseRegistry) groupRMNSubjectBySelector(e cldf.Environment, rmnSubjec
 		if slices.ContainsFunc(grouped[s.ChainSelector].subjects, func(subj Subject) bool {
 			return IfSubjectEqual(subj, GlobalCurseSubject())
 		}) {
+			continue
+		}
+		if s.Subject != nil {
+			// Use the literal subject verbatim, bypassing connectivity validation.
+			if !slices.Contains(grouped[s.ChainSelector].subjects, *s.Subject) {
+				grouped[s.ChainSelector] = curseActionDetails{
+					curseAdapter: adapter,
+					subjects:     append(grouped[s.ChainSelector].subjects, *s.Subject),
+				}
+			}
 			continue
 		}
 		// find if target subject is connected if not global
