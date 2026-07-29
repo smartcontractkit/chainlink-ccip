@@ -6,11 +6,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 )
 
@@ -74,4 +76,69 @@ func FilterExecutorDestChains(
 		out[executorAddr] = filtered
 	}
 	return out, nil
+}
+
+// extractCommitteeVerifierAddresses picks the CommitteeVerifier and its resolver out of a
+// set of refs, requiring exactly one of each.
+func extractCommitteeVerifierAddresses(refs []datastore.AddressRef, chainSelector uint64) (verifier string, resolver string, err error) {
+	for _, addr := range refs {
+		switch addr.Type {
+		case datastore.ContractType(committee_verifier.ContractType):
+			if verifier != "" {
+				return "", "", fmt.Errorf("duplicate committee verifier contract on chain %d", chainSelector)
+			}
+			verifier = addr.Address
+		case datastore.ContractType(CommitteeVerifierResolverType):
+			if resolver != "" {
+				return "", "", fmt.Errorf("duplicate committee verifier resolver contract on chain %d", chainSelector)
+			}
+			resolver = addr.Address
+		}
+	}
+	if verifier == "" {
+		return "", "", fmt.Errorf("committee verifier contract not found on chain %d", chainSelector)
+	}
+	if resolver == "" {
+		return "", "", fmt.Errorf("committee verifier resolver contract not found on chain %d", chainSelector)
+	}
+	return verifier, resolver, nil
+}
+
+// makeAllowlistUpdates returns the adds and removes to apply so the allowlist becomes (current ∪ added) \ removed.
+// It takes the current on-chain allowlist and the config's added/removed sender lists (hex addresses).
+func makeAllowlistUpdates(current []common.Address, added, removed []string) (toAdd, toRemove []common.Address, err error) {
+	curSet := make(map[common.Address]struct{}, len(current))
+	for _, a := range current {
+		curSet[a] = struct{}{}
+	}
+	addedSet := make(map[common.Address]struct{}, len(added))
+	for _, s := range added {
+		if !common.IsHexAddress(s) {
+			return nil, nil, fmt.Errorf("invalid hex address in added allowlist: %q", s)
+		}
+		addedSet[common.HexToAddress(s)] = struct{}{}
+	}
+	removedSet := make(map[common.Address]struct{}, len(removed))
+	for _, s := range removed {
+		if !common.IsHexAddress(s) {
+			return nil, nil, fmt.Errorf("invalid hex address in removed allowlist: %q", s)
+		}
+		removedSet[common.HexToAddress(s)] = struct{}{}
+	}
+	desiredSet := make(map[common.Address]struct{})
+	for a := range curSet {
+		if _, remove := removedSet[a]; !remove {
+			desiredSet[a] = struct{}{}
+		}
+	}
+	for a := range addedSet {
+		desiredSet[a] = struct{}{}
+	}
+	desired := make([]common.Address, 0, len(desiredSet))
+	for a := range desiredSet {
+		desired = append(desired, a)
+	}
+	toAdd = AddressesNotIn(desired, current)
+	toRemove = AddressesNotIn(current, desired)
+	return toAdd, toRemove, nil
 }

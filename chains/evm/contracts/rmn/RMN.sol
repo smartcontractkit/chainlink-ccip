@@ -122,10 +122,48 @@ contract RMN is AuthorizedCallers, ITypeAndVersion, IRMN {
     return s_cursedSubjects.contains(subject) || s_cursedSubjects.contains(GLOBAL_CURSE_SUBJECT);
   }
 
+  // ================================================================
+  // │                        Compatibility                         │
+  // ================================================================
+
+  // Functions in this section are purely for compatibility with older CCIP versions. They serve no further purpose
+  // and return hardcoded values. They are included to avoid breaking existing integrations.
+
   /// @inheritdoc IRMN
   function isBlessed(
     TaggedRoot calldata // subject
   ) external pure override returns (bool) {
     return true;
+  }
+
+  /// @dev this is included in the preimage of the digest that RMN nodes sign.
+  bytes32 private constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
+
+  /// @notice Returns the 32 byte header used in computing the report digest.
+  /// @return digestHeader the digest header.
+  function getReportDigestHeader() external pure returns (bytes32 digestHeader) {
+    return RMN_V1_6_ANY2EVM_REPORT;
+  }
+
+  /// @dev the configuration of an RMN signer.
+  struct Signer {
+    address onchainPublicKey; // ─╮ For signing reports.
+    uint64 nodeIndex; // ─────────╯ Maps to nodes in home chain config, should be strictly increasing.
+  }
+
+  /// @dev the contract config.
+  struct Config {
+    bytes32 rmnHomeContractConfigDigest; // Digest of the RMNHome contract config.
+    Signer[] signers; // List of signers.
+    uint64 fSign; // Max number of faulty RMN nodes; f+1 signers are required to verify a report, must configure 2f+1 signers in total.
+  }
+
+  /// @notice Returns the current configuration of the contract and a version number.
+  /// @dev This contract does not track RMN signer configuration, so this always returns an empty
+  /// config at version 0.
+  /// @return version the current config version.
+  /// @return config the current config.
+  function getVersionedConfig() external pure returns (uint32 version, Config memory config) {
+    return (0, Config({rmnHomeContractConfigDigest: bytes32(0), signers: new Signer[](0), fSign: 0}));
   }
 }

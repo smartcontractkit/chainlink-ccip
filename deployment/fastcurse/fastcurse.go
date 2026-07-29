@@ -36,6 +36,13 @@ type CurseActionInput struct {
 	ChainSelector        uint64
 	SubjectChainSelector uint64
 	Version              *semver.Version
+	// Subject, if set, is used verbatim as the curse subject instead of deriving one
+	// from SubjectChainSelector. This bypasses the IsChainConnectedToTargetChain
+	// connectivity check, so it can be used both for hardcoded test subjects (see
+	// FiredrillSubject) and for real, selector-derived subjects when the target
+	// chain's connectivity can't be confirmed (e.g. unreachable or stalled chain).
+	// Mutually exclusive with IsGlobalCurse and SubjectChainSelector.
+	Subject *Subject
 }
 
 type curseActionDetails struct {
@@ -98,34 +105,88 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 			return curseCfg, fmt.Errorf("failed to list connected chains for chain selector %d: %w", chainSelector, err)
 		}
 		for _, connectedChainSelector := range connectedChains {
-			connectedChainFamily, err := chain_selectors.GetSelectorFamily(connectedChainSelector)
+			// laneActionsForConnectedChain validates the connected chain is
+			// still cursable. Lanes discovered by ListConnectedChains (via
+			// offRamps) may reference chains that are no longer in the
+			// environment, whose RMN version can't be derived, or whose
+			// router no longer supports the cursed chain via
+			// IsChainSupported. When any of these hold the lane pair is
+			// silently skipped so the global curse on the primary chain
+			// still proceeds.
+			laneActions, err := laneActionsForConnectedChain(e, cr, chainSelector, version, connectedChainSelector)
 			if err != nil {
 				return curseCfg, err
 			}
-			connectedAdapter, ok := cr.GetCurseSubjectAdapter(connectedChainFamily)
-			if !ok {
-				return curseCfg, fmt.Errorf("no curse subject adapter registered for chain family '%s'",
-					connectedChainFamily)
-			}
-			connectedVersion, err := connectedAdapter.DeriveCurseAdapterVersion(e, connectedChainSelector)
-			if err != nil {
-				return curseCfg, fmt.Errorf("failed to derive curse adapter version for chain selector %d: %w", connectedChainSelector, err)
-			}
-			// Add both directions for v1.6 lane safety (reverse can be any version).
-			// Even for a global curse, v1.6 lanes must be represented bidirectionally.
-			curseCfg.CurseActions = append(curseCfg.CurseActions, CurseActionInput{
-				ChainSelector:        connectedChainSelector,
-				Version:              connectedVersion,
-				SubjectChainSelector: chainSelector,
-			})
-			curseCfg.CurseActions = append(curseCfg.CurseActions, CurseActionInput{
-				ChainSelector:        chainSelector,
-				Version:              version,
-				SubjectChainSelector: connectedChainSelector,
-			})
+			curseCfg.CurseActions = append(curseCfg.CurseActions, laneActions...)
 		}
 	}
 	return curseCfg, nil
+}
+
+// laneActionsForConnectedChain validates that a chain discovered by
+// ListConnectedChains is still cursable and returns the bidirectional
+// lane curse actions. It returns nil actions when the connected chain
+// should be gracefully skipped: the chain is not in the environment, its
+// RMN version can't be derived, or its router no longer supports the
+// cursed chain (IsChainSupported=false). Only config-level errors
+// (missing adapter registrations) are returned as hard errors.
+func laneActionsForConnectedChain(
+	e cldf.Environment,
+	cr *CurseRegistry,
+	cursedChainSelector uint64,
+	cursedVersion *semver.Version,
+	connectedChainSelector uint64,
+) ([]CurseActionInput, error) {
+	connectedChainFamily, err := chain_selectors.GetSelectorFamily(connectedChainSelector)
+	if err != nil {
+		return nil, err
+	}
+	connectedSubjectAdapter, ok := cr.GetCurseSubjectAdapter(connectedChainFamily)
+	if !ok {
+		return nil, fmt.Errorf("no curse subject adapter registered for chain family '%s'",
+			connectedChainFamily)
+	}
+	connectedVersion, err := connectedSubjectAdapter.DeriveCurseAdapterVersion(e, connectedChainSelector)
+	if err != nil {
+		e.Logger.Infof("Skipping discovered lane %d<->%d: cannot derive curse adapter version for chain %d: %v",
+			cursedChainSelector, connectedChainSelector, connectedChainSelector, err)
+		return nil, nil
+	}
+	connectedCurseAdapter, ok := cr.GetCurseAdapter(connectedChainFamily, connectedVersion)
+	if !ok {
+		return nil, fmt.Errorf("no curse adapter registered for chain family '%s' and RMN version '%s'",
+			connectedChainFamily, connectedVersion.String())
+	}
+	if err := connectedCurseAdapter.Initialize(e, connectedChainSelector); err != nil {
+		e.Logger.Infof("Skipping discovered lane %d<->%d: cannot initialize curse adapter for chain %d: %v",
+			cursedChainSelector, connectedChainSelector, connectedChainSelector, err)
+		return nil, nil
+	}
+	supported, err := connectedCurseAdapter.IsChainConnectedToTargetChain(e, connectedChainSelector, cursedChainSelector)
+	if err != nil {
+		e.Logger.Infof("Skipping discovered lane %d<->%d: cannot verify connectivity for chain %d: %v",
+			cursedChainSelector, connectedChainSelector, connectedChainSelector, err)
+		return nil, nil
+	}
+	if !supported {
+		e.Logger.Infof("Skipping discovered lane %d<->%d: chain %d no longer supports chain %d (IsChainSupported=false)",
+			cursedChainSelector, connectedChainSelector, connectedChainSelector, cursedChainSelector)
+		return nil, nil
+	}
+	// Add both directions for v1.6 lane safety (reverse can be any version).
+	// Even for a global curse, v1.6 lanes must be represented bidirectionally.
+	return []CurseActionInput{
+		{
+			ChainSelector:        connectedChainSelector,
+			Version:              connectedVersion,
+			SubjectChainSelector: cursedChainSelector,
+		},
+		{
+			ChainSelector:        cursedChainSelector,
+			Version:              cursedVersion,
+			SubjectChainSelector: connectedChainSelector,
+		},
+	}, nil
 }
 
 func applyGlobalCurseOnNetwork(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry, curse bool) func(cldf.Environment, GlobalCurseOnNetworkInput) (cldf.ChangesetOutput, error) {

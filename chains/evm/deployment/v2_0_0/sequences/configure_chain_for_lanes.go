@@ -59,7 +59,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			return seqtypes.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		if err := validateEVMAddresses(input.Router, input.OnRamp, input.FeeQuoter, input.OffRamp); err != nil {
+		if err := validateEVMAddresses(input.Router, input.FeeQuoter, input.OffRamp); err != nil {
+			return seqtypes.OnChainOutput{}, err
+		}
+		// The OnRamp arrives abi-encoded because that is the form it goes on the wire in
+		// (see the EVM adapter's GetOnRampAddress); the address is decoded from it below.
+		if err := validateEVMOnRampAddress(input.OnRamp); err != nil {
 			return seqtypes.OnChainOutput{}, err
 		}
 
@@ -377,9 +382,13 @@ func maybeAddSourceChainConfigArgOnLocalChain(
 	for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
 		laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, common.HexToAddress(ccv))
 	}
-	onRamps := make([][]byte, 0, len(remoteConfig.OnRamps))
-	for _, onRampAddress := range remoteConfig.OnRamps {
-		onRamps = append(onRamps, common.LeftPadBytes(onRampAddress, 32))
+	// Source onramps are opaque here: the OffRamp matches an incoming message by hashing
+	// the bytes it carries, and how those bytes are encoded is the source family's business.
+	// The caller resolves them through the source chain's own adapter and we store the
+	// result verbatim rather than second-guessing another family's encoding.
+	onRamps, err := nonEmptySourceOnRamps(remoteSelector, remoteConfig.OnRamps)
+	if err != nil {
+		return nil, err
 	}
 
 	offRampAddr := common.BytesToAddress(input.OffRamp)
@@ -883,10 +892,39 @@ func adapterDestChainConfigToFeeQuoterV2(cfg changesetadapters.FeeQuoterDestChai
 	}
 }
 
+// nonEmptySourceOnRamps passes the source chain's onramp addresses through, rejecting only
+// empty entries: the OffRamp silently drops those, which would leave the lane enabled with
+// a source it can never match. Length and layout are deliberately not checked, since they
+// belong to whichever family the source chain is.
+func nonEmptySourceOnRamps(sourceChainSelector uint64, onRamps [][]byte) ([][]byte, error) {
+	for i, onRamp := range onRamps {
+		if len(onRamp) == 0 {
+			return nil, fmt.Errorf("onRamps[%d] for source chain %d is empty", i, sourceChainSelector)
+		}
+	}
+	return onRamps, nil
+}
+
 func validateEVMAddresses(addrs ...[]byte) error {
 	for _, addr := range addrs {
 		if len(addr) != common.AddressLength {
 			return fmt.Errorf("invalid EVM address: expected %d bytes, got %d", common.AddressLength, len(addr))
+		}
+	}
+	return nil
+}
+
+// validateEVMOnRampAddress checks the OnRamp is abi.encode(address): 32 bytes whose top
+// 12 are zero. Unlike the other contracts on the input, the OnRamp is carried in the form
+// it takes inside messages, so a plain 20-byte address here means the caller bypassed the
+// adapter and would go on to whitelist a value no message can match.
+func validateEVMOnRampAddress(addr []byte) error {
+	if len(addr) != 32 {
+		return fmt.Errorf("invalid EVM onRamp address: expected 32 abi-encoded bytes, got %d", len(addr))
+	}
+	for _, b := range addr[:32-common.AddressLength] {
+		if b != 0 {
+			return fmt.Errorf("invalid EVM onRamp address: expected abi.encode(address) with a zero 12-byte prefix, got %x", addr)
 		}
 	}
 	return nil

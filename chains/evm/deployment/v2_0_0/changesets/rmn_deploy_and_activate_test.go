@@ -24,6 +24,7 @@ import (
 	rmnremoteops1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
+	rmn_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -120,6 +121,18 @@ func testActivateRMNApplyWithLegacyContract(t *testing.T, deployLegacy legacyRMN
 	owner, err := rmnC.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, rmnTimelockAddr, owner, "RMN should be owned by RMNMCMS timelock after proposal execution")
+
+	// CCIP 1.6 offchain reads getReportDigestHeader/getVersionedConfig from whatever RMN is active
+	// behind the proxy. The v2_1_0 ops binding predates those getters, so use the latest generated
+	// binding here to call them against the same deployed address.
+	rmnLatestC, err := rmn_latest.NewRMN(newRMN, chain.Client)
+	require.NoError(t, err)
+	digestHeader, err := rmnLatestC.GetReportDigestHeader(nil)
+	require.NoError(t, err)
+	require.NotEqual(t, [32]byte{}, digestHeader)
+	versionedConfig, err := rmnLatestC.GetVersionedConfig(nil)
+	require.NoError(t, err)
+	require.Equal(t, uint32(0), versionedConfig.Version)
 
 	proxyAddr := common.HexToAddress(proxyRef.Address)
 	proxyC, err := rmn_proxy_bind.NewRMNProxy(proxyAddr, chain.Client)

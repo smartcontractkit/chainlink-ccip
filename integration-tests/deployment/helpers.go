@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -29,7 +31,6 @@ import (
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	sequencesV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
@@ -38,13 +39,14 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	mcmsapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	v2changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
 
 func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, qualifiers []string) {
@@ -432,55 +434,54 @@ func NewDefaultDeploymentConfigForEVM(version *semver.Version) mcmsapi.ContractD
 	}
 }
 
-func NewLaneChainDefinitionForV2(chainSelector, remoteChainSelector uint64) lanes.ChainDefinition {
-	return lanes.ChainDefinition{
-		Selector: chainSelector,
-		CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-			{
-				CommitteeVerifier: []datastore.AddressRef{
-					{
-						ChainSelector: chainSelector,
-						Type:          datastore.ContractType(committee_verifier.ContractType),
-						Version:       committee_verifier.Version,
-						Qualifier:     "alpha",
-					},
-					{
-						ChainSelector: chainSelector,
-						Type:          datastore.ContractType(sequencesV2_0_0.CommitteeVerifierResolverType),
-						Version:       common_utils.Version_2_0_0,
-					},
+// LaneCommitteeQualifier is the committee verifier qualifier deployed by
+// testsetupV2_0_0.CreateBasicContractParams, which the 2.0 lane helpers below configure.
+const LaneCommitteeQualifier = "alpha"
+
+// NewLaneTopologyForV2 builds a single-NOP topology covering every given chain under
+// LaneCommitteeQualifier, signing with signer. It is the minimum
+// ConfigureChainsForLanesFromTopology needs to derive a signature quorum; supplying the
+// signer address inline keeps the changeset from reaching for Job Distributor.
+func NewLaneTopologyForV2(signer string, chainSelectors ...uint64) *offchain.EnvironmentTopology {
+	chainConfigs := make(map[string]offchain.ChainCommitteeConfig, len(chainSelectors))
+	for _, sel := range chainSelectors {
+		chainConfigs[strconv.FormatUint(sel, 10)] = offchain.ChainCommitteeConfig{
+			NOPAliases: []string{"nop-1"},
+			Threshold:  1,
+		}
+	}
+	return &offchain.EnvironmentTopology{
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{
+				{Alias: "nop-1", SignerAddressByFamily: map[string]string{chain_selectors.FamilyEVM: signer}},
+			},
+			Committees: map[string]offchain.CommitteeConfig{
+				LaneCommitteeQualifier: {
+					Qualifier:    LaneCommitteeQualifier,
+					ChainConfigs: chainConfigs,
 				},
-				RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-					remoteChainSelector: testsetupV2_0_0.CreateBasicCommitteeVerifierRemoteChainConfig(),
-				},
 			},
 		},
-		DefaultInboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: chainSelector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     "alpha",
-			},
-		},
-		DefaultOutboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: chainSelector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     "alpha",
-			},
-		},
-		DefaultExecutor: datastore.AddressRef{
+	}
+}
+
+// NewLaneOverridesForV2 pins the lane's CCVs to the committee verifier deployed under
+// LaneCommitteeQualifier. Without it the changeset auto-resolves CCVs under the "default"
+// qualifier, which CreateBasicContractParams does not deploy.
+func NewLaneOverridesForV2(chainSelector uint64) *v2changesets.ChainOverrides {
+	verifier := []datastore.AddressRef{
+		{
 			ChainSelector: chainSelector,
-			Type:          datastore.ContractType(sequencesV2_0_0.ExecutorProxyType),
-			Version:       executor.Version,
-			Qualifier:     "default",
+			Type:          datastore.ContractType(committee_verifier.ContractType),
+			Version:       committee_verifier.Version,
+			Qualifier:     LaneCommitteeQualifier,
 		},
-		FeeQuoterDestChainConfig: testsetupV2_0_0.CreateBasicFeeQuoterDestChainConfig(),
-		ExecutorDestChainConfig:  testsetupV2_0_0.CreateBasicExecutorDestChainConfig(),
-		AddressBytesLength:       20,
-		BaseExecutionGasCost:     80_000,
+	}
+	return &v2changesets.ChainOverrides{
+		RemoteChainCfg: v2changesets.PartialRemoteChainConfig{
+			DefaultInboundCCVs:  verifier,
+			DefaultOutboundCCVs: verifier,
+		},
 	}
 }
 
@@ -623,4 +624,16 @@ func DeployBurnMintTokenEVM(t *testing.T, env *cldf_deployment.Environment, sele
 	require.NoError(t, err)
 
 	return token
+}
+
+// CurrentBlockEVM returns the latest block number on the given EVM chain. The simulated backend
+// mines exactly one block per transaction, so an unchanged block number across an Apply
+// proves no transaction was sent.
+func CurrentBlockEVM(t *testing.T, e *cldf_deployment.Environment, sel uint64) uint64 {
+	t.Helper()
+	chain, ok := e.BlockChains.EVMChains()[sel]
+	require.True(t, ok, "chain selector %d not found in environment", sel)
+	header, err := chain.Client.HeaderByNumber(t.Context(), nil)
+	require.NoError(t, err)
+	return header.Number.Uint64()
 }
