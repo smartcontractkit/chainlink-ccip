@@ -2,10 +2,12 @@ package fastcurse
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+	"golang.org/x/sync/errgroup"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -263,27 +265,37 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to group curse actions: %w", err)
 		}
 
+		eg := errgroup.Group{}
+		mutex := &sync.Mutex{}
 		for selector, curseDetail := range grouped {
-			subjectsToCurse, err := filterSubjectsToCurse(e, cfg.Force, selector, curseDetail)
-			if err != nil {
-				return cldf.ChangesetOutput{}, err
-			}
+			eg.Go(func() error {
+				subjectsToCurse, err := filterSubjectsToCurse(e, cfg.Force, selector, curseDetail)
+				if err != nil {
+					return fmt.Errorf("failed to filter subjects to curse on chain with selector %d: %w", selector, err)
+				}
 
-			if len(subjectsToCurse) == 0 {
-				e.Logger.Infof("No new subjects to curse on chain with selector %d, skipping", selector)
-				continue
-			}
+				if len(subjectsToCurse) == 0 {
+					e.Logger.Infof("No new subjects to curse on chain with selector %d, skipping", selector)
+					return nil
+				}
 
-			e.Logger.Infof("Cursing %d subjects on chain with selector %d", len(subjectsToCurse), selector)
-			curseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, curseDetail.curseAdapter.Curse(), e.BlockChains, CurseInput{
-				Subjects:      subjectsToCurse,
-				ChainSelector: selector,
+				e.Logger.Infof("Cursing %d subjects on chain with selector %d", len(subjectsToCurse), selector)
+				curseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, curseDetail.curseAdapter.Curse(), e.BlockChains, CurseInput{
+					Subjects:      subjectsToCurse,
+					ChainSelector: selector,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to curse subjects on chain with selector %d: %w", selector, err)
+				}
+				mutex.Lock()
+				defer mutex.Unlock()
+				batchOps = append(batchOps, curseReport.Output.BatchOps...)
+				reports = append(reports, curseReport.ExecutionReports...)
+				return nil
 			})
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to curse subjects on chain with selector %d: %w", selector, err)
-			}
-			batchOps = append(batchOps, curseReport.Output.BatchOps...)
-			reports = append(reports, curseReport.ExecutionReports...)
+		}
+		if err := eg.Wait(); err != nil {
+			return cldf.ChangesetOutput{}, err
 		}
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
@@ -317,41 +329,53 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to group curse actions: %w", err)
 		}
 
+		eg := errgroup.Group{}
+		mutex := &sync.Mutex{}
+
 		for selector, curseDetail := range grouped {
-			adapter := curseDetail.curseAdapter
-			subjects := curseDetail.subjects
-			alreadyCursedSubjects := make([]Subject, 0)
-			for _, subject := range subjects {
-				if cfg.Force {
+			eg.Go(func() error {
+				adapter := curseDetail.curseAdapter
+				subjects := curseDetail.subjects
+				alreadyCursedSubjects := make([]Subject, 0)
+				for _, subject := range subjects {
+					if cfg.Force {
+						alreadyCursedSubjects = append(alreadyCursedSubjects, subject)
+						continue
+					}
+					cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
+					if err != nil {
+						return fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)
+					}
+					if !cursed {
+						e.Logger.Infof("Subject %x is not cursed on chain with selector %d, skipping", subject, selector)
+						continue
+					}
 					alreadyCursedSubjects = append(alreadyCursedSubjects, subject)
-					continue
 				}
-				cursed, err := adapter.IsSubjectCursedOnChain(e, selector, subject)
+				if len(alreadyCursedSubjects) == 0 {
+					e.Logger.Infof("No new subjects to uncurse on chain with selector %d, skipping", selector)
+					return nil
+				}
+				e.Logger.Infof("Uncursing %d subjects on chain with selector %d", len(alreadyCursedSubjects), selector)
+				unCurseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.Uncurse(), e.BlockChains, CurseInput{
+					Subjects:      alreadyCursedSubjects,
+					ChainSelector: selector,
+				})
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to check if subject %x is cursed on chain with selector %d: %w", subject, selector, err)
+					return fmt.Errorf("failed to uncurse subjects on chain with selector %d: %w", selector, err)
 				}
-				if !cursed {
-					e.Logger.Infof("Subject %x is not cursed on chain with selector %d, skipping", subject, selector)
-					continue
-				}
-				alreadyCursedSubjects = append(alreadyCursedSubjects, subject)
-			}
-			if len(alreadyCursedSubjects) == 0 {
-				e.Logger.Infof("No new subjects to uncurse on chain with selector %d, skipping", selector)
-				continue
-			}
-			e.Logger.Infof("Uncursing %d subjects on chain with selector %d", len(alreadyCursedSubjects), selector)
-			unCurseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.Uncurse(), e.BlockChains, CurseInput{
-				Subjects:      alreadyCursedSubjects,
-				ChainSelector: selector,
+				mutex.Lock()
+				defer mutex.Unlock()
+				performedUncurse = true
+				batchOps = append(batchOps, unCurseReport.Output.BatchOps...)
+				reports = append(reports, unCurseReport.ExecutionReports...)
+				return nil
 			})
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to curse subjects on chain with selector %d: %w", selector, err)
-			}
-			performedUncurse = true
-			batchOps = append(batchOps, unCurseReport.Output.BatchOps...)
-			reports = append(reports, unCurseReport.ExecutionReports...)
 		}
+		if err := eg.Wait(); err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+
 		if len(cfg.CurseActions) > 0 && !performedUncurse {
 			return cldf.ChangesetOutput{}, fmt.Errorf("uncurse skipped all actions: no subjects are currently cursed on chain")
 		}
