@@ -66,8 +66,13 @@ type RemoteChainDefaults struct {
 
 // RemoteChainConfig defines the configuration for a remote chain.
 type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
-	AllowTrafficFrom          *bool
-	OnRamps                   []RemoteContract
+	AllowTrafficFrom *bool
+	// OnRamps are the remote chain's OnRamp addresses as returned by that chain's
+	// GetOnRampAddress: the encoding it writes into the messages it sends.
+	OnRamps []RemoteContract
+	// OffRamp is the remote chain's OffRamp address in that chain's native
+	// encoding: destination-side addresses travel unpadded, so this is the
+	// 20-byte address for an EVM remote. GetOffRampAddress returns it directly.
 	OffRamp                   RemoteContract
 	DefaultInboundCCVs        []LocalContract
 	LaneMandatedInboundCCVs   []LocalContract
@@ -88,11 +93,14 @@ type ConfigureChainForLanesInput struct {
 	ChainSelector       uint64
 	AllowOnrampOverride bool
 	Router              []byte
-	OnRamp              []byte
-	CommitteeVerifiers  []CommitteeVerifierConfig[datastore.AddressRef]
-	FeeQuoter           []byte
-	OffRamp             []byte
-	RemoteChains        map[uint64]RemoteChainConfig[[]byte, string]
+	// OnRamp is the local OnRamp as returned by this chain's GetOnRampAddress, so it
+	// carries the family's message encoding rather than its plain contract address.
+	// On EVM that means 32 abi-encoded bytes; the sequence decodes the address from it.
+	OnRamp             []byte
+	CommitteeVerifiers []CommitteeVerifierConfig[datastore.AddressRef]
+	FeeQuoter          []byte
+	OffRamp            []byte
+	RemoteChains       map[uint64]RemoteChainConfig[[]byte, string]
 	// FamilyExtras holds chain-family-specific configuration passed through
 	// from the changeset. Each family adapter's sequence is responsible for
 	// interpreting this map. All values must be serializable.
@@ -106,7 +114,15 @@ type ConfigureChainForLanesInput struct {
 type ChainFamily interface {
 	ConfigureChainForLanes() *cldf_ops.Sequence[ConfigureChainForLanesInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
+	// GetOnRampAddress returns the OnRamp address of chainSelector in the encoding that
+	// chain writes into the onRampAddress field of the messages it sends. A destination
+	// chain whitelists that exact byte string, because the OffRamp identifies the source
+	// onramp by hashing the bytes carried in the message. For most families this is the
+	// native address; EVM abi-encodes it, so it is 20 bytes left-padded to 32.
 	GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+	// GetOffRampAddress returns the OffRamp address of chainSelector in that chain's
+	// native encoding. Destination-side addresses are never padded, so an EVM OffRamp
+	// is 20 bytes.
 	GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
 	GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
