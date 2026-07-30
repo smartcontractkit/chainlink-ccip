@@ -31,7 +31,7 @@ var (
 )
 
 // PoolOps abstracts the version-specific token pool contract calls.
-// Each EVM pool version (v1.5.1, v1.6.1) provides an implementation
+// Each EVM pool version (v1.5.1, v1.6.1, v2.0.0) provides an implementation
 // that wires into its own bindings/operations.
 type PoolOps interface {
 	GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error)
@@ -50,11 +50,12 @@ type PoolOps interface {
 
 // EVMPoolAdapter provides the shared pool-specific TokenAdapter methods
 // for EVM pool versions that follow the same datastore + TAR + BnM pattern
-// (currently v1.5.1 and v1.6.1). Version-specific contract calls are
+// (currently v1.5.1, v1.6.1, and v2.0.0). Version-specific contract calls are
 // delegated to the Ops field.
 //
-// Per-version adapters embed this struct and override only
-// ConfigureTokenForTransfersSequence (which differs structurally).
+// Per-version adapters embed this struct and override the sequences whose
+// behavior genuinely differs by version (e.g. v2.0.0 overrides
+// ConfigureTokenForTransfersSequence).
 type EVMPoolAdapter struct {
 	EVMTokenBase
 	Ops PoolOps
