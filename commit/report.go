@@ -229,7 +229,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	lggr.Infow("ShouldAcceptedAttestedReport passed checks",
 		"timestamp", time.Now().UTC(),
-		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
+		"unblessedRoots", decodedReport.UnblessedMerkleRoots,
 		"unblessedRootsLen", len(decodedReport.UnblessedMerkleRoots),
 		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
@@ -367,7 +367,6 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	lggr.Infow("ShouldTransmitAcceptedReport passed checks",
 		"timestamp", time.Now().UTC(),
-		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
 		"unblessedRootsLen", len(decodedReport.UnblessedMerkleRoots),
 		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),

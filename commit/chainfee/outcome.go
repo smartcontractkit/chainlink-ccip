@@ -258,7 +258,7 @@ func (p *processor) getGasPricesToUpdate(
 
 	destChainCfg, err := p.homeChain.GetChainConfig(p.destChain)
 	if err != nil {
-		lggr.Errorw("error getting dest chain config", logutil.FieldChain, p.destChain, "err", err)
+		lggr.Errorw("error getting dest chain config", logutil.FieldDestChain, p.destChain, "err", err)
 		return gasPrices
 	}
 	execGasPriceDeviation := destChainCfg.Config.GasPriceDeviationPPB.Int64()
