@@ -367,6 +367,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	lggr.Infow("ShouldTransmitAcceptedReport passed checks",
 		"timestamp", time.Now().UTC(),
+		"unblessedRoots", decodedReport.UnblessedMerkleRoots,
 		"unblessedRootsLen", len(decodedReport.UnblessedMerkleRoots),
 		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
