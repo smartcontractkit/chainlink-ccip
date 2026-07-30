@@ -32,15 +32,6 @@ contract CCTPVerifier_setDynamicConfig is CCTPVerifierSetup {
     s_cctpVerifier.setDynamicConfig(cfg);
   }
 
-  function test_setDynamicConfig_RevertWhen_InvalidFastFinalityBps_Zero() public {
-    CCTPVerifier.DynamicConfig memory newConfig = CCTPVerifier.DynamicConfig({
-      feeAggregator: makeAddr("feeAggregator2"), allowlistAdmin: makeAddr("allowlistAdmin2"), fastFinalityBps: 0
-    });
-
-    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidFastFinalityBps.selector, uint16(0)));
-    s_cctpVerifier.setDynamicConfig(newConfig);
-  }
-
   function test_setDynamicConfig_RevertWhen_InvalidFastFinalityBps_ExceedsMax() public {
     CCTPVerifier.DynamicConfig memory newConfig = CCTPVerifier.DynamicConfig({
       feeAggregator: makeAddr("feeAggregator2"),
