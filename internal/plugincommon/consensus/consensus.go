@@ -11,6 +11,14 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
+// Analyzer-relevant log messages (consensus-not-reached signals). These are kept as
+// exported package-level constants so the log-analysis tooling can match them exactly.
+// MsgInsufficientObservationsForConsensus is logged (at Error) when there are fewer than 2f+1 items
+// for a key, so ordered consensus cannot be reached. Exported so the log-analysis tooling can match
+// it exactly. The other consensus-not-reached signals are Debug-level and intentionally left as
+// literals (the analyzer reads prod logs, where Debug is off).
+const MsgInsufficientObservationsForConsensus = "insufficient items to reach consensus"
+
 // GetConsensusMap takes a mapping from chains to a list of items,
 // return a mapping from chains to a single consensus item.
 // The consensus item for a given chain is the item with the
@@ -125,7 +133,7 @@ func GetOrderedConsensus[K comparable, T cmp.Ordered](
 		}
 
 		if len(items) < 2*int(minThresh)+1 {
-			lggr.Errorw("insufficient items to reach consensus",
+			lggr.Errorw(MsgInsufficientObservationsForConsensus,
 				"objectName", objectName,
 				"key", key,
 				"minThresh", minThresh,

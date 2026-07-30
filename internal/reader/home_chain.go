@@ -21,10 +21,21 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 const (
 	defaultConfigPageSize = uint64(100)
+)
+
+// Analyzer-relevant log messages (root causes of chains not being discovered/known from
+// the home chain). Kept as exported package-level constants so the log-analysis tooling
+// can match them exactly.
+const (
+	MsgInitialConfigFetchFailed  = "Initial fetch of on-chain configs failed"
+	MsgNoOnChainConfigsFound     = "no on chain configs found"
+	MsgFailedToDecodeChainConfig = "failed to decode opaque chain config"
+	MsgInvalidChainConfigInfo    = "invalid chain config info"
 )
 
 type HomeChain interface {
@@ -102,7 +113,7 @@ func (r *homeChainPoller) poll() {
 	// Initial fetch once poll is called before any ticks
 	if err := r.fetchAndSetConfigs(ctx); err != nil {
 		// Just log, don't return error as we want to keep polling
-		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
+		r.lggr.Errorw(MsgInitialConfigFetchFailed, "err", err)
 		r.failedPolls.Add(1)
 	} else {
 		r.failedPolls.Store(0)
@@ -168,7 +179,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 
 	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
-		r.lggr.Warnw("no on chain configs found")
+		r.lggr.Warnw(MsgNoOnChainConfigsFound)
 		return nil
 	}
 
@@ -332,7 +343,7 @@ func convertOnChainConfigToHomeChainConfig(
 		chainConfig := chainConfigInfo.ChainConfig
 		decoded, err := chainconfig.DecodeChainConfig(chainConfig.Config)
 		if err != nil {
-			lggr.Warnw(fmt.Sprintf("failed to decode opaque chain config of chain selector %d", chainSelector), "err", err)
+			lggr.Warnw(MsgFailedToDecodeChainConfig, logutil.FieldChain, chainSelector, "err", err)
 			continue
 		}
 
@@ -368,7 +379,7 @@ func getValidChainConfigInfos(lggr logger.Logger, chainConfigInfos []ChainConfig
 	validChainConfigInfos := make([]ChainConfigInfo, 0)
 	for _, chainConfigInfo := range chainConfigInfos {
 		if err := validateChainConfigInfos(chainConfigInfo); err != nil {
-			lggr.Warnw("invalid chain config info", "err", err)
+			lggr.Warnw(MsgInvalidChainConfigInfo, "err", err)
 			continue
 		}
 		validChainConfigInfos = append(validChainConfigInfos, chainConfigInfo)

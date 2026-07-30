@@ -28,6 +28,15 @@ type LatestRoundData struct {
 // Number of batch operations performed (getLatestRoundData and getDecimals)
 const priceReaderOperationCount = 2
 
+// Analyzer-relevant log messages. These explain why a token price/feed could not
+// be read (root causes of price staleness) and must equal the logged msg exactly.
+const (
+	// MsgAnswerNilOrNonPositive: a price feed's latest answer was nil or non-positive.
+	MsgAnswerNilOrNonPositive = "latestRoundData.Answer is nil or non positive"
+	// MsgMissingTokenInfo: a token was skipped because its token info was absent.
+	MsgMissingTokenInfo = "missing token info, token skipped"
+)
+
 // ContractTokenMap maps contracts to their token indices
 type ContractTokenMap map[types.BoundContract][]ccipocr3.UnknownEncodedAddress
 
@@ -72,7 +81,7 @@ func (l *DefaultAccessor) GetFeedPricesUSD(
 		}
 
 		if latestRoundData.Answer == nil || latestRoundData.Answer.Cmp(big.NewInt(0)) <= 0 {
-			lggr.Errorw("latestRoundData.Answer is nil or non positive", "contract", boundContract.Address)
+			lggr.Errorw(MsgAnswerNilOrNonPositive, "contract", boundContract.Address)
 			continue
 		}
 
@@ -84,7 +93,7 @@ func (l *DefaultAccessor) GetFeedPricesUSD(
 			tokenInfo := tokenInfoMap[token]
 			price := calculateUsdPer1e18TokenAmount(normalizedContractPrice, tokenInfo.Decimals)
 			if price == nil {
-				lggr.Errorw("failed to calculate price", "token", token)
+				lggr.Errorw("failed to calculate price", logutil.FieldToken, token)
 				continue
 			}
 			prices[token] = ccipocr3.NewBigInt(price)
@@ -117,7 +126,7 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 
 	feeQuoterAddressStr, err := l.addrCodec.AddressBytesToString(feeQuoterAddress[:], l.chainSelector)
 	if err != nil {
-		lggr.Warnw("failed to convert fee quoter address to string", "chain", l.chainSelector, "err", err)
+		lggr.Warnw("failed to convert fee quoter address to string", logutil.FieldChain, l.chainSelector, "err", err)
 		return make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig), nil
 	}
 
@@ -146,13 +155,18 @@ func (l *DefaultAccessor) GetFeeQuoterTokenUpdates(
 	for i, token := range tokenBytes {
 		tokenAddressStr, err := l.addrCodec.AddressBytesToString(token[:], l.chainSelector)
 		if err != nil {
-			lggr.Errorw("failed to convert token address to string", "token", token, "chain", l.chainSelector, "err", err)
+			lggr.Errorw("failed to convert token address to string",
+				logutil.FieldToken, token, logutil.FieldChain, l.chainSelector, "err", err)
 			continue
 		}
 
 		// token not available on fee quoter
 		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
-			lggr.Debugw("empty fee quoter update found", "chain", l.chainSelector, "token", tokenAddressStr)
+			lggr.Debugw(
+				"empty fee quoter update found",
+				logutil.FieldChain, l.chainSelector,
+				logutil.FieldToken, tokenAddressStr,
+			)
 			continue
 		}
 		updateMap[ccipocr3.UnknownEncodedAddress(tokenAddressStr)] = updates[i]
@@ -172,7 +186,7 @@ func (l *DefaultAccessor) prepareBatchRequest(
 	for _, token := range tokens {
 		tokenInfo, ok := tokenInfoMap[token]
 		if !ok {
-			l.lggr.Errorw("get tokenInfo for %s: missing token info, token skipped", token)
+			l.lggr.Errorw(MsgMissingTokenInfo, logutil.FieldToken, token)
 			continue
 		}
 

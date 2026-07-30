@@ -13,6 +13,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 type backgroundObserver struct {
@@ -106,7 +107,7 @@ func (o *backgroundObserver) Observe(
 				return nil, fmt.Errorf("internal error, cache contains not ready token data")
 			}
 
-			lggr := logger.With(o.lggr, "msgID", msg.Header.MessageID.String(),
+			lggr := logger.With(o.lggr, logutil.FieldMessageID, msg.Header.MessageID.String(),
 				"sourceChain", chainSel.String(), "seqNum", seqNum.String())
 
 			if exists {
@@ -175,7 +176,7 @@ func (o *backgroundObserver) worker(id int) {
 			}
 
 			lggr := logger.With(lggr,
-				"msgID", msg.Header.MessageID.String(),
+				logutil.FieldMessageID, msg.Header.MessageID.String(),
 				"sourceChain", msg.Header.SourceChainSelector.String(),
 				"seqNum", msg.Header.SequenceNumber.String(),
 				"numTokens", len(msg.TokenAmounts),
@@ -249,7 +250,7 @@ func newMsgQueue(lggr logger.Logger) *msgQueue {
 // enqueue adds a message to the queue with the given availableAfter duration.
 func (q *msgQueue) enqueue(msg cciptypes.Message, availableAfter time.Duration) bool {
 	lggr := logger.With(
-		q.lggr, "msgID", msg.Header.MessageID.String(),
+		q.lggr, logutil.FieldMessageID, msg.Header.MessageID.String(),
 		"sourceChain", msg.Header.SourceChainSelector.String(),
 		"seqNum", msg.Header.SequenceNumber.String(),
 		"availableAfter", availableAfter,
@@ -294,7 +295,7 @@ func (q *msgQueue) dequeue() (cciptypes.Message, bool) {
 	for i, msg := range q.msgs {
 		if time.Now().UTC().After(msg.availableAt) {
 			q.lggr.Debugw("message popped from the queue",
-				"msgID", msg.msg.Header.MessageID.String(),
+				logutil.FieldMessageID, msg.msg.Header.MessageID.String(),
 				"sourceChain", msg.msg.Header.SourceChainSelector.String(),
 				"seqNum", msg.msg.Header.SequenceNumber.String(),
 				"enqueuedSince", time.Since(msg.enqueuedAt),
@@ -316,7 +317,7 @@ func (q *msgQueue) containsMsg(msgID cciptypes.Bytes32) bool {
 
 	contains := q.msgIDs.Contains(msgID)
 	if contains {
-		q.lggr.Debugw("message already exists in the queue", "msgID", msgID.String())
+		q.lggr.Debugw("message already exists in the queue", logutil.FieldMessageID, msgID.String())
 		return true
 	}
 
@@ -377,7 +378,7 @@ func (c *inMemTokenDataCache) set(msgID cciptypes.Bytes32, tokenData exectypes.M
 
 	c.inMemTokenData[msgID] = tokenData
 	c.expiresAt[msgID] = time.Now().Add(c.expirationInterval).UTC()
-	c.lggr.Debugw("token data cached", "msgID", msgID, "expiresAt", c.expiresAt[msgID])
+	c.lggr.Debugw("token data cached", logutil.FieldMessageID, msgID, "expiresAt", c.expiresAt[msgID])
 }
 
 // size returns the number of cached token data
@@ -406,7 +407,7 @@ func (c *inMemTokenDataCache) runExpirationLoop(cleanupInterval time.Duration) {
 					for msgID, expiresAt := range c.expiresAt {
 						if c.hasExpired(msgID) {
 							c.lggr.Debugw("token data expired and removed from cache",
-								"msgID", msgID.String(),
+								logutil.FieldMessageID, msgID.String(),
 								"expiresAt", expiresAt,
 								"now", time.Now().UTC(),
 							)

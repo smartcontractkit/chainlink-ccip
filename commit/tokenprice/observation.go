@@ -20,6 +20,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+// ObservedTokenPrices is the milestone carrying a single oracle's observed feed
+// prices and fee-quoter updates for the round (used by the participation lens).
+const ObservedTokenPrices = "observed token prices"
+
 func (p *processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
@@ -51,7 +55,7 @@ func (p *processor) Observation(
 	now := time.Now().UTC()
 
 	lggr.Infow(
-		"observed token prices",
+		ObservedTokenPrices,
 		"feedPrices", feedTokenPrices,
 		"feeQuoterUpdates", feeQuoterUpdates,
 		"timestampNow", now,

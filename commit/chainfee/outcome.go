@@ -18,6 +18,26 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+// Milestone log messages for the chainfee processor. Stable identifiers the
+// log-analysis tooling keys on; keep them and their call sites in sync. The msg
+// equals the constant exactly, with detail in structured fields.
+const (
+	// GasPricesOutcome carries the round's chain-fee outcome (the prices selected for update).
+	GasPricesOutcome = "Gas Prices Outcome"
+
+	// NoConsensusOnFeeComponents: consensus over observed fee components failed this round.
+	NoConsensusOnFeeComponents = "no consensus on fee components, nothing to update"
+
+	// ChainFeeUpdateNeeded*: the round decided a fee write is due, and why.
+	// ChainFeeUpdateNeededHeartbeat is the staleness signal (BatchWriteFrequency elapsed).
+	ChainFeeUpdateNeededNoPrevious = "chain fee update needed: no previous update exists"
+	ChainFeeUpdateNeededHeartbeat  = "chain fee update needed: heartbeat time passed"
+	ChainFeeUpdateNeededDeviation  = "chain fee update needed: deviation threshold exceeded"
+
+	// ChainFeeUpdateNotNeeded: fees are fresh and within deviation — healthy no-op.
+	ChainFeeUpdateNotNeeded = "chain fee update not needed"
+)
+
 func (p *processor) Outcome(
 	ctx context.Context,
 	_ Outcome,
@@ -37,12 +57,13 @@ func (p *processor) Outcome(
 
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
-		lggr.Warn("no consensus on fee components, nothing to update",
+		lggr.Warnw(NoConsensusOnFeeComponents,
 			"consensusObs", consensusObs)
 		return Outcome{}, nil
 	}
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
+	var missingNativeTokenPriceChains []cciptypes.ChainSelector
 	// We need to report a packed GasPrice
 	// The packed GasPrice is a 224-bit integer with the following format:
 	// (dataAvFeePriceUSD) << 112 | (executionFeePriceUSD)
@@ -59,12 +80,10 @@ func (p *processor) Outcome(
 		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 		usdPerFeeToken, ok := consensusObs.NativeTokenPrices[chain]
 		if !ok {
-			lggr.Warnw("missing native token price for chain, chain fee will not be updated",
-				"chain", chain,
-			)
+			missingNativeTokenPriceChains = append(missingNativeTokenPriceChains, chain)
 			continue
 		}
-		lggr.Debugw("USD per fee token", "chain", chain, "usdPerFeeToken", usdPerFeeToken)
+		lggr.Debugw("USD per fee token", logutil.FieldChain, chain, "usdPerFeeToken", usdPerFeeToken)
 
 		// Example with Wei as the lowest denominator and Eth as the Fee token
 		// usdPerEthToken = Xe18USD18
@@ -73,12 +92,12 @@ func (p *processor) Outcome(
 		// execFee = 30 Gwei = 30e9 wei = 30e9 * XUSD18
 		execFee, err := mathslib.CalculateUsdPerUnitGas(chain, feeComp.ExecutionFee, usdPerFeeToken.Int)
 		if err != nil {
-			lggr.Errorw("error calculating USD per unit gas", "chain", chain, "err", err)
+			lggr.Errorw("error calculating USD per unit gas", logutil.FieldChain, chain, "err", err)
 			continue
 		}
 		daFee, err := mathslib.CalculateUsdPerUnitGas(chain, feeComp.DataAvailabilityFee, usdPerFeeToken.Int)
 		if err != nil {
-			lggr.Errorw("error calculating USD per unit gas", "chain", chain, "err", err)
+			lggr.Errorw("error calculating USD per unit gas", logutil.FieldChain, chain, "err", err)
 			continue
 		}
 		chainFeeUsd := ComponentsUSDPrices{
@@ -101,9 +120,10 @@ func (p *processor) Outcome(
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
 
-	lggr.Infow("Gas Prices Outcome",
+	lggr.Infow(GasPricesOutcome,
 		"gasPrices", gasPrices,
 		"consensusTimestamp", consensusObs.TimestampNow,
+		"missingNativeTokenPriceChains", missingNativeTokenPriceChains,
 	)
 
 	out := Outcome{GasPrices: gasPrices}
@@ -238,7 +258,7 @@ func (p *processor) getGasPricesToUpdate(
 
 	destChainCfg, err := p.homeChain.GetChainConfig(p.destChain)
 	if err != nil {
-		lggr.Errorw("error getting dest chain config", "chain", p.destChain, "err", err)
+		lggr.Errorw("error getting dest chain config", logutil.FieldDestChain, p.destChain, "err", err)
 		return gasPrices
 	}
 	execGasPriceDeviation := destChainCfg.Config.GasPriceDeviationPPB.Int64()
@@ -247,7 +267,7 @@ func (p *processor) getGasPricesToUpdate(
 	for chain, currentChainFee := range currentChainUSDFees {
 		chainCfg, err := p.homeChain.GetChainConfig(chain)
 		if err != nil {
-			lggr.Errorw("error getting chain config", "chain", chain, "err", err)
+			lggr.Errorw("error getting chain config", logutil.FieldChain, chain, "err", err)
 			continue
 		}
 
@@ -255,14 +275,14 @@ func (p *processor) getGasPricesToUpdate(
 		packedFee := cciptypes.NewBigInt(FeeComponentsToPackedFee(currentChainFee))
 		lastUpdate, exists := latestUpdates[chain]
 		lggr := logger.With(lggr,
-			"chain", chain,
+			logutil.FieldChain, chain,
 			"consensusTimestamp", consensusTimestamp,
 			"currentChainFee", currentChainFee,
 			"packedFee", packedFee,
 			"lastUpdate", lastUpdate)
 		// If the chain is not in the fee quoter updates or is stale, then we should update it
 		if !exists {
-			lggr.Infow("chain fee update needed: no previous update exists")
+			lggr.Infow(ChainFeeUpdateNeededNoPrevious)
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
@@ -272,7 +292,7 @@ func (p *processor) getGasPricesToUpdate(
 
 		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
 		if consensusTimestamp.After(nextUpdateTime) {
-			lggr.Infow("chain fee update needed: heartbeat time passed",
+			lggr.Infow(ChainFeeUpdateNeededHeartbeat,
 				"nextUpdateTime", nextUpdateTime,
 				"consensusTimestamp", consensusTimestamp,
 				"heartbeatInterval", p.cfg.RemoteGasPriceBatchWriteFrequency)
@@ -289,8 +309,8 @@ func (p *processor) getGasPricesToUpdate(
 		}
 
 		// Validating later as chain can be updated even if the config is invalid when write frequency is reached
-		if feeConfig.Validate() != nil {
-			lggr.Errorw("invalid fee config for chain", "err", err)
+		if valErr := feeConfig.Validate(); valErr != nil {
+			lggr.Errorw("invalid fee config for chain", logutil.FieldChain, chain, "err", valErr)
 			continue
 		}
 
@@ -307,8 +327,7 @@ func (p *processor) getGasPricesToUpdate(
 		)
 
 		if executionFeeDeviates || dataAvFeeDeviates {
-			lggr.Infow(
-				"chain fee update needed: deviation threshold exceeded for either execution or data availability fee",
+			lggr.Infow(ChainFeeUpdateNeededDeviation,
 				"executionFeeDeviates", executionFeeDeviates,
 				"dataAvFeeDeviates", dataAvFeeDeviates,
 				"executionFeeDeviationPPB", feeConfig.GasPriceDeviationPPB,
@@ -320,8 +339,8 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
-		lggr.Infow("chain fee update not needed",
-			"chain", chain,
+		lggr.Infow(ChainFeeUpdateNotNeeded,
+			logutil.FieldChain, chain,
 			"currentChainFee", currentChainFee,
 			"lastUpdateTimestamp", lastUpdate.Timestamp,
 			"currentTimestamp", consensusTimestamp,

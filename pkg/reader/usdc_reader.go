@@ -14,8 +14,13 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
+
+// MsgChainReaderMissing is logged when a configured chain has no contract reader and is skipped,
+// a root cause of that chain producing no USDC observations.
+const MsgChainReaderMissing = "chain reader is missing for chain, skipping"
 
 // USDCMessageReader retrieves each of the CCTPv1 MessageSent event created
 // when a ccipSend is made with USDC token transfer. The events are created
@@ -127,7 +132,7 @@ func NewUSDCMessageReader(
 		case sel.FamilyEVM:
 			contractReader, ok := contractReaders[chainSelector]
 			if !ok {
-				lggr.Errorf("chain reader is missing for chain %d, skipping", chainSelector)
+				lggr.Errorw(MsgChainReaderMissing, logutil.FieldChain, chainSelector)
 				continue
 			}
 			bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
@@ -222,7 +227,7 @@ func bindReaderContract[T contractreader.ContractReaderFacade](
 	}
 
 	lggr.Debugw("Binding contract",
-		"chainSel", chainSel,
+		logutil.FieldChain, chainSel,
 		"contractName", contractName,
 		"address", addressStr,
 	)
