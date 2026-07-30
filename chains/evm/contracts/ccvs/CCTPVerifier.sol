@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierV1} from "../interfaces/ICrossChainVerifierV1.sol";
 import {IMessageTransmitter} from "../pools/USDC/interfaces/IMessageTransmitter.sol";
 import {ITokenMessenger} from "../pools/USDC/interfaces/ITokenMessenger.sol";
+import {ITokenMinter} from "../pools/USDC/interfaces/ITokenMinter.sol";
 
 import {FeeTokenHandler} from "../libraries/FeeTokenHandler.sol";
 import {FinalityCodec} from "../libraries/FinalityCodec.sol";
@@ -33,6 +34,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   error InvalidRecipient(bytes32 expected, bytes32 got);
   error InvalidBurnMessageBodyVersion(uint32 expected, uint32 got);
   error InvalidToken(bytes token);
+  error InvalidBurnToken(address expected, address resolvedLocalToken);
   error InvalidTokenTransferLength(uint256 length);
   error InvalidVerifierArgsLength(uint256 length);
   error OnlyCallableByOwnerOrAllowlistAdmin();
@@ -137,6 +139,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   uint256 private constant SOURCE_DOMAIN_START = VERIFIER_VERSION_SIZE + 4;
   /// @notice The starting index of the recipient in the Verifier Results (CCTP message offset 76).
   uint256 private constant RECIPIENT_START = VERIFIER_VERSION_SIZE + 76;
+  /// @notice The starting index of the burnToken in the Verifier Results (CCTP message offset 152).
+  uint256 private constant BURN_TOKEN_START = VERIFIER_VERSION_SIZE + 148 + 4;
   /// @notice The starting index of the burn message body version in the Verifier Results (CCTP message offset 148).
   uint256 private constant BURN_MESSAGE_BODY_VERSION_START = VERIFIER_VERSION_SIZE + 148;
   /// @notice The starting index of the messageSender in the Verifier Results.
@@ -161,6 +165,8 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice The token messenger, which is used on source to send USDC over CCTP.
   /// @dev The token messenger calls into the message transmitter after burning USDC and forming the app-specific message body.
   ITokenMessenger private immutable i_tokenMessenger;
+  /// @notice The token minter, used to resolve Circle's canonical mapping from a remote domain/token to its local token.
+  ITokenMinter private immutable i_tokenMinter;
   /// @notice The local domain identifier, i.e. a CCTP-specific identifier for the chain to which this contract is deployed.
   uint32 private immutable i_localDomainIdentifier;
 
@@ -202,6 +208,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     // Set the immutable state variables.
     i_tokenMessenger = tokenMessenger;
+    i_tokenMinter = ITokenMinter(tokenMessenger.localMinter());
     i_messageTransmitterProxy = messageTransmitterProxy;
     i_localDomainIdentifier = messageTransmitter.localDomain();
     i_usdcToken = usdcToken;
@@ -308,6 +315,17 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
+    // We expect exactly one token transfer per message.
+    if (message.tokenTransfer.length != 1) revert InvalidTokenTransferLength(message.tokenTransfer.length);
+
+    // The destination token of the transfer must correspond to USDC.
+    {
+      bytes memory destTokenAddress = message.tokenTransfer[0].destTokenAddress;
+      if (Internal._leftPadBytesToBytes32(destTokenAddress) != bytes32(uint256(uint160(address(i_usdcToken))))) {
+        revert InvalidToken(destTokenAddress);
+      }
+    }
+
     if (verifierResults.length < MINIMUM_VERIFIER_RESULT_SIZE) revert InvalidVerifierResults();
 
     bytes4 versionPrefix = bytes4(verifierResults[:VERIFIER_VERSION_SIZE]);
@@ -331,6 +349,17 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     uint32 attestedSourceDomain = uint32(bytes4(verifierResults[SOURCE_DOMAIN_START:SOURCE_DOMAIN_START + 4]));
     if (attestedSourceDomain != sourceDomain.domainIdentifier) {
       revert InvalidSourceDomain(sourceDomain.domainIdentifier, attestedSourceDomain);
+    }
+
+    // Circle's canonical mapping for the attested sourceDomain and burnToken must resolve to this chain's USDC token.
+    // This is a defense-in-depth check confirming that the burned token is actually recognized as USDC by CCTP itself,
+    // rather than relying solely on the local configuration of this verifier.
+    {
+      bytes32 burnToken = bytes32(verifierResults[BURN_TOKEN_START:BURN_TOKEN_START + 32]);
+      address resolvedLocalToken = i_tokenMinter.getLocalToken(attestedSourceDomain, burnToken);
+      if (resolvedLocalToken != address(i_usdcToken)) {
+        revert InvalidBurnToken(address(i_usdcToken), resolvedLocalToken);
+      }
     }
 
     // The messaging-layer recipient must be the token messenger. CCTP's message transmitter is a generic messaging

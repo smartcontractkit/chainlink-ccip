@@ -30,6 +30,7 @@ contract e2e_lombard is OnRampSetup {
   // Version tags used by VersionedVerifierResolver inbound routing and each verifier's verifyMessage parsing.
   bytes4 internal constant LOMBARD_VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
   bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
+  uint8 internal constant LOMBARD_VERSION = 2;
   bytes32 internal constant LOMBARD_CHAIN_ID = bytes32(uint256(10_000));
   bytes32 internal constant REMOTE_BRIDGE_SENDER = bytes32(uint256(0x999999));
 
@@ -397,7 +398,8 @@ contract e2e_lombard is OnRampSetup {
       messageV1.tokenTransfer[0].destTokenAddress,
       messageV1.sender,
       messageV1.tokenTransfer[0].tokenReceiver,
-      messageV1.tokenTransfer[0].amount
+      messageV1.tokenTransfer[0].amount,
+      messageId
     );
     bytes memory fakeProof = bytes("fake signature data");
 
@@ -443,18 +445,22 @@ contract e2e_lombard is OnRampSetup {
   ///   bytes 33..64: sender (32 bytes)
   ///   bytes 65..96: recipient (32 bytes)
   ///   bytes 97..128: amount (32 bytes)
+  ///   bytes 129..164: optionalMessage (36 bytes: versionTag + messageId)
   function _generateValidLombardPayload(
     bytes memory destToken,
     bytes memory sender,
     bytes memory tokenReceiver,
-    uint256 amount
+    uint256 amount,
+    bytes32 messageId
   ) internal view returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
-      bytes1(0),
+      LOMBARD_VERSION,
       Internal._leftPadBytesToBytes32(destToken),
       Internal._leftPadBytesToBytes32(sender),
       Internal._leftPadBytesToBytes32(tokenReceiver),
-      bytes32(amount)
+      bytes32(amount),
+      LOMBARD_VERSION_TAG_V2_0_0,
+      messageId
     );
 
     // Encode the full payload structure

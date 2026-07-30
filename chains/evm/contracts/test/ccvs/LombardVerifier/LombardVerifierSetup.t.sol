@@ -9,15 +9,15 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {BaseERC20} from "../../../tokens/BaseERC20.sol";
+import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
 import {MockLombardBridge} from "../../mocks/MockLombardBridge.sol";
 import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 
-import {BaseERC20} from "../../../tokens/BaseERC20.sol";
-import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
-
 contract LombardVerifierSetup is BaseVerifierSetup {
   bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
+  uint8 internal constant LOMBARD_VERSION = 2;
 
   LombardVerifier internal s_lombardVerifier;
   MockLombardBridge internal s_mockBridge;
@@ -137,18 +137,21 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   ///   bytes 33..64: sender (32 bytes)
   ///   bytes 65..96: recipient (32 bytes)
   ///   bytes 97..128: amount (32 bytes)
+  ///   bytes 129..164: optionalMessage (36 bytes: versionTag + messageId)
   /// @param destToken The destination token address.
   /// @param sender The sender address.
   /// @param tokenReceiver The token receiver address.
   /// @param amount The amount to transfer.
+  /// @param messageId The message ID.
   /// @return rawPayload The encoded payload, with destinationCaller set to the LombardVerifier under test.
   function _generateValidRawPayload(
     bytes memory destToken,
     bytes memory sender,
     bytes memory tokenReceiver,
-    uint256 amount
+    uint256 amount,
+    bytes32 messageId
   ) internal view returns (bytes memory) {
-    return _generateRawPayload(destToken, sender, tokenReceiver, amount, address(s_lombardVerifier));
+    return _generateRawPayload(destToken, sender, tokenReceiver, amount, address(s_lombardVerifier), messageId);
   }
 
   /// @notice Generates a rawPayload with an explicit destinationCaller. The envelope sender and recipient default to
@@ -158,9 +161,11 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     bytes memory sender,
     bytes memory tokenReceiver,
     uint256 amount,
-    address destinationCaller
+    address destinationCaller,
+    bytes32 messageId
   ) internal view returns (bytes memory) {
-    return _generateRawPayload(destToken, sender, tokenReceiver, amount, destinationCaller, REMOTE_BRIDGE_SENDER);
+    return
+      _generateRawPayload(destToken, sender, tokenReceiver, amount, destinationCaller, REMOTE_BRIDGE_SENDER, messageId);
   }
 
   /// @notice Generates a rawPayload with an explicit destinationCaller and envelope sender, for tests that need to
@@ -171,10 +176,11 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     bytes memory tokenReceiver,
     uint256 amount,
     address destinationCaller,
-    bytes32 envelopeSender
+    bytes32 envelopeSender,
+    bytes32 messageId
   ) internal view returns (bytes memory) {
     return _generateRawPayload(
-      destToken, sender, tokenReceiver, amount, destinationCaller, envelopeSender, address(s_mockBridge)
+      destToken, sender, tokenReceiver, amount, destinationCaller, envelopeSender, address(s_mockBridge), messageId
     );
   }
 
@@ -187,14 +193,17 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     uint256 amount,
     address destinationCaller,
     bytes32 envelopeSender,
-    address recipient
+    address recipient,
+    bytes32 messageId
   ) internal pure returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
-      bytes1(0),
+      LOMBARD_VERSION,
       Internal._leftPadBytesToBytes32(destToken),
       Internal._leftPadBytesToBytes32(sender),
       Internal._leftPadBytesToBytes32(tokenReceiver),
-      bytes32(amount)
+      bytes32(amount),
+      VERSION_TAG_V2_0_0,
+      messageId
     );
 
     // Encode the full payload structure

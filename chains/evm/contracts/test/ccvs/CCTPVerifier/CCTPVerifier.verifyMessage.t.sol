@@ -104,6 +104,38 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     s_cctpVerifier.verifyMessage(message, messageHash, "");
   }
 
+  function test_verifyMessage_RevertWhen_InvalidTokenTransferLength() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    // We expect exactly one token transfer per message.
+    message.tokenTransfer = new MessageV1Codec.TokenTransferV1[](0);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidTokenTransferLength.selector, 0));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidToken() public {
+    address invalidDestToken = makeAddr("invalidDestToken");
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      invalidDestToken,
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, abi.encodePacked(invalidDestToken)));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
+  }
+
   function test_verifyMessage_RevertWhen_InvalidVerifierResults() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
@@ -224,6 +256,26 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     vm.expectRevert(
       abi.encodeWithSelector(CCTPVerifier.InvalidSourceDomain.selector, REMOTE_DOMAIN_IDENTIFIER, wrongSourceDomain)
     );
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidBurnToken() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    // Circle's canonical mapping has no entry for this burnToken, so it resolves to address(0).
+    bytes32 unmappedBurnToken = bytes32(abi.encode(makeAddr("unmappedBurnToken")));
+    s_baseCCTPMessage.body.burnToken = unmappedBurnToken;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidBurnToken.selector, address(s_USDCToken), address(0)));
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 

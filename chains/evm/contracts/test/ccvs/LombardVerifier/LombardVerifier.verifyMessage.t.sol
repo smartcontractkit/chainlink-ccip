@@ -30,7 +30,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].destTokenAddress,
       message.sender,
       message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     // Proofs are not used. Using raw bytes format.
@@ -52,7 +53,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].destTokenAddress,
       message.sender,
       message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, wrongMessageId));
@@ -72,7 +74,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].destTokenAddress,
       message.sender,
       message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     bytes memory shortMessageId = new bytes(20);
@@ -111,7 +114,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].destTokenAddress,
       message.sender,
       message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     // Make the mailbox fail.
@@ -173,9 +177,11 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, tooShortCcvData);
   }
 
-  function test_verifyMessage_RevertWhen_InvalidVerifierResults_MessageBodyTooShort() public {
+  function test_verifyMessage_RevertWhen_InvalidBridgeMessageLength() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
+
+    bytes memory tooShortPayload = bytes("\x00");
 
     bytes memory rawPayload = abi.encodePacked(
       bytes4(0x01000000),
@@ -185,13 +191,15 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
         REMOTE_BRIDGE_SENDER,
         address(s_mockBridge),
         address(s_lombardVerifier),
-        bytes("\x00")
+        tooShortPayload
       )
     );
 
     vm.startPrank(s_offRamp);
 
-    vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
+    vm.expectRevert(
+      abi.encodeWithSelector(LombardVerifier.InvalidBridgeMessageLength.selector, 165, tooShortPayload.length)
+    );
     s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
@@ -203,7 +211,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].destTokenAddress,
       message.sender,
       message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     vm.startPrank(s_offRamp);
@@ -229,7 +238,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // Generate a rawPayload with a different (invalid) token address.
     bytes memory invalidToken = abi.encodePacked(makeAddr("wrongToken"));
     bytes memory rawPayload = _generateValidRawPayload(
-      invalidToken, message.sender, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount
+      invalidToken, message.sender, message.tokenTransfer[0].tokenReceiver, message.tokenTransfer[0].amount, messageId
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
@@ -260,7 +269,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].tokenReceiver,
       message.tokenTransfer[0].amount,
       address(s_lombardVerifier),
-      wrongRemoteBridgeSender
+      wrongRemoteBridgeSender,
+      messageId
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
@@ -290,7 +300,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].amount,
       address(s_lombardVerifier),
       REMOTE_BRIDGE_SENDER,
-      wrongRecipient
+      wrongRecipient,
+      messageId
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
@@ -312,7 +323,11 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // Generate a rawPayload with a different (invalid) receiver address.
     bytes memory invalidReceiver = abi.encodePacked(address(999));
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.sender, invalidReceiver, message.tokenTransfer[0].amount
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      invalidReceiver,
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
@@ -334,7 +349,11 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // Generate a rawPayload with a different (invalid) amount.
     uint256 invalidAmount = message.tokenTransfer[0].amount + 100;
     bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress, message.sender, message.tokenTransfer[0].tokenReceiver, invalidAmount
+      message.tokenTransfer[0].destTokenAddress,
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      invalidAmount,
+      messageId
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
@@ -369,7 +388,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       abi.encodePacked(localAdapter),
       message.sender,
       message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
@@ -391,7 +411,8 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       message.tokenTransfer[0].destTokenAddress,
       invalidSender,
       message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount
+      message.tokenTransfer[0].amount,
+      messageId
     );
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");

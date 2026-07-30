@@ -33,6 +33,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidMessageVersion(uint8 expected, uint8 actual);
   error InvalidCCVVersion(bytes4 expected, bytes4 actual);
   error TokenNotSupported(address token);
+  error InvalidTokenPayload();
   error MustTransferTokens();
   error InvalidVerifierResults();
   error InvalidToken(bytes32 expected, bytes32 actual);
@@ -41,6 +42,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidRemoteBridgeSender(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
+  error InvalidBridgeMessageLength(uint256 expected, uint256 actual);
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
@@ -104,6 +106,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   /// @notice The size of the rawPayload length field in ccvData.
   uint256 private constant RAW_PAYLOAD_LENGTH_SIZE = 2;
   uint256 private constant PAYLOAD_START_INDEX = VERSION_TAG_SIZE + RAW_PAYLOAD_LENGTH_SIZE;
+  // version + token + sender + recipient + amount
+  uint256 private constant BRIDGE_MESSAGE_FIXED_SIZE = 1 + 4 * BYTES32_SIZE;
+  // fixed Bridge body + versionTag + messageId
+  uint256 private constant EXPECTED_BRIDGE_MESSAGE_SIZE = BRIDGE_MESSAGE_FIXED_SIZE + BRIDGED_MESSAGE_SIZE;
 
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
@@ -247,7 +253,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     _assertNotCursedByRMN(message.sourceChainSelector);
     _onlyOffRamp(message.sourceChainSelector);
 
-    if (message.tokenTransfer.length == 0) {
+    if (message.tokenTransfer.length != 1) {
       revert MustTransferTokens();
     }
 
@@ -358,8 +364,15 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     uint256 amount;
     {
       bytes memory msgBody = _validateEnvelope(rawPayload, sourceChainSelector);
-      if (msgBody.length < 128) {
-        revert InvalidVerifierResults();
+
+      if (msgBody.length != EXPECTED_BRIDGE_MESSAGE_SIZE) {
+        revert InvalidBridgeMessageLength(EXPECTED_BRIDGE_MESSAGE_SIZE, msgBody.length);
+      }
+
+      uint8 bridgeMessageVersion = uint8(msgBody[0]);
+
+      if (bridgeMessageVersion != SUPPORTED_BRIDGE_MSG_VERSION) {
+        revert InvalidMessageVersion(SUPPORTED_BRIDGE_MSG_VERSION, bridgeMessageVersion);
       }
 
       assembly {
