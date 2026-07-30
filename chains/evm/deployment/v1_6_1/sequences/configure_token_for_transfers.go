@@ -5,7 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	evmops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations"
 	v1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -30,10 +30,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		if input.TokenAddress != "" {
 			tokenAddress = common.HexToAddress(input.TokenAddress)
 		} else {
-			tokenAddrReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: input.ChainSelector,
-				Address:       common.HexToAddress(input.TokenPoolAddress),
-			})
+			tokenAddrReport, err := evmops.ExecuteRead(b, chain, common.HexToAddress(input.TokenPoolAddress), NewTokenPool, token_pool.NewReadGetToken, struct{}{})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from token pool with address %s on %s: %w", input.TokenPoolAddress, chain, err)
 			}
@@ -46,11 +43,7 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 
 		// Validate the pool supports the token
-		isSupported, err := cldf_ops.ExecuteOperation(b, token_pool.IsSupportedToken, chain, evm_contract.FunctionInput[common.Address]{
-			ChainSelector: input.ChainSelector,
-			Address:       tokenPoolAddress,
-			Args:          tokenAddress,
-		})
+		isSupported, err := evmops.ExecuteRead(b, chain, tokenPoolAddress, NewTokenPool, token_pool.NewReadIsSupportedToken, tokenAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if token %s is supported by token pool %s on %s: %w", tokenAddress, tokenPoolAddress, chain, err)
 		}

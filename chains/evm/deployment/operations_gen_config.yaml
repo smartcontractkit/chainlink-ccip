@@ -11,19 +11,6 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
-  # 1.5.0
-  - contract_name: BurnMintTokenPoolAndProxy
-    version: "1.5.0"
-    functions:
-      - name: getRemotePool
-        access: public
-      - name: getCurrentInboundRateLimiterState
-        access: public
-      - name: getCurrentOutboundRateLimiterState
-        access: public
-      - name: getPreviousPool
-        access: public
-
   # 1.6.3
   - contract_name: FeeQuoter
     version: "1.6.3"
@@ -64,64 +51,7 @@ contracts:
         access: owner
 
   # 1.6.1
-  - contract_name: TokenPool
-    version: "1.6.1"
-    abi_file: burn_mint_token_pool.json
-    no_deployment: true
-    functions:
-      - name: applyChainUpdates
-        access: owner
-      - name: setRateLimitAdmin
-        access: owner
-      - name: getRateLimitAdmin
-        access: public
-      - name: transferOwnership
-        access: owner
-      - name: setChainRateLimiterConfigs
-        access: owner
-      - name: setChainRateLimiterConfig
-        access: owner
-      - name: getToken
-        access: public
-      - name: getTokenDecimals
-        access: public
-      - name: isSupportedToken
-        access: public
-      - name: getAllowListEnabled
-        access: public
-      - name: getAllowList
-        access: public
-      - name: applyAllowListUpdates
-        access: owner
-      - name: getRouter
-        access: public
-      - name: setRouter
-        access: owner
-      - name: getSupportedChains
-        access: public
-      - name: getRemoteToken
-        access: public
-      - name: getRemotePools
-        access: public
-      - name: addRemotePool
-        access: owner
-      - name: removeRemotePool
-        access: owner
-      - name: getCurrentInboundRateLimiterState
-        access: public
-      - name: getCurrentOutboundRateLimiterState
-        access: public
-
   - contract_name: BurnMintTokenPool
-    version: "1.6.1"
-
-  - contract_name: BurnFromMintTokenPool
-    version: "1.6.1"
-
-  - contract_name: BurnToAddressMintTokenPool
-    version: "1.6.1"
-
-  - contract_name: BurnWithFromMintTokenPool
     version: "1.6.1"
 
   - contract_name: BurnMintWithLockReleaseFlagTokenPool
