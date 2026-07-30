@@ -38,7 +38,12 @@ type PoolOps interface {
 	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
-	SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]evm_contract.WriteOutput, error)
+	// SetAdmins updates the admin roles on the pool. A nil pointer means "leave this
+	// admin unchanged". Implementations own version-specific semantics: pre-2.0 pools
+	// reject a non-nil feeAdmin (no such concept on the contract); v2.0+ sets both
+	// admins in a single SetDynamicConfig write. Returns no writes when on-chain
+	// state already matches.
+	SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
 	Version() *semver.Version
 }
@@ -186,15 +191,16 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 	)
 }
 
-// SetTokenPoolAdmins updates the rate limit admin on a pre-2.0 EVM token pool. FeeAdmin is not
-// supported on these versions (no such concept on the contract) and is rejected before any
-// on-chain read. No-op (zero BatchOps) when the desired rate limit admin already matches
-// on-chain state.
+// SetTokenPoolAdmins updates the admin roles on an EVM token pool. Version-specific
+// capability lives in PoolOps.SetAdmins: pre-2.0 pools support only the rate limit
+// admin (a non-nil FeeAdmin is rejected there), while v2.0+ pools set both admins in
+// a single SetDynamicConfig write. No-op (zero BatchOps) when the desired values
+// already match on-chain state.
 func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-pool-adapter:set-token-pool-admins",
 		a.Ops.Version(),
-		"Updates the rate limit admin on a pre-2.0 EVM token pool; no-op when the value already matches",
+		"Updates the admin roles on an EVM token pool; no-op when the values already match",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
 			chain, ok := chains.EVMChains()[input.Selector]
 			if !ok {
@@ -205,31 +211,29 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 			}
 			poolAddr := common.HexToAddress(input.PoolAddress)
 
+			var rateLimitAdmin *common.Address
+			if input.RateLimitAdmin != nil {
+				if !common.IsHexAddress(*input.RateLimitAdmin) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s", input.Selector, *input.RateLimitAdmin)
+				}
+				addr := common.HexToAddress(*input.RateLimitAdmin)
+				rateLimitAdmin = &addr
+			}
+			var feeAdmin *common.Address
 			if input.FeeAdmin != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf(
-					"fee admin is not supported on EVM token pools at version %s (chain %d, pool %s)",
-					a.Ops.Version(), input.Selector, poolAddr.Hex())
+				if !common.IsHexAddress(*input.FeeAdmin) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid fee admin address for chain %d: %s", input.Selector, *input.FeeAdmin)
+				}
+				addr := common.HexToAddress(*input.FeeAdmin)
+				feeAdmin = &addr
 			}
-			if input.RateLimitAdmin == nil {
-				return sequences.OnChainOutput{}, nil
-			}
-			if !common.IsHexAddress(*input.RateLimitAdmin) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s", input.Selector, *input.RateLimitAdmin)
-			}
-			desiredRateLimitAdmin := common.HexToAddress(*input.RateLimitAdmin)
-
-			_, currentRateLimitAdmin, err := a.Ops.GetPoolAdmins(b.GetContext(), &chain, poolAddr)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get pool admins for token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
-			}
-			if desiredRateLimitAdmin == currentRateLimitAdmin {
-				b.Logger.Infof("Rate limit admin already matches desired value for pool %s on chain %d; skipping", poolAddr.Hex(), input.Selector)
+			if rateLimitAdmin == nil && feeAdmin == nil {
 				return sequences.OnChainOutput{}, nil
 			}
 
-			writes, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, desiredRateLimitAdmin)
+			writes, err := a.Ops.SetAdmins(b, chain, poolAddr, rateLimitAdmin, feeAdmin)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set admins on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
 			}
 			if len(writes) == 0 {
 				return sequences.OnChainOutput{}, nil
@@ -407,7 +411,8 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 					if !common.IsHexAddress(rlAdminHex) {
 						return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
 					}
-					output, err := a.Ops.SetRateLimitAdmin(b, chain, poolAddr, common.HexToAddress(rlAdminHex))
+					rlAdminAddr := common.HexToAddress(rlAdminHex)
+					output, err := a.Ops.SetAdmins(b, chain, poolAddr, &rlAdminAddr, nil)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
 					}

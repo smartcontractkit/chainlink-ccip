@@ -207,10 +207,6 @@ func (t *TokenAdapter) SetTokenTransferFee(e *deployment.Environment) *cldf_ops.
 	return evm_tokens.SetTokenTransferFeeConfigForTokenPools
 }
 
-func (t *TokenAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokens.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
-	return evm_tokens.SetTokenPoolAdmins
-}
-
 func (t *TokenAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) tokens.TokenTransferFeeConfig {
 	return tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
 }
@@ -426,7 +422,7 @@ func (p *poolOpsV200) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	return writes, nil
 }
 
-func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]contract.WriteOutput, error) {
+func (p *poolOpsV200) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]contract.WriteOutput, error) {
 	pool, err := token_pool.NewTokenPoolContract(poolAddr, chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate token pool v2.0.0 contract at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
@@ -435,8 +431,17 @@ func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dynamic config of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 	}
-	if newAdmin == cfg.RateLimitAdmin {
-		b.Logger.Info("Rate limit admin is already set to the desired address; no update needed")
+
+	desiredRateLimitAdmin := cfg.RateLimitAdmin
+	if rlAdmin != nil {
+		desiredRateLimitAdmin = *rlAdmin
+	}
+	desiredFeeAdmin := cfg.FeeAdmin
+	if feeAdmin != nil {
+		desiredFeeAdmin = *feeAdmin
+	}
+	if desiredRateLimitAdmin == cfg.RateLimitAdmin && desiredFeeAdmin == cfg.FeeAdmin {
+		b.Logger.Infof("Token pool admins already match desired values for pool %s on chain %d; skipping", poolAddr.Hex(), chain.Selector)
 		return nil, nil
 	}
 
@@ -447,8 +452,8 @@ func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
 			Args: token_pool.SetDynamicConfigArgs{
-				RateLimitAdmin: newAdmin,
-				FeeAdmin:       cfg.FeeAdmin,
+				RateLimitAdmin: desiredRateLimitAdmin,
+				FeeAdmin:       desiredFeeAdmin,
 				Router:         cfg.Router,
 			},
 		},
@@ -456,7 +461,6 @@ func (p *poolOpsV200) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, pool
 	if err != nil {
 		return nil, fmt.Errorf("SetDynamicConfig v2.0.0: %w", err)
 	}
-
 	return []contract.WriteOutput{report.Output}, nil
 }
 
