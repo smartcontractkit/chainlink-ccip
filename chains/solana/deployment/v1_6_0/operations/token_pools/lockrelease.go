@@ -513,11 +513,13 @@ var UpdateRateLimitAdminLockRelease = operations.NewOperation(
 			b.Logger.Info("Rate limit admin already matches the desired value for lock release token pool with token mint:", input.TokenMint.String())
 			return sequences.OnChainOutput{}, nil
 		}
-		authority, err := GetAuthorityLockRelease(chain, input.Program, input.TokenMint)
+		// err here is the error from the GetAccountDataBorshInto read above, which has already
+		// returned for every error except rpc.ErrNotFound — so err != nil at this point means
+		// exactly "account absent" (the pool config account may legitimately not exist yet:
+		// under MCMS the initialize op only queues a proposal, so this op must still build its
+		// instruction). Fall back to the program upgrade authority in that case.
+		authority := chainConfig.Config.Owner
 		if err != nil {
-			// The pool config account may legitimately not exist yet: under MCMS the initialize
-			// op only queues a proposal, so this op must still build its instruction. Fall back to
-			// the program upgrade authority in that case.
 			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)

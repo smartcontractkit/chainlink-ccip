@@ -624,7 +624,7 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 
 			rlAdmin, err := solana.PublicKeyFromBase58(*input.RateLimitAdmin)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s", input.Selector, *input.RateLimitAdmin)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s: %w", input.Selector, *input.RateLimitAdmin, err)
 			}
 
 			var op = tokenpoolops.UpdateRateLimitAdminBurnMint
@@ -639,11 +639,11 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 
 			tokenPool, err := solana.PublicKeyFromBase58(input.PoolAddress)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s", input.Selector, input.PoolAddress)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s: %w", input.Selector, input.PoolAddress, err)
 			}
 			tokenMint, err := solana.PublicKeyFromBase58(input.TokenRef.Address)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid token mint address for chain %d: %s", input.Selector, input.TokenRef.Address)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token mint address for chain %d: %s: %w", input.Selector, input.TokenRef.Address, err)
 			}
 
 			rlOut, err := operations.ExecuteOperation(b, op, chain, tokenpoolops.TokenPoolTransferOwnershipInput{
