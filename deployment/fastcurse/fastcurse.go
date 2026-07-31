@@ -16,10 +16,22 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
+const (
+	maxConcurrentSequenceExecutions = 20
+)
+
 type GlobalCurseOnNetworkInput struct {
-	ChainSelectors map[uint64]*semver.Version
-	Force          bool
-	MCMS           mcms.Input
+	ChainSelectors                  map[uint64]*semver.Version
+	Force                           bool
+	MCMS                            mcms.Input
+	MaxConcurrentSequenceExecutions int
+}
+
+func getEffectiveMaxConcurrentSequenceExecutions(cfg *RMNCurseConfig) int {
+	if cfg != nil && cfg.MaxConcurrentSequenceExecutions > 0 {
+		return cfg.MaxConcurrentSequenceExecutions
+	}
+	return maxConcurrentSequenceExecutions
 }
 
 type RMNCurseConfig struct {
@@ -27,8 +39,9 @@ type RMNCurseConfig struct {
 	// Use this if you want to include curse subject even when they are already cursed (CurseChangeset) or already uncursed (UncurseChangeset)
 	Force bool
 	// Use this if you want to allow asymmetric lane curses. Useful when a chain is unreachable or stalled and we want to curse subjects on other chains.
-	AllowAsymmetricLaneCurses bool
-	Reason                    string
+	AllowAsymmetricLaneCurses       bool
+	MaxConcurrentSequenceExecutions int
+	Reason                          string
 	// MCMS configures the resulting proposal.
 	MCMS mcms.Input
 }
@@ -120,6 +133,7 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 				return curseCfg, err
 			}
 			curseCfg.CurseActions = append(curseCfg.CurseActions, laneActions...)
+			curseCfg.MaxConcurrentSequenceExecutions = cfg.MaxConcurrentSequenceExecutions
 		}
 	}
 	return curseCfg, nil
@@ -266,6 +280,7 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 		}
 
 		eg := errgroup.Group{}
+		eg.SetLimit(getEffectiveMaxConcurrentSequenceExecutions(&cfg))
 		mutex := &sync.Mutex{}
 		for selector, curseDetail := range grouped {
 			eg.Go(func() error {
@@ -330,6 +345,7 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 		}
 
 		eg := errgroup.Group{}
+		eg.SetLimit(getEffectiveMaxConcurrentSequenceExecutions(&cfg))
 		mutex := &sync.Mutex{}
 
 		for selector, curseDetail := range grouped {
