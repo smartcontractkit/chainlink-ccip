@@ -9,6 +9,7 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
+import {MockTokenMinter} from "../../mocks/MockTokenMinter.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
@@ -83,6 +84,38 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
 
     // Ensure that the mint recipient received the tokens.
+    // Mock transmitter always just mints 1 token.
+    assertEq(s_USDCToken.balanceOf(s_tokenReceiverAddress), 1);
+  }
+
+  function test_verifyMessage_ResolvesLocalMinterThroughTokenMessenger() public {
+    // The token messenger's owner can replace the local minter. Move the canonical burn token mapping from the
+    // minter the verifier saw at deployment to a newly rotated minter: verification must resolve through the new
+    // minter, a stale cached reference would no longer resolve the burn token.
+    MockTokenMinter newMinter = new MockTokenMinter();
+    newMinter.setLocalToken(REMOTE_DOMAIN_IDENTIFIER, bytes32(abi.encode(s_USDCToken)), address(s_USDCToken));
+    s_mockTokenMessenger.i_tokenMinter()
+      .setLocalToken(REMOTE_DOMAIN_IDENTIFIER, bytes32(abi.encode(s_USDCToken)), address(0));
+    vm.mockCall(
+      address(s_mockTokenMessenger),
+      abi.encodeCall(s_mockTokenMessenger.localMinter, ()),
+      abi.encode(address(newMinter))
+    );
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+
     // Mock transmitter always just mints 1 token.
     assertEq(s_USDCToken.balanceOf(s_tokenReceiverAddress), 1);
   }

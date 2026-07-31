@@ -165,8 +165,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
   /// @notice The token messenger, which is used on source to send USDC over CCTP.
   /// @dev The token messenger calls into the message transmitter after burning USDC and forming the app-specific message body.
   ITokenMessenger private immutable i_tokenMessenger;
-  /// @notice The token minter, used to resolve Circle's canonical mapping from a remote domain/token to its local token.
-  ITokenMinter private immutable i_tokenMinter;
   /// @notice The local domain identifier, i.e. a CCTP-specific identifier for the chain to which this contract is deployed.
   uint32 private immutable i_localDomainIdentifier;
 
@@ -208,7 +206,6 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
 
     // Set the immutable state variables.
     i_tokenMessenger = tokenMessenger;
-    i_tokenMinter = ITokenMinter(tokenMessenger.localMinter());
     i_messageTransmitterProxy = messageTransmitterProxy;
     i_localDomainIdentifier = messageTransmitter.localDomain();
     i_usdcToken = usdcToken;
@@ -356,7 +353,10 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     // rather than relying solely on the local configuration of this verifier.
     {
       bytes32 burnToken = bytes32(verifierResults[BURN_TOKEN_START:BURN_TOKEN_START + 32]);
-      address resolvedLocalToken = i_tokenMinter.getLocalToken(attestedSourceDomain, burnToken);
+      // The minter is resolved through the token messenger on every call because the token messenger's owner can
+      // replace its local minter, which would leave a cached minter reference stale.
+      address resolvedLocalToken =
+        ITokenMinter(i_tokenMessenger.localMinter()).getLocalToken(attestedSourceDomain, burnToken);
       if (resolvedLocalToken != address(i_usdcToken)) {
         revert InvalidBurnToken(address(i_usdcToken), resolvedLocalToken);
       }
