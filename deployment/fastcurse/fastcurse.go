@@ -90,9 +90,10 @@ func verifyGlobalCurseOnNetworkInput(cr *CurseRegistry, mcmsRegistry *changesets
 func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg GlobalCurseOnNetworkInput) (RMNCurseConfig, error) {
 	// form the curse input for each chain selector
 	curseCfg := RMNCurseConfig{
-		CurseActions: make([]CurseActionInput, 0),
-		Force:        cfg.Force,
-		MCMS:         cfg.MCMS,
+		CurseActions:                    make([]CurseActionInput, 0),
+		Force:                           cfg.Force,
+		MCMS:                            cfg.MCMS,
+		MaxConcurrentSequenceExecutions: cfg.MaxConcurrentSequenceExecutions,
 	}
 	for chainSelector, version := range cfg.ChainSelectors {
 		curseAction := CurseActionInput{
@@ -133,7 +134,6 @@ func formCurseConfigForGlobalCurse(e cldf.Environment, cr *CurseRegistry, cfg Gl
 				return curseCfg, err
 			}
 			curseCfg.CurseActions = append(curseCfg.CurseActions, laneActions...)
-			curseCfg.MaxConcurrentSequenceExecutions = cfg.MaxConcurrentSequenceExecutions
 		}
 	}
 	return curseCfg, nil
