@@ -3,9 +3,11 @@ package token_pools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/burnmint_token_pool"
@@ -556,27 +558,26 @@ var UpdateRateLimitAdminBurnMint = operations.NewOperation(
 	func(b operations.Bundle, chain cldf_solana.Chain, input TokenPoolTransferOwnershipInput) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.Program)
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		// NOTE: input.NewOwner carries the desired rate limit admin — the input type is shared
+		// with the transfer-ownership ops. BnM pool state has the same wire layout as
+		// test_token_pool.State, which is why that type is used for decoding.
 		var chainConfig test_token_pool.State
 		err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
-		if err == nil {
-			if chainConfig.Config.RateLimitAdmin == input.NewOwner {
-				b.Logger.Info("New owner is the same as the current rate limit admin for burn mint token pool with token mint:", input.TokenMint.String())
-				return sequences.OnChainOutput{}, nil
-			}
+		if err != nil && !errors.Is(err, rpc.ErrNotFound) {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to read burn mint token pool config for token mint %s: %w", input.TokenMint.String(), err)
+		}
+		if err == nil && chainConfig.Config.RateLimitAdmin == input.NewOwner {
+			b.Logger.Info("Rate limit admin already matches the desired value for burn mint token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, nil
 		}
 		authority, err := GetAuthorityBurnMint(chain, input.Program, input.TokenMint)
 		if err != nil {
-			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
+			// The pool config account may legitimately not exist yet: under MCMS the initialize
+			// op only queues a proposal, so this op must still build its instruction. Fall back to
+			// the program upgrade authority in that case.
 			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
-			}
-			// if we had to assume the authority, then the pool isn't initialized yet and therefore
-			// there won't be an authority set on-chain yet, so we can skip the update since the initializer
-			// will be able to set the correct authority during initialization
-			if authority == input.NewOwner {
-				b.Logger.Info("New owner is the same as the current owner for burn mint token pool with token mint:", input.TokenMint.String())
-				return sequences.OnChainOutput{}, nil
 			}
 		}
 		ixn, err := burnmint_token_pool.NewSetRateLimitAdminInstruction(
