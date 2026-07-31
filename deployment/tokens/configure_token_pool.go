@@ -185,6 +185,8 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 						PoolAddress:    fullPoolRef.Address,
 						RateLimitAdmin: pool.RateLimitAdmin,
 						FeeAdmin:       pool.FeeAdmin,
+						TokenPoolRef:   fullPoolRef,
+						TokenRef:       fullTokenRef,
 					})
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to set admin roles on pool %s: %w", fullPoolRef.Address, err)

@@ -53,6 +53,13 @@ type SetTokenPoolAdminsSequenceInput struct {
 	RateLimitAdmin *string `json:"rateLimitAdmin,omitempty" yaml:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if non-nil, is the desired fee admin.
 	FeeAdmin *string `json:"feeAdmin,omitempty" yaml:"feeAdmin,omitempty"`
+	// TokenPoolRef is the fully resolved pool reference. EVM adapters ignore it; Solana
+	// needs Type to select the burnmint or lockrelease program, because a Solana pool
+	// address is a program ID shared across many token mints.
+	TokenPoolRef datastore.AddressRef `json:"tokenPoolRef,omitempty" yaml:"tokenPoolRef,omitempty"`
+	// TokenRef is the fully resolved token reference. EVM adapters ignore it; Solana needs
+	// Address as the token mint to derive the pool config PDA.
+	TokenRef datastore.AddressRef `json:"tokenRef,omitempty" yaml:"tokenRef,omitempty"`
 }
 
 // TokenAdminRoleAdapter is an optional interface for chain families that support token admin role management.

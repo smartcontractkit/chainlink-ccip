@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
@@ -17,6 +18,9 @@ import (
 	tokenpoolV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	tokenpoolV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/token_pool"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
+	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	burnmint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -26,11 +30,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	solchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 )
 
 func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
@@ -728,4 +735,176 @@ func TestConfigureTokenPool_MCMSOwnedPool(t *testing.T) {
 	out2, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
 	require.NoError(t, err)
 	require.Empty(t, out2.MCMSTimelockProposals, "no-op re-apply must not emit an MCMS proposal")
+}
+
+// solanaPoolFixture identifies a deployed Solana token pool for use by ConfigureTokenPool tests.
+// Ref is the fully resolved pool reference (Address is the pool program ID, shared across every
+// mint that pool type serves); Mint is the specific token mint the pool was initialized for.
+type solanaPoolFixture struct {
+	Ref  datastore.AddressRef
+	Mint solana.PublicKey
+}
+
+// setupSolanaPoolsForConfigure stands up a Solana chain (plus a throwaway EVM chain, matching
+// the environment.New pattern used elsewhere in this package) with an initialized BurnMint pool
+// and an initialized LockRelease pool, ready for ConfigureTokenPool admin-role tests. Task 3
+// reuses this helper for the fee-admin-rejection and unsupported-pool-type tests.
+func setupSolanaPoolsForConfigure(t *testing.T) (env *cldf_deployment.Environment, bnm solanaPoolFixture, lnr solanaPoolFixture) {
+	t.Helper()
+
+	src := chainsel.SOLANA_DEVNET.Selector
+	dst := chainsel.TEST_90000002.Selector
+
+	programsPath, ds, err := PreloadSolanaEnvironment(t, src)
+	require.NoError(t, err)
+
+	env, err = environment.New(t.Context(),
+		environment.WithSolanaContainer(t, []uint64{src}, programsPath, solanaProgramIDs),
+		environment.WithEVMSimulated(t, []uint64{dst}),
+	)
+	require.NoError(t, err)
+	env.DataStore = ds.Seal()
+
+	solChain, ok := env.BlockChains.SolanaChains()[src]
+	require.True(t, ok, "Solana chain not found in environment")
+
+	deployRegistry := deployapi.GetRegistry()
+	deployOut, err := deployapi.DeployContracts(deployRegistry).Apply(*env, deployapi.ContractDeploymentConfig{
+		MCMS: mcms.Input{},
+		Chains: map[uint64]deployapi.ContractDeploymentConfigPerChain{
+			src: NewDefaultDeploymentConfigForSolana(cciputils.Version_1_6_0),
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, env, deployOut.DataStore)
+
+	deployPool := func(symbol, poolType string) solanaPoolFixture {
+		expansionOut, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: cciputils.Version_1_6_0,
+			MCMS:                NewDefaultInputForMCMS("Configure Token Pool test setup"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				src: {
+					TokenPoolVersion: cciputils.Version_1_6_0,
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: "",
+						PoolType:           poolType,
+						RateLimitAdmin:     solana.NewWallet().PublicKey().String(),
+					},
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Decimals:               9,
+						Symbol:                 symbol,
+						Name:                   symbol,
+						Type:                   solanautils.SPLTokens,
+						ExternalAdmin:          solana.NewWallet().PublicKey().String(),
+						DisableFreezeAuthority: true,
+						Senders:                []string{solChain.DeployerKey.PublicKey().String()},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, expansionOut.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, expansionOut.MCMSTimelockProposals, false)
+
+		tokenRef, err := datastore_utils.FindAndFormatRef(
+			env.DataStore,
+			datastore.AddressRef{Qualifier: symbol},
+			src,
+			datastore_utils.FullRef,
+		)
+		require.NoError(t, err)
+
+		poolRef, err := datastore_utils.FindAndFormatRef(
+			env.DataStore,
+			datastore.AddressRef{
+				ChainSelector: src,
+				Qualifier:     "",
+				Type:          datastore.ContractType(poolType),
+				Version:       cciputils.Version_1_6_0,
+			},
+			src,
+			datastore_utils.FullRef,
+		)
+		require.NoError(t, err)
+
+		return solanaPoolFixture{Ref: poolRef, Mint: solana.MustPublicKeyFromBase58(tokenRef.Address)}
+	}
+
+	bnm = deployPool("CTP_SOL_BNM", cciputils.BurnMintTokenPool.String())
+	lnr = deployPool("CTP_SOL_LNR", cciputils.LockReleaseTokenPool.String())
+
+	return env, bnm, lnr
+}
+
+// solanaPoolRateLimitAdmin reads the on-chain rate limit admin for a Solana token pool.
+// BnM and LnR pools share the same state layout, so either binding decodes both.
+func solanaPoolRateLimitAdmin(t *testing.T, chain solchain.Chain, poolProgramID solana.PublicKey, tokenMint solana.PublicKey) solana.PublicKey {
+	t.Helper()
+	poolStatePDA, err := tokens.TokenPoolConfigAddress(tokenMint, poolProgramID)
+	require.NoError(t, err)
+	var poolState burnmint_token_pool.State
+	require.NoError(t, chain.GetAccountDataBorshInto(t.Context(), poolStatePDA, &poolState))
+	return poolState.Config.RateLimitAdmin
+}
+
+func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
+	env, bnm, lnr := setupSolanaPoolsForConfigure(t) // helper from Step 6
+
+	for _, tc := range []struct {
+		name string
+		pool solanaPoolFixture // {Ref datastore.AddressRef, Mint solana.PublicKey}
+	}{
+		{"burnmint", bnm},
+		{"lockrelease", lnr},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			newAdmin := solana.NewWallet().PublicKey()
+			newAdminStr := newAdmin.String()
+
+			// A Solana pool program ID is shared across every mint that pool type serves, so it
+			// cannot alone identify "the pool for this mint" the way an EVM pool address can.
+			// The chain-agnostic ConfigureTokenPoolInput has no separate token field, so the
+			// mint-specific pool config PDA is what's passed as TokenPoolRef.Address here: the
+			// Solana adapter's ResolveTokenPoolRef (see chains/solana/deployment/v1_6_0/sequences/tokens.go)
+			// recognizes a PDA, reads its owner to recover the program ID, and tags the resolved
+			// ref with the PDA so DeriveTokenAddress can still identify the mint downstream.
+			solChain := env.BlockChains.SolanaChains()[tc.pool.Ref.ChainSelector]
+			poolProgramID := solana.MustPublicKeyFromBase58(tc.pool.Ref.Address)
+			poolConfigPDA, err := tokens.TokenPoolConfigAddress(tc.pool.Mint, poolProgramID)
+			require.NoError(t, err)
+			apiPoolRef := datastore.AddressRef{ChainSelector: tc.pool.Ref.ChainSelector, Address: poolConfigPDA.String()}
+
+			out, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+					ChainSelector: tc.pool.Ref.ChainSelector,
+					Pools: []tokensapi.PoolConfigUpdate{{
+						TokenPoolRef:   apiPoolRef,
+						RateLimitAdmin: &newAdminStr,
+					}},
+				}},
+				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+			})
+			require.NoError(t, err)
+			testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+			require.Equal(t, newAdmin, solanaPoolRateLimitAdmin(t, solChain, poolProgramID, tc.pool.Mint),
+				"rate limit admin should match the requested value")
+
+			// Re-applying the same value must produce no transactions.
+			out2, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+					ChainSelector: tc.pool.Ref.ChainSelector,
+					Pools: []tokensapi.PoolConfigUpdate{{
+						TokenPoolRef:   apiPoolRef,
+						RateLimitAdmin: &newAdminStr,
+					}},
+				}},
+				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+			})
+			require.NoError(t, err)
+			require.Empty(t, out2.MCMSTimelockProposals, "re-applying an unchanged admin must emit no proposals")
+			require.Equal(t, newAdmin, solanaPoolRateLimitAdmin(t, solChain, poolProgramID, tc.pool.Mint),
+				"rate limit admin must be unchanged after the no-op apply")
+		})
+	}
 }
