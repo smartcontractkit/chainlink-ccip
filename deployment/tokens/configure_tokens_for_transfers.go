@@ -870,12 +870,12 @@ func ResolveTokenFeeAdapter(e cldf.Environment, sel uint64, poolRef datastore.Ad
 
 	tokAdapter, ok := registry.GetTokenAdapter(fam, ref.Version)
 	if !ok {
-		return nil, fmt.Errorf("no token adapter found for chain family %s and pool ref %s", datastore_utils.SprintRef(poolRef), fam)
+		return nil, fmt.Errorf("no token adapter found for chain family %s and pool ref %s", fam, datastore_utils.SprintRef(poolRef))
 	}
 
 	feeAdapter, ok := tokAdapter.(TokenFeeAdapter)
 	if !ok {
-		return nil, fmt.Errorf("token adapter for chain family %s and pool ref %s does not implement TokenFeeAdapter", datastore_utils.SprintRef(poolRef), fam)
+		return nil, fmt.Errorf("token adapter for chain family %s and pool ref %s does not implement TokenFeeAdapter", fam, datastore_utils.SprintRef(poolRef))
 	}
 
 	return feeAdapter, nil
@@ -885,14 +885,14 @@ func ResolveTokenFeeAdapter(e cldf.Environment, sel uint64, poolRef datastore.Ad
 // for the given source and destination chain selectors. It may be overridden via the optional overrides
 // argument, allowing the caller to customize specific fields of the returned config.
 func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeConfig)) TokenTransferFeeConfig {
-	minFeeUSDCents := uint32(25)
-
-	// NOTE: we validate that src != dst so only one of these if statements will execute
-	if src == chain_selectors.ETHEREUM_MAINNET.Selector {
+	var minFeeUSDCents uint32
+	switch {
+	case src == chain_selectors.ETHEREUM_MAINNET.Selector:
 		minFeeUSDCents = 50
-	}
-	if dst == chain_selectors.ETHEREUM_MAINNET.Selector {
+	case dst == chain_selectors.ETHEREUM_MAINNET.Selector:
 		minFeeUSDCents = 150
+	default:
+		minFeeUSDCents = 25
 	}
 
 	cfg := TokenTransferFeeConfig{
