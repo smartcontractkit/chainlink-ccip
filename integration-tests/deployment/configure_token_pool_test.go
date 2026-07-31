@@ -870,9 +870,7 @@ func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
 			// ref with the PDA so DeriveTokenAddress can still identify the mint downstream.
 			solChain := env.BlockChains.SolanaChains()[tc.pool.Ref.ChainSelector]
 			poolProgramID := solana.MustPublicKeyFromBase58(tc.pool.Ref.Address)
-			poolConfigPDA, err := tokens.TokenPoolConfigAddress(tc.pool.Mint, poolProgramID)
-			require.NoError(t, err)
-			apiPoolRef := datastore.AddressRef{ChainSelector: tc.pool.Ref.ChainSelector, Address: poolConfigPDA.String()}
+			apiPoolRef := solanaApiPoolRef(t, tc.pool)
 
 			out, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
 				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
@@ -890,7 +888,11 @@ func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
 			require.Equal(t, newAdmin, solanaPoolRateLimitAdmin(t, solChain, poolProgramID, tc.pool.Mint),
 				"rate limit admin should match the requested value")
 
-			// Re-applying the same value must produce no transactions.
+			// Re-applying the same value must produce no transactions. Refresh the bundle's
+			// reporter first: ExecuteSequence memoizes on (sequence def, input) and would
+			// otherwise return the first apply's cached report without re-running the op,
+			// making this assertion vacuous. See TestConfigureTokenPool_MCMSOwnedPool above.
+			env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(env.OperationsBundle)
 			out2, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
 				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
 					ChainSelector: tc.pool.Ref.ChainSelector,
@@ -907,4 +909,99 @@ func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
 				"rate limit admin must be unchanged after the no-op apply")
 		})
 	}
+}
+
+// solanaApiPoolRef builds the API-facing TokenPoolRef for a Solana pool fixture: the pool
+// config PDA, not the bare pool program ID. Passing the program ID directly into
+// ConfigureTokenPool().Apply fails with "token derivation is only possible if a pool PDA is
+// provided" — the generic ResolveTokenPoolRef exact-matches the datastore by program ID and
+// short-circuits before the Solana PDA-normalizing resolver runs. See
+// TestConfigureTokenPool_Admins_Solana for the same pattern.
+func solanaApiPoolRef(t *testing.T, pool solanaPoolFixture) datastore.AddressRef {
+	t.Helper()
+	poolProgramID := solana.MustPublicKeyFromBase58(pool.Ref.Address)
+	poolConfigPDA, err := tokens.TokenPoolConfigAddress(pool.Mint, poolProgramID)
+	require.NoError(t, err)
+	return datastore.AddressRef{ChainSelector: pool.Ref.ChainSelector, Address: poolConfigPDA.String()}
+}
+
+func TestConfigureTokenPool_UnsupportedFields_Solana(t *testing.T) {
+	env, bnm, _ := setupSolanaPoolsForConfigure(t)
+	apiPoolRef := solanaApiPoolRef(t, bnm)
+	feeAdmin := solana.NewWallet().PublicKey().String()
+
+	t.Run("feeAdmin", func(t *testing.T) {
+		_, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+			Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+				ChainSelector: bnm.Ref.ChainSelector,
+				Pools: []tokensapi.PoolConfigUpdate{{
+					TokenPoolRef: apiPoolRef,
+					FeeAdmin:     &feeAdmin,
+				}},
+			}},
+			MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "fee admin is not supported")
+	})
+
+	t.Run("finalityConfig", func(t *testing.T) {
+		_, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+			Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+				ChainSelector: bnm.Ref.ChainSelector,
+				Pools: []tokensapi.PoolConfigUpdate{{
+					TokenPoolRef:   apiPoolRef,
+					FinalityConfig: &finality.Config{},
+				}},
+			}},
+			MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "does not support finality config updates")
+	})
+}
+
+func TestConfigureTokenPool_FeeConfig_Solana(t *testing.T) {
+	env, bnm, _ := setupSolanaPoolsForConfigure(t)
+	apiPoolRef := solanaApiPoolRef(t, bnm)
+	remote := chainsel.TEST_90000002.Selector // the EVM chain from the helper's env
+
+	out, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: bnm.Ref.ChainSelector,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef: apiPoolRef,
+				Remotes: []tokensapi.RemoteConfigUpdate{{
+					RemoteChainSelector: remote,
+					TokenTransferFeeConfig: &tokensapi.PartialTokenTransferFeeConfig{
+						IsEnabled:                  cciputils.NewOptional(true),
+						DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(10)),
+						DestBytesOverhead:          cciputils.NewOptional(uint32(200_000)),
+					},
+				}},
+			}},
+		}},
+		MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+	})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+	// Solana pools are below v2.0.0, so the fee config lands on the FeeQuoter. Read it back
+	// through the same resolution path the changeset used
+	// (deployment/tokens/configure_tokens_for_transfers.go:512).
+	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(env.OperationsBundle, env.BlockChains, env.DataStore, bnm.Ref.ChainSelector, remote)
+	require.NoError(t, err)
+
+	onchain, err := feeAdapter.GetOnchainTokenTransferFeeConfig(
+		env.OperationsBundle,
+		env.BlockChains,
+		fqRef,
+		bnm.Ref.ChainSelector,
+		remote,
+		bnm.Mint.String(),
+	)
+	require.NoError(t, err)
+	require.True(t, onchain.IsEnabled, "fee config should be enabled on-chain")
+	require.Equal(t, uint32(200_000), onchain.DestBytesOverhead, "destBytesOverhead should match the requested value")
+	require.Equal(t, uint32(10), onchain.MinFeeUSDCents, "min fee USD cents should match the requested default finality fee")
 }
