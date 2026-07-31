@@ -49,7 +49,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	v1_6_5_Usdc_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool"
 	v2_0_0_Cctp_message_transmitter_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
-	rmn_2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
+	rmn_2_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -96,8 +96,8 @@ var (
 		},
 		utils.RMN: {
 			Version2_1_0: rawContractInfo{
-				solidityStandardJSONInput: rmn_2_0_0.SolidityStandardInput,
-				bytecode:                  rmn_2_0_0.RMNBin,
+				solidityStandardJSONInput: rmn_2_1_0.SolidityStandardInput,
+				bytecode:                  rmn_2_1_0.RMNBin,
 				name:                      "contracts/rmn/RMN.sol:RMN",
 			},
 		},
