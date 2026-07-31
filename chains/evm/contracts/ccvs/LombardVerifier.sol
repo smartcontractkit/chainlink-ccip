@@ -96,7 +96,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     address localAdapter;
   }
 
-  string public constant typeAndVersion = "LombardVerifier 2.0.0";
+  string public constant typeAndVersion = "LombardVerifier 2.1.0";
   /// @notice The size of the version tag in bytes.
   uint256 private constant VERSION_TAG_SIZE = 4;
   /// @notice The size of a bytes32 in bytes.

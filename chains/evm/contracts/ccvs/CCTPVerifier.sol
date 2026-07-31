@@ -89,7 +89,7 @@ contract CCTPVerifier is Ownable2StepMsgSender, BaseVerifier {
     bytes4 versionTag;
   }
 
-  string public constant override typeAndVersion = "CCTPVerifier 2.0.0";
+  string public constant override typeAndVersion = "CCTPVerifier 2.1.0";
   /// @notice CCTP contracts use the number 1 to represent V2, as 0 represents V1.
   uint32 private constant SUPPORTED_CCTP_VERSION = 1;
   /// @notice The only supported burn message body version.
