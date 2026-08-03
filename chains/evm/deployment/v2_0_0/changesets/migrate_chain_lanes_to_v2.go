@@ -53,8 +53,8 @@ type MigrateChainLanesToV2Input struct {
 	// discovery. Any lane to one of these remotes is left untouched. Useful for routing around
 	// a flaky/unreachable remote chain RPC or to intentionally hold a lane back from migration.
 	ExcludedRemoteChains []uint64 `json:"excludedRemoteChains,omitempty" yaml:"excludedRemoteChains,omitempty"`
-	// ExcludeLanesWithTokenSymbols optionally skips any lane whose local chain has a token with one
-	// of these symbols configured (supported) for the remote chain — e.g. []string{"USDC", "LBTC"}
+	// ExcludeLanesWithTokenSymbols optionally skips any lane where either chain has a token with one
+	// of these symbols configured (supported) for the other chain — e.g. []string{"USDC", "LBTC"}
 	// to hold back token lanes that need a dedicated migration path. Symbols are matched
 	// case-insensitively against each configured token's on-chain ERC20 symbol(). Reading which
 	// tokens are configured requires a non-nil fee-quoter/ramp updater registry.
@@ -225,6 +225,13 @@ func (d *laneDiscoverer) run(chainSelectors []uint64) ([]v2changesets.CrossFamil
 			if _, dup := seen[key]; dup {
 				continue
 			}
+			excluded, err := d.reverseDirectionCarriesExcludedToken(chainSel, remote)
+			if err != nil {
+				return nil, err
+			}
+			if excluded {
+				continue
+			}
 			seen[key] = struct{}{}
 			pairs = append(pairs, v2changesets.CrossFamilyLanePair{ChainA: chainSel, ChainB: remote})
 		}
@@ -285,6 +292,36 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 	}
 	slices.Sort(remotes)
 	return remotes, nil
+}
+
+// reverseDirectionCarriesExcludedToken checks the remote-to-local direction before a directional
+// candidate is promoted to a bidirectional lane. chainCandidates already checked chainSel-to-remote.
+func (d *laneDiscoverer) reverseDirectionCarriesExcludedToken(chainSel, remote uint64) (bool, error) {
+	if len(d.excludedSymbols) == 0 {
+		return false, nil
+	}
+
+	resolver, ok := d.resolvers.GetLaneVersionResolver(remote)
+	if !ok {
+		return false, fmt.Errorf("no lane version resolver registered for reverse chain %d", remote)
+	}
+	if !resolver.IsSupportedChain(d.env, remote) {
+		return false, fmt.Errorf("reverse chain %d is not supported by its lane version resolver", remote)
+	}
+	laneVersions, _, err := resolver.DeriveLaneVersionsForChain(d.env, remote)
+	if err != nil {
+		return false, fmt.Errorf("failed to derive lane versions for reverse chain %d: %w", remote, err)
+	}
+	version, connected := laneVersions[chainSel]
+	if !connected {
+		return false, nil
+	}
+
+	excluded, err := d.tokenExcludedRemotes(remote, map[uint64]*semver.Version{chainSel: version})
+	if err != nil {
+		return false, fmt.Errorf("failed to evaluate token symbol exclusion for reverse lane %d->%d: %w", remote, chainSel, err)
+	}
+	return isExcluded(excluded, chainSel), nil
 }
 
 // tokenExcludedRemotes returns the remotes whose lane on chainSel carries a token with an excluded
