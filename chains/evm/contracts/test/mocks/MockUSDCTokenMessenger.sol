@@ -3,12 +3,14 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
+import {MockTokenMinter} from "./MockTokenMinter.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
 // contracts involved with the Cross Chain Token Protocol.
 contract MockUSDCTokenMessenger is ITokenMessenger {
   uint32 private immutable i_messageBodyVersion;
   address private immutable i_transmitter;
+  MockTokenMinter public immutable i_tokenMinter;
 
   bytes32 public constant DESTINATION_TOKEN_MESSENGER = keccak256("i_destinationTokenMessenger");
 
@@ -21,6 +23,7 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;
+    i_tokenMinter = new MockTokenMinter();
   }
 
   function depositForBurnWithCaller(
@@ -104,5 +107,9 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
 
   function localMessageTransmitter() external view returns (address) {
     return i_transmitter;
+  }
+
+  function localMinter() external view returns (address) {
+    return address(i_tokenMinter);
   }
 }
