@@ -207,6 +207,11 @@ func ExecuteMCMSTimelockProposal(t *testing.T, env cldf.Environment, timelockPro
 				continue
 			}
 			if bg, ok := evmChains[sel].Client.(simBackendProvider); ok {
+				// AdjustTime refuses to run while the tx pool still reports pending
+				// transactions, and the pool drops mined transactions on a background
+				// goroutine. Committing blocks on a tx pool sync, so transactions
+				// confirmed by the preceding steps are settled before we adjust time.
+				bg.Backend().Commit()
 				require.NoError(t, bg.Backend().AdjustTime(delay))
 				bg.Backend().Commit()
 				t.Logf("[ExecuteMCMSTimelockProposal] AdjustTime(%v) + Commit on EVM chain %d", delay, sel)
