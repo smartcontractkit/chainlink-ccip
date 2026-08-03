@@ -14,6 +14,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 func processConfigResults(
@@ -32,7 +33,7 @@ func processConfigResults(
 		case consts.ContractNameRMNProxy:
 			config.RMNProxy, err = processRMNProxyResults(results)
 		case consts.ContractNameRMNRemote:
-			config.RMNRemote, config.CurseInfo, err = processRMNRemoteResults(results, destChainSelector)
+			config.CurseInfo, err = processRMNRemoteResults(results, destChainSelector)
 		case consts.ContractNameOnRamp:
 			// Only process OnRamp results for source chains
 			if resultsChainSelector != destChainSelector {
@@ -44,7 +45,8 @@ func processConfigResults(
 				config.Router, err = processRouterResults(results)
 			}
 		default:
-			lggr.Warnw("Unhandled contract in batch results", "chain", resultsChainSelector, "contract", contract.Name)
+			lggr.Warnw("Unhandled contract in batch results",
+				logutil.FieldChain, resultsChainSelector, "contract", contract.Name)
 		}
 		if err != nil {
 			return cciptypes.ChainConfigSnapshot{}, fmt.Errorf("process %s results: %w", contract.Name, err)
@@ -84,11 +86,11 @@ func processSourceChainConfigResults(
 					if err != nil {
 						if isNoBindingsError(err) {
 							lggr.Debugw("no bindings for source chain config, ignore if chain is disabled",
-								"chain", chain,
+								logutil.FieldSourceChain, chain,
 								"error", err)
 						} else {
 							lggr.Errorw("Failed to get source chain config from result",
-								"chain", chain,
+								logutil.FieldSourceChain, chain,
 								"error", err)
 						}
 						continue
@@ -97,7 +99,7 @@ func processSourceChainConfigResults(
 					cfg, ok := v.(*cciptypes.SourceChainConfig)
 					if !ok {
 						lggr.Errorw("Invalid result type from GetSourceChainConfig",
-							"chain", chain,
+							logutil.FieldSourceChain, chain,
 							"type", fmt.Sprintf("%T", v))
 						continue
 					}
@@ -234,64 +236,27 @@ func processRMNProxyResults(results []types.BatchReadResult) (cciptypes.RMNProxy
 func processRMNRemoteResults(
 	results []types.BatchReadResult,
 	destChainSelector cciptypes.ChainSelector,
-) (
-	cciptypes.RMNRemoteConfig,
-	cciptypes.CurseInfo,
-	error,
-) {
-	config := cciptypes.RMNRemoteConfig{}
-
-	if len(results) != 3 {
-		return cciptypes.RMNRemoteConfig{}, cciptypes.CurseInfo{},
-			fmt.Errorf("expected 3 RMN remote results, got %d", len(results))
+) (cciptypes.CurseInfo, error) {
+	if len(results) != 1 {
+		return cciptypes.CurseInfo{}, fmt.Errorf("expected 1 RMN remote result, got %d", len(results))
 	}
-
-	// Process DigestHeader
-	val, err := results[0].GetResult()
-	if err != nil {
-		return cciptypes.RMNRemoteConfig{}, cciptypes.CurseInfo{},
-			fmt.Errorf("get RMN remote digest header result: %w", err)
-	}
-
-	typed, ok := val.(*cciptypes.RMNDigestHeader)
-	if !ok {
-		return cciptypes.RMNRemoteConfig{}, cciptypes.CurseInfo{},
-			fmt.Errorf("invalid type for RMN remote digest header: %T", val)
-	}
-	config.DigestHeader = *typed
-
-	// Process VersionedConfig
-	val, err = results[1].GetResult()
-	if err != nil {
-		return cciptypes.RMNRemoteConfig{}, cciptypes.CurseInfo{},
-			fmt.Errorf("get RMN remote versioned config result: %w", err)
-	}
-
-	vconf, ok := val.(*cciptypes.VersionedConfig)
-	if !ok {
-		return cciptypes.RMNRemoteConfig{}, cciptypes.CurseInfo{},
-			fmt.Errorf("invalid type for RMN remote versioned config: %T", val)
-	}
-	config.VersionedConfig = *vconf
 
 	// Process CursedSubjects
-	val, err = results[2].GetResult()
+	val, err := results[0].GetResult()
 	if err != nil {
-		return cciptypes.RMNRemoteConfig{}, cciptypes.CurseInfo{},
-			fmt.Errorf("get RMN remote cursed subjects result: %w", err)
+		return cciptypes.CurseInfo{}, fmt.Errorf("get RMN remote cursed subjects result: %w", err)
 	}
 
 	c, ok := val.(*cciptypes.RMNCurseResponse)
 	if !ok {
-		return cciptypes.RMNRemoteConfig{}, cciptypes.CurseInfo{},
-			fmt.Errorf("invalid type for RMN remote cursed subjects: %T", val)
+		return cciptypes.CurseInfo{}, fmt.Errorf("invalid type for RMN remote cursed subjects: %T", val)
 	}
 	curseInfo := *getCurseInfoFromCursedSubjects(
 		mapset.NewSet(c.CursedSubjects...),
 		destChainSelector,
 	)
 
-	return config, curseInfo, nil
+	return curseInfo, nil
 }
 
 func processRouterResults(results []types.BatchReadResult) (cciptypes.RouterConfig, error) {

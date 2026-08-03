@@ -20,6 +20,19 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+// Milestone log messages for the execute plugin. Stable identifiers the
+// log-analysis tooling keys on; msg equals the constant exactly. GeneratedOutcome
+// carries execPluginState + the outcome (via ToLogFormat), from which the
+// GetCommitReports → GetMessages → Filter state machine and progress are reconstructable.
+const (
+	// GeneratedOutcome is the round's non-empty outcome milestone.
+	GeneratedOutcome = "generated outcome"
+
+	// EmptyOutcome: the round produced an empty outcome (nothing pending, or startup).
+	// Whether this is healthy idle or a stall is judged by the analyzer against observed load.
+	EmptyOutcome = "exec outcome: empty outcome"
+)
+
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
 func (p *Plugin) Outcome(
@@ -91,7 +104,7 @@ func (p *Plugin) Outcome(
 	// This may happen if there is nothing to observe, or during startup when the contracts have
 	// been discovered. In the latter case, getCommitReportsOutcome will return an empty outcome.
 	if outcome.IsEmpty() {
-		lggr.Warnw("exec outcome: empty outcome")
+		lggr.Infow(EmptyOutcome)
 		if p.contractsInitialized {
 			return p.ocrTypeCodec.EncodeOutcome(exectypes.Outcome{State: exectypes.Initialized})
 		}
@@ -99,7 +112,7 @@ func (p *Plugin) Outcome(
 	}
 	p.observer.TrackOutcome(outcome,
 		state, outctx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
-	lggr.Infow("generated outcome",
+	lggr.Infow(GeneratedOutcome,
 		"outcomeWithoutMsgData", outcome.ToLogFormat(),
 		"numCommitReports", len(outcome.CommitReports),
 		"numExecReports", len(outcome.Reports),

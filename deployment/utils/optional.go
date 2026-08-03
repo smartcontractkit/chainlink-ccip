@@ -45,6 +45,11 @@ func (o Optional[T]) Get() (T, bool) {
 	return o.Value, o.Valid
 }
 
+// IsPresent reports whether the optional holds an explicitly set value.
+func (o Optional[T]) IsPresent() bool {
+	return o.Valid
+}
+
 // UnmarshalYAML supports three YAML representations:
 //   - Very-Verbose: `field: {value: 32, valid: false}` → backwards-compatible explicit control
 //   - Semi-verbose: `field: {value: 32}` → {Value: 32, Valid: true} (inferred)

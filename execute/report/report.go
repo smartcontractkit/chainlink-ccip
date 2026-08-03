@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 // buildSingleChainReportHelper converts the on-chain event data stored in ccipocr3.ExecutePluginCommitData into the
@@ -171,7 +172,7 @@ func CheckIfPseudoDeleted() Check {
 			isAlreadyExecuted := slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber)
 			isPartOfReport := report.SequenceNumberRange.Contains(msg.Header.SequenceNumber)
 			if isPartOfReport && !isAlreadyExecuted {
-				lggr.Infow("message pseudo deleted", "index", idx, "messageID", msg.Header.MessageID)
+				lggr.Infow("message pseudo deleted", "index", idx, logutil.FieldMessageID, msg.Header.MessageID)
 			}
 			return PseudoDeleted, nil
 		}
@@ -185,7 +186,7 @@ func CheckAlreadyExecuted() Check {
 		if slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber) {
 			lggr.Infow(
 				"message already executed",
-				"messageID", msg.Header.MessageID,
+				logutil.FieldMessageID, msg.Header.MessageID,
 				"sourceChain", report.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", AlreadyExecuted)
@@ -208,7 +209,7 @@ func CheckTokenData() Check {
 		if !messageTokenData.IsReady() {
 			lggr.Infow(
 				"unable to read token data - token data not ready",
-				"messageID", msg.Header.MessageID,
+				logutil.FieldMessageID, msg.Header.MessageID,
 				"sourceChain", report.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"error", messageTokenData.Error(),
@@ -218,7 +219,7 @@ func CheckTokenData() Check {
 
 		lggr.Infow(
 			"read token data",
-			"messageID", msg.Header.MessageID,
+			logutil.FieldMessageID, msg.Header.MessageID,
 			"sourceChain", report.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
 			"data", messageTokenData.ToByteSlice())
@@ -258,7 +259,7 @@ func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64, addr
 
 		if _, ok := sendersNonce[report.SourceChain]; !ok {
 			lggr.Errorw("Skipping message - nonces not available for chain",
-				"messageID", msg.Header.MessageID,
+				logutil.FieldMessageID, msg.Header.MessageID,
 				"sourceChain", report.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", MissingNoncesForChain)
@@ -273,7 +274,7 @@ func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64, addr
 
 		if _, ok := chainNonces[sender]; !ok {
 			lggr.Errorw("Skipping message - missing nonce",
-				"messageID", msg.Header.MessageID,
+				logutil.FieldMessageID, msg.Header.MessageID,
 				"sourceChain", report.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", MissingNonce)
@@ -291,7 +292,7 @@ func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64, addr
 		// Check expected nonce is valid for sequenced messages.
 		if msg.Header.Nonce != expectedNonce[report.SourceChain][sender] {
 			lggr.Warnw("Skipping message - invalid nonce",
-				"messageID", msg.Header.MessageID,
+				logutil.FieldMessageID, msg.Header.MessageID,
 				"sourceChain", report.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"have", msg.Header.Nonce,
@@ -312,7 +313,7 @@ func CheckIfInflight(inflight IsInflight) Check {
 		if inflight(report.SourceChain, msg.Header.MessageID) {
 			lggr.Infow(
 				"message already in flight",
-				"messageID", msg.Header.MessageID,
+				logutil.FieldMessageID, msg.Header.MessageID,
 				"sourceChain", report.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", "inflight")
@@ -504,7 +505,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 		meta validationMetadata,
 	) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 		b.lggr.Infow("messages added to report",
-			"messageIDs", slicelib.Map(execReport.Messages, func(m ccipocr3.Message) ccipocr3.Bytes32 {
+			logutil.FieldMessageIDs, slicelib.Map(execReport.Messages, func(m ccipocr3.Message) ccipocr3.Bytes32 {
 				return m.Header.MessageID
 			}),
 			"seqNums", slicelib.Map(execReport.Messages, func(m ccipocr3.Message) ccipocr3.SeqNum {
@@ -591,7 +592,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 			// this message didn't work, continue to the next one
 			b.lggr.Debugw("message did not fit in report, deleting from in-progress report built",
 				"sourceChain", commitData.Messages[i].Header.SourceChainSelector,
-				"messageID", commitData.Messages[i].Header.MessageID,
+				logutil.FieldMessageID, commitData.Messages[i].Header.MessageID,
 				"seqNum", commitData.Messages[i].Header.SequenceNumber,
 			)
 			delete(msgs, i)

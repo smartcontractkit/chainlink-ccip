@@ -22,6 +22,17 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+// Analyzer-relevant log messages. Data-access milestones (what was actually read) and
+// nonce-retrieval anomalies; each must equal the logged msg exactly.
+const (
+	// MsgQueriedMessages: messages read between sequence numbers.
+	MsgQueriedMessages = "queried messages between sequence numbers"
+	// MsgUnexpectedNumNonces: a nonce batch returned an unexpected number of results.
+	MsgUnexpectedNumNonces = "unexpected number of nonces"
+	// MsgInvalidNonceValue: a nonce value could not be interpreted.
+	MsgInvalidNonceValue = "invalid nonce value returned"
+)
+
 // DefaultAccessor is an implementation of cciptypes.ChainAccessor that allows the CCIPReader
 // to cutover and migrate away from depending directly on contract reader and contract writer.
 type DefaultAccessor struct {
@@ -83,8 +94,8 @@ func (l *DefaultAccessor) GetAllConfigsLegacy(
 ) (cciptypes.ChainConfigSnapshot, map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
 	lggr := logger.With(
 		l.lggr,
-		"destChainSelector", destChainSelector,
-		"sourceChainSelector", l.chainSelector,
+		logutil.FieldDestChain, destChainSelector,
+		logutil.FieldSourceChain, l.chainSelector,
 	)
 
 	var configRequests contractreader.ExtendedBatchGetLatestValuesRequest
@@ -160,8 +171,6 @@ func prepareDestChainRequest(
 		staticConfig          cciptypes.OffRampStaticChainConfig
 		dynamicConfig         cciptypes.OffRampDynamicChainConfig
 		rmnRemoteAddress      []byte
-		rmnDigestHeader       cciptypes.RMNDigestHeader
-		rmnVersionConfig      cciptypes.VersionedConfig
 		cursedSubjects        cciptypes.RMNCurseResponse
 	)
 
@@ -198,23 +207,11 @@ func prepareDestChainRequest(
 			Params:    map[string]any{},
 			ReturnVal: &rmnRemoteAddress,
 		}},
-		consts.ContractNameRMNRemote: {
-			{
-				ReadName:  consts.MethodNameGetReportDigestHeader,
-				Params:    map[string]any{},
-				ReturnVal: &rmnDigestHeader,
-			},
-			{
-				ReadName:  consts.MethodNameGetVersionedConfig,
-				Params:    map[string]any{},
-				ReturnVal: &rmnVersionConfig,
-			},
-			{
-				ReadName:  consts.MethodNameGetCursedSubjects,
-				Params:    map[string]any{},
-				ReturnVal: &cursedSubjects,
-			},
-		},
+		consts.ContractNameRMNRemote: {{
+			ReadName:  consts.MethodNameGetCursedSubjects,
+			Params:    map[string]any{},
+			ReturnVal: &cursedSubjects,
+		}},
 	}
 
 	// Get source chain config requests and append them to requests
@@ -320,7 +317,7 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 	seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
 	lggr := logutil.WithContextValues(ctx, l.lggr)
-	lggr = logger.With(lggr, "destChainSelector", destChainSelector, "seqNumRange", seqNumRange.String())
+	lggr = logger.With(lggr, logutil.FieldDestChain, destChainSelector, logutil.FieldSeqNumRange, seqNumRange.String())
 
 	seq, err := l.contractReader.ExtendedQueryKey(
 		ctx,
@@ -356,10 +353,10 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
-	lggr.Infow("queried messages between sequence numbers",
+	lggr.Infow(MsgQueriedMessages,
 		"numMsgs", len(seq),
-		"sourceChainSelector", l.chainSelector,
-		"seqNumRange", seqNumRange.String(),
+		logutil.FieldSourceChain, l.chainSelector,
+		logutil.FieldSeqNumRange, seqNumRange.String(),
 	)
 
 	onRampAddress, err := l.GetContractAddress(consts.ContractNameOnRamp)
@@ -398,8 +395,8 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 		"seqNum.MsgID", slicelib.Map(msgsWithoutDataField, func(m cciptypes.Message) string {
 			return fmt.Sprintf("%d.%d", m.Header.SequenceNumber, m.Header.MessageID)
 		}),
-		"sourceChainSelector", l.chainSelector,
-		"seqNumRange", seqNumRange.String(),
+		logutil.FieldSourceChain, l.chainSelector,
+		logutil.FieldSeqNumRange, seqNumRange.String(),
 	)
 
 	return msgs, nil
@@ -409,7 +406,7 @@ func (l *DefaultAccessor) LatestMessageTo(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
-	lggr := logger.With(l.lggr, "destChainSelector", destChainSelector)
+	lggr := logger.With(l.lggr, logutil.FieldDestChain, destChainSelector)
 
 	seq, err := l.contractReader.ExtendedQueryKey(
 		ctx,
@@ -438,8 +435,8 @@ func (l *DefaultAccessor) LatestMessageTo(
 
 	lggr.Debugw("queried latest message from source",
 		"numMsgs", len(seq),
-		"sourceChainSelector", l.chainSelector,
-		"destChainSelector", destChainSelector,
+		logutil.FieldSourceChain, l.chainSelector,
+		logutil.FieldDestChain, destChainSelector,
 	)
 	if len(seq) > 1 {
 		return 0, fmt.Errorf("more than one message found for the latest message query")
@@ -466,7 +463,7 @@ func (l *DefaultAccessor) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
-	lggr := logger.With(l.lggr, "destChainSelector", destChainSelector)
+	lggr := logger.With(l.lggr, logutil.FieldDestChain, destChainSelector)
 	var expectedNextSequenceNumber uint64
 	err := l.contractReader.ExtendedGetLatestValue(
 		ctx,
@@ -728,7 +725,7 @@ func (l *DefaultAccessor) Nonces(
 	// Process results, we range over batchResults, but there should only be result for nonce manager
 	for _, results := range batchResult {
 		if len(results) != len(responses) {
-			lggr.Errorw("unexpected number of nonces",
+			lggr.Errorw(MsgUnexpectedNumNonces,
 				"expected", len(responses), "got", len(results))
 			continue
 		}
@@ -743,7 +740,7 @@ func (l *DefaultAccessor) Nonces(
 
 			val, ok := returnVal.(*uint64)
 			if !ok || val == nil {
-				lggr.Errorw("invalid nonce value returned", "address", key.address)
+				lggr.Errorw(MsgInvalidNonceValue, "address", key.address)
 				continue
 			}
 			if _, ok := res[key.chain]; !ok {
@@ -780,7 +777,7 @@ func prepareNoncesInput(
 		}
 		for _, address := range addresses {
 			lggr.Infow("getting nonce for address",
-				"address", address, "chain", chain)
+				"address", address, logutil.FieldSourceChain, chain)
 
 			sender, err := addrCodec.AddressStringToBytes(string(address), chain)
 			if err != nil {
@@ -882,7 +879,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 			// Log error if we have fewer results than requested selectors
 			lggr.Errorw("Skipping selector due to missing result",
 				"selectorIndex", i,
-				"chain", chain,
+				logutil.FieldSourceChain, chain,
 				"lenFeeQuoterResults", len(results))
 			continue
 		}
@@ -891,7 +888,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		val, err := readResult.GetResult()
 		if err != nil {
 			lggr.Warnw("failed to get chain fee price update from batch result",
-				"chain", chain,
+				logutil.FieldSourceChain, chain,
 				"err", err)
 			continue
 		}
@@ -900,7 +897,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		update, ok := val.(*cciptypes.TimestampedUnixBig)
 		if !ok || update == nil {
 			lggr.Warnw("Invalid type or nil value received for chain fee price update",
-				"chain", chain,
+				logutil.FieldSourceChain, chain,
 				"type", fmt.Sprintf("%T", val),
 				"ok", ok)
 			continue
@@ -909,7 +906,7 @@ func (l *DefaultAccessor) processFeePriceUpdateResults(
 		// Check if the update is empty
 		if update.Timestamp == 0 || update.Value == nil {
 			lggr.Debugw("chain fee price update is empty",
-				"chain", chain,
+				logutil.FieldSourceChain, chain,
 				"update", update)
 			continue
 		}

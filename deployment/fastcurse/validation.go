@@ -35,11 +35,13 @@ func validateVersions(cfg RMNCurseConfig) error {
 // Business rule:
 // - non-global lane actions must include the reverse direction (any version is acceptable)
 // - global curses are excluded
+// - actions with an explicit Subject are excluded, since they aren't tied to a real
+//   lane between two chain selectors
 func validateBidirectionalLaneActions(cfg RMNCurseConfig) error {
 	allLaneActions := make(map[laneKey]curseActionInfo)
 
 	for _, action := range cfg.CurseActions {
-		if action.IsGlobalCurse {
+		if action.IsGlobalCurse || action.Subject != nil {
 			continue
 		}
 		if action.Version == nil {

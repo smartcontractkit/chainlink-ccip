@@ -16,7 +16,7 @@ import (
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -62,7 +62,7 @@ var ConfigureRMNCurseAdmins = cldf_ops.NewSequence(
 	},
 )
 
-// SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.0.0 contract.
+// SeqCurseInput holds the parameters for cursing one or more subjects on an RMN v2.1.0 contract.
 type SeqCurseInput struct {
 	// ChainSelector is added to make the input distinct from other chains that have the same RMN address and Subjects
 	// Without this distinction the sequence will trigger an cache hit in CLD and might not be executed.
@@ -71,7 +71,7 @@ type SeqCurseInput struct {
 	Subjects      [][16]byte
 }
 
-// SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.0.0 contract.
+// SeqUncurseInput holds the parameters for uncursing one or more subjects on an RMN v2.1.0 contract.
 type SeqUncurseInput struct {
 	// ChainSelector is added to make the input distinct from other chains that have the same RMN address and Subjects
 	// Without this distinction the sequence will trigger an cache hit in CLD and might not be executed.
@@ -80,7 +80,7 @@ type SeqUncurseInput struct {
 	Subjects      [][16]byte
 }
 
-// RmnCurse curses one or more subjects on an RMN v2.0.0 contract.
+// RmnCurse curses one or more subjects on an RMN v2.1.0 contract.
 var RmnCurse = cldf_ops.NewSequence(
 	"rmn-curse",
 	rmnops.Version,
@@ -101,7 +101,7 @@ var RmnCurse = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	})
 
-// RmnUncurse uncurses one or more subjects on an RMN v2.0.0 contract.
+// RmnUncurse uncurses one or more subjects on an RMN v2.1.0 contract.
 var RmnUncurse = cldf_ops.NewSequence(
 	"rmn-uncurse",
 	rmnops.Version,
@@ -122,7 +122,7 @@ var RmnUncurse = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	})
 
-// ActivateRMNInput deploys RMN 2.0.0 with the Ultra Fast Curse RBACTimelock as an initial
+// ActivateRMNInput deploys RMN 2.1.0 with the Ultra Fast Curse RBACTimelock as an initial
 // curse admin, transfers RMN ownership to RMNMCMS, and points RMNProxy at the new RMN
 // implementation (final step — makes fast curse live for CCIP consumers).
 type ActivateRMNInput struct {
@@ -131,6 +131,9 @@ type ActivateRMNInput struct {
 	// CurseAdmins are optional additional authorized callers added at deploy time.
 	// The Ultra Fast Curse RBACTimelock is always included.
 	CurseAdmins []common.Address
+	// SubjectsToMigrate are cursed subjects from the current RMN that should be cursed
+	// on the new RMN before ownership transfer. Applied using deployer/owner key.
+	SubjectsToMigrate [][16]byte
 }
 
 // ActivateRMNOutput holds on-chain deploy results and MCMS batch ops split by owning timelock.
@@ -144,13 +147,12 @@ type ActivateRMNOutput struct {
 var DeployAndActivateRMN = cldf_ops.NewSequence(
 	"deploy-and-activate-rmn",
 	rmnops.Version,
-	"Deploy RMN 2.0.0 with Ultra Fast Curse MCMS as curse admin, transfer ownership to RMNMCMS, and point RMNProxy at the new RMN",
+	"Deploy RMN 2.1.0 with curse admins, migrate active curses using deployer key, transfer ownership to RMNMCMS, and point RMNProxy at the new RMN",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ActivateRMNInput) (output ActivateRMNOutput, err error) {
 		if input.ChainSelector != chain.Selector {
 			return ActivateRMNOutput{}, fmt.Errorf("input chain selector %d does not match chain %d",
 				input.ChainSelector, chain.Selector)
 		}
-		var writes []contract.WriteOutput
 
 		rmnTimelock, err := resolveTimelockAddress(input.ExistingAddresses, chain.Selector, common_utils.RMNTimelockQualifier)
 		if err != nil {
@@ -163,7 +165,7 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 			return ActivateRMNOutput{}, err
 		}
 
-		// 1. Deploy RMN 2.0.0 with the Ultra Fast Curse RBACTimelock and any optional curse admins.
+		// 1. Deploy RMN 2.1.0 with the Ultra Fast Curse RBACTimelock and any optional curse admins.
 		curseAdmins := make([]common.Address, 0, 1+len(input.CurseAdmins))
 		curseAdmins = append(curseAdmins, ultraFastCurseTimeLock)
 		curseAdmins = append(curseAdmins, input.CurseAdmins...)
@@ -184,6 +186,23 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		rmnAddr := common.HexToAddress(rmnRef.Address)
 		output.Addresses = append(output.Addresses, rmnRef)
 
+		// 1.5. Apply any cursed subjects from the previous RMN using deployer/owner key,
+		// before ownership transfer. This ensures curses are applied by the owner directly,
+		// not via MCMS proposal.
+		if len(input.SubjectsToMigrate) > 0 {
+			opOutput, err := cldf_ops.ExecuteOperation(b, rmnops.Curse0ByOwnerOrAuthorized, chain, contract.FunctionInput[[][16]byte]{
+				Address:       rmnAddr,
+				ChainSelector: chain.Selector,
+				Args:          input.SubjectsToMigrate,
+			})
+			if err != nil {
+				return ActivateRMNOutput{}, fmt.Errorf("failed to migrate curses on RMN at %s on chain %d: %w", rmnAddr.Hex(), chain.Selector, err)
+			}
+			if !opOutput.Output.Executed() {
+				return ActivateRMNOutput{}, fmt.Errorf("curse migration on RMN at %s on chain %d was prepared for MCMS instead of executing on-chain", rmnAddr.Hex(), chain.Selector)
+			}
+		}
+
 		// 2. Transfer RMN ownership to RMNMCMS timelock.
 		ownershipBatchOps, err := mcms_seq.TransferAndAcceptOwnership(b, chain, []mcms_ops.OpTransferOwnershipInput{
 			{
@@ -200,20 +219,18 @@ var DeployAndActivateRMN = cldf_ops.NewSequence(
 		output.RMNMCMSBatchOps = append(output.RMNMCMSBatchOps, ownershipBatchOps...)
 
 		// 3. Point RMNProxy at the new RMN (makes the implementation live for CCIP).
-		rmnProxyWrites, err := pointRMNProxyAtRMN(b, chain, input.ExistingAddresses, rmnAddr)
+		// pointRMNProxyAtRMN returns writes only when SetRMN must be proposed via MCMS.
+		setRMNWrites, err := pointRMNProxyAtRMN(b, chain, input.ExistingAddresses, rmnAddr)
 		if err != nil {
 			return ActivateRMNOutput{}, err
 		}
-		writes = append(writes, rmnProxyWrites...)
 
-		if len(writes) > 0 {
-			batch, err := contract.NewBatchOperationFromWrites(writes)
+		if len(setRMNWrites) > 0 {
+			batch, err := contract.NewBatchOperationFromWrites(setRMNWrites)
 			if err != nil {
 				return ActivateRMNOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 			}
-			if len(batch.Transactions) > 0 {
-				output.CLLCCIPBatchOps = append(output.CLLCCIPBatchOps, batch)
-			}
+			output.CLLCCIPBatchOps = append(output.CLLCCIPBatchOps, batch)
 		}
 
 		return output, nil
@@ -237,6 +254,9 @@ func pointRMNProxyAtRMN(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set RMN on RMNProxy on chain %d: %w", chain.Selector, err)
+	}
+	if setRMNReport.Output.Executed() {
+		return nil, nil
 	}
 	return []contract.WriteOutput{setRMNReport.Output}, nil
 }

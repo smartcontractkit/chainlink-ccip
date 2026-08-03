@@ -26,6 +26,7 @@ const (
 	CapabilitiesRegistry       cldf.ContractType = "CapabilitiesRegistry"
 	CCIPHome                   cldf.ContractType = "CCIPHome"
 	RMNHome                    cldf.ContractType = "RMNHome"
+	RMN                        cldf.ContractType = "RMN"
 	TokenPoolLookupTable       cldf.ContractType = "TokenPoolLookupTable"
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
@@ -56,7 +57,7 @@ const (
 	CLLQualifier         = "CLLCCIP"
 	RMNTimelockQualifier = "RMNMCMS"
 	// UltraFastCurseMCMSQualifier qualifies the dedicated MCMS deployment used for Ultra Fast Curse
-	// (RMN 2.0.0 authorized caller / curse admin).
+	// (RMN 2.1.0 authorized caller / curse admin).
 	UltraFastCurseMCMSQualifier = "UltraFastCurse"
 )
 

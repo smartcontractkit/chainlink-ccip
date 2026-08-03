@@ -98,6 +98,12 @@ func addrBytes(hexAddr string) []byte {
 	return common.HexToAddress(hexAddr).Bytes()
 }
 
+// onRampBytes is the form the EVM adapter returns an OnRamp address in: abi.encode(address),
+// which is what the OnRamp writes into its messages and what a destination OffRamp whitelists.
+func onRampBytes(hexAddr string) []byte {
+	return common.LeftPadBytes(common.HexToAddress(hexAddr).Bytes(), 32)
+}
+
 func buildConfigureChainForLanesInput(
 	local deployedContracts,
 	localSelector uint64,
@@ -107,7 +113,7 @@ func buildConfigureChainForLanesInput(
 	return changesetadapters.ConfigureChainForLanesInput{
 		ChainSelector: localSelector,
 		Router:        addrBytes(local.router),
-		OnRamp:        addrBytes(local.onRamp),
+		OnRamp:        onRampBytes(local.onRamp),
 		FeeQuoter:     addrBytes(local.feeQuoter),
 		OffRamp:       addrBytes(local.offRamp),
 		CommitteeVerifiers: []changesetadapters.CommitteeVerifierConfig[datastore.AddressRef]{
@@ -124,7 +130,7 @@ func buildConfigureChainForLanesInput(
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
 				AllowTrafficFrom:         new(true),
-				OnRamps:                  [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OnRamps:                  [][]byte{onRampBytes(remote.onRamp)},
 				OffRamp:                  common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultExecutor:          local.executor,
 				DefaultInboundCCVs:       []string{local.committeeVerifier},
@@ -171,7 +177,7 @@ func assertOnChainState(
 	assert.True(t, srcCfg.Output.IsEnabled)
 	assert.Equal(t, local.router, srcCfg.Output.Router.Hex())
 	assert.Len(t, srcCfg.Output.OnRamps, 1)
-	assert.Equal(t, common.LeftPadBytes(common.HexToAddress(remote.onRamp).Bytes(), 32), srcCfg.Output.OnRamps[0])
+	assert.Equal(t, onRampBytes(remote.onRamp), srcCfg.Output.OnRamps[0])
 	assert.Len(t, srcCfg.Output.DefaultCCVs, 1)
 	assert.Equal(t, local.committeeVerifier, srcCfg.Output.DefaultCCVs[0].Hex())
 
@@ -533,7 +539,7 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 	input := buildConfigureChainForLanesInput(local, chainSelector, remoteAContracts, remoteA)
 	input.RemoteChains[remoteB] = changesetadapters.RemoteChainConfig[[]byte, string]{
 		AllowTrafficFrom:    new(true),
-		OnRamps:             [][]byte{common.HexToAddress(remoteBContracts.onRamp).Bytes()},
+		OnRamps:             [][]byte{onRampBytes(remoteBContracts.onRamp)},
 		OffRamp:             common.HexToAddress(remoteBContracts.offRamp).Bytes(),
 		DefaultExecutor:     local.executor,
 		DefaultInboundCCVs:  []string{local.committeeVerifier},
@@ -738,13 +744,13 @@ func TestConfigureChainForLanes_PartialUpdatePreservesExistingFields(t *testing.
 	partialInput := changesetadapters.ConfigureChainForLanesInput{
 		ChainSelector: chainSelector,
 		Router:        addrBytes(local.router),
-		OnRamp:        addrBytes(local.onRamp),
+		OnRamp:        onRampBytes(local.onRamp),
 		FeeQuoter:     addrBytes(local.feeQuoter),
 		OffRamp:       addrBytes(local.offRamp),
 		RemoteChains: map[uint64]changesetadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
 				AllowTrafficFrom:     new(true),
-				OnRamps:              [][]byte{common.HexToAddress(remote.onRamp).Bytes()},
+				OnRamps:              [][]byte{onRampBytes(remote.onRamp)},
 				OffRamp:              common.HexToAddress(remote.offRamp).Bytes(),
 				DefaultInboundCCVs:   []string{local.committeeVerifier},
 				DefaultOutboundCCVs:  []string{local.committeeVerifier},

@@ -10,7 +10,7 @@ import (
 	burnmintwithlockreleaseflagtokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_mint_with_lock_release_flag_token_pool"
 	burnwithfromminttokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
 	v2feequoter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
@@ -32,12 +32,12 @@ import (
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	evmseqV1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	cctpthroughccvtokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_verifier"
+	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 	committeeverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	executorops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/rmn"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	versionedverifierresolverops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -45,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -77,7 +76,6 @@ func init() {
 	laneMigratorReg.RegisterRampUpdater(chainsel.FamilyEVM, semver.MustParse("2.0.0"), &LaneMigrator{})
 	laneMigratorReg.RegisterRouterUpdater(chainsel.FamilyEVM, semver.MustParse("1.2.0"), &adapters1_2.RouterUpdater{})
 
-	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyEVM, v, &ChainFamilyAdapter{})
 	ccvadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyEVM, &ChainFamilyAdapter{})
 
 	ccvadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyEVM, &EVMCommitteeVerifierContractAdapter{})
@@ -90,9 +88,11 @@ func init() {
 	feeAggReg.RegisterFeeAggregatorAdapter(chainsel.FamilyEVM, v, NewFeeAggregatorAdapter())
 
 	curseRegistry := fastcurse.GetCurseRegistry()
+	// Keyed by RMN's own version (currently 2.1.0), not the surrounding EVM lane suite version `v`:
+	// RMN can be upgraded independently of the rest of the lane contracts behind the RMNProxy.
 	curseRegistry.RegisterNewCurse(fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      v,
+		CursingVersion:      rmnops.Version,
 		CurseAdapter:        NewCurseAdapter(),
 		CurseSubjectAdapter: NewCurseAdapter(),
 	})
@@ -123,7 +123,9 @@ func registerContractVerificationMetadata(v *semver.Version) {
 	verification.RegisterContractMetadata(utils.LockReleaseTokenPool, v, lockreleasetokenpoolv2.SolidityStandardInput, lockreleasetokenpoolv2.LockReleaseTokenPoolBin, "contracts/pools/LockReleaseTokenPool.sol:LockReleaseTokenPool")
 	verification.RegisterContractMetadata(versionedverifierresolverops.CommitteeVerifierResolverType, v, versioned_verifier_resolver.SolidityStandardInput, versioned_verifier_resolver.VersionedVerifierResolverBin, "contracts/ccvs/VersionedVerifierResolver.sol:VersionedVerifierResolver")
 	verification.RegisterContractMetadata(versionedverifierresolverops.CCTPVerifierResolverType, v, versioned_verifier_resolver.SolidityStandardInput, versioned_verifier_resolver.VersionedVerifierResolverBin, "contracts/ccvs/VersionedVerifierResolver.sol:VersionedVerifierResolver")
-	verification.RegisterContractMetadata(cctpverifierops.ContractType, v, cctp_verifier.SolidityStandardInput, cctp_verifier.CCTPVerifierBin, "contracts/ccvs/CCTPVerifier.sol:CCTPVerifier")
+	// Keyed by CCTPVerifier's own version (currently 2.1.0), not the surrounding EVM lane suite version `v`:
+	// CCTPVerifier can be upgraded independently of the rest of the lane contracts.
+	verification.RegisterContractMetadata(cctpverifierops.ContractType, cctpverifierops.Version, cctp_verifier.SolidityStandardInput, cctp_verifier.CCTPVerifierBin, "contracts/ccvs/CCTPVerifier.sol:CCTPVerifier")
 	verification.RegisterContractMetadata(cctpthroughccvtokenpoolops.ContractType, v, cctp_through_ccv_token_pool.SolidityStandardInput, cctp_through_ccv_token_pool.CCTPThroughCCVTokenPoolBin, "contracts/pools/USDC/CCTPThroughCCVTokenPool.sol:CCTPThroughCCVTokenPool")
 	verification.RegisterContractMetadata(usdctokenpoolproxyops.ContractType, v, usdc_token_pool_proxy.SolidityStandardInput, usdc_token_pool_proxy.USDCTokenPoolProxyBin, "contracts/pools/USDC/USDCTokenPoolProxy.sol:USDCTokenPoolProxy")
 	verification.RegisterContractMetadata(mock_receiver.ContractType, v, mock_receiver_v2.SolidityStandardInput, mock_receiver_v2.MockReceiverV2Bin, "contracts/test/mocks/MockReceiverV2.sol:MockReceiverV2")

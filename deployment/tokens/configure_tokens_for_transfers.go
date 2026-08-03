@@ -52,7 +52,7 @@ type TokenTransferConfig struct {
 	LiquidityMigrationAmount *big.Int `yaml:"liquidityMigrationAmount" json:"liquidityMigrationAmount"`
 	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with LiquidityMigrationAmount. See LiquidityMigrationAmount for ownership and entry-point requirements.
-	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,string" json:"liquidityMigrationBasisPoints,string"`
+	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints" json:"liquidityMigrationBasisPoints"`
 	// AutoMigrateRemoteChains is only applicable when migrating a pre-V2 pool to V2. When true, the changeset
 	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
 	// automatically with (token, pool, decimals, rate limits, and MigrationMetadata). Legacy lane fees are read
@@ -853,4 +853,61 @@ func LegacyRateLimitsForAutoMigrate[R any, CCV any](
 		Outbound: legacy.Outbound,
 		Inbound:  inboundLegacy,
 	}, nil
+}
+
+func ResolveTokenFeeAdapter(e cldf.Environment, sel uint64, poolRef datastore.AddressRef) (TokenFeeAdapter, error) {
+	registry := GetTokenAdapterRegistry()
+
+	fam, err := chain_selectors.GetSelectorFamily(sel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain selector family for selector %d: %w", sel, err)
+	}
+
+	ref, err := ResolveTokenPoolRef(e, registry, sel, poolRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve token pool ref: %w", err)
+	}
+
+	tokAdapter, ok := registry.GetTokenAdapter(fam, ref.Version)
+	if !ok {
+		return nil, fmt.Errorf("no token adapter found for chain family %s and pool ref %s", fam, datastore_utils.SprintRef(poolRef))
+	}
+
+	feeAdapter, ok := tokAdapter.(TokenFeeAdapter)
+	if !ok {
+		return nil, fmt.Errorf("token adapter for chain family %s and pool ref %s does not implement TokenFeeAdapter", fam, datastore_utils.SprintRef(poolRef))
+	}
+
+	return feeAdapter, nil
+}
+
+// GetDefaultChainAgnosticTokenTransferFeeConfig returns sensible default token transfer fee configuration
+// for the given source and destination chain selectors. It may be overridden via the optional overrides
+// argument, allowing the caller to customize specific fields of the returned config.
+func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeConfig)) TokenTransferFeeConfig {
+	var minFeeUSDCents uint32
+	switch {
+	case src == chain_selectors.ETHEREUM_MAINNET.Selector:
+		minFeeUSDCents = 50
+	case dst == chain_selectors.ETHEREUM_MAINNET.Selector:
+		minFeeUSDCents = 150
+	default:
+		minFeeUSDCents = 25
+	}
+
+	cfg := TokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: 0,
+		CustomFinalityTransferFeeBps:  0,
+		DefaultFinalityFeeUSDCents:    minFeeUSDCents,
+		CustomFinalityFeeUSDCents:     minFeeUSDCents,
+		DestBytesOverhead:             32,
+		DestGasOverhead:               90_000,
+		IsEnabled:                     true,
+	}
+
+	for _, override := range overrides {
+		override(&cfg)
+	}
+
+	return cfg
 }

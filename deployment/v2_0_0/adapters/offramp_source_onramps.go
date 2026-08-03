@@ -11,8 +11,11 @@ import (
 type OffRampSetSourceOnRampsEntry struct {
 	LocalChainSelector  uint64 `json:"localChainSelector" yaml:"localChainSelector"`
 	SourceChainSelector uint64 `json:"sourceChainSelector" yaml:"sourceChainSelector"`
-	// OnRamps are hex strings (20- or 32-byte) in durable-pipeline input, not [][]byte: operators
-	// author yaml/json as human-readable hex, and each chain-family adapter encodes to on-chain bytes.
+	// OnRamps are hex strings in durable-pipeline input, not [][]byte: operators author
+	// yaml/json as human-readable hex. Each entry must be the onramp address exactly as the
+	// source chain writes it into its messages, since the OffRamp matches by hashing those
+	// bytes. For an EVM source that is abi.encode(address) — 32 bytes, left zero-padded —
+	// not the 20-byte contract address.
 	OnRamps []string `json:"onRamps" yaml:"onRamps"`
 }
 

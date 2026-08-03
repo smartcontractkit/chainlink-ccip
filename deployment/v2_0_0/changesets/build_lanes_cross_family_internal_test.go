@@ -128,11 +128,12 @@ func TestExpandLanesToPartialChainConfigs_MultipleCommittees(t *testing.T) {
 	assert.Contains(t, cfgB.CommitteeVerifiers[1].RemoteChains, chainA)
 }
 
-func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerRemoteChain(t *testing.T) {
+func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerLaneLeg(t *testing.T) {
 	chainA := uint64(100)
 	chainB := uint64(200)
 
 	// alpha is on both chains; beta only on chainA; gamma only on chainB.
+	// Only alpha covers both sides of the lane, so it is the only qualifier for either leg.
 	committees := map[string]offchain.CommitteeConfig{
 		"alpha": {
 			Qualifier: "alpha",
@@ -165,21 +166,17 @@ func TestExpandLanesToPartialChainConfigs_FiltersCommitteeQualifiersPerRemoteCha
 		bySel[c.ChainSelector] = c
 	}
 
+	// beta (chainA only) and gamma (chainB only) are excluded from both legs;
+	// only alpha spans both chains.
 	cfgA := bySel[chainA]
-	require.Len(t, cfgA.CommitteeVerifiers, 2)
+	require.Len(t, cfgA.CommitteeVerifiers, 1)
 	assert.Equal(t, "alpha", cfgA.CommitteeVerifiers[0].CommitteeQualifier)
-	assert.Equal(t, "gamma", cfgA.CommitteeVerifiers[1].CommitteeQualifier)
-	for _, cv := range cfgA.CommitteeVerifiers {
-		assert.Contains(t, cv.RemoteChains, chainB)
-	}
+	assert.Contains(t, cfgA.CommitteeVerifiers[0].RemoteChains, chainB)
 
 	cfgB := bySel[chainB]
-	require.Len(t, cfgB.CommitteeVerifiers, 2)
+	require.Len(t, cfgB.CommitteeVerifiers, 1)
 	assert.Equal(t, "alpha", cfgB.CommitteeVerifiers[0].CommitteeQualifier)
-	assert.Equal(t, "beta", cfgB.CommitteeVerifiers[1].CommitteeQualifier)
-	for _, cv := range cfgB.CommitteeVerifiers {
-		assert.Contains(t, cv.RemoteChains, chainA)
-	}
+	assert.Contains(t, cfgB.CommitteeVerifiers[0].RemoteChains, chainA)
 }
 
 func TestExpandLanesToPartialChainConfigs_ChainOverridesCommitteeVerifierFinalityConfig(t *testing.T) {
@@ -224,12 +221,12 @@ func TestExpandLanesToPartialChainConfigs_ChainOverridesCommitteeVerifierFinalit
 			cfg = c
 		}
 	}
-	require.Len(t, cfg.CommitteeVerifiers, 2)
+	// Only alpha covers both chainA and chainB; beta/gamma are single-chain.
+	require.Len(t, cfg.CommitteeVerifiers, 1)
 	for _, cv := range cfg.CommitteeVerifiers {
 		require.NotNil(t, cv.AllowedFinalityConfig)
 		require.Equal(t, *finalityCfg, *cv.AllowedFinalityConfig)
 		require.Contains(t, cv.RemoteChains, chainB)
-
 	}
 }
 

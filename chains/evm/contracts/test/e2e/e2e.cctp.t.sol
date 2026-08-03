@@ -395,6 +395,12 @@ contract cctp_e2e is OnRampSetup {
     });
     s_destCCTPSetup.verifier.setDomains(sourceDomainArgs);
 
+    // Configure Circle's canonical mapping so the source chain's burnToken resolves to the destination USDC token.
+    s_destCCTPSetup.tokenMessenger.i_tokenMinter()
+      .setLocalToken(
+        SOURCE_DOMAIN, bytes32(abi.encode(address(s_sourceCCTPSetup.token))), address(s_destCCTPSetup.token)
+      );
+
     // Set authorized callers on the message transmitter proxy on destination.
     address[] memory mtProxyAuthorizedCallers = new address[](1);
     mtProxyAuthorizedCallers[0] = address(s_destCCTPSetup.verifier);

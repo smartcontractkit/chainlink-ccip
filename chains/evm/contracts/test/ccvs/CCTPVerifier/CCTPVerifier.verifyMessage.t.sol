@@ -9,6 +9,7 @@ import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {CCTPHelper} from "../../helpers/CCTPHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
+import {MockTokenMinter} from "../../mocks/MockTokenMinter.sol";
 import {CCTPVerifierSetup} from "./CCTPVerifierSetup.t.sol";
 
 contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
@@ -87,6 +88,38 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     assertEq(s_USDCToken.balanceOf(s_tokenReceiverAddress), 1);
   }
 
+  function test_verifyMessage_ResolvesLocalMinterThroughTokenMessenger() public {
+    // The token messenger's owner can replace the local minter. Move the canonical burn token mapping from the
+    // minter the verifier saw at deployment to a newly rotated minter: verification must resolve through the new
+    // minter, a stale cached reference would no longer resolve the burn token.
+    MockTokenMinter newMinter = new MockTokenMinter();
+    newMinter.setLocalToken(REMOTE_DOMAIN_IDENTIFIER, bytes32(abi.encode(s_USDCToken)), address(s_USDCToken));
+    s_mockTokenMessenger.i_tokenMinter()
+      .setLocalToken(REMOTE_DOMAIN_IDENTIFIER, bytes32(abi.encode(s_USDCToken)), address(0));
+    vm.mockCall(
+      address(s_mockTokenMessenger),
+      abi.encodeCall(s_mockTokenMessenger.localMinter, ()),
+      abi.encode(address(newMinter))
+    );
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+
+    // Mock transmitter always just mints 1 token.
+    assertEq(s_USDCToken.balanceOf(s_tokenReceiverAddress), 1);
+  }
+
   function test_verifyMessage_RevertWhen_CursedByRMN() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
       DEST_CHAIN_SELECTOR,
@@ -101,6 +134,38 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     _setMockRMNChainCurse(message.sourceChainSelector, true);
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, message.sourceChainSelector));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidTokenTransferLength() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    // We expect exactly one token transfer per message.
+    message.tokenTransfer = new MessageV1Codec.TokenTransferV1[](0);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidTokenTransferLength.selector, 0));
+    s_cctpVerifier.verifyMessage(message, messageHash, "");
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidToken() public {
+    address invalidDestToken = makeAddr("invalidDestToken");
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      invalidDestToken,
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidToken.selector, abi.encodePacked(invalidDestToken)));
     s_cctpVerifier.verifyMessage(message, messageHash, "");
   }
 
@@ -224,6 +289,67 @@ contract CCTPVerifier_verifyMessage is CCTPVerifierSetup {
     vm.expectRevert(
       abi.encodeWithSelector(CCTPVerifier.InvalidSourceDomain.selector, REMOTE_DOMAIN_IDENTIFIER, wrongSourceDomain)
     );
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidBurnToken() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    // Circle's canonical mapping has no entry for this burnToken, so it resolves to address(0).
+    bytes32 unmappedBurnToken = bytes32(abi.encode(makeAddr("unmappedBurnToken")));
+    s_baseCCTPMessage.body.burnToken = unmappedBurnToken;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidBurnToken.selector, address(s_USDCToken), address(0)));
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidRecipient() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    bytes32 wrongRecipient = bytes32(abi.encode(makeAddr("wrongRecipient")));
+    s_baseCCTPMessage.header.recipient = wrongRecipient;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        CCTPVerifier.InvalidRecipient.selector, bytes32(abi.encode(s_mockTokenMessenger)), wrongRecipient
+      )
+    );
+    s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidBurnMessageBodyVersion() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageHash) = _createCCIPMessage(
+      DEST_CHAIN_SELECTOR,
+      SOURCE_CHAIN_SELECTOR,
+      CCIP_FAST_FINALITY_THRESHOLD,
+      address(s_USDCToken),
+      TRANSFER_AMOUNT,
+      s_tokenReceiver
+    );
+
+    s_baseCCTPMessage.hookData.messageId = messageHash;
+    s_baseCCTPMessage.body.version = 0;
+    bytes memory verifierResults = _createVerifierResults(s_cctpVerifier.versionTag(), s_baseCCTPMessage);
+
+    vm.expectRevert(abi.encodeWithSelector(CCTPVerifier.InvalidBurnMessageBodyVersion.selector, 1, 0));
     s_cctpVerifier.verifyMessage(message, messageHash, verifierResults);
   }
 

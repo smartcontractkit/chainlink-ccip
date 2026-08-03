@@ -7,6 +7,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 // solanaUSDCMessageReaderAccessor is a USDCReader for Solana that delegates calls to the Solana ChainAccessor
@@ -35,7 +37,7 @@ func NewSolanaUSDCReaderAccessor(
 	}
 
 	lggr.Debugw("Syncing contract to accessor",
-		"chainSelector", chainSelector,
+		logutil.FieldChain, chainSelector,
 		"contractName", consts.ContractNameUSDCTokenPool,
 		"address", addressStr,
 	)

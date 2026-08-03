@@ -49,6 +49,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
 	v1_6_5_Usdc_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool"
 	v2_0_0_Cctp_message_transmitter_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
+	rmn_2_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -75,6 +76,7 @@ var (
 	Version1_6_3 = semver.MustParse("1.6.3").String()
 	Version1_6_5 = semver.MustParse("1.6.5").String()
 	Version2_0_0 = semver.MustParse("2.0.0").String()
+	Version2_1_0 = semver.MustParse("2.1.0").String()
 )
 
 // contracts maps type & version of a contract to its corresponding standard JSON input, name, and bytecode.
@@ -92,7 +94,13 @@ var (
 				name:                      "contracts/pools/USDC/USDCTokenPool.sol:USDCTokenPool",
 			},
 		},
-
+		utils.RMN: {
+			Version2_1_0: rawContractInfo{
+				solidityStandardJSONInput: rmn_2_1_0.SolidityStandardInput,
+				bytecode:                  rmn_2_1_0.RMNBin,
+				name:                      "contracts/rmn/RMN.sol:RMN",
+			},
+		},
 		utils.HybridLockReleaseUSDCTokenPool: {
 			Version1_6_2: rawContractInfo{
 				solidityStandardJSONInput: hybrid_lock_release_usdc_token_pool.SolidityStandardInput,

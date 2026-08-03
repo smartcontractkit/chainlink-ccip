@@ -65,7 +65,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	for _, token := range tokens {
 		tokenAddressBytes, err := pr.addressCodec.AddressStringToBytes(string(token), chain)
 		if err != nil {
-			lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
+			lggr.Warnw("failed to convert token address to bytes", logutil.FieldToken, token, "err", err)
 			continue
 		}
 
@@ -75,7 +75,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	accessor, err := getChainAccessor(pr.chainAccessors, chain)
 	if err != nil {
 		// Don't return an error if the chain accessor is not found, just log warning and return nil
-		lggr.Warnw("chain accessor not found", "chain", chain, "err", err)
+		lggr.Warnw("chain accessor not found", logutil.FieldChain, chain, "err", err)
 		return nil, nil
 	}
 
@@ -102,7 +102,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 	accessor, err := getChainAccessor(pr.chainAccessors, pr.feedChain)
 	if err != nil {
 		// Don't return an error if the chain accessor is not found, just log and return empty map
-		lggr.Debugw("chain accessor not found on node for feed chain", "chain", pr.feedChain, "err", err)
+		lggr.Debugw("chain accessor not found on node for feed chain", logutil.FieldChain, pr.feedChain, "err", err)
 		return make(ccipocr3.TokenPriceMap), nil
 	}
 
