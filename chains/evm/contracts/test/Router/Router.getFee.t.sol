@@ -15,7 +15,7 @@ contract Router_getFee is RouterSetup {
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
     });
 
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 expectedFee = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 10e9);
   }
 
@@ -24,6 +24,6 @@ contract Router_getFee is RouterSetup {
     Client.EVM2AnyMessage memory message;
 
     vm.expectRevert(abi.encodeWithSelector(IRouterClient.UnsupportedDestinationChain.selector, 999));
-    s_sourceRouter.getFee(999, message);
+    s_router.getFee(999, message);
   }
 }

@@ -14,6 +14,8 @@ import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BaseERC20} from "../../tokens/BaseERC20.sol";
 import {CrossChainToken} from "../../tokens/CrossChainToken.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {RouterFixture} from "../RouterFixture.t.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
@@ -29,7 +31,7 @@ import {VmSafe} from "forge-std/Vm.sol";
 ///      2. Fee withdrawal works for all components (OnRamp, Executor, TokenPool, Verifier)
 ///      3. Verifier fees go to resolver (proxy), not implementation
 ///      4. All withdrawFeeTokens functions are permissionless (PAL compatible)
-contract e2e_feeWithdrawal is OnRampSetup {
+contract e2e_feeWithdrawal is OnRampSetup, RouterFixture {
   bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
 
   struct Balances {
@@ -58,7 +60,11 @@ contract e2e_feeWithdrawal is OnRampSetup {
     "CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])"
   );
 
-  function setUp() public virtual override {
+  function _setUpRouters() internal override(BaseTest, RouterFixture) {
+    RouterFixture._setUpRouters();
+  }
+
+  function setUp() public virtual override(BaseTest, OnRampSetup) {
     super.setUp();
 
     s_feeAggregator = makeAddr("feeAggregator");
@@ -113,7 +119,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     // Set up router with onRamp
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    Router(address(s_sourceRouter)).applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     // Deploy verifier implementation
     s_verifierImpl = new CommitteeVerifier(
@@ -215,7 +221,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     s_offRamp.applySourceChainConfigUpdates(updates);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
 
     // Set up automation address (simulates Chainlink Automation/CRE)
     s_automationAddress = makeAddr("automation");
@@ -255,7 +261,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: address(s_testToken), amount: 1e18});
 
     // Get fee and approve
-    uint256 fee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 fee = Router(address(s_sourceRouter)).getFee(DEST_CHAIN_SELECTOR, message);
     IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), fee);
     // Also approve the token being transferred
     IERC20(address(s_testToken)).approve(address(s_sourceRouter), message.tokenAmounts[0].amount);
@@ -264,7 +270,7 @@ contract e2e_feeWithdrawal is OnRampSetup {
     vm.recordLogs();
 
     // Perform ccipSend
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    Router(address(s_sourceRouter)).ccipSend(DEST_CHAIN_SELECTOR, message);
 
     // Extract receipts from the CCIPMessageSent event
     OnRamp.Receipt[] memory receipts = _getReceiptsFromLogs(vm.getRecordedLogs());

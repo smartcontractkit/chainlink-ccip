@@ -66,9 +66,10 @@ contract OnRamp_getFee is OnRampSetup {
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    // Assert the fee is in a reasonable range.
-    assertLt(feeAmount, 1e19);
-    assertGt(feeAmount, 5e17);
+    // Assert the fee is in a reasonable USD range, independent of the configured fee token price.
+    uint256 feeUSDValue = feeAmount * s_feeTokenPrice / 1e18;
+    assertLt(feeUSDValue, 50e18);
+    assertGt(feeUSDValue, 1e18);
   }
 
   function test_getFee_WithLaneMandatedCCVs() public {
@@ -103,8 +104,10 @@ contract OnRamp_getFee is OnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    assertLt(feeAmount, 1e19);
-    assertGt(feeAmount, 5e17);
+    // Assert the fee is in a reasonable USD range, independent of the configured fee token price.
+    uint256 feeUSDValue = feeAmount * s_feeTokenPrice / 1e18;
+    assertLt(feeUSDValue, 50e18);
+    assertGt(feeUSDValue, 1e18);
   }
 
   function test_getFee_WithCustomExecutorAndCCVs() public {
@@ -138,8 +141,10 @@ contract OnRamp_getFee is OnRampSetup {
 
     uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
 
-    assertLt(feeAmount, 1e19);
-    assertGt(feeAmount, 5e17);
+    // Assert the fee is in a reasonable USD range, independent of the configured fee token price.
+    uint256 feeUSDValue = feeAmount * s_feeTokenPrice / 1e18;
+    assertLt(feeUSDValue, 50e18);
+    assertGt(feeUSDValue, 1e18);
   }
 
   function test_getFee_RevertWhen_ExceedsMaxFeePerMessage() public {
