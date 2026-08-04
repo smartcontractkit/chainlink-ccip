@@ -611,7 +611,7 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 		"Sets the rate limit admin on a Solana 1.6 token pool; no-op when the value already matches",
 		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
 			if input.FeeAdmin != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("fee admin is not supported on Solana 1.6 token pools (pool %s on chain %d)", input.PoolAddress, input.Selector)
+				return sequences.OnChainOutput{}, fmt.Errorf("fee admin is not supported on Solana 1.6 token pools (pool %s on chain %d)", input.TokenPoolRef.Address, input.Selector)
 			}
 			if input.RateLimitAdmin == nil {
 				return sequences.OnChainOutput{}, nil
@@ -637,9 +637,9 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
 			}
 
-			tokenPool, err := solana.PublicKeyFromBase58(input.PoolAddress)
+			tokenPool, err := solana.PublicKeyFromBase58(input.TokenPoolRef.Address)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s: %w", input.Selector, input.PoolAddress, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s: %w", input.Selector, input.TokenPoolRef.Address, err)
 			}
 			tokenMint, err := solana.PublicKeyFromBase58(input.TokenRef.Address)
 			if err != nil {
@@ -652,7 +652,7 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 				NewOwner:  rlAdmin,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool %s on chain %d: %w", input.PoolAddress, input.Selector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
 			}
 
 			return sequences.OnChainOutput{BatchOps: rlOut.Output.BatchOps}, nil

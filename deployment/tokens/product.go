@@ -47,15 +47,14 @@ type TokenPoolAdminAdapter interface {
 type SetTokenPoolAdminsSequenceInput struct {
 	// Selector is the chain selector for the chain on which the pool lives.
 	Selector uint64 `json:"selector" yaml:"selector"`
-	// PoolAddress is the token pool address (family-specific string form).
-	PoolAddress string `json:"poolAddress" yaml:"poolAddress"`
 	// RateLimitAdmin, if non-nil, is the desired rate limit admin.
 	RateLimitAdmin *string `json:"rateLimitAdmin,omitempty" yaml:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if non-nil, is the desired fee admin.
 	FeeAdmin *string `json:"feeAdmin,omitempty" yaml:"feeAdmin,omitempty"`
-	// TokenPoolRef is the fully resolved pool reference. EVM adapters ignore it; Solana
-	// needs Type to select the burnmint or lockrelease program, because a Solana pool
-	// address is a program ID shared across many token mints.
+	// TokenPoolRef is the fully resolved pool reference. Address is the token pool address
+	// in family-specific string form. Solana additionally needs Type to select the burnmint
+	// or lockrelease program, because a Solana pool address is a program ID shared across
+	// many token mints.
 	TokenPoolRef datastore.AddressRef `json:"tokenPoolRef" yaml:"tokenPoolRef"`
 	// TokenRef is the fully resolved token reference. EVM adapters ignore it; Solana needs
 	// Address as the token mint to derive the pool config PDA.

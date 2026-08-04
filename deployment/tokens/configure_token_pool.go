@@ -184,7 +184,6 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 					}
 					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
 						Selector:       selector,
-						PoolAddress:    fullPoolRef.Address,
 						RateLimitAdmin: pool.RateLimitAdmin,
 						FeeAdmin:       pool.FeeAdmin,
 						TokenPoolRef:   fullPoolRef,
