@@ -17,10 +17,13 @@ import (
 // ChainOverrides holds per-chain lane settings that differ from chain-family adapter defaults.
 // Only set fields you need to override; omitted fields use adapter defaults at apply time.
 type ChainOverrides struct {
-	AllowlistEnabled                *bool                    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
-	AllowList                       []string                 `json:"allowList,omitempty" yaml:"allowList,omitempty"`
-	CommitteeVerifierFinalityConfig *finality.Config         `json:"committeeVerifierFinalityConfig,omitempty" yaml:"committeeVerifierFinalityConfig,omitempty"`
-	RemoteChainCfg                  PartialRemoteChainConfig `json:"remoteChainCfg,omitempty" yaml:"remoteChainCfg,omitempty"`
+	AllowlistEnabled                    *bool                    `json:"allowlistEnabled,omitempty" yaml:"allowlistEnabled,omitempty"`
+	AllowList                           []string                 `json:"allowList,omitempty" yaml:"allowList,omitempty"`
+	CommitteeVerifierFinalityConfig     *finality.Config         `json:"committeeVerifierFinalityConfig,omitempty" yaml:"committeeVerifierFinalityConfig,omitempty"`
+	CommitteeVerifierFeeUSDCents        *uint16                  `json:"committeeVerifierFeeUSDCents,omitempty" yaml:"committeeVerifierFeeUSDCents,omitempty"`
+	CommitteeVerifierGasForVerification *uint32                  `json:"committeeVerifierGasForVerification,omitempty" yaml:"committeeVerifierGasForVerification,omitempty"`
+	CommitteeVerifierPayloadSizeBytes   *uint16                  `json:"committeeVerifierPayloadSizeBytes,omitempty" yaml:"committeeVerifierPayloadSizeBytes,omitempty"`
+	RemoteChainCfg                      PartialRemoteChainConfig `json:"remoteChainCfg,omitempty" yaml:"remoteChainCfg,omitempty"`
 }
 
 // CrossFamilyLanePair defines a bidirectional lane with optional per-chain overrides.
@@ -207,6 +210,9 @@ func chainOverridesToCommitteeVerifierRemote(o *ChainOverrides) committeeVerifie
 	return committeeVerifierRemoteChainInput{
 		AllowlistEnabled:        o.AllowlistEnabled,
 		AddedAllowlistedSenders: append([]string(nil), o.AllowList...),
+		FeeUSDCents:             o.CommitteeVerifierFeeUSDCents,
+		GasForVerification:      o.CommitteeVerifierGasForVerification,
+		PayloadSizeBytes:        o.CommitteeVerifierPayloadSizeBytes,
 	}
 }
 
