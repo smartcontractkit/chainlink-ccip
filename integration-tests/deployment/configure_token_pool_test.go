@@ -629,7 +629,6 @@ func TestConfigureTokenPool_FeeConfig(t *testing.T) {
 	require.Equal(t, before, after, "no-op fee update must not send transactions")
 }
 
-
 func TestConfigureTokenPool_CombinedUpdate(t *testing.T) {
 	tc := setupV2PoolsForConfigureImpl(t, "CTP_ALL", false)
 
@@ -747,8 +746,7 @@ type solanaPoolFixture struct {
 
 // setupSolanaPoolsForConfigure stands up a Solana chain (plus a throwaway EVM chain, matching
 // the environment.New pattern used elsewhere in this package) with an initialized BurnMint pool
-// and an initialized LockRelease pool, ready for ConfigureTokenPool admin-role tests. Task 3
-// reuses this helper for the fee-admin-rejection and unsupported-pool-type tests.
+// and an initialized LockRelease pool, ready for ConfigureTokenPool tests.
 func setupSolanaPoolsForConfigure(t *testing.T) (env *cldf_deployment.Environment, bnm solanaPoolFixture, lnr solanaPoolFixture) {
 	t.Helper()
 
@@ -758,7 +756,8 @@ func setupSolanaPoolsForConfigure(t *testing.T) (env *cldf_deployment.Environmen
 	programsPath, ds, err := PreloadSolanaEnvironment(t, src)
 	require.NoError(t, err)
 
-	env, err = environment.New(t.Context(),
+	env, err = environment.New(
+		t.Context(),
 		environment.WithSolanaContainer(t, []uint64{src}, programsPath, solanaProgramIDs),
 		environment.WithEVMSimulated(t, []uint64{dst}),
 	)
