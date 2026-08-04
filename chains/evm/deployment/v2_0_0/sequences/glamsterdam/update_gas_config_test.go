@@ -79,6 +79,33 @@ func deployGasCfgOnRamp(t *testing.T, e *cldf.Environment, chainSel uint64, base
 	return addr
 }
 
+// deployGasCfgOnRampUnconfigured deploys OnRamp but never calls ApplyDestChainConfigUpdates for
+// gasCfgTargetChainSel, leaving GetDestChainConfig(gasCfgTargetChainSel) at its zero value —
+// Router == address(0), matching the contract's own "lane disabled/not configured" convention.
+func deployGasCfgOnRampUnconfigured(t *testing.T, e *cldf.Environment, chainSel uint64) common.Address {
+	t.Helper()
+	chain := e.BlockChains.EVMChains()[chainSel]
+
+	out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, rmpops.Deploy, chain, contract.DeployInput[rmpops.ConstructorArgs]{
+		ChainSelector:  chainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(rmpops.ContractType, *rmpops.Version),
+		Args: rmpops.ConstructorArgs{
+			StaticConfig: rmpops.StaticConfig{
+				ChainSelector:         chainSel,
+				RmnRemote:             gasCfgRmnAddr,
+				TokenAdminRegistry:    gasCfgTokenAdminRegistry,
+				MaxUSDCentsPerMessage: 1_000_000,
+			},
+			DynamicConfig: rmpops.DynamicConfig{
+				FeeQuoter: gasCfgRouterAddr, // placeholder, not exercised by this test
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	return common.HexToAddress(out.Output.Address)
+}
+
 func deployGasCfgFeeQuoter(
 	t *testing.T,
 	e *cldf.Environment,
@@ -136,6 +163,27 @@ func deployGasCfgCommitteeVerifier(t *testing.T, e *cldf.Environment, chainSel u
 	require.NoError(t, err)
 
 	return addr
+}
+
+// deployGasCfgCommitteeVerifierUnconfigured deploys CommitteeVerifier but never calls
+// ApplyRemoteChainConfigUpdates for gasCfgTargetChainSel, leaving GetRemoteChainConfig at its zero
+// value — Router == address(0), matching BaseVerifier's "lane paused/not configured" convention.
+func deployGasCfgCommitteeVerifierUnconfigured(t *testing.T, e *cldf.Environment, chainSel uint64) common.Address {
+	t.Helper()
+	chain := e.BlockChains.EVMChains()[chainSel]
+
+	out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, cvops.Deploy, chain, contract.DeployInput[cvops.ConstructorArgs]{
+		ChainSelector:  chainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(cvops.ContractType, *cvops.Version),
+		Args: cvops.ConstructorArgs{
+			DynamicConfig: cvops.DynamicConfig{FeeAggregator: gasCfgRouterAddr},
+			Rmn:           gasCfgRmnAddr,
+			VersionTag:    [4]byte{0x01, 0x02, 0x03, 0x04},
+		},
+	})
+	require.NoError(t, err)
+
+	return common.HexToAddress(out.Output.Address)
 }
 
 func deployGasCfgOffRamp(t *testing.T, e *cldf.Environment, chainSel uint64, gasForCallExactCheck uint16, maxGasBufferToUpdateState uint32) common.Address {
@@ -326,5 +374,98 @@ func TestUpdateGasConfig_MissingCommitteeVerifier(t *testing.T) {
 
 	reportStr := report.Output.Report.String()
 	require.Contains(t, reportStr, "chain 6395199058653144747: OnRamp.DestChainConfig.BaseExecutionGasCost matched expected Prague value 200000, applying Glamsterdam value 400000")
+	require.NotContains(t, reportStr, "CommitteeVerifier.RemoteChainConfigArgs.GasForVerification")
+}
+
+// TestUpdateGasConfig_SkipsDisabledOnRampLane confirms that a chain whose OnRamp has no dest
+// chain config for the target (Router == address(0), OnRamp's own "not configured" convention) is
+// not written to at all — no zero-value fallback write, and the lane isn't silently re-enabled.
+// FeeQuoter and CommitteeVerifier for the same chain still get their normal writes.
+func TestUpdateGasConfig_SkipsDisabledOnRampLane(t *testing.T) {
+	const gasCfgDisabledOnRampChain = uint64(7729159394445656398)
+
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{gasCfgDisabledOnRampChain}))
+	require.NoError(t, err)
+
+	baselineFQConfig := fqops.DestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                1_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   20,
+		ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		LinkFeeMultiplierPercent:    100,
+	}
+
+	onRampAddr := deployGasCfgOnRampUnconfigured(t, e, gasCfgDisabledOnRampChain)
+	fqAddr := deployGasCfgFeeQuoter(t, e, gasCfgDisabledOnRampChain, baselineFQConfig)
+	cvAddr := deployGasCfgCommitteeVerifier(t, e, gasCfgDisabledOnRampChain, 75_000)
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, glamsterdamseq.UpdateGasConfig, e.BlockChains, glamsterdamseq.UpdateGasConfigInput{
+		TargetChainSelector: gasCfgTargetChainSel,
+		Lanes: []glamsterdamseq.LaneAddresses{
+			{
+				ChainSelector:            gasCfgDisabledOnRampChain,
+				OnRampAddress:            onRampAddr,
+				FeeQuoterAddress:         fqAddr,
+				CommitteeVerifierAddress: cvAddr,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, report.Output.BatchOps, 1)
+	require.Len(t, report.Output.BatchOps[0].Transactions, 2, "expected FeeQuoter + CommitteeVerifier writes only, no OnRamp write")
+
+	reportStr := report.Output.Report.String()
+	require.Contains(t, reportStr, "chain 7729159394445656398: OnRamp has no router configured for the target chain (router == address(0)) - lane is disabled/not configured, skipping this contract's write")
+	require.NotContains(t, reportStr, "OnRamp.DestChainConfig.BaseExecutionGasCost")
+}
+
+// TestUpdateGasConfig_SkipsDisabledCommitteeVerifierLane confirms that a chain whose
+// CommitteeVerifier has no remote chain config for the target (Router == address(0)) doesn't get
+// a GasForVerification write, while OnRamp/FeeQuoter for the same chain still do.
+func TestUpdateGasConfig_SkipsDisabledCommitteeVerifierLane(t *testing.T) {
+	const gasCfgDisabledCVChain = uint64(8901935845869299604)
+
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{gasCfgDisabledCVChain}))
+	require.NoError(t, err)
+
+	baselineFQConfig := fqops.DestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                1_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   20,
+		ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		LinkFeeMultiplierPercent:    100,
+	}
+
+	onRampAddr := deployGasCfgOnRamp(t, e, gasCfgDisabledCVChain, 200_000)
+	fqAddr := deployGasCfgFeeQuoter(t, e, gasCfgDisabledCVChain, baselineFQConfig)
+	cvAddr := deployGasCfgCommitteeVerifierUnconfigured(t, e, gasCfgDisabledCVChain)
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, glamsterdamseq.UpdateGasConfig, e.BlockChains, glamsterdamseq.UpdateGasConfigInput{
+		TargetChainSelector: gasCfgTargetChainSel,
+		Lanes: []glamsterdamseq.LaneAddresses{
+			{
+				ChainSelector:            gasCfgDisabledCVChain,
+				OnRampAddress:            onRampAddr,
+				FeeQuoterAddress:         fqAddr,
+				CommitteeVerifierAddress: cvAddr,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, report.Output.BatchOps, 1)
+	require.Len(t, report.Output.BatchOps[0].Transactions, 2, "expected OnRamp + FeeQuoter writes only, no CommitteeVerifier write")
+
+	reportStr := report.Output.Report.String()
+	require.Contains(t, reportStr, "chain 8901935845869299604: CommitteeVerifier has no router configured for the target chain (router == address(0)) - lane is disabled/not configured, skipping this contract's write")
 	require.NotContains(t, reportStr, "CommitteeVerifier.RemoteChainConfigArgs.GasForVerification")
 }

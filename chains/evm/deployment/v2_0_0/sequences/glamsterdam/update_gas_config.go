@@ -124,6 +124,10 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			var writes []contract.WriteOutput
 
 			// --- OnRamp: BaseExecutionGasCost (row 1) ---
+			// Router == address(0) is OnRamp's own convention for "this destination isn't
+			// configured" (see OnRamp.sol getFee's DestinationChainNotSupported check) — skip the
+			// write entirely rather than applying a meaningless zero-value fallback or risking
+			// re-enabling a deliberately-paused lane.
 			onRampCur, err := cldf_ops.ExecuteOperation(b, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: lane.ChainSelector,
 				Address:       lane.OnRampAddress,
@@ -134,32 +138,36 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					"failed to read OnRamp dest chain config for src %d, dst %d: %w", lane.ChainSelector, input.TargetChainSelector, err,
 				)
 			}
-			baseExecResult := glamsterdamutils.Resolve(OnRampBaseExecutionGasCost, onRampCur.Output.BaseExecutionGasCost)
-			glamsterdamutils.AddField(output.Report, lane.ChainSelector, baseExecResult)
+			if onRampCur.Output.Router == (common.Address{}) {
+				output.Report.AddDisabledLane(lane.ChainSelector, "OnRamp")
+			} else {
+				baseExecResult := glamsterdamutils.Resolve(OnRampBaseExecutionGasCost, onRampCur.Output.BaseExecutionGasCost)
+				glamsterdamutils.AddField(output.Report, lane.ChainSelector, baseExecResult)
 
-			onRampWrite, err := cldf_ops.ExecuteOperation(b, applyOnRampDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
-				ChainSelector: lane.ChainSelector,
-				Address:       lane.OnRampAddress,
-				Args: []onramp.DestChainConfigArgs{
-					{
-						DestChainSelector:         input.TargetChainSelector,
-						Router:                    onRampCur.Output.Router,
-						AddressBytesLength:        onRampCur.Output.AddressBytesLength,
-						TokenReceiverAllowed:      onRampCur.Output.TokenReceiverAllowed,
-						MessageNetworkFeeUSDCents: onRampCur.Output.MessageNetworkFeeUSDCents,
-						TokenNetworkFeeUSDCents:   onRampCur.Output.TokenNetworkFeeUSDCents,
-						BaseExecutionGasCost:      baseExecResult.AppliedValue,
-						DefaultCCVs:               onRampCur.Output.DefaultCCVs,
-						LaneMandatedCCVs:          onRampCur.Output.LaneMandatedCCVs,
-						DefaultExecutor:           onRampCur.Output.DefaultExecutor,
-						OffRamp:                   onRampCur.Output.OffRamp,
+				onRampWrite, err := cldf_ops.ExecuteOperation(b, applyOnRampDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
+					ChainSelector: lane.ChainSelector,
+					Address:       lane.OnRampAddress,
+					Args: []onramp.DestChainConfigArgs{
+						{
+							DestChainSelector:         input.TargetChainSelector,
+							Router:                    onRampCur.Output.Router,
+							AddressBytesLength:        onRampCur.Output.AddressBytesLength,
+							TokenReceiverAllowed:      onRampCur.Output.TokenReceiverAllowed,
+							MessageNetworkFeeUSDCents: onRampCur.Output.MessageNetworkFeeUSDCents,
+							TokenNetworkFeeUSDCents:   onRampCur.Output.TokenNetworkFeeUSDCents,
+							BaseExecutionGasCost:      baseExecResult.AppliedValue,
+							DefaultCCVs:               onRampCur.Output.DefaultCCVs,
+							LaneMandatedCCVs:          onRampCur.Output.LaneMandatedCCVs,
+							DefaultExecutor:           onRampCur.Output.DefaultExecutor,
+							OffRamp:                   onRampCur.Output.OffRamp,
+						},
 					},
-				},
-			})
-			if err != nil {
-				return UpdateGasConfigOutput{}, fmt.Errorf("failed to apply OnRamp dest chain config update for src %d: %w", lane.ChainSelector, err)
+				})
+				if err != nil {
+					return UpdateGasConfigOutput{}, fmt.Errorf("failed to apply OnRamp dest chain config update for src %d: %w", lane.ChainSelector, err)
+				}
+				writes = append(writes, onRampWrite.Output)
 			}
-			writes = append(writes, onRampWrite.Output)
 
 			// --- FeeQuoter: DefaultTokenDestGasOverhead, MaxPerMsgGasLimit,
 			// DestGasPerPayloadByteBase, DefaultTxGasLimit (rows 2-5) ---
@@ -218,21 +226,25 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 						"failed to read CommitteeVerifier remote chain config for src %d, dst %d: %w", lane.ChainSelector, input.TargetChainSelector, err,
 					)
 				}
-				gasForVerificationResult := glamsterdamutils.Resolve(CommitteeVerifierGasForVerification, cvCur.Output.RemoteChainConfig.GasForVerification)
-				glamsterdamutils.AddField(output.Report, lane.ChainSelector, gasForVerificationResult)
+				if cvCur.Output.RemoteChainConfig.Router == (common.Address{}) {
+					output.Report.AddDisabledLane(lane.ChainSelector, "CommitteeVerifier")
+				} else {
+					gasForVerificationResult := glamsterdamutils.Resolve(CommitteeVerifierGasForVerification, cvCur.Output.RemoteChainConfig.GasForVerification)
+					glamsterdamutils.AddField(output.Report, lane.ChainSelector, gasForVerificationResult)
 
-				newCVConfig := cvCur.Output.RemoteChainConfig
-				newCVConfig.GasForVerification = gasForVerificationResult.AppliedValue
+					newCVConfig := cvCur.Output.RemoteChainConfig
+					newCVConfig.GasForVerification = gasForVerificationResult.AppliedValue
 
-				cvWrite, err := cldf_ops.ExecuteOperation(b, applyCommitteeVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
-					ChainSelector: lane.ChainSelector,
-					Address:       lane.CommitteeVerifierAddress,
-					Args:          []committee_verifier.RemoteChainConfigArgs{newCVConfig},
-				})
-				if err != nil {
-					return UpdateGasConfigOutput{}, fmt.Errorf("failed to apply CommitteeVerifier remote chain config update for src %d: %w", lane.ChainSelector, err)
+					cvWrite, err := cldf_ops.ExecuteOperation(b, applyCommitteeVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
+						ChainSelector: lane.ChainSelector,
+						Address:       lane.CommitteeVerifierAddress,
+						Args:          []committee_verifier.RemoteChainConfigArgs{newCVConfig},
+					})
+					if err != nil {
+						return UpdateGasConfigOutput{}, fmt.Errorf("failed to apply CommitteeVerifier remote chain config update for src %d: %w", lane.ChainSelector, err)
+					}
+					writes = append(writes, cvWrite.Output)
 				}
-				writes = append(writes, cvWrite.Output)
 			}
 
 			// --- OffRamp: GasForCallExactCheck, MaxGasBufferToUpdateState (rows 6-7) ---

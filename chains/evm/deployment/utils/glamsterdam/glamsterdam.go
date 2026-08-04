@@ -114,6 +114,20 @@ func (r *Report) AddReadError(chainSelector uint64, description string, err erro
 	))
 }
 
+// AddDisabledLane records a chain/contract where the on-chain config for the target destination
+// is not actually configured (router == address(0), the contract's own convention for "this
+// remote chain is paused/not supported" — see e.g. OnRamp.sol's getFee check and
+// BaseVerifier.sol's "_applyRemoteChainConfigUpdates" comment "The router can be zero to pause
+// the remote chain"). No write is made for this contract on this chain: writing to a disabled
+// lane would either be meaningless (zero-value fallback writes) or risk silently re-enabling a
+// lane that was deliberately paused.
+func (r *Report) AddDisabledLane(chainSelector uint64, contractName string) {
+	r.Lines = append(r.Lines, fmt.Sprintf(
+		"chain %d: %s has no router configured for the target chain (router == address(0)) - "+
+			"lane is disabled/not configured, skipping this contract's write", chainSelector, contractName,
+	))
+}
+
 // AddLine appends an arbitrary pre-formatted line to the report, e.g. the output of
 // FieldResultString.
 func (r *Report) AddLine(line string) {
