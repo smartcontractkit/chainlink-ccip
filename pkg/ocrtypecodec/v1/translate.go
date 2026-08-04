@@ -252,6 +252,9 @@ func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg cciptypes.RemoteCo
 func (t *protoTranslator) rmnRemoteConfigFromProto(
 	pbRmnRemoteCfg *ocrtypecodecpb.RmnRemoteConfig,
 ) (cciptypes.RemoteConfig, error) {
+	if pbRmnRemoteCfg == nil {
+		return cciptypes.RemoteConfig{}, nil
+	}
 	var rmnSigners []cciptypes.RemoteSignerInfo
 	if len(pbRmnRemoteCfg.Signers) > 0 {
 		rmnSigners = make([]cciptypes.RemoteSignerInfo, len(pbRmnRemoteCfg.Signers))
