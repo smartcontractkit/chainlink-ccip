@@ -26,6 +26,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+// CommitOffchainConfigLoaded is the startup milestone carrying the resolved
+// (post-defaults) commit offchain config; the log-analysis tooling reads its
+// cadences to derive health thresholds.
+const CommitOffchainConfigLoaded = "Commit Offchain Config"
+
 const (
 	// Estimated maximum number of source chains the system will support.
 	// This value should be adjusted as we approach supporting that number of chains.
@@ -115,11 +120,14 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
 	}
 
-	lggr.Infow("Commit Offchain Config", "offchainConfig", offchainConfig)
-
 	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}
+
+	// Logged post-defaults so the resolved cadences the log-analysis tooling reads
+	// (e.g. RemoteGasPriceBatchWriteFrequency, TokenPriceBatchWriteFrequency) reflect
+	// what the plugin actually runs with.
+	lggr.Infow(CommitOffchainConfigLoaded, "offchainConfig", offchainConfig)
 
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for oracleID, node := range p.ocrConfig.Config.Nodes {

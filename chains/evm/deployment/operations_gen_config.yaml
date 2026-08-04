@@ -430,7 +430,7 @@ contracts:
         access: public
 
   - contract_name: LombardTokenPool
-    version: "2.0.0"
+    version: "2.1.0"
     functions:
       - name: setPath
         access: owner
@@ -532,7 +532,7 @@ contracts:
         access: public
 
   - contract_name: LombardVerifier
-    version: "2.0.0"
+    version: "2.1.0"
     functions:
       - name: applyRemoteChainConfigUpdates
         access: owner
@@ -574,7 +574,7 @@ contracts:
         access: public
 
   - contract_name: CCTPVerifier
-    version: "2.0.0"
+    version: "2.1.0"
     functions:
       - name: applyRemoteChainConfigUpdates
         access: owner

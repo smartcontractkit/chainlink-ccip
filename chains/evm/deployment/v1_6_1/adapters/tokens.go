@@ -24,8 +24,9 @@ import (
 )
 
 var (
-	_ tokensapi.TokenPoolMigrator = &TokenAdapter{}
-	_ tokensapi.TokenAdapter      = &TokenAdapter{}
+	_ tokensapi.TokenPoolMigrator     = &TokenAdapter{}
+	_ tokensapi.TokenAdapter          = &TokenAdapter{}
+	_ tokensapi.TokenPoolAdminAdapter = &TokenAdapter{}
 )
 
 // TokenAdapter handles EVM token pools at version 1.6.1.
@@ -215,13 +216,33 @@ func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
-func (p *poolOpsV161) SetRateLimitAdmin(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, newAdmin common.Address) ([]evm_contract.WriteOutput, error) {
+func (p *poolOpsV161) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error) {
+	if feeAdmin != nil {
+		return nil, fmt.Errorf("fee admin is not supported on v1.6.x token pools (pool %s on chain %d)", poolAddr.Hex(), chain.Selector)
+	}
+	if rlAdmin == nil {
+		return nil, nil
+	}
+
+	pool, err := token_pool.NewTokenPool(poolAddr, chain.Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate v1.6.1 token pool contract at %s: %w", poolAddr.Hex(), err)
+	}
+	current, err := pool.GetRateLimitAdmin(&bind.CallOpts{Context: b.GetContext()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rate limit admin of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+	}
+	if *rlAdmin == current {
+		b.Logger.Infof("Rate limit admin already matches desired value for pool %s on chain %d; skipping", poolAddr.Hex(), chain.Selector)
+		return nil, nil
+	}
+
 	report, err := cldf_ops.ExecuteOperation(b,
 		tpOps.SetRateLimitAdmin, chain,
 		evm_contract.FunctionInput[common.Address]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
-			Args:          newAdmin,
+			Args:          *rlAdmin,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("SetRateLimitAdmin v1.6.1: %w", err)

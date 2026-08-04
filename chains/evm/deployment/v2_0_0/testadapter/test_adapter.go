@@ -17,8 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
-	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
-	"github.com/xssnick/tonutils-go/tlb"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -32,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/common/extraargs"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 )
 
@@ -311,56 +308,8 @@ func (a *EVMAdapter) serializeExtraArgsV3(opts ...testadapters.ExtraArgOpt) ([]b
 	return buf.Bytes(), nil
 }
 
-func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
-	switch sourceFamily {
-	case chain_selectors.FamilyEVM:
-		extraArgs := extraargs.ClientGenericExtraArgsV2{
-			GasLimit:                 new(big.Int).SetUint64(100_000),
-			AllowOutOfOrderExecution: true,
-		}
-		for _, opt := range opts {
-			switch opt.Name {
-			case testadapters.ExtraArgFinality:
-				if opt.Value.(uint32) > 0 {
-					return a.serializeExtraArgsV3(opts...)
-				}
-			case testadapters.ExtraArgGasLimit:
-				extraArgs.GasLimit = opt.Value.(*big.Int)
-			case testadapters.ExtraArgOOO:
-				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
-			default:
-				// unsupported arg
-			}
-		}
-		return extraargs.SerializeClientGenericExtraArgsV2(extraArgs)
-	case chain_selectors.FamilySolana:
-		// EVM allows empty extraArgs
-		return nil, nil
-	case chain_selectors.FamilyTon:
-		// TODO: maybe for 1.6 we should look up the source adapter and use a 1.6 method to encode? would be good to avoid other chain SDKs
-		extraArgs := ton_onramp.GenericExtraArgsV2{
-			GasLimit:                 big.NewInt(1000000),
-			AllowOutOfOrderExecution: true,
-		}
-		for _, opt := range opts {
-			switch opt.Name {
-			case testadapters.ExtraArgGasLimit:
-				extraArgs.GasLimit = opt.Value.(*big.Int)
-			case testadapters.ExtraArgOOO:
-				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
-			default:
-				// unsupported arg
-			}
-		}
-		extraArgsCell, err := tlb.ToCell(extraArgs)
-		if err != nil {
-			return nil, err
-		}
-		return extraArgsCell.ToBOC(), nil
-	default:
-		// TODO: add support for other families
-		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)
-	}
+func (a *EVMAdapter) GetExtraArgs(_ []byte, _ string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
+	return a.serializeExtraArgsV3(opts...)
 }
 
 func (a *EVMAdapter) AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error {

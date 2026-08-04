@@ -18,6 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+// ObservedFeeComponents is the milestone carrying a single oracle's observed fee
+// components for the round (used by the participation/divergence lens).
+const ObservedFeeComponents = "observed fee components"
+
 // Observation will make several calls to fetch:
 // - chain fee components
 // - native token prices
@@ -67,7 +71,7 @@ func (p *processor) Observation(
 			mapset.NewSet(slices.Collect(maps.Keys(nativeTokenPrices))...),
 		)
 
-	lggr.Infow("observed fee components",
+	lggr.Infow(ObservedFeeComponents,
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,

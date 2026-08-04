@@ -26,6 +26,7 @@ const (
 	CapabilitiesRegistry       cldf.ContractType = "CapabilitiesRegistry"
 	CCIPHome                   cldf.ContractType = "CCIPHome"
 	RMNHome                    cldf.ContractType = "RMNHome"
+	RMN                        cldf.ContractType = "RMN"
 	TokenPoolLookupTable       cldf.ContractType = "TokenPoolLookupTable"
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"

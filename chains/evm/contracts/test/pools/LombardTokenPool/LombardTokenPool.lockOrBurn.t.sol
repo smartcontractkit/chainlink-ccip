@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {IBridgeV2} from "../../../interfaces/lombard/IBridgeV2.sol";
 
 import {Pool} from "../../../libraries/Pool.sol";
@@ -42,6 +43,49 @@ contract LombardTokenPool_lockOrBurn is LombardTokenPoolSetup {
     assertEq(out.destPoolData, abi.encode(uint8(DEFAULT_TOKEN_DECIMALS)));
     assertEq(s_token.balanceOf(s_verifierResolver.getOutboundImplementation(DEST_CHAIN_SELECTOR, "")), amount);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
+  }
+
+  function test_lockOrBurn_V2_RetainsBpsFeeInPool() public {
+    uint16 finalityTransferFeeBps = 1000; // 10%.
+    uint256 amount = 1e18;
+    uint256 expectedFee = (amount * finalityTransferFeeBps) / 10_000;
+    uint256 expectedDestAmount = amount - expectedFee;
+
+    changePrank(OWNER);
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
+        destGasOverhead: 50_000,
+        destBytesOverhead: 0,
+        finalityFeeUSDCents: 0,
+        fastFinalityFeeUSDCents: 0,
+        finalityTransferFeeBps: finalityTransferFeeBps,
+        fastFinalityTransferFeeBps: finalityTransferFeeBps,
+        isEnabled: true
+      })
+    });
+    s_pool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+    changePrank(s_allowedOnRamp);
+
+    deal(address(s_token), address(s_pool), amount);
+
+    (, uint256 destAmount) = s_pool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        receiver: abi.encodePacked(s_receiver),
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        originalSender: OWNER,
+        amount: amount,
+        localToken: address(s_token)
+      }),
+      0,
+      ""
+    );
+
+    address verifierImpl = s_verifierResolver.getOutboundImplementation(DEST_CHAIN_SELECTOR, "");
+    assertEq(destAmount, expectedDestAmount);
+    assertEq(s_token.balanceOf(verifierImpl), expectedDestAmount, "Verifier should only receive the post-fee amount");
+    assertEq(s_token.balanceOf(address(s_pool)), expectedFee, "Pool should retain the bps fee");
   }
 
   function test_lockOrBurn_V1() public {

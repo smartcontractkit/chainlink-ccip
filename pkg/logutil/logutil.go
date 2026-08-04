@@ -42,6 +42,31 @@ const (
 	PhaseShouldTransmit = "strn"
 )
 
+// Standardized inline log-field keys. Unlike the keys above (attached automatically
+// to every plugin log line), these are used ad hoc inside individual log calls.
+// Both the commit and execute plugins should reference these so a given concept has
+// exactly one key across all logs, which the log-analysis tooling relies on to bucket
+// and extract fields deterministically. Note FieldSeqNum is a CCIP message sequence
+// number and is distinct from the ocrSeqNr (OCR round) key above.
+const (
+	// FieldChain is a single/destination chain selector (dominant existing key: "chain").
+	FieldChain = "chain"
+	// FieldSourceChain / FieldDestChain are directional chain selectors.
+	FieldSourceChain = "sourceChain"
+	FieldDestChain   = "destChain"
+	// FieldSeqNum is a CCIP message sequence number; FieldSeqNumRange a range of them.
+	FieldSeqNum      = "seqNum"
+	FieldSeqNumRange = "seqNumRange"
+	// FieldMerkleRoot is a merkle root (dominant existing key: "merkleRoot").
+	FieldMerkleRoot = "merkleRoot"
+	// FieldToken is a token identifier/address.
+	FieldToken = "token"
+	// FieldMessageID is a CCIP message ID; FieldMessageIDs a collection of them.
+	// Value is the Go-idiomatic form matching cciptypes Header.MessageID.
+	FieldMessageID  = "messageID"
+	FieldMessageIDs = "messageIDs"
+)
+
 // WithComponent returns a logger with the component log field set.
 // Components can be any object that uses a logger.
 // Do not call multiple times.

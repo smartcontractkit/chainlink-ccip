@@ -393,12 +393,13 @@ func TestDiscoverLanesToMigrate_SkipsLanesWithExcludedTokenSymbol(t *testing.T) 
 	other := common.HexToAddress("0x0000000000000000000000000000000000001234")
 
 	resolver := &fakeLaneVersionResolver{
-		supported: map[uint64]bool{chainA: true},
+		supported: map[uint64]bool{chainA: true, remotePlain: true},
 		lanes: map[uint64]map[uint64]*semver.Version{
 			chainA: {
 				remoteWithUSDC: version,
 				remotePlain:    version,
 			},
+			remotePlain: {chainA: version},
 		},
 	}
 	importer := &fakeConfigImporter{
@@ -428,6 +429,43 @@ func TestDiscoverLanesToMigrate_SkipsLanesWithExcludedTokenSymbol(t *testing.T) 
 	require.NoError(t, err)
 	require.Len(t, lanes, 1)
 	assert.Equal(t, remotePlain, lanes[0].ChainB)
+}
+
+func TestDiscoverLanesToMigrate_SkipsLaneWithExcludedTokenOnlyInReverseDirection(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	chainB := chainsel.TEST_90000002.Selector
+	version := semver.MustParse("1.6.0")
+	usdc := common.HexToAddress("0x000000000000000000000000000000000000abcd")
+	other := common.HexToAddress("0x0000000000000000000000000000000000001234")
+
+	resolver := &fakeLaneVersionResolver{
+		supported: map[uint64]bool{chainA: true, chainB: true},
+		lanes: map[uint64]map[uint64]*semver.Version{
+			chainA: {chainB: version},
+			chainB: {chainA: version},
+		},
+	}
+	importer := &fakeConfigImporter{
+		tokensPerRemote: map[uint64][]common.Address{
+			chainB: {other}, // chainA -> chainB has no excluded token.
+			chainA: {usdc},  // chainB -> chainA carries USDC.
+		},
+	}
+
+	lanes, err := discoverLanesToMigrate(
+		cldf.Environment{},
+		registryWithResolver(t, resolver),
+		fqRegistryWithImporter(t, version, importer),
+		symbolLookupFrom(map[common.Address]string{usdc: "USDC", other: "WETH"}),
+		MigrateChainLanesToV2Config{
+			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+				ChainSelectors:               []uint64{chainA},
+				ExcludeLanesWithTokenSymbols: []string{"USDC"},
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Empty(t, lanes)
 }
 
 func TestDiscoverLanesToMigrate_SkipsVersionWithoutConfigImporter(t *testing.T) {

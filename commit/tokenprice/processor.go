@@ -78,6 +78,10 @@ func NewProcessor(
 	return plugincommon.NewTrackedProcessor(lggr, p, processorsLabel, metricsReporter)
 }
 
+// OutcomeTokenPrices is the milestone carrying the round's token-price outcome
+// (the token prices selected for update).
+const OutcomeTokenPrices = "outcome token prices"
+
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	return Query{}, nil
 }
@@ -108,7 +112,7 @@ func (p *processor) Outcome(
 
 	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
 	lggr.Infow(
-		"outcome token prices",
+		OutcomeTokenPrices,
 		"tokenPrices", tokenPriceOutcome,
 	)
 

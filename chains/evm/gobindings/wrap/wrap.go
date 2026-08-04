@@ -1,12 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/generate/wrap"
-	zksyncwrapper "github.com/smartcontractkit/chainlink-evm/gethwrappers/helpers/zksync"
 )
 
 func main() {
@@ -21,21 +18,8 @@ func main() {
 		outDirSuffix = "../generated/latest"
 	}
 
-	if os.Getenv("ZKSYNC") == "true" {
-		switch contract {
-		case "CREATE2Factory", "TokenPoolFactory":
-			fmt.Printf("Skipping zk bytecode binding for %s\n", pkgName)
-			return
-		}
+	projectRoot := "../solc/" + project
+	abiGenPath := "../scripts/abigen"
 
-		zksyncBytecodePath := filepath.Join("..", "zkout", contract+".sol", contract+".json")
-		zksyncBytecode := zksyncwrapper.ReadBytecodeFromForgeJSON(zksyncBytecodePath)
-		outPath := filepath.Join(wrap.GetOutDir(outDirSuffix, pkgName), pkgName+"_zksync.go")
-		zksyncwrapper.WrapZksyncDeploy(zksyncBytecode, contract, pkgName, outPath)
-	} else {
-		projectRoot := "../solc/" + project
-		abiGenPath := "../scripts/abigen"
-
-		wrap.GenWrapper(projectRoot, contract, pkgName, outDirSuffix, abiGenPath)
-	}
+	wrap.GenWrapper(projectRoot, contract, pkgName, outDirSuffix, abiGenPath)
 }

@@ -18,6 +18,7 @@ pragma solidity ^0.8.24;
 
 import {IBurnMintERC20} from "../../interfaces/IBurnMintERC20.sol";
 import {ITokenMessenger} from "../../pools/USDC/interfaces/ITokenMessenger.sol";
+import {MockTokenMinter} from "./MockTokenMinter.sol";
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
@@ -26,6 +27,7 @@ import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWith
 contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   uint32 private immutable i_messageBodyVersion;
   address private immutable i_transmitter;
+  MockTokenMinter public immutable i_tokenMinter;
 
   bytes32 public constant DESTINATION_TOKEN_MESSENGER = keccak256("i_destinationTokenMessenger");
 
@@ -42,6 +44,7 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
     s_nonce = 1;
     i_transmitter = transmitter;
     localMessageTransmitterWithRelay = IMessageTransmitterWithRelay(transmitter);
+    i_tokenMinter = new MockTokenMinter();
   }
 
   // The mock function is based on the same function in https://github.com/circlefin/evm-cctp-contracts/blob/master/src/TokenMessenger.sol
@@ -166,6 +169,10 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
 
   function localMessageTransmitter() external view returns (address) {
     return i_transmitter;
+  }
+
+  function localMinter() external view returns (address) {
+    return address(i_tokenMinter);
   }
 
   /**
