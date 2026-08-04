@@ -131,4 +131,7 @@ interface ITokenMessenger {
   /// to/from remote domainsmessage transmitter for this token messenger.
   /// @dev immutable
   function localMessageTransmitter() external view returns (address);
+
+  /// Returns the local minter responsible for minting and burning tokens.
+  function localMinter() external view returns (address);
 }

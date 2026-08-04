@@ -90,7 +90,9 @@ func TestFetchNOPSigningKeys_SingleNOP_EVMSigningKey_ReturnsKey(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Contains(t, report.Output.SigningKeysByNOP, "nop-1")
-	assert.Equal(t, "abcd1234", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilyEVM])
+	// JD stores the address as bare hex; the EVM reader canonicalises it, because a Chainlink node
+	// rejects an unprefixed signer_address when creating a ccvcommitteeverifier job.
+	assert.Equal(t, "0xabcd1234", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilyEVM])
 }
 
 func TestFetchNOPSigningKeys_MultipleNOPs_DifferentChains_ReturnsAllKeys(t *testing.T) {
@@ -159,10 +161,12 @@ func TestFetchNOPSigningKeys_MultipleNOPs_DifferentChains_ReturnsAllKeys(t *test
 	require.NoError(t, err)
 	require.Len(t, report.Output.SigningKeysByNOP, 2)
 
-	// EVM and Solana both index the same OnchainSigningAddress — raw, no normalization.
+	// EVM and Solana both index the same OnchainSigningAddress. Both families read it through
+	// EVMSigningIdentityReader here, so both come back canonicalised: nop-1's address is already
+	// prefixed and passes through unchanged, nop-2's is bare and gains the prefix.
 	assert.Equal(t, "0xevm-key-1", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilyEVM])
 	assert.Equal(t, "0xevm-key-1", report.Output.SigningKeysByNOP["nop-1"][chainsel.FamilySolana])
-	assert.Equal(t, "evm-key-2", report.Output.SigningKeysByNOP["nop-2"][chainsel.FamilyEVM])
+	assert.Equal(t, "0xevm-key-2", report.Output.SigningKeysByNOP["nop-2"][chainsel.FamilyEVM])
 }
 
 func TestFetchNOPSigningKeys_NOPNotFound_ReturnsError(t *testing.T) {

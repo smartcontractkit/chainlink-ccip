@@ -84,7 +84,6 @@ func buildOneReport(
 	if rep.IsEmpty() {
 		lggr.Warnw("buildOneReport: generated an empty report",
 			"merkleOutcomeType", merkleOutcomeType,
-			"blessedMerkleRoots", rep.BlessedMerkleRoots,
 			"unblessedMerkleRoots", unblessedMerkleRoots,
 			"priceUpdates", priceUpdates,
 		)

@@ -12,6 +12,10 @@ import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
+/// @notice Base contract for CCV implementations that handle token transfers.
+/// @dev Verifiers must not hold token balances between calls. Any token amount a verifier receives (e.g. from a
+/// token pool) must be forwarded onward (e.g. bridged/deposited) within the same call, so a verifier's token
+/// balance is zero except transiently within a single transaction.
 abstract contract BaseVerifier is ICrossChainVerifierV1, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
 

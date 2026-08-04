@@ -26,6 +26,10 @@ var (
 	errOffRampConfigMismatch = errors.New("offramp config digest mismatch")
 )
 
+// GotObservation is the milestone carrying a single oracle's observation for the
+// round (via ToLogFormat, message data omitted); used by the participation lens.
+const GotObservation = "execute plugin got observation"
+
 // Observation collects data across two phases which happen in separate rounds.
 // These phases happen continuously so that except for the first round, every
 // subsequent round can have a new execution report.
@@ -147,7 +151,7 @@ func (p *Plugin) Observation(
 	for _, reports := range observation.CommitReports {
 		numCommitReports += len(reports)
 	}
-	lggr.Infow("execute plugin got observation",
+	lggr.Infow(GotObservation,
 		"observationWithoutMsgDataAndDiscoveryObs", observation.ToLogFormat(),
 		"duration", time.Since(tStart),
 		"state", state,
@@ -293,7 +297,7 @@ func (p *Plugin) observeTokenDataForMessage(
 	msgTkData, err := p.tokenDataObserver.Observe(ctx, msgObs)
 	if err != nil {
 		// In case of failure, initialize the token data with an error, that will prevent this specific token
-		lggr.Errorw("failed to observe token data", "err", err, "messageID", msg.Header.MessageID)
+		lggr.Errorw("failed to observe token data", "err", err, logutil.FieldMessageID, msg.Header.MessageID)
 		// from being processed and sent later but won't stop the rest of messages
 		msgTkData = make(exectypes.TokenDataObservations)
 		msgTkData[srcChain] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
@@ -316,8 +320,8 @@ func (p *Plugin) readMessagesForReport(
 
 	if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
 		lggr.Errorw("missing messages in range",
-			"srcChain", srcChain,
-			"seqRange", report.SequenceNumberRange,
+			logutil.FieldSourceChain, srcChain,
+			logutil.FieldSeqNumRange, report.SequenceNumberRange,
 		)
 		return nil, fmt.Errorf("missing messages in range")
 	}
@@ -391,7 +395,7 @@ func (p *Plugin) getMessagesObservation(
 		srcChain := report.SourceChain
 
 		if !supportedChains.Contains(srcChain) {
-			lggr.Infow("skipping report of unsupported source chain", "srcChain", srcChain)
+			lggr.Infow("skipping report of unsupported source chain", logutil.FieldSourceChain, srcChain)
 			continue
 		}
 
@@ -399,9 +403,9 @@ func (p *Plugin) getMessagesObservation(
 		msgs, err := p.readMessagesForReport(ctx, lggr, srcChain, report)
 		if err != nil {
 			lggr.Errorw("unable to read all messages for report",
-				"srcChain", srcChain,
-				"seqRange", report.SequenceNumberRange,
-				"merkleRoot", report.MerkleRoot,
+				logutil.FieldSourceChain, srcChain,
+				logutil.FieldSeqNumRange, report.SequenceNumberRange,
+				logutil.FieldMerkleRoot, report.MerkleRoot,
 				"err", err,
 			)
 			continue
@@ -524,7 +528,7 @@ func (p *Plugin) getFilterObservation(
 			// In all cases, since we don't need to execute these messages, we don't need to fetch their sender's nonce.
 			if msg.IsPseudoDeleted() {
 				lggr.Debugw("skipping pseudo-deleted message",
-					"messageID", msg.Header.MessageID,
+					logutil.FieldMessageID, msg.Header.MessageID,
 				)
 				continue
 			}

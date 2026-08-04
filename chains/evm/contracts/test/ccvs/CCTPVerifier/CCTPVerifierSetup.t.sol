@@ -101,6 +101,10 @@ contract CCTPVerifierSetup is BaseVerifierSetup {
     });
     s_cctpVerifier.setDomains(domains);
 
+    // Configure Circle's canonical mapping so the burnToken used in tests resolves to the local USDC token.
+    s_mockTokenMessenger.i_tokenMinter()
+      .setLocalToken(REMOTE_DOMAIN_IDENTIFIER, bytes32(abi.encode(s_USDCToken)), address(s_USDCToken));
+
     // Grant mint and burn roles to the token messenger and the message transmitter.
     CrossChainToken(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockTokenMessenger));
     CrossChainToken(address(s_USDCToken)).grantMintAndBurnRoles(address(s_mockMessageTransmitter));

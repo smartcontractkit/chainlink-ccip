@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 type solanaUSDCMessageReader struct {
@@ -171,10 +172,10 @@ func (u solanaUSDCMessageReader) MessagesByTokenID(
 	for tokenID := range tokens {
 		if _, ok := out[tokenID]; !ok {
 			// Token is not available in the source chain, it should never happen at this stage
-			u.lggr.Warnw("Message not found in the source chain",
-				"seqNr", tokenID.SeqNr,
+			u.lggr.Warnw(MsgMessageNotFoundInSourceChain,
+				logutil.FieldSeqNum, tokenID.SeqNr,
 				"tokenIndex", tokenID.Index,
-				"chainSelector", source,
+				logutil.FieldSourceChain, source,
 				"data", cctpData[tokenID],
 			)
 		}

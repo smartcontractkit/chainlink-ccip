@@ -88,7 +88,7 @@ func (c ccipChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset
 	}
 	supportedChains, err := c.homeChain.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
-		c.lggr.Warnw("error getting supported chains", err)
+		c.lggr.Warnw("error getting supported chains", "err", err)
 		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	erc20_lock_box_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_usdc_token_messenger"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_usdc_token_transmitter"
 	siloed_usdc_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"

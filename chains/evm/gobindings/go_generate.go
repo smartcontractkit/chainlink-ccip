@@ -17,7 +17,6 @@ package ccip
 //go:generate go run ./wrap ccip RMN rmn
 //go:generate go run ./wrap ccip EtherSenderReceiver ether_sender_receiver
 
-// Skip these for ZKSync as it doesn't support the create2 opcode
 //go:generate go run ./wrap ccip CREATE2Factory create2_factory
 //go:generate go run ./wrap ccip TokenPoolFactory token_pool_factory
 
