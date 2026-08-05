@@ -164,7 +164,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 
 			remoteAdapter := [32]byte{}
 			if remoteChain.RemoteAdapter != "" {
-				remoteAdapter, err = parseRemoteAdapter(remoteChain.RemoteAdapter)
+				remoteAdapter, err = parseLombardIdentifier(remoteChain.RemoteAdapter)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to parse remote adapter for remote chain %d: %w", remoteChainSelector, err)
 				}
@@ -201,6 +201,13 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lombardChainID to bytes32: %w", err)
 			}
+			if remoteChain.RemoteBridgeSender == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("remote bridge sender is required for remote chain %d", remoteChainSelector)
+			}
+			remoteBridgeSender, err := parseLombardIdentifier(remoteChain.RemoteBridgeSender)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to parse remote bridge sender for remote chain %d: %w", remoteChainSelector, err)
+			}
 
 			tokenPoolPathArgs = append(tokenPoolPathArgs, lombard_token_pool.SetPathArgs{
 				RemoteChainSelector: remoteChainSelector,
@@ -219,7 +226,9 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote path on LombardVerifier for remote chain %d: %w", remoteChainSelector, err)
 			}
 
-			if existingVerifierPathReport.Output.LChainId != lchainID || existingVerifierPathReport.Output.AllowedCaller != verifierAllowedCaller {
+			if existingVerifierPathReport.Output.LChainId != lchainID ||
+				existingVerifierPathReport.Output.AllowedCaller != verifierAllowedCaller ||
+				existingVerifierPathReport.Output.RemoteBridgeSender != remoteBridgeSender {
 				setRemotePathReport, err := cldf_ops.ExecuteOperation(b, lombard_verifier.SetPath, chain, contract_utils.FunctionInput[lombard_verifier.SetPathArgs]{
 					ChainSelector: chain.Selector,
 					Address:       lombardVerifierAddress,
@@ -227,6 +236,7 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 						RemoteChainSelector: remoteChainSelector,
 						LChainId:            lchainID,
 						AllowedCaller:       remoteCallerOnDest,
+						RemoteBridgeSender:  remoteBridgeSender[:],
 					},
 				})
 				if err != nil {
@@ -352,7 +362,9 @@ func paddedLombardChainID(lombardChainID uint32) ([32]byte, error) {
 	return toBytes32LeftPad(lchainIDBytes)
 }
 
-func parseRemoteAdapter(raw string) ([32]byte, error) {
+// parseLombardIdentifier accepts either an EVM address hex string or a 32-byte hex string and
+// left-pads it to bytes32, matching how the LombardVerifier stores remote identifiers.
+func parseLombardIdentifier(raw string) ([32]byte, error) {
 	if common.IsHexAddress(raw) {
 		return toBytes32LeftPad(common.HexToAddress(raw).Bytes())
 	}
@@ -362,7 +374,7 @@ func parseRemoteAdapter(raw string) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 	if len(decoded) == 0 {
-		return [32]byte{}, errors.New("remote adapter cannot be empty")
+		return [32]byte{}, errors.New("value cannot be empty")
 	}
 
 	return toBytes32LeftPad(decoded)
