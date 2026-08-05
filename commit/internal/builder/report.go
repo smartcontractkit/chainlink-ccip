@@ -28,9 +28,16 @@ type ReportBuilderFunc func(
 ) ([]Report, error)
 
 // NewReportBuilder returns a ReportBuilderFunc based on the provided config.
-func NewReportBuilder(MaxMerkleRootsPerReport, MaxPricesPerReport uint64) (ReportBuilderFunc, error) {
+func NewReportBuilder(RMNEnabled bool, MaxMerkleRootsPerReport, MaxPricesPerReport uint64) (ReportBuilderFunc, error) {
 	// These options were added to allow for more flexibility around report building. For example Solana
 	// only supports a single merkle root per report.
+
+	if RMNEnabled {
+		if MaxPricesPerReport > 0 || MaxMerkleRootsPerReport > 0 {
+			return nil, fmt.Errorf("RMNEnabled is not supported with MaxPricesPerReport or MaxMerkleRootsPerReport set")
+		}
+		return buildStandardReport, nil
+	}
 
 	// MaxPricesPerReport is a superset of MaxMerkleRootsPerReport, so check it first.
 	if MaxPricesPerReport > 0 {
@@ -46,15 +53,18 @@ func NewReportBuilder(MaxMerkleRootsPerReport, MaxPricesPerReport uint64) (Repor
 }
 
 // buildOneReport is the common logic for building a report. Different report building
-// algorithms can reassemble reports by selecting which merkle roots to include in the report,
-// and which price updates to use.
+// algorithms can reassemble reports by selecting which blessed and unblessed merkle
+// roots to include in the report, and which price updates and rmn signatures to use.
 //
 // This function may return empty reports, for example roots are ignored if the
 // merkleOutcomeType is not "ReportGenerated".
 func buildOneReport(
 	lggr logger.Logger,
 	merkleOutcomeType merkleroot.OutcomeType,
+	blessedMerkleRoots []cciptypes.MerkleRootChain,
 	unblessedMerkleRoots []cciptypes.MerkleRootChain,
+	rmnSignatures []cciptypes.RMNECDSASignature,
+	rmnRemoteFSign uint64,
 	priceUpdates cciptypes.PriceUpdates,
 ) Report {
 	var (
@@ -64,15 +74,17 @@ func buildOneReport(
 
 	// Merkle root data is only included when the outcomeType is "ReportGenerated".
 	if merkleOutcomeType == merkleroot.ReportGenerated {
-		// MerkleRoots will be empty arrays if there is nothing to report.
-		// BlessedMerkleRoots is left empty for onchain interface compatibility.
+		// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
 		rep = cciptypes.CommitPluginReport{
+			BlessedMerkleRoots:   blessedMerkleRoots,
 			UnblessedMerkleRoots: unblessedMerkleRoots,
+			RMNSignatures:        rmnSignatures,
 		}
 
-		allRoots := append([]cciptypes.MerkleRootChain(nil), unblessedMerkleRoots...)
+		allRoots := append(blessedMerkleRoots, unblessedMerkleRoots...)
 		sort.Slice(allRoots, func(i, j int) bool { return allRoots[i].ChainSel < allRoots[j].ChainSel })
 		repInfo = cciptypes.CommitReportInfo{
+			RemoteF:     rmnRemoteFSign,
 			MerkleRoots: allRoots,
 		}
 	}
@@ -84,8 +96,10 @@ func buildOneReport(
 	if rep.IsEmpty() {
 		lggr.Warnw("buildOneReport: generated an empty report",
 			"merkleOutcomeType", merkleOutcomeType,
-			"blessedMerkleRoots", rep.BlessedMerkleRoots,
+			"blessedMerkleRoots", blessedMerkleRoots,
 			"unblessedMerkleRoots", unblessedMerkleRoots,
+			"rmnSignatures", rmnSignatures,
+			"rmnRemoteFSign", rmnRemoteFSign,
 			"priceUpdates", priceUpdates,
 		)
 
@@ -104,7 +118,16 @@ func buildStandardReport(
 	outcome committypes.Outcome,
 	_ pluginconfig.CommitOffchainConfig,
 ) ([]Report, error) {
-	unblessedMerkleRoots := outcome.MerkleRootOutcome.RootsToReport
+	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
+	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
+
+	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
+		if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
+			blessedMerkleRoots = append(blessedMerkleRoots, r)
+		} else {
+			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
+		}
+	}
 
 	priceUpdates := cciptypes.PriceUpdates{
 		TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
@@ -114,7 +137,10 @@ func buildStandardReport(
 	report := buildOneReport(
 		lggr,
 		outcome.MerkleRootOutcome.OutcomeType,
+		blessedMerkleRoots,
 		unblessedMerkleRoots,
+		outcome.MerkleRootOutcome.RMNReportSignatures,
+		outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
 		priceUpdates,
 	)
 	// Do not include empty reports, which may sometimes happen for merkle root reports.
@@ -176,6 +202,7 @@ func buildMultipleMerkleRootReports(
 	var reports []Report
 
 	numRoots := uint64(0)
+	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
 	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
 
 	priceUpdates := cciptypes.PriceUpdates{
@@ -184,6 +211,15 @@ func buildMultipleMerkleRootReports(
 	}
 
 	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
+
+		// TODO: Support RMN.
+		/*
+			if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
+				blessedMerkleRoots = append(blessedMerkleRoots, r)
+			} else {
+				unblessedMerkleRoots = append(unblessedMerkleRoots, r)
+			}
+		*/
 		unblessedMerkleRoots = append(unblessedMerkleRoots, r)
 		numRoots++
 
@@ -191,7 +227,10 @@ func buildMultipleMerkleRootReports(
 			report := buildOneReport(
 				lggr,
 				outcome.MerkleRootOutcome.OutcomeType,
+				blessedMerkleRoots,
 				unblessedMerkleRoots,
+				nil, // no RMN for partial reports.
+				0,   // no RMN for partial reports.
 				priceUpdates,
 			)
 
@@ -202,6 +241,7 @@ func buildMultipleMerkleRootReports(
 
 			// reset accumulators for next report.
 			numRoots = 0
+			blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0)
 			unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0)
 
 			// price updates are only included in the first report.
@@ -214,7 +254,10 @@ func buildMultipleMerkleRootReports(
 		report := buildOneReport(
 			lggr,
 			outcome.MerkleRootOutcome.OutcomeType,
+			blessedMerkleRoots,
 			unblessedMerkleRoots,
+			nil, // no RMN for partial reports.
+			0,   // no RMN for partial reports.
 			priceUpdates,
 		)
 
@@ -273,6 +316,9 @@ func buildMultiplePriceReports(
 				lggr,
 				outcome.MerkleRootOutcome.OutcomeType,
 				nil,
+				nil,
+				nil, // no RMN for partial reports.
+				0,   // no RMN for partial reports.
 				priceUpdates,
 			)
 			reports = append(reports, report)
@@ -291,6 +337,9 @@ func buildMultiplePriceReports(
 			lggr,
 			outcome.MerkleRootOutcome.OutcomeType,
 			nil,
+			nil,
+			nil, // no RMN for partial reports.
+			0,   // no RMN for partial reports.
 			priceUpdates,
 		)
 		reports = append(reports, report)
