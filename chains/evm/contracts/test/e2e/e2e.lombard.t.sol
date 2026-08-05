@@ -16,6 +16,8 @@ import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {AdvancedPoolHooks} from "../../pools/AdvancedPoolHooks.sol";
 import {LombardTokenPool} from "../../pools/Lombard/LombardTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {RouterFixture} from "../RouterFixture.t.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockLombardBridge} from "../mocks/MockLombardBridge.sol";
 import {MockLombardMailbox} from "../mocks/MockLombardMailbox.sol";
@@ -26,7 +28,7 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
-contract e2e_lombard is OnRampSetup {
+contract e2e_lombard is OnRampSetup, RouterFixture {
   // Version tags used by VersionedVerifierResolver inbound routing and each verifier's verifyMessage parsing.
   bytes4 internal constant LOMBARD_VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
   bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
@@ -51,13 +53,17 @@ contract e2e_lombard is OnRampSetup {
   LombardTokenPool internal s_sourceLombardPool;
   LombardTokenPool internal s_destLombardPool;
 
-  function setUp() public virtual override {
+  function _setUpRouters() internal override(BaseTest, RouterFixture) {
+    RouterFixture._setUpRouters();
+  }
+
+  function setUp() public virtual override(BaseTest, OnRampSetup) {
     super.setUp();
 
     // Ensure Router can resolve the onRamp address for the verifier allowlist check.
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    Router(address(s_sourceRouter)).applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     // ================================================================
     // │                     CommitteeVerifier                        │
@@ -331,7 +337,7 @@ contract e2e_lombard is OnRampSetup {
 
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
 
     // Seed existing fee recipients to avoid first-transfer cold init costs.
     deal(s_sourceFeeToken, s_committeeCCV, 1);
@@ -380,7 +386,7 @@ contract e2e_lombard is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    Router(address(s_sourceRouter)).ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
     assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber, expectedMsgNum);

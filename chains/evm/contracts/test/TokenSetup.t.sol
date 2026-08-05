@@ -7,68 +7,17 @@ import {ERC20LockBox} from "../pools/ERC20LockBox.sol";
 import {LockReleaseTokenPool} from "../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../tokenAdminRegistry/TokenAdminRegistry.sol";
-import {BaseERC20} from "../tokens/BaseERC20.sol";
 import {CrossChainToken} from "../tokens/CrossChainToken.sol";
-import {BaseTest} from "./BaseTest.t.sol";
+import {TokenFixture} from "./TokenFixture.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract TokenSetup is BaseTest {
-  address[] internal s_sourceTokens;
-  address[] internal s_destTokens;
-
-  address internal s_sourceFeeToken;
-  address internal s_destFeeToken;
-
-  TokenAdminRegistry internal s_tokenAdminRegistry;
-
-  mapping(address sourceToken => address sourcePool) internal s_sourcePoolByToken;
-  mapping(address sourceToken => address destPool) internal s_destPoolBySourceToken;
-  mapping(address destToken => address destPool) internal s_destPoolByToken;
-  mapping(address sourceToken => address destToken) internal s_destTokenBySourceToken;
-
+/// @notice Layers real token pools and registry wiring on top of the TokenFixture tokens. Only suites that transfer
+/// tokens through pools should inherit this, others should inherit TokenFixture to keep pools out of their compile
+/// scope.
+contract TokenSetup is TokenFixture {
   mapping(address token => ERC20LockBox lockBox) internal s_lockBoxes;
-
-  function _deployCrossChainToken(
-    string memory tokenName,
-    uint8 decimals
-  ) internal returns (CrossChainToken) {
-    return new CrossChainToken(
-      BaseERC20.ConstructorParams({
-        name: tokenName,
-        symbol: tokenName,
-        decimals: decimals,
-        maxSupply: 0,
-        preMint: 0,
-        preMintRecipient: address(0),
-        ccipAdmin: OWNER
-      }),
-      OWNER,
-      OWNER
-    );
-  }
-
-  function _deploySourceToken(
-    string memory tokenName,
-    uint256 dealAmount,
-    uint8 decimals
-  ) internal returns (address) {
-    CrossChainToken token = _deployCrossChainToken(tokenName, decimals);
-    s_sourceTokens.push(address(token));
-    deal(address(token), OWNER, dealAmount);
-    return address(token);
-  }
-
-  function _deployDestToken(
-    string memory tokenName,
-    uint256 dealAmount
-  ) internal returns (address) {
-    CrossChainToken token = _deployCrossChainToken(tokenName, 18);
-    s_destTokens.push(address(token));
-    deal(address(token), OWNER, dealAmount);
-    return address(token);
-  }
 
   function _deployLockReleasePool(
     address token,
@@ -96,12 +45,12 @@ contract TokenSetup is BaseTest {
       s_sourcePoolByToken[address(token)] = address(pool);
     } else {
       s_destPoolByToken[address(token)] = address(pool);
-      s_destPoolBySourceToken[s_sourceTokens[s_destTokens.length - 1]] = address(pool);
     }
   }
 
-  function _deployTokenAndBurnMintPool(
+  function _deployBurnMintPool(
     address token,
+    uint8 localTokenDecimals,
     bool isSourcePool
   ) internal {
     address router = address(s_sourceRouter);
@@ -110,7 +59,7 @@ contract TokenSetup is BaseTest {
     }
 
     BurnMintTokenPool pool = new BurnMintTokenPool(
-      IBurnMintERC20(address(token)), DEFAULT_TOKEN_DECIMALS, address(0), address(s_mockRMNRemote), router
+      IBurnMintERC20(address(token)), localTokenDecimals, address(0), address(s_mockRMNRemote), router
     );
     CrossChainToken(token).grantMintAndBurnRoles(address(pool));
 
@@ -118,42 +67,34 @@ contract TokenSetup is BaseTest {
       s_sourcePoolByToken[address(token)] = address(pool);
     } else {
       s_destPoolByToken[address(token)] = address(pool);
-      s_destPoolBySourceToken[s_sourceTokens[s_destTokens.length - 1]] = address(pool);
     }
   }
 
   function setUp() public virtual override {
     super.setUp();
 
-    bool isSetup = s_sourceTokens.length != 0;
+    // setUp is often called multiple times from tests' setUp due to inheritance.
+    bool isSetup = s_sourcePoolByToken[s_sourceTokens[0]] != address(0);
     if (isSetup) {
       return;
     }
 
-    s_tokenAdminRegistry = new TokenAdminRegistry();
+    // Source pools: lock/release for the fee token, burn/mint for the others.
+    _deployLockReleasePool(s_sourceTokens[0], true);
+    _deployBurnMintPool(s_sourceTokens[1], DEFAULT_TOKEN_DECIMALS, true);
+    _deployBurnMintPool(s_sourceTokens[2], USDC_TOKEN_DECIMALS, true);
 
-    // Source tokens & pools
-    address sourceLink = _deploySourceToken("sLINK", type(uint256).max, 18);
-    _deployLockReleasePool(sourceLink, true);
-    s_sourceFeeToken = sourceLink;
+    // Destination pools mirror the source pool types.
+    _deployLockReleasePool(s_destTokens[0], false);
+    _deployBurnMintPool(s_destTokens[1], DEFAULT_TOKEN_DECIMALS, false);
+    _deployBurnMintPool(s_destTokens[2], USDC_TOKEN_DECIMALS, false);
 
-    address sourceEth = _deploySourceToken("sETH", 2 ** 128, 18);
-    _deployTokenAndBurnMintPool(sourceEth, true);
-
-    // Destination tokens & pools
-    address destLink = _deployDestToken("dLINK", type(uint256).max);
-    _deployLockReleasePool(destLink, false);
-    s_destFeeToken = destLink;
-
-    s_destTokenBySourceToken[sourceLink] = destLink;
-
-    address destEth = _deployDestToken("dETH", 2 ** 128);
-    _deployTokenAndBurnMintPool(destEth, false);
-
-    s_destTokenBySourceToken[sourceEth] = destEth;
+    s_destPoolBySourceToken[s_sourceTokens[0]] = s_destPoolByToken[s_destTokens[0]];
+    s_destPoolBySourceToken[s_sourceTokens[1]] = s_destPoolByToken[s_destTokens[1]];
+    s_destPoolBySourceToken[s_sourceTokens[2]] = s_destPoolByToken[s_destTokens[2]];
 
     // Float the dest link lock release pool with funds.
-    IERC20(destLink).transfer(address(s_lockBoxes[destLink]), 1000 ether);
+    IERC20(s_destTokens[0]).transfer(address(s_lockBoxes[s_destTokens[0]]), 1000 ether);
 
     // Set pools in the registry.
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {

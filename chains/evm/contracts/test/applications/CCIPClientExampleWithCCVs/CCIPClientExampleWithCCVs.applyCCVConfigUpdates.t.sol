@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CCIPClientExampleWithCCVs} from "../../../applications/CCIPClientExampleWithCCVs.sol";
+import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
 
@@ -15,7 +16,7 @@ contract CCIPClientExampleWithCCVs_applyCCVConfigUpdates is RouterSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_client = new CCIPClientExampleWithCCVs(s_destRouter, IERC20(s_destFeeToken));
+    s_client = new CCIPClientExampleWithCCVs(IRouterClient(address(s_destRouter)), IERC20(s_destFeeToken));
   }
 
   function test_applyCCVConfigUpdates() public {

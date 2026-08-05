@@ -1,6 +1,7 @@
 pragma solidity ^0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
+import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
 import {CCIPClientExample} from "../../../applications/CCIPClientExample.sol";
 import {Client} from "../../../libraries/Client.sol";
@@ -12,7 +13,8 @@ import {ERC165Checker} from "@openzeppelin/contracts@5.3.0/utils/introspection/E
 
 contract CCIPClientExample_sanity is RouterSetup {
   function test_ImmutableExamples() public {
-    CCIPClientExample exampleContract = new CCIPClientExample(s_sourceRouter, IERC20(s_sourceFeeToken));
+    CCIPClientExample exampleContract =
+      new CCIPClientExample(IRouterClient(address(s_sourceRouter)), IERC20(s_sourceFeeToken));
     deal(address(exampleContract), 100 ether);
     deal(s_sourceFeeToken, address(exampleContract), 100 ether);
 

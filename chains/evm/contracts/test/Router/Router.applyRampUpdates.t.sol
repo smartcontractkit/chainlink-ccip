@@ -6,14 +6,16 @@ import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
-import {BaseTest} from "../BaseTest.t.sol";
+import {RouterFixture} from "../RouterFixture.t.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
-contract Router_applyRampUpdates is BaseTest {
+contract Router_applyRampUpdates is RouterFixture {
   MaybeRevertMessageReceiver internal s_receiver;
+  Router internal s_router;
 
   function setUp() public virtual override {
     super.setUp();
+    s_router = Router(payable(address(s_sourceRouter)));
     s_receiver = new MaybeRevertMessageReceiver(false);
   }
 
@@ -31,7 +33,7 @@ contract Router_applyRampUpdates is BaseTest {
     });
 
     vm.expectCall(address(s_receiver), abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message));
-    s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
+    s_router.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
   }
 
   function _assertOffRampRouteReverts(
@@ -40,7 +42,7 @@ contract Router_applyRampUpdates is BaseTest {
     vm.startPrank(offRamp.offRamp);
 
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
-    s_sourceRouter.routeMessage(
+    s_router.routeMessage(
       Client.Any2EVMMessage({
         messageId: bytes32("a"),
         sourceChainSelector: offRamp.sourceChainSelector,
@@ -64,27 +66,27 @@ contract Router_applyRampUpdates is BaseTest {
     }
 
     // Test adding offRamps
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
+    s_router.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
 
     // There is no uniqueness guarantee on fuzz input, offRamps will not emit in case of a duplicate,
     // hence cannot assert on number of offRamps event emissions, we need to use isOffRa
     for (uint256 i = 0; i < offRamps.length; ++i) {
-      assertTrue(s_sourceRouter.isOffRamp(offRamps[i].sourceChainSelector, offRamps[i].offRamp));
+      assertTrue(s_router.isOffRamp(offRamps[i].sourceChainSelector, offRamps[i].offRamp));
     }
 
     // Test removing offRamps
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), s_sourceRouter.getOffRamps(), new Router.OffRamp[](0));
+    s_router.applyRampUpdates(new Router.OnRamp[](0), s_router.getOffRamps(), new Router.OffRamp[](0));
 
-    assertEq(0, s_sourceRouter.getOffRamps().length);
+    assertEq(0, s_router.getOffRamps().length);
     for (uint256 i = 0; i < offRamps.length; ++i) {
-      assertFalse(s_sourceRouter.isOffRamp(offRamps[i].sourceChainSelector, offRamps[i].offRamp));
+      assertFalse(s_router.isOffRamp(offRamps[i].sourceChainSelector, offRamps[i].offRamp));
     }
 
     // Testing removing and adding in same call
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), offRamps, offRamps);
+    s_router.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
+    s_router.applyRampUpdates(new Router.OnRamp[](0), offRamps, offRamps);
     for (uint256 i = 0; i < offRamps.length; ++i) {
-      assertTrue(s_sourceRouter.isOffRamp(offRamps[i].sourceChainSelector, offRamps[i].offRamp));
+      assertTrue(s_router.isOffRamp(offRamps[i].sourceChainSelector, offRamps[i].offRamp));
     }
   }
 
@@ -118,14 +120,14 @@ contract Router_applyRampUpdates is BaseTest {
       vm.expectEmit();
       emit Router.OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
     }
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
-    Router.OffRamp[] memory gotOffRamps = s_sourceRouter.getOffRamps();
+    Router.OffRamp[] memory gotOffRamps = s_router.getOffRamps();
     assertEq(offRampUpdates.length, gotOffRamps.length);
 
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
       assertEq(offRampUpdates[i].offRamp, gotOffRamps[i].offRamp);
-      assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+      assertTrue(s_router.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
       _assertOffRampRouteSucceeds(offRampUpdates[i]);
     }
 
@@ -154,22 +156,20 @@ contract Router_applyRampUpdates is BaseTest {
       vm.expectEmit();
       emit Router.OffRampAdded(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
     }
-    s_sourceRouter.applyRampUpdates(onRampUpdates, partialOffRampRemoves, partialOffRampAdds);
+    s_router.applyRampUpdates(onRampUpdates, partialOffRampRemoves, partialOffRampAdds);
 
-    gotOffRamps = s_sourceRouter.getOffRamps();
+    gotOffRamps = s_router.getOffRamps();
     assertEq(offRampUpdates.length, gotOffRamps.length);
 
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
-      assertFalse(
-        s_sourceRouter.isOffRamp(partialOffRampRemoves[i].sourceChainSelector, partialOffRampRemoves[i].offRamp)
-      );
+      assertFalse(s_router.isOffRamp(partialOffRampRemoves[i].sourceChainSelector, partialOffRampRemoves[i].offRamp));
       _assertOffRampRouteReverts(partialOffRampRemoves[i]);
 
-      assertTrue(s_sourceRouter.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
+      assertTrue(s_router.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
       _assertOffRampRouteSucceeds(partialOffRampAdds[i]);
     }
     for (uint256 i = numberOfPartialUpdates; i < offRampUpdates.length; ++i) {
-      assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+      assertTrue(s_router.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
       _assertOffRampRouteSucceeds(offRampUpdates[i]);
     }
 
@@ -181,7 +181,7 @@ contract Router_applyRampUpdates is BaseTest {
       vm.expectEmit();
       emit Router.OffRampRemoved(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
     }
-    s_sourceRouter.applyRampUpdates(onRampUpdates, partialOffRampAdds, new Router.OffRamp[](0));
+    s_router.applyRampUpdates(onRampUpdates, partialOffRampAdds, new Router.OffRamp[](0));
 
     uint256 numberOfRemainingOfframps = offRampUpdates.length - numberOfPartialUpdates;
     Router.OffRamp[] memory remainingOffRampRemoves = new Router.OffRamp[](numberOfRemainingOfframps);
@@ -193,17 +193,17 @@ contract Router_applyRampUpdates is BaseTest {
       vm.expectEmit();
       emit Router.OffRampRemoved(remainingOffRampRemoves[i].sourceChainSelector, remainingOffRampRemoves[i].offRamp);
     }
-    s_sourceRouter.applyRampUpdates(onRampUpdates, remainingOffRampRemoves, new Router.OffRamp[](0));
+    s_router.applyRampUpdates(onRampUpdates, remainingOffRampRemoves, new Router.OffRamp[](0));
 
     // Check there are no offRamps.
-    assertEq(0, s_sourceRouter.getOffRamps().length);
+    assertEq(0, s_router.getOffRamps().length);
 
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
-      assertFalse(s_sourceRouter.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
+      assertFalse(s_router.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
       _assertOffRampRouteReverts(partialOffRampAdds[i]);
     }
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
-      assertFalse(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+      assertFalse(s_router.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
       _assertOffRampRouteReverts(offRampUpdates[i]);
     }
 
@@ -216,21 +216,21 @@ contract Router_applyRampUpdates is BaseTest {
       vm.expectEmit();
       emit Router.OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
     }
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     // Check initial offRamps are added back and can route to receiver.
-    gotOffRamps = s_sourceRouter.getOffRamps();
+    gotOffRamps = s_router.getOffRamps();
     assertEq(offRampUpdates.length, gotOffRamps.length);
 
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
       assertEq(offRampUpdates[i].offRamp, gotOffRamps[i].offRamp);
-      assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+      assertTrue(s_router.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
       _assertOffRampRouteSucceeds(offRampUpdates[i]);
     }
 
     // Check offramps that were not added back remain unset.
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
-      assertFalse(s_sourceRouter.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
+      assertFalse(s_router.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
       _assertOffRampRouteReverts(partialOffRampAdds[i]);
     }
   }
@@ -244,7 +244,7 @@ contract Router_applyRampUpdates is BaseTest {
       emit Router.OnRampSet(onRamps[i].destChainSelector, onRamps[i].onRamp);
     }
 
-    s_sourceRouter.applyRampUpdates(onRamps, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    s_router.applyRampUpdates(onRamps, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     // Test setting onRamps to unsupported
     for (uint256 i = 0; i < onRamps.length; ++i) {
@@ -253,10 +253,10 @@ contract Router_applyRampUpdates is BaseTest {
       vm.expectEmit();
       emit Router.OnRampSet(onRamps[i].destChainSelector, onRamps[i].onRamp);
     }
-    s_sourceRouter.applyRampUpdates(onRamps, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    s_router.applyRampUpdates(onRamps, new Router.OffRamp[](0), new Router.OffRamp[](0));
     for (uint256 i = 0; i < onRamps.length; ++i) {
-      assertEq(address(0), s_sourceRouter.getOnRamp(onRamps[i].destChainSelector));
-      assertFalse(s_sourceRouter.isChainSupported(onRamps[i].destChainSelector));
+      assertEq(address(0), s_router.getOnRamp(onRamps[i].destChainSelector));
+      assertFalse(s_router.isChainSupported(onRamps[i].destChainSelector));
     }
   }
 
@@ -266,21 +266,21 @@ contract Router_applyRampUpdates is BaseTest {
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](0);
     address onRamp = address(uint160(2));
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: onRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
-    assertEq(onRamp, s_sourceRouter.getOnRamp(DEST_CHAIN_SELECTOR));
-    assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_SELECTOR));
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    assertEq(onRamp, s_router.getOnRamp(DEST_CHAIN_SELECTOR));
+    assertTrue(s_router.isChainSupported(DEST_CHAIN_SELECTOR));
 
     // Disable onRamp
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(0)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
-    assertEq(address(0), s_sourceRouter.getOnRamp(DEST_CHAIN_SELECTOR));
-    assertFalse(s_sourceRouter.isChainSupported(DEST_CHAIN_SELECTOR));
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    assertEq(address(0), s_router.getOnRamp(DEST_CHAIN_SELECTOR));
+    assertFalse(s_router.isChainSupported(DEST_CHAIN_SELECTOR));
 
     // Re-enable onRamp
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: onRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
-    assertEq(onRamp, s_sourceRouter.getOnRamp(DEST_CHAIN_SELECTOR));
-    assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_SELECTOR));
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    assertEq(onRamp, s_router.getOnRamp(DEST_CHAIN_SELECTOR));
+    assertTrue(s_router.isChainSupported(DEST_CHAIN_SELECTOR));
   }
 
   function test_RevertWhen_applyRampUpdatesWhen_OnlyOwner() public {
@@ -288,7 +288,7 @@ contract Router_applyRampUpdates is BaseTest {
     vm.expectRevert("Only callable by owner");
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](0);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
   }
 
   function test_RevertWhen_applyRampUpdatesWhen_OffRampMismatch() public {
@@ -300,11 +300,11 @@ contract Router_applyRampUpdates is BaseTest {
 
     vm.expectEmit();
     emit Router.OffRampAdded(DEST_CHAIN_SELECTOR, offRamp);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_SELECTOR, offRamp);
 
     vm.expectRevert(abi.encodeWithSelector(Router.OffRampMismatch.selector, SOURCE_CHAIN_SELECTOR, offRamp));
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
   }
 }
