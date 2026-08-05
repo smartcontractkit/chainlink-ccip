@@ -102,6 +102,15 @@ var DeployLombardChain = cldf_ops.NewSequence(
 		addresses = append(addresses, lombardVerifierRef)
 		lombardVerifierAddress := common.HexToAddress(lombardVerifierRef.Address)
 
+		// Save the Bridge address to the datastore for use in configure_lombard_chain_for_lanes
+		bridgeRef := datastore.AddressRef{
+			Type:          datastore.ContractType("LombardBridge"),
+			ChainSelector: input.ChainSelector,
+			Address:       lombardBridgeAddress.Hex(),
+			Version:       lombard_verifier.Version,
+		}
+		addresses = append(addresses, bridgeRef)
+
 		_, err = cldf_ops.ExecuteOperation(b, lombard_verifier.UpdateSupportedTokens, chain, contract_utils.FunctionInput[lombard_verifier.UpdateSupportedTokensArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       lombardVerifierAddress,

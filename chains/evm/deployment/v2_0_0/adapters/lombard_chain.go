@@ -82,3 +82,15 @@ func (c *LombardChainAdapter) RemoteTokenPoolAddress(ds datastore.DataStore, cha
 	}
 	return c.AddressRefToBytes(tokenPool)
 }
+
+// RemoteBridgeSender returns the address of the Bridge/AssetRouter on the remote chain.
+func (c *LombardChainAdapter) RemoteBridgeSender(ds datastore.DataStore, chains chain.BlockChains, selector uint64) ([]byte, error) {
+	bridgeRef, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:    datastore.ContractType("LombardBridge"),
+		Version: lombard_verifier.Version,
+	}, selector, datastore_utils.FullRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find Lombard Bridge address on chain %d: %w", selector, err)
+	}
+	return common.FromHex(bridgeRef.Address), nil
+}

@@ -201,12 +201,14 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert lombardChainID to bytes32: %w", err)
 			}
-			if remoteChain.RemoteBridgeSender == "" {
-				return sequences.OnChainOutput{}, fmt.Errorf("remote bridge sender is required for remote chain %d", remoteChainSelector)
-			}
-			remoteBridgeSender, err := parseLombardIdentifier(remoteChain.RemoteBridgeSender)
+			// Fetch the remote bridge sender from the datastore instead of requiring it in the input
+			remoteBridgeSenderBytes, err := dep.RemoteChains[remoteChainSelector].RemoteBridgeSender(dep.DataStore, dep.BlockChains, remoteChainSelector)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to parse remote bridge sender for remote chain %d: %w", remoteChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote bridge sender for remote chain %d: %w", remoteChainSelector, err)
+			}
+			remoteBridgeSender, err := toBytes32LeftPad(remoteBridgeSenderBytes)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to convert remote bridge sender to bytes32 for chain %d: %w", remoteChainSelector, err)
 			}
 
 			tokenPoolPathArgs = append(tokenPoolPathArgs, lombard_token_pool.SetPathArgs{

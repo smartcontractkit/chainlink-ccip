@@ -64,10 +64,6 @@ type RemoteLombardChainConfig struct {
 	// RemoteAdapter is the optional remote token identifier accepted by Lombard bridge.
 	// Accepts either an EVM address hex string or a 32-byte hex string. Leave empty to disable adapter override.
 	RemoteAdapter string
-	// RemoteBridgeSender is the BridgeV2/AssetRouter on the remote chain expected to have sent the GMP envelope.
-	// Accepts either an EVM address hex string or a 32-byte hex string. Required: the LombardVerifier rejects a
-	// zero value, and inbound messages whose envelope sender does not match it.
-	RemoteBridgeSender string
 	FeeUSDCents        uint16
 	GasForVerification uint32
 	PayloadSizeBytes   uint16
@@ -101,6 +97,9 @@ type RemoteLombardChain interface {
 	RemoteTokenAddress(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error)
 
 	RemoteTokenPoolAddress(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error)
+
+	// RemoteBridgeSender returns the address of the Bridge/AssetRouter on the remote chain.
+	RemoteBridgeSender(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64) ([]byte, error)
 }
 
 // LombardChainRegistry maintains a registry of Lombard chains.
