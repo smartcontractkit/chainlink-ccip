@@ -23,6 +23,8 @@ import {USDCTokenPoolProxy} from "../../pools/USDC/USDCTokenPoolProxy.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {BaseERC20} from "../../tokens/BaseERC20.sol";
 import {CrossChainToken} from "../../tokens/CrossChainToken.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {RouterFixture} from "../RouterFixture.t.sol";
 import {CCTPHelper} from "../helpers/CCTPHelper.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockE2EUSDCTransmitterCCTPV2} from "../mocks/MockE2EUSDCTransmitterCCTPV2.sol";
@@ -33,7 +35,7 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract cctp_e2e is OnRampSetup {
+contract cctp_e2e is OnRampSetup, RouterFixture {
   bytes4 private constant CCTP_VERSION_TAG_V2_0_0 = bytes4(keccak256("CCTPVerifier 2.0.0"));
 
   uint32 private constant CCTP_VERSION = 1;
@@ -63,7 +65,11 @@ contract cctp_e2e is OnRampSetup {
   CCTPSetup internal s_sourceCCTPSetup;
   CCTPSetup internal s_destCCTPSetup;
 
-  function setUp() public override {
+  function _setUpRouters() internal override(BaseTest, RouterFixture) {
+    RouterFixture._setUpRouters();
+  }
+
+  function setUp() public override(BaseTest, OnRampSetup) {
     super.setUp();
 
     s_offRamp = new OffRampHelper(
@@ -98,11 +104,11 @@ contract cctp_e2e is OnRampSetup {
     // Apply off ramp and on ramp updates on the source router.
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    Router(address(s_sourceRouter)).applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+    Router(address(s_sourceRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
 
     // Set the default CCV on the off ramp.
     address[] memory defaultDestCCVs = new address[](1);
@@ -206,7 +212,7 @@ contract cctp_e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    Router(address(s_sourceRouter)).ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
     assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber, expectedMsgNum);

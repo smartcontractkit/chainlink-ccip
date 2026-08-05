@@ -1,54 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
-import {RateLimiterHelper} from "../helpers/RateLimiterHelper.sol";
-import {Test} from "forge-std/Test.sol";
-
-contract RateLimiterSetup is Test {
-  RateLimiterHelper internal s_helper;
-  RateLimiter.Config internal s_config;
-
-  uint256 internal constant BLOCK_TIME = 1234567890;
-
-  function setUp() public virtual {
-    s_config = RateLimiter.Config({isEnabled: true, rate: 5, capacity: 100});
-    s_helper = new RateLimiterHelper(s_config);
-  }
-}
-
-contract RateLimiter_constructor is RateLimiterSetup {
-  function test_Constructor() public view {
-    RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
-    assertEq(s_config.rate, rateLimiter.rate);
-    assertEq(s_config.capacity, rateLimiter.capacity);
-    assertEq(s_config.capacity, rateLimiter.tokens);
-    assertEq(s_config.isEnabled, rateLimiter.isEnabled);
-    assertEq(BLOCK_TIME, rateLimiter.lastUpdated);
-  }
-}
-
-contract RateLimiter_setTokenBucketConfig is RateLimiterSetup {
-  function test_setTokenBucketConfig_SettingConfigRefills() public {
-    RateLimiter.TokenBucket memory bucket = s_helper.currentTokenBucketState();
-    assertEq(s_config.rate, bucket.rate);
-    assertEq(s_config.capacity, bucket.capacity);
-    assertEq(s_config.capacity, bucket.tokens);
-    assertEq(s_config.isEnabled, bucket.isEnabled);
-    assertEq(BLOCK_TIME, bucket.lastUpdated);
-
-    s_config = RateLimiter.Config({isEnabled: true, rate: uint128(bucket.rate * 2), capacity: bucket.capacity * 8});
-
-    s_helper.setTokenBucketConfig(s_config);
-
-    bucket = s_helper.currentTokenBucketState();
-    assertEq(s_config.rate, bucket.rate);
-    assertEq(s_config.capacity, bucket.capacity);
-    assertEq(s_config.capacity, bucket.tokens);
-    assertEq(s_config.isEnabled, bucket.isEnabled);
-    assertEq(BLOCK_TIME, bucket.lastUpdated);
-  }
-}
+import {RateLimiter} from "../../../libraries/RateLimiter.sol";
+import {RateLimiterSetup} from "./RateLimiterSetup.t.sol";
 
 contract RateLimiter_consume is RateLimiterSetup {
   address internal s_token = address(100);
@@ -59,7 +13,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(s_config.capacity, rateLimiter.capacity);
     assertEq(s_config.capacity, rateLimiter.tokens);
     assertEq(s_config.isEnabled, rateLimiter.isEnabled);
-    assertEq(BLOCK_TIME, rateLimiter.lastUpdated);
+    assertEq(i_blockTime, rateLimiter.lastUpdated);
 
     uint256 requestTokens = 50;
 
@@ -70,7 +24,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(s_config.capacity, rateLimiter.capacity);
     assertEq(s_config.capacity - requestTokens, rateLimiter.tokens);
     assertEq(s_config.isEnabled, rateLimiter.isEnabled);
-    assertEq(BLOCK_TIME, rateLimiter.lastUpdated);
+    assertEq(i_blockTime, rateLimiter.lastUpdated);
   }
 
   function test_Refill() public {
@@ -83,10 +37,10 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(s_config.capacity, rateLimiter.capacity);
     assertEq(s_config.capacity - requestTokens, rateLimiter.tokens);
     assertEq(s_config.isEnabled, rateLimiter.isEnabled);
-    assertEq(BLOCK_TIME, rateLimiter.lastUpdated);
+    assertEq(i_blockTime, rateLimiter.lastUpdated);
 
     uint256 warpTime = 4;
-    vm.warp(BLOCK_TIME + warpTime);
+    vm.warp(i_blockTime + warpTime);
 
     s_helper.consume(requestTokens, address(0));
 
@@ -95,7 +49,7 @@ contract RateLimiter_consume is RateLimiterSetup {
     assertEq(s_config.capacity, rateLimiter.capacity);
     assertEq(s_config.capacity - requestTokens * 2 + warpTime * s_config.rate, rateLimiter.tokens);
     assertEq(s_config.isEnabled, rateLimiter.isEnabled);
-    assertEq(BLOCK_TIME + warpTime, rateLimiter.lastUpdated);
+    assertEq(i_blockTime + warpTime, rateLimiter.lastUpdated);
   }
 
   function test_consume_ConsumeWhenDisabled() public {
@@ -181,7 +135,7 @@ contract RateLimiter_consume is RateLimiterSetup {
   }
 
   function test_RevertWhen_RateLimitReachedOverConsecutiveBlocks() public {
-    uint256 initBlockTime = BLOCK_TIME + 10000;
+    uint256 initBlockTime = i_blockTime + 10000;
     vm.warp(initBlockTime);
 
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();

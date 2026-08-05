@@ -24,7 +24,7 @@ contract Router_ccipSend is RouterSetup {
     message.tokenAmounts[0].amount = 2 ** 64;
     message.tokenAmounts[0].token = s_sourceTokens[1];
 
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 expectedFee = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 0);
 
     uint256 balanceBefore = sourceToken1.balanceOf(OWNER);
@@ -44,7 +44,7 @@ contract Router_ccipSend is RouterSetup {
     );
 
     vm.resumeGasMetering();
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
     // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
@@ -57,7 +57,7 @@ contract Router_ccipSend is RouterSetup {
     vm.pauseGasMetering();
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 expectedFee = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 0);
 
     vm.expectCall(
@@ -65,7 +65,7 @@ contract Router_ccipSend is RouterSetup {
       abi.encodeCall(IEVM2AnyOnRampClient.forwardFromRouter, (DEST_CHAIN_SELECTOR, message, expectedFee, OWNER))
     );
     vm.resumeGasMetering();
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_ccipSend_nativeFeeOneTokenSuccess_gas() public {
@@ -82,8 +82,8 @@ contract Router_ccipSend is RouterSetup {
     message.tokenAmounts[0].token = s_sourceTokens[1];
     // Native fees will be wrapped so we need to calculate the event with
     // the wrapped native feeCoin address.
-    message.feeToken = s_sourceRouter.getWrappedNative();
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    message.feeToken = s_router.getWrappedNative();
+    uint256 expectedFee = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 0);
 
     vm.expectCall(
@@ -102,7 +102,7 @@ contract Router_ccipSend is RouterSetup {
     });
 
     vm.resumeGasMetering();
-    s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
     // Assert the user balance is lowered by the tokenAmounts sent and the fee amount
@@ -117,8 +117,8 @@ contract Router_ccipSend is RouterSetup {
 
     // Native fees will be wrapped so we need to calculate the event with
     // the wrapped native feeCoin address.
-    message.feeToken = s_sourceRouter.getWrappedNative();
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    message.feeToken = s_router.getWrappedNative();
+    uint256 expectedFee = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     assertGt(expectedFee, 0);
 
     vm.expectCall(
@@ -130,7 +130,7 @@ contract Router_ccipSend is RouterSetup {
     message.feeToken = address(0);
 
     vm.resumeGasMetering();
-    s_sourceRouter.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend{value: expectedFee}(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_NonLinkFeeToken() public {
@@ -142,25 +142,25 @@ contract Router_ccipSend is RouterSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = s_sourceTokens[1];
     IERC20(s_sourceTokens[1]).approve(address(s_sourceRouter), 2 ** 64);
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_NativeFeeToken() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = address(0); // Raw native
-    uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 nativeQuote = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     vm.stopPrank();
     hoax(address(1), 100 ether);
-    s_sourceRouter.ccipSend{value: nativeQuote}(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend{value: nativeQuote}(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_NativeFeeTokenOverpay() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = address(0); // Raw native
-    uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 nativeQuote = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     vm.stopPrank();
     hoax(address(1), 100 ether);
-    s_sourceRouter.ccipSend{value: nativeQuote + 1}(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend{value: nativeQuote + 1}(DEST_CHAIN_SELECTOR, message);
     // We expect the overpayment to be taken in full.
     assertEq(address(1).balance, 100 ether - (nativeQuote + 1));
     assertEq(address(s_sourceRouter).balance, 0);
@@ -168,14 +168,14 @@ contract Router_ccipSend is RouterSetup {
 
   function test_WrappedNativeFeeToken() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.feeToken = s_sourceRouter.getWrappedNative();
-    uint256 nativeQuote = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    message.feeToken = s_router.getWrappedNative();
+    uint256 nativeQuote = s_router.getFee(DEST_CHAIN_SELECTOR, message);
     vm.stopPrank();
     hoax(address(1), 100 ether);
     // Now address(1) has nativeQuote wrapped.
-    IWrappedNative(s_sourceRouter.getWrappedNative()).deposit{value: nativeQuote}();
-    IWrappedNative(s_sourceRouter.getWrappedNative()).approve(address(s_sourceRouter), nativeQuote);
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    IWrappedNative(s_router.getWrappedNative()).deposit{value: nativeQuote}();
+    IWrappedNative(s_router.getWrappedNative()).approve(address(s_sourceRouter), nativeQuote);
+    s_router.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
   // Reverts
@@ -185,7 +185,7 @@ contract Router_ccipSend is RouterSetup {
 
     vm.expectRevert(Router.BadARMSignal.selector);
 
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
+    s_router.ccipSend(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
   }
 
   function test_RevertWhen_UnsupportedDestinationChain() public {
@@ -194,7 +194,7 @@ contract Router_ccipSend is RouterSetup {
 
     vm.expectRevert(abi.encodeWithSelector(IRouterClient.UnsupportedDestinationChain.selector, wrongChain));
 
-    s_sourceRouter.ccipSend(wrongChain, message);
+    s_router.ccipSend(wrongChain, message);
   }
 
   function test_RevertWhen_FeeTokenAmountTooLow() public {
@@ -203,7 +203,7 @@ contract Router_ccipSend is RouterSetup {
 
     vm.expectRevert();
 
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_InvalidMsgValue() public {
@@ -212,7 +212,7 @@ contract Router_ccipSend is RouterSetup {
     vm.stopPrank();
     hoax(address(1), 1);
     vm.expectRevert(IRouterClient.InvalidMsgValue.selector);
-    s_sourceRouter.ccipSend{value: 1}(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend{value: 1}(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_NativeFeeTokenZeroValue() public {
@@ -220,7 +220,7 @@ contract Router_ccipSend is RouterSetup {
     message.feeToken = address(0); // Raw native
     // Include no value, should revert
     vm.expectRevert();
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
   function test_NativeFeeTokenInsufficientValue() public {
@@ -231,7 +231,7 @@ contract Router_ccipSend is RouterSetup {
 
     hoax(address(1), 1);
     vm.expectRevert(IRouterClient.InsufficientFeeTokenAmount.selector);
-    s_sourceRouter.ccipSend{value: 1}(DEST_CHAIN_SELECTOR, message);
+    s_router.ccipSend{value: 1}(DEST_CHAIN_SELECTOR, message);
   }
 
   function _generateEmptyMessage() public view returns (Client.EVM2AnyMessage memory) {

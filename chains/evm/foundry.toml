@@ -13,9 +13,10 @@ bytecode_hash = "none"
 ffi = false
 optimizer = true
 # default is zero, using a non-zero amount enables us to test e.g. billing based on gas prices.
-gas_price = 1
-block_timestamp = 1234567890
-block_number = 12345
+gas_price = 1_000_000_000 # 1 gwei
+# Realistic mainnet-like values, e.g. timestamps that don't fit in uint31 surface unsafe downcasts.
+block_timestamp = 1785456000 # Thu Jul 30 2026
+block_number = 23_500_000
 deny = 'warnings'
 # License should be removed once WETH in the chainlink NPM package has a license identifier.
 ignored_error_codes = ["too-many-warnings", "code-size", "license"]

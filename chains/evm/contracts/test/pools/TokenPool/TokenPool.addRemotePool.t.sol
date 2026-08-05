@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Router} from "../../../Router.sol";
+import {IRouter} from "../../../interfaces/IRouter.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
@@ -34,7 +34,7 @@ contract TokenPool_addRemotePool is TokenPoolSetup {
     address fakeOffRamp = makeAddr("fakeOffRamp");
 
     vm.mockCall(
-      address(s_sourceRouter), abi.encodeCall(Router.isOffRamp, (DEST_CHAIN_SELECTOR, fakeOffRamp)), abi.encode(true)
+      address(s_sourceRouter), abi.encodeCall(IRouter.isOffRamp, (DEST_CHAIN_SELECTOR, fakeOffRamp)), abi.encode(true)
     );
 
     vm.startPrank(fakeOffRamp);

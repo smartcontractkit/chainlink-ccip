@@ -63,8 +63,8 @@ contract CommitteeVerifierSetup is BaseVerifierSetup {
 
   function _generateBasicMessageV1() internal pure returns (MessageV1Codec.MessageV1 memory, bytes32 messageId) {
     MessageV1Codec.MessageV1 memory message = MessageV1Codec.MessageV1({
-      sourceChainSelector: 1,
-      destChainSelector: 2,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      destChainSelector: DEST_CHAIN_SELECTOR,
       messageNumber: 1,
       executionGasLimit: 400_000,
       ccipReceiveGasLimit: 200_000,

@@ -52,7 +52,7 @@ contract OffRampSetup is BaseTest {
 
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: isEnabled,
       onRamps: onRamps,

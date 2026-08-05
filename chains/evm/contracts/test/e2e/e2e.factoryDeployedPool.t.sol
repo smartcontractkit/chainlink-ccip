@@ -194,7 +194,7 @@ contract e2e_factoryDeployedPool is e2e {
 
     // Source: send via Router, tokens get burned.
     vm.recordLogs();
-    bytes32 messageId = s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    bytes32 messageId = IRouterClient(address(s_sourceRouter)).ccipSend(DEST_CHAIN_SELECTOR, message);
 
     assertEq(senderBalanceBefore - TOKEN_TRANSFER_AMOUNT, IERC20(s_factoryToken).balanceOf(OWNER));
     assertEq(sourceSupplyBefore - TOKEN_TRANSFER_AMOUNT, IERC20(s_factoryToken).totalSupply());

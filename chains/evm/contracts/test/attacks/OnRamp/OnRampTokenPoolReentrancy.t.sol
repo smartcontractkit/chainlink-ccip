@@ -72,7 +72,7 @@ contract OnRampTokenPoolReentrancy is RouterSetup {
       feeToken: address(s_feeToken)
     });
 
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message1);
+    uint256 expectedFee = s_router.getFee(DEST_CHAIN_SELECTOR, message1);
     assertGt(expectedFee, 0);
 
     vm.expectRevert(OnRamp.ReentrancyGuardReentrantCall.selector);

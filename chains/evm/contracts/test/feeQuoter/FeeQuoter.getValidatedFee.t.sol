@@ -21,7 +21,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
   }
 
   function test_getValidatedFee_EmptyMessage() public view {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+    address[2] memory testTokens = [s_sourceFeeToken, s_weth];
 
     for (uint256 i = 0; i < testTokens.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -33,7 +33,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
   }
 
   function test_getValidatedFee_HighGasMessage() public view {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+    address[2] memory testTokens = [s_sourceFeeToken, s_weth];
 
     uint256 customGasLimit = MAX_GAS_LIMIT;
     uint256 customDataSize = MAX_DATA_SIZE;
@@ -52,7 +52,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
   }
 
   function test_getValidatedFee_messageWithToken() public view {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+    address[2] memory testTokens = [s_sourceFeeToken, s_weth];
 
     uint256 tokenAmount = 10000e18;
     for (uint256 i = 0; i < testTokens.length; ++i) {
@@ -65,7 +65,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
   }
 
   function test_getValidatedFee_MessageWithDataAndTokenTransfer() public view {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+    address[2] memory testTokens = [s_sourceFeeToken, s_weth];
 
     uint256 customGasLimit = 1_000_000;
     for (uint256 i = 0; i < testTokens.length; ++i) {

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Router} from "../../../Router.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {BaseERC20} from "../../../tokens/BaseERC20.sol";
@@ -59,11 +58,9 @@ contract SiloedLockReleaseTokenPool_getAllLockBoxConfigs is BaseTest {
     );
 
     // Setup router.
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](4);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: CHAIN_A, onRamp: address(1)});
-    onRampUpdates[1] = Router.OnRamp({destChainSelector: CHAIN_B, onRamp: address(2)});
-    onRampUpdates[2] = Router.OnRamp({destChainSelector: CHAIN_C, onRamp: address(3)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    _setMockRouterOnRamp(address(s_sourceRouter), CHAIN_A, address(1));
+    _setMockRouterOnRamp(address(s_sourceRouter), CHAIN_B, address(2));
+    _setMockRouterOnRamp(address(s_sourceRouter), CHAIN_C, address(3));
   }
 
   function test_getAllLockBoxConfigs() public {

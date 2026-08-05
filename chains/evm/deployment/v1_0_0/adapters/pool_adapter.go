@@ -207,10 +207,10 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
 			}
-			if !common.IsHexAddress(input.PoolAddress) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for chain %d: %s", input.Selector, input.PoolAddress)
+			if !common.IsHexAddress(input.TokenPoolRef.Address) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for chain %d: %s", input.Selector, input.TokenPoolRef.Address)
 			}
-			poolAddr := common.HexToAddress(input.PoolAddress)
+			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
 
 			var rateLimitAdmin *common.Address
 			if input.RateLimitAdmin != nil {

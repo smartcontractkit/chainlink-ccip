@@ -5,10 +5,10 @@ import {Router} from "../../Router.sol";
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {Client} from "../../libraries/Client.sol";
-import {BaseTest} from "../BaseTest.t.sol";
+import {RouterFixture} from "../RouterFixture.t.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
-contract Router_routeMessage is BaseTest {
+contract Router_routeMessage is RouterFixture {
   IAny2EVMMessageReceiver internal s_receiver;
   MaybeRevertMessageReceiver internal s_reverting_receiver;
 
@@ -22,7 +22,7 @@ contract Router_routeMessage is BaseTest {
 
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
 
     vm.startPrank(address(s_offRamp));
   }

@@ -19,13 +19,19 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {BaseERC20} from "../../../tokens/BaseERC20.sol";
 import {CrossChainToken} from "../../../tokens/CrossChainToken.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
+import {RouterFixture} from "../../RouterFixture.t.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
-contract OffRamp_executeSingleMessage is OffRampSetup {
-  function setUp() public virtual override {
+contract OffRamp_executeSingleMessage is OffRampSetup, RouterFixture {
+  function _setUpRouters() internal override(BaseTest, RouterFixture) {
+    RouterFixture._setUpRouters();
+  }
+
+  function setUp() public virtual override(BaseTest, OffRampSetup) {
     super.setUp();
 
     MessageV1Codec.MessageV1 memory message = _getMessage();
@@ -33,7 +39,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     // Apply off ramp updates on the receiver.
     Router.OffRamp[] memory offRamps = new Router.OffRamp[](1);
     offRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
 
     // Mock validateReport for default message structure.
     bytes32 messageHash = keccak256(MessageV1Codec._encodeMessageV1(message));
@@ -607,7 +613,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     });
 
     vm.expectCall(
-      address(s_sourceRouter),
+      address(s_destRouter),
       abi.encodeCall(
         IRouter.routeMessage,
         (any2EVMMessage, GAS_FOR_CALL_EXACT_CHECK, expectedReceiverGasLimit, address(bytes20(message.receiver)))
