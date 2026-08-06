@@ -30,10 +30,22 @@ type FieldSpec[T comparable] struct {
 
 // ApplyRatio returns a Fallback function that scales a mismatched current value by the same
 // ratio the source doc used to go from its Prague baseline to its Glamsterdam value, rounded to
-// the nearest integer.
+// the nearest integer. Panics if the scaled result overflows T rather than silently wrapping,
+// since a wrapped fallback value would otherwise be written on-chain with no indication anything
+// went wrong.
 func ApplyRatio[T constraints.Integer](prague, glamsterdam T) func(current T) T {
 	return func(current T) T {
-		return T(math.Round(float64(current) * float64(glamsterdam) / float64(prague)))
+		scaled := math.Round(float64(current) * float64(glamsterdam) / float64(prague))
+
+		result := T(scaled)
+		if float64(result) != scaled {
+			panic(fmt.Sprintf(
+				"ApplyRatio: scaled value %v overflows the target type (got %v after conversion)",
+				scaled, result,
+			))
+		}
+
+		return result
 	}
 }
 

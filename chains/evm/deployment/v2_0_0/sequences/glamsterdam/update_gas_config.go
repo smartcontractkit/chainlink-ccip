@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_verifier"
 )
 
 // applyOnRampDestChainConfigUpdates mirrors onramp.ApplyDestChainConfigUpdates, but always routes
@@ -69,6 +71,39 @@ var applyCommitteeVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.
 	},
 })
 
+// applyLombardVerifierRemoteChainConfigUpdates mirrors
+// lombard_verifier.ApplyRemoteChainConfigUpdates, but always routes the write through MCMS.
+var applyLombardVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]lombard_verifier.RemoteChainConfigArgs, *lombard_verifier.LombardVerifierContract]{
+	Name:            "glamsterdam:lombard-verifier:apply-remote-chain-config-updates",
+	Version:         semver.MustParse("2.1.0"),
+	Description:     "Calls applyRemoteChainConfigUpdates on LombardVerifier, always producing an MCMS proposal",
+	ContractType:    lombard_verifier.ContractType,
+	ContractABI:     lombard_verifier.LombardVerifierABI,
+	NewContract:     lombard_verifier.NewLombardVerifierContract,
+	IsAllowedCaller: contract.NoCallersAllowed[*lombard_verifier.LombardVerifierContract, []lombard_verifier.RemoteChainConfigArgs],
+	Validate:        func([]lombard_verifier.RemoteChainConfigArgs) error { return nil },
+	CallContract: func(c *lombard_verifier.LombardVerifierContract, opts *bind.TransactOpts, args []lombard_verifier.RemoteChainConfigArgs) (*types.Transaction, error) {
+		return c.ApplyRemoteChainConfigUpdates(opts, args)
+	},
+})
+
+// applyCCTPVerifierRemoteChainConfigUpdates mirrors cctp_verifier.ApplyRemoteChainConfigUpdates,
+// but always routes the write through MCMS. The doc refers to this contract as "USDCVerifier";
+// the Solidity/Go type is CCTPVerifier.
+var applyCCTPVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]cctp_verifier.RemoteChainConfigArgs, *cctp_verifier.CCTPVerifierContract]{
+	Name:            "glamsterdam:cctp-verifier:apply-remote-chain-config-updates",
+	Version:         semver.MustParse("2.1.0"),
+	Description:     "Calls applyRemoteChainConfigUpdates on CCTPVerifier (USDCVerifier), always producing an MCMS proposal",
+	ContractType:    cctp_verifier.ContractType,
+	ContractABI:     cctp_verifier.CCTPVerifierABI,
+	NewContract:     cctp_verifier.NewCCTPVerifierContract,
+	IsAllowedCaller: contract.NoCallersAllowed[*cctp_verifier.CCTPVerifierContract, []cctp_verifier.RemoteChainConfigArgs],
+	Validate:        func([]cctp_verifier.RemoteChainConfigArgs) error { return nil },
+	CallContract: func(c *cctp_verifier.CCTPVerifierContract, opts *bind.TransactOpts, args []cctp_verifier.RemoteChainConfigArgs) (*types.Transaction, error) {
+		return c.ApplyRemoteChainConfigUpdates(opts, args)
+	},
+})
+
 // LaneAddresses is the set of contract addresses to update on one source chain that has a
 // confirmed lane pointed at the Glamsterdam target chain.
 type LaneAddresses struct {
@@ -80,6 +115,14 @@ type LaneAddresses struct {
 	// address to skip this chain's CommitteeVerifier update entirely (e.g. it isn't deployed/
 	// tracked in the datastore yet).
 	CommitteeVerifierAddress common.Address
+	// LombardVerifierAddress is optional. If set, LombardVerifier's GasForVerification (row 11)
+	// is read, resolved against its expected Prague baseline, and written back. Leave as the zero
+	// address to skip this chain's LombardVerifier update entirely.
+	LombardVerifierAddress common.Address
+	// CCTPVerifierAddress is optional. If set, CCTPVerifier's ("USDCVerifier" in the doc)
+	// GasForVerification (row 12) is read, resolved against its expected Prague baseline, and
+	// written back. Leave as the zero address to skip this chain's CCTPVerifier update entirely.
+	CCTPVerifierAddress common.Address
 	// OffRampAddress is optional. If set, OffRamp's immutable gas fields are read and sanity
 	// checked against their expected Prague baseline (no write is ever made — there is no
 	// setter for either field). Leave as the zero address to skip this chain's check.
@@ -244,6 +287,72 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 						return UpdateGasConfigOutput{}, fmt.Errorf("failed to apply CommitteeVerifier remote chain config update for src %d: %w", lane.ChainSelector, err)
 					}
 					writes = append(writes, cvWrite.Output)
+				}
+			}
+
+			// --- LombardVerifier: GasForVerification (row 11) ---
+			// Optional: skipped entirely if LombardVerifier isn't deployed/tracked in the
+			// datastore for this chain yet.
+			if lane.LombardVerifierAddress != (common.Address{}) {
+				lvCur, err := cldf_ops.ExecuteOperation(b, lombard_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
+					ChainSelector: lane.ChainSelector,
+					Address:       lane.LombardVerifierAddress,
+					Args:          input.TargetChainSelector,
+				})
+				if err != nil {
+					output.Report.AddReadError(lane.ChainSelector, "read LombardVerifier remote chain config", err)
+				} else if lvCur.Output.RemoteChainConfig.Router == (common.Address{}) {
+					output.Report.AddDisabledLane(lane.ChainSelector, "LombardVerifier")
+				} else {
+					gasForVerificationResult := glamsterdamutils.Resolve(LombardVerifierGasForVerification, lvCur.Output.RemoteChainConfig.GasForVerification)
+					glamsterdamutils.AddField(output.Report, lane.ChainSelector, gasForVerificationResult)
+
+					newLVConfig := lvCur.Output.RemoteChainConfig
+					newLVConfig.GasForVerification = gasForVerificationResult.AppliedValue
+
+					lvWrite, err := cldf_ops.ExecuteOperation(b, applyLombardVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]lombard_verifier.RemoteChainConfigArgs]{
+						ChainSelector: lane.ChainSelector,
+						Address:       lane.LombardVerifierAddress,
+						Args:          []lombard_verifier.RemoteChainConfigArgs{newLVConfig},
+					})
+					if err != nil {
+						output.Report.AddReadError(lane.ChainSelector, "apply LombardVerifier remote chain config update", err)
+					} else {
+						writes = append(writes, lvWrite.Output)
+					}
+				}
+			}
+
+			// --- CCTPVerifier ("USDCVerifier" in the doc): GasForVerification (row 12) ---
+			// Optional: skipped entirely if CCTPVerifier isn't deployed/tracked in the datastore
+			// for this chain yet.
+			if lane.CCTPVerifierAddress != (common.Address{}) {
+				cctpCur, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
+					ChainSelector: lane.ChainSelector,
+					Address:       lane.CCTPVerifierAddress,
+					Args:          input.TargetChainSelector,
+				})
+				if err != nil {
+					output.Report.AddReadError(lane.ChainSelector, "read CCTPVerifier remote chain config", err)
+				} else if cctpCur.Output.RemoteChainConfig.Router == (common.Address{}) {
+					output.Report.AddDisabledLane(lane.ChainSelector, "CCTPVerifier")
+				} else {
+					gasForVerificationResult := glamsterdamutils.Resolve(USDCVerifierGasForVerification, cctpCur.Output.RemoteChainConfig.GasForVerification)
+					glamsterdamutils.AddField(output.Report, lane.ChainSelector, gasForVerificationResult)
+
+					newCCTPConfig := cctpCur.Output.RemoteChainConfig
+					newCCTPConfig.GasForVerification = gasForVerificationResult.AppliedValue
+
+					cctpWrite, err := cldf_ops.ExecuteOperation(b, applyCCTPVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
+						ChainSelector: lane.ChainSelector,
+						Address:       lane.CCTPVerifierAddress,
+						Args:          []cctp_verifier.RemoteChainConfigArgs{newCCTPConfig},
+					})
+					if err != nil {
+						output.Report.AddReadError(lane.ChainSelector, "apply CCTPVerifier remote chain config update", err)
+					} else {
+						writes = append(writes, cctpWrite.Output)
+					}
 				}
 			}
 

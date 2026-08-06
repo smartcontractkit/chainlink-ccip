@@ -16,11 +16,13 @@ import (
 	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	glamsterdamseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/glamsterdam"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_verifier"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
@@ -114,6 +116,12 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 				lane.CommitteeVerifierAddress = common.HexToAddress(cvRef.Address)
 			} else {
 				report.AddUnresolvedContract(sel, "CommitteeVerifier")
+			}
+			if lvRef := datastore_utils.GetAddressRef(addrs, sel, lombard_verifier.ContractType, lombard_verifier.Version, ""); !datastore_utils.IsAddressRefEmpty(lvRef) {
+				lane.LombardVerifierAddress = common.HexToAddress(lvRef.Address)
+			}
+			if cctpRef := datastore_utils.GetAddressRef(addrs, sel, cctp_verifier.ContractType, cctp_verifier.Version, ""); !datastore_utils.IsAddressRefEmpty(cctpRef) {
+				lane.CCTPVerifierAddress = common.HexToAddress(cctpRef.Address)
 			}
 			if offRampRef := datastore_utils.GetAddressRef(addrs, sel, offramp.ContractType, offramp.Version, ""); !datastore_utils.IsAddressRefEmpty(offRampRef) {
 				lane.OffRampAddress = common.HexToAddress(offRampRef.Address)

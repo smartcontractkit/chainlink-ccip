@@ -76,6 +76,25 @@ var (
 		GlamsterdamValue: 750_000,
 		Fallback:         glamsterdamutils.ApplyRatio[uint32](250_000, 750_000),
 	}
+
+	// LombardVerifierGasForVerification is table row 11. Guesstimate value (real value needs
+	// testnet measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	LombardVerifierGasForVerification = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "LombardVerifier.RemoteChainConfigArgs.GasForVerification",
+		ExpectedPrague:   275_000,
+		GlamsterdamValue: 825_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](275_000, 825_000),
+	}
+
+	// USDCVerifierGasForVerification is table row 12. The doc calls this contract "USDCVerifier";
+	// the Solidity/Go type is CCTPVerifier. Guesstimate value (real value needs testnet
+	// measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	USDCVerifierGasForVerification = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "CCTPVerifier.RemoteChainConfigArgs.GasForVerification",
+		ExpectedPrague:   200_000,
+		GlamsterdamValue: 600_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](200_000, 600_000),
+	}
 )
 
 // OffRamp fields (table rows 6-7) are immutable, set only in the constructor, with no setter —
