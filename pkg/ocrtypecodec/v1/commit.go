@@ -210,12 +210,6 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 	if err != nil {
 		return committypes.Outcome{}, fmt.Errorf("merkle roots from proto: %w", err)
 	}
-	rangesSelectedForReport, err := c.tr.chainRangeFromProto(
-		pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport(),
-	)
-	if err != nil {
-		return committypes.Outcome{}, fmt.Errorf("chain ranges from proto: %w", err)
-	}
 	sigs, err := c.tr.ccipRmnSignaturesFromProto(pbOutcome.GetMerkleRootOutcome().GetRmnReportSignatures())
 	if err != nil {
 		return committypes.Outcome{}, fmt.Errorf("rmn report signatures from proto: %w", err)
@@ -226,9 +220,11 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 	}
 	return committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
-			OutcomeType:             merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
-			RangesSelectedForReport: rangesSelectedForReport,
-			RootsToReport:           rootsToReport,
+			OutcomeType: merkleroot.OutcomeType(pbOutcome.GetMerkleRootOutcome().GetOutcomeType()),
+			RangesSelectedForReport: c.tr.chainRangeFromProto(
+				pbOutcome.GetMerkleRootOutcome().GetRangesSelectedForReport(),
+			),
+			RootsToReport: rootsToReport,
 			RMNEnabledChains: c.tr.rmnEnabledChainsFromProto(
 				pbOutcome.GetMerkleRootOutcome().GetRmnEnabledChains(),
 			),
