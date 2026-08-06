@@ -115,14 +115,18 @@ type LaneAddresses struct {
 	// address to skip this chain's CommitteeVerifier update entirely (e.g. it isn't deployed/
 	// tracked in the datastore yet).
 	CommitteeVerifierAddress common.Address
-	// LombardVerifierAddress is optional. If set, LombardVerifier's GasForVerification (row 11)
-	// is read, resolved against its expected Prague baseline, and written back. Leave as the zero
-	// address to skip this chain's LombardVerifier update entirely.
-	LombardVerifierAddress common.Address
-	// CCTPVerifierAddress is optional. If set, CCTPVerifier's ("USDCVerifier" in the doc)
+	// LombardVerifierAddresses is optional and may contain more than one address — e.g. during a
+	// migration window a chain can have both a v2.0.0 and v2.1.0 LombardVerifier tracked in the
+	// datastore simultaneously, and both need their GasForVerification (row 11) updated in
+	// lockstep. Each address is read, resolved against its expected Prague baseline, and written
+	// back independently. Leave empty to skip this chain's LombardVerifier update entirely.
+	LombardVerifierAddresses []common.Address
+	// CCTPVerifierAddresses is optional and may contain more than one address, same reasoning as
+	// LombardVerifierAddresses above. CCTPVerifier's ("USDCVerifier" in the doc)
 	// GasForVerification (row 12) is read, resolved against its expected Prague baseline, and
-	// written back. Leave as the zero address to skip this chain's CCTPVerifier update entirely.
-	CCTPVerifierAddress common.Address
+	// written back independently for each address. Leave empty to skip this chain's CCTPVerifier
+	// update entirely.
+	CCTPVerifierAddresses []common.Address
 	// OffRampAddress is optional. If set, OffRamp's immutable gas fields are read and sanity
 	// checked against their expected Prague baseline (no write is ever made — there is no
 	// setter for either field). Leave as the zero address to skip this chain's check.
@@ -291,12 +295,13 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			}
 
 			// --- LombardVerifier: GasForVerification (row 11) ---
-			// Optional: skipped entirely if LombardVerifier isn't deployed/tracked in the
-			// datastore for this chain yet.
-			if lane.LombardVerifierAddress != (common.Address{}) {
+			// Optional: skipped entirely if no LombardVerifier is deployed/tracked in the
+			// datastore for this chain yet. If more than one version's address is present (e.g.
+			// during a migration window), every one of them gets updated.
+			for _, lombardVerifierAddress := range lane.LombardVerifierAddresses {
 				lvCur, err := cldf_ops.ExecuteOperation(b, lombard_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 					ChainSelector: lane.ChainSelector,
-					Address:       lane.LombardVerifierAddress,
+					Address:       lombardVerifierAddress,
 					Args:          input.TargetChainSelector,
 				})
 				if err != nil {
@@ -312,7 +317,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 
 					lvWrite, err := cldf_ops.ExecuteOperation(b, applyLombardVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]lombard_verifier.RemoteChainConfigArgs]{
 						ChainSelector: lane.ChainSelector,
-						Address:       lane.LombardVerifierAddress,
+						Address:       lombardVerifierAddress,
 						Args:          []lombard_verifier.RemoteChainConfigArgs{newLVConfig},
 					})
 					if err != nil {
@@ -324,12 +329,13 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			}
 
 			// --- CCTPVerifier ("USDCVerifier" in the doc): GasForVerification (row 12) ---
-			// Optional: skipped entirely if CCTPVerifier isn't deployed/tracked in the datastore
-			// for this chain yet.
-			if lane.CCTPVerifierAddress != (common.Address{}) {
+			// Optional: skipped entirely if no CCTPVerifier is deployed/tracked in the datastore
+			// for this chain yet. If more than one version's address is present (e.g. during a
+			// migration window), every one of them gets updated.
+			for _, cctpVerifierAddress := range lane.CCTPVerifierAddresses {
 				cctpCur, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 					ChainSelector: lane.ChainSelector,
-					Address:       lane.CCTPVerifierAddress,
+					Address:       cctpVerifierAddress,
 					Args:          input.TargetChainSelector,
 				})
 				if err != nil {
@@ -345,7 +351,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 
 					cctpWrite, err := cldf_ops.ExecuteOperation(b, applyCCTPVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
 						ChainSelector: lane.ChainSelector,
-						Address:       lane.CCTPVerifierAddress,
+						Address:       cctpVerifierAddress,
 						Args:          []cctp_verifier.RemoteChainConfigArgs{newCCTPConfig},
 					})
 					if err != nil {

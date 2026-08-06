@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -26,6 +27,42 @@ import (
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
+
+// supportedLombardVerifierVersions and supportedCCTPVerifierVersions are the datastore-tagged
+// contract versions this changeset knows how to drive. The v2.1.0 client/ABI (imported above) is
+// backward-compatible with a v2.0.0-deployed contract for the two methods this changeset calls
+// (GetRemoteChainConfig / applyRemoteChainConfigUpdates have identical signatures in both ABI
+// versions), so a single client library can safely call either. Listing both here means a chain
+// with only a v2.0.0-tagged verifier in the datastore is still resolved and updated, instead of
+// being silently skipped because the datastore lookup only ever checked for v2.1.0.
+var (
+	supportedLombardVerifierVersions = []*semver.Version{lombard_verifier.Version, semver.MustParse("2.0.0")}
+	supportedCCTPVerifierVersions    = []*semver.Version{cctp_verifier.Version, semver.MustParse("2.0.0")}
+)
+
+// resolveAddressRefsAllVersions returns every distinct address matching contractType across
+// versions for the given chain — unlike a single-version lookup, it doesn't stop at the first
+// match. This is used for verifier contracts where a chain can have more than one version live
+// at once during a migration window, and all of them need updating, not just one.
+func resolveAddressRefsAllVersions(
+	addrs []datastore.AddressRef, sel uint64, contractType cldf_deployment.ContractType,
+	versions []*semver.Version, qualifier string,
+) []common.Address {
+	seen := make(map[common.Address]bool, len(versions))
+	var out []common.Address
+	for _, v := range versions {
+		ref := datastore_utils.GetAddressRef(addrs, sel, contractType, v, qualifier)
+		if datastore_utils.IsAddressRefEmpty(ref) {
+			continue
+		}
+		addr := common.HexToAddress(ref.Address)
+		if !seen[addr] {
+			seen[addr] = true
+			out = append(out, addr)
+		}
+	}
+	return out
+}
 
 // GlamsterdamGasUpdateCfg is configuration for the UpdateGasConfigForGlamsterdamV2 changeset.
 type GlamsterdamGasUpdateCfg struct {
@@ -117,12 +154,8 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 			} else {
 				report.AddUnresolvedContract(sel, "CommitteeVerifier")
 			}
-			if lvRef := datastore_utils.GetAddressRef(addrs, sel, lombard_verifier.ContractType, lombard_verifier.Version, ""); !datastore_utils.IsAddressRefEmpty(lvRef) {
-				lane.LombardVerifierAddress = common.HexToAddress(lvRef.Address)
-			}
-			if cctpRef := datastore_utils.GetAddressRef(addrs, sel, cctp_verifier.ContractType, cctp_verifier.Version, ""); !datastore_utils.IsAddressRefEmpty(cctpRef) {
-				lane.CCTPVerifierAddress = common.HexToAddress(cctpRef.Address)
-			}
+			lane.LombardVerifierAddresses = resolveAddressRefsAllVersions(addrs, sel, lombard_verifier.ContractType, supportedLombardVerifierVersions, "")
+			lane.CCTPVerifierAddresses = resolveAddressRefsAllVersions(addrs, sel, cctp_verifier.ContractType, supportedCCTPVerifierVersions, "")
 			if offRampRef := datastore_utils.GetAddressRef(addrs, sel, offramp.ContractType, offramp.Version, ""); !datastore_utils.IsAddressRefEmpty(offRampRef) {
 				lane.OffRampAddress = common.HexToAddress(offRampRef.Address)
 			}
