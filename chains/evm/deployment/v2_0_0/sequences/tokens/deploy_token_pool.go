@@ -221,11 +221,22 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			AdvancedPoolHooksConfig: AdvancedPoolHooksConfig{
 				Allowlist: allowlist,
 			},
+			LockBoxGroups: input.LockBoxGroups,
 		}
 
 		// Deploy the desired pool contract
 		output := sequences.OnChainOutput{}
 		switch {
+		// NOTE: the siloed case must precede the lock-release case below, because
+		// utils.IsLockReleasePoolType deliberately reports true for the siloed type. The siloed pool
+		// has a distinct constructor (no lockbox argument) and needs one lockbox per silo group, so
+		// it cannot share DeployLockReleaseTokenPool.
+		case tokenPoolType == datastore.ContractType(utils.SiloedLockReleaseTokenPool):
+			if report, err := cldf_ops.ExecuteSequence(b, DeploySiloedLockReleaseTokenPool, chain, internalInput); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy siloed lock release token pool on chain %d: %w", chain.Selector, err)
+			} else {
+				output = report.Output
+			}
 		case utils.IsLockReleasePoolType(tokenPoolType.String()):
 			if report, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, internalInput); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool on chain %d: %w", chain.Selector, err)

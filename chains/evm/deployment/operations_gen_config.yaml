@@ -162,6 +162,14 @@ contracts:
         access: owner
       - name: withdrawSiloedLiquidity
         access: owner
+      # provideLiquidity/provideSiloedLiquidity are rebalancer-gated on-chain rather than onlyOwner,
+      # and there is no rebalancer access alias, so they are declared public and rely on that check.
+      - name: provideLiquidity
+        access: public
+      - name: provideSiloedLiquidity
+        access: public
+      - name: updateSiloDesignations
+        access: owner
       - name: getToken
         access: public
 
@@ -412,6 +420,8 @@ contracts:
   - contract_name: SiloedLockReleaseTokenPool
     version: "2.0.0"
     functions:
+      - name: configureLockBoxes
+        access: owner
       - name: getLockBox
         access: public
       - name: getAllLockBoxConfigs
