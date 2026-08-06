@@ -727,19 +727,17 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mark chains as siloed and set silo rebalancers via updateSiloDesignations
-	type siloConfigUpdate struct {
-		RemoteChainSelector uint64
-		Rebalancer          common.Address
-	}
-	tx, err = oldPoolBound.Transact(chain.DeployerKey, "updateSiloDesignations",
-		[]uint64{},
-		[]siloConfigUpdate{
-			{RemoteChainSelector: remoteChain1, Rebalancer: deployer},
-			{RemoteChainSelector: remoteChain2, Rebalancer: deployer},
-		},
-	)
-	require.NoError(t, err)
-	_, err = chain.Confirm(tx)
+	_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.UpdateSiloDesignations, chain,
+		evm_contract.FunctionInput[old_siloed.UpdateSiloDesignationsArgs]{
+			ChainSelector: chainSel, Address: oldPoolAddr,
+			Args: old_siloed.UpdateSiloDesignationsArgs{
+				Removes: []uint64{},
+				Adds: []old_siloed.SiloConfigUpdate{
+					{RemoteChainSelector: remoteChain1, Rebalancer: deployer},
+					{RemoteChainSelector: remoteChain2, Rebalancer: deployer},
+				},
+			},
+		})
 	require.NoError(t, err)
 
 	// Set deployer as the unsiloed rebalancer (for provideLiquidity)
@@ -766,19 +764,26 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	tx, err = oldPoolBound.Transact(chain.DeployerKey, "provideSiloedLiquidity", remoteChain1, silo1Amount)
-	require.NoError(t, err)
-	_, err = chain.Confirm(tx)
-	require.NoError(t, err)
+	for _, silo := range []struct {
+		remoteChainSelector uint64
+		amount              *big.Int
+	}{
+		{remoteChain1, silo1Amount},
+		{remoteChain2, silo2Amount},
+	} {
+		_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.ProvideSiloedLiquidity, chain,
+			evm_contract.FunctionInput[old_siloed.ProvideSiloedLiquidityArgs]{
+				ChainSelector: chainSel, Address: oldPoolAddr,
+				Args: old_siloed.ProvideSiloedLiquidityArgs{
+					RemoteChainSelector: silo.remoteChainSelector,
+					Amount:              silo.amount,
+				},
+			})
+		require.NoError(t, err)
+	}
 
-	tx, err = oldPoolBound.Transact(chain.DeployerKey, "provideSiloedLiquidity", remoteChain2, silo2Amount)
-	require.NoError(t, err)
-	_, err = chain.Confirm(tx)
-	require.NoError(t, err)
-
-	tx, err = oldPoolBound.Transact(chain.DeployerKey, "provideLiquidity", unsiloedAmount)
-	require.NoError(t, err)
-	_, err = chain.Confirm(tx)
+	_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.ProvideLiquidity, chain,
+		evm_contract.FunctionInput[*big.Int]{ChainSelector: chainSel, Address: oldPoolAddr, Args: unsiloedAmount})
 	require.NoError(t, err)
 
 	// Deploy new v2.0 siloed pool via gobindings
