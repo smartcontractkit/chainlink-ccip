@@ -253,6 +253,7 @@ func setupEVM2SVMForConnectChains(t *testing.T) (
 	version = semver.MustParse("1.6.0")
 	for _, chainSel := range allChains {
 		mint, _ := solana.NewRandomPrivateKey()
+		SeedUltraFastCurseMCMS(t, e)
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
@@ -370,6 +371,7 @@ func setupEVM2EVMForConnectChains(t *testing.T, chains []uint64) (
 		GasForCallExactCheck:                    uint16(5000),
 	}
 	for _, chainSel := range chains {
+		SeedUltraFastCurseMCMS(t, e)
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS:   mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{chainSel: deployCfg},

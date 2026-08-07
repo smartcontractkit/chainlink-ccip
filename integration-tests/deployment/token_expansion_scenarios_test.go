@@ -93,6 +93,7 @@ func setupEVMOnlyEnv(t *testing.T) (*deployment.Environment, uint64, uint64) {
 		selA: NewDefaultDeploymentConfigForEVM(v1_6_0_scenarios),
 		selB: NewDefaultDeploymentConfigForEVM(v1_6_0_scenarios),
 	}
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deployapi.DeployContracts(deployRegistry).Apply(*env, deployapi.ContractDeploymentConfig{
 		Chains: deployInput,
 		MCMS:   mcms.Input{},
@@ -1010,6 +1011,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		evmChainSel: NewDefaultDeploymentConfigForEVM(v1_6_0_scenarios),
 		solChainSel: NewDefaultDeploymentConfigForSolana(v1_6_0_scenarios),
 	}
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deployapi.DeployContracts(deployRegistry).Apply(*env, deployapi.ContractDeploymentConfig{Chains: deployInput, MCMS: mcms.Input{}})
 	require.NoError(t, err)
 	MergeAddresses(t, env, output.DataStore)
@@ -1796,6 +1798,7 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 		},
 		MCMS: mcms.Input{},
 	}
+	SeedUltraFastCurseMCMS(t, env)
 	deployOut, err := deployapi.DeployContracts(deployRegistry).Apply(*env, deployInput)
 	require.NoError(t, err)
 	MergeAddresses(t, env, deployOut.DataStore)

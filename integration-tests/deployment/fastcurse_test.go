@@ -116,6 +116,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 
 	dReg := deploy.GetRegistry()
 	version := semver.MustParse("1.6.0")
+	SeedUltraFastCurseMCMS(t, env)
 	_, err = deploy.DeployContracts(dReg).Apply(*env, deploy.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deploy.ContractDeploymentConfigPerChain{

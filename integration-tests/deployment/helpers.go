@@ -640,3 +640,20 @@ func CurrentBlockEVM(t *testing.T, e *cldf_deployment.Environment, sel uint64) u
 	require.NoError(t, err)
 	return header.Number.Uint64()
 }
+
+// SeedUltraFastCurseMCMS registers an Ultra Fast Curse RBACTimelock ref for every EVM chain in the
+// environment.
+//
+// Chain-contract deploys use that timelock as the RMN's curse admin and fail without it. These test
+// flows deploy contracts before any MCMS exists, so the ref is seeded rather than deployed: the
+// address is only ever passed as a constructor argument, never called.
+func SeedUltraFastCurseMCMS(t *testing.T, e *cldf_deployment.Environment) {
+	t.Helper()
+	selectors := make([]uint64, 0)
+	for sel := range e.BlockChains.EVMChains() {
+		selectors = append(selectors, sel)
+	}
+	ds, err := testsetupV2_0_0.WithUltraFastCurseMCMS(e.DataStore, selectors...)
+	require.NoError(t, err, "failed to seed UltraFastCurse MCMS timelock refs")
+	e.DataStore = ds
+}
