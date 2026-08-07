@@ -12,16 +12,17 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 )
 
-// applyTokenPoolTokenTransferFeeConfigUpdates mirrors
+// ApplyTokenPoolTokenTransferFeeConfigUpdates mirrors
 // token_pool.ApplyTokenTransferFeeConfigUpdates, but always routes the write through MCMS. Both
 // LombardTokenPool and (Siloed)USDCTokenPool inherit this function unmodified from the shared
 // TokenPool base contract, so the base TokenPoolABI binds to either address correctly.
-var applyTokenPoolTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs, *token_pool.TokenPoolContract]{
+// Exported for use by other packages (e.g., adapters).
+var ApplyTokenPoolTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs, *token_pool.TokenPoolContract]{
 	Name:            "glamsterdam:token-pool:apply-token-transfer-fee-config-updates",
 	Version:         semver.MustParse("2.0.0"),
 	Description:     "Calls applyTokenTransferFeeConfigUpdates on TokenPool, always producing an MCMS proposal",
@@ -98,7 +99,7 @@ var UpdateTokenPoolGasConfig = cldf_ops.NewSequence(
 			newConfig := cur.Output
 			newConfig.DestGasOverhead = result.AppliedValue
 
-			write, err := cldf_ops.ExecuteOperation(b, applyTokenPoolTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
+			write, err := cldf_ops.ExecuteOperation(b, ApplyTokenPoolTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
 				ChainSelector: lane.ChainSelector,
 				Address:       lane.PoolAddress,
 				Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{

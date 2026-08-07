@@ -12,15 +12,15 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 )
 
-// applyFeeQuoterTokenTransferFeeConfigUpdates mirrors fee_quoter.ApplyTokenTransferFeeConfigUpdates,
+// ApplyFeeQuoterTokenTransferFeeConfigUpdates mirrors fee_quoter.ApplyTokenTransferFeeConfigUpdates,
 // but always routes the write through MCMS regardless of who the deployer key is, per this
-// feature's "always MCMS" decision.
-var applyFeeQuoterTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[fee_quoter.ApplyTokenTransferFeeConfigUpdatesArgs, *fee_quoter.FeeQuoterContract]{
+// feature's "always MCMS" decision. Exported for use by other packages (e.g., adapters).
+var ApplyFeeQuoterTokenTransferFeeConfigUpdates = contract.NewWrite(contract.WriteParams[fee_quoter.ApplyTokenTransferFeeConfigUpdatesArgs, *fee_quoter.FeeQuoterContract]{
 	Name:            "glamsterdam:fee-quoter:apply-token-transfer-fee-config-updates",
 	Version:         semver.MustParse("1.6.0"),
 	Description:     "Calls applyTokenTransferFeeConfigUpdates on FeeQuoter, always producing an MCMS proposal",
@@ -121,7 +121,7 @@ var UpdateTokenTransferFeeConfig = cldf_ops.NewSequence(
 				continue
 			}
 
-			write, err := cldf_ops.ExecuteOperation(b, applyFeeQuoterTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fee_quoter.ApplyTokenTransferFeeConfigUpdatesArgs]{
+			write, err := cldf_ops.ExecuteOperation(b, ApplyFeeQuoterTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fee_quoter.ApplyTokenTransferFeeConfigUpdatesArgs]{
 				ChainSelector: lane.ChainSelector,
 				Address:       lane.FeeQuoterAddress,
 				Args: fee_quoter.ApplyTokenTransferFeeConfigUpdatesArgs{

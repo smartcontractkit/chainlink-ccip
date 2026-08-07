@@ -3,7 +3,7 @@ package glamsterdam_test
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 	"github.com/stretchr/testify/require"
 )
 
