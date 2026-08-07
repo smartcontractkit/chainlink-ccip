@@ -147,6 +147,17 @@ type DeployTokenPoolInput struct {
 	// declarative setDynamicConfig reconcile (no-op if it already matches).
 	// EVM 2.0.0+ only.
 	FeeAggregator string `yaml:"feeAggregator,omitempty" json:"feeAggregator,omitempty"`
+	// LockBoxGroups declares the liquidity topology of a SiloedLockReleaseTokenPool. Each group is a
+	// set of remote chain selectors that share one ERC20LockBox; chains in different groups have
+	// isolated ("siloed") liquidity. One lockbox is deployed per group and mapped to every chain in
+	// it via the pool's configureLockBoxes.
+	//
+	// Required (and only meaningful) for SiloedLockReleaseTokenPool. The plain LockReleaseTokenPool
+	// takes a single lockbox in its constructor and ignores this field. A chain must not appear in
+	// more than one group, and every remote chain the pool will serve needs to be covered - a chain
+	// with no lockbox reverts with LockBoxNotConfigured on its first transfer.
+	// EVM 2.0.0+ only.
+	LockBoxGroups [][]uint64 `yaml:"lockBoxGroups,omitempty" json:"lockBoxGroups,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
