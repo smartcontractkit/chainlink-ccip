@@ -13,6 +13,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -21,13 +22,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	routerops1_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
-	adaptersv1_5_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
-	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
-	adaptersv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/adapters"
-	rmnremoteops1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
+	adaptersv2_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
+	rmnops2_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	soladapterv1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/adapters"
 	solofframpops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -37,6 +35,66 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
+
+// deployRMN2_1WithProxy deploys RMN 2.1.0 on the given chain together with the RMNProxy that
+// fronts it, and registers both in the datastore. The proxy is mandatory for the 2.1.0 fastcurse
+// adapter: it resolves the active RMN via utils.ActiveRMNAddress -> RMNProxy.getARM(). It returns
+// the RMN address and the RMNProxy address.
+func deployRMN2_1WithProxy(
+	t *testing.T,
+	bundle cldf_ops.Bundle,
+	evmChain cldf_evm.Chain,
+	ds *datastore.MemoryDataStore,
+) (common.Address, common.Address) {
+	t.Helper()
+	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops2_1.Deploy, evmChain, contract.DeployInput[rmnops2_1.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnops2_1.ContractType, *rmnops2_1.Version),
+		ChainSelector:  evmChain.Selector,
+		Args:           rmnops2_1.ConstructorArgs{CurseAdmins: []common.Address{}},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnops2_1.ContractType),
+		Version:       rmnops2_1.Version,
+		ChainSelector: evmChain.Selector,
+		Address:       deployRMNOp.Output.Address,
+	}))
+	rmnAddress := common.HexToAddress(deployRMNOp.Output.Address)
+
+	deployRMNProxyOp, err := cldf_ops.ExecuteOperation(bundle, rmnproxyops.Deploy, evmChain, contract.DeployInput[rmnproxyops.ConstructorArgs]{
+		ChainSelector:  evmChain.Selector,
+		TypeAndVersion: deployment.NewTypeAndVersion(rmnproxyops.ContractType, *semver.MustParse("1.0.0")),
+		Args:           rmnproxyops.ConstructorArgs{RMN: rmnAddress},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Type:          datastore.ContractType(rmnproxyops.ContractType),
+		Version:       semver.MustParse("1.0.0"),
+		ChainSelector: evmChain.Selector,
+		Address:       deployRMNProxyOp.Output.Address,
+	}))
+
+	return rmnAddress, common.HexToAddress(deployRMNProxyOp.Output.Address)
+}
+
+// rmnOwnershipTransferInput builds the transfer-ownership input that hands the RMN 2.1.0
+// deployment on each of the given chains over to that chain's timelock.
+func rmnOwnershipTransferInput(selectors []uint64, timelockAddrs map[uint64]string) []deploy.TransferOwnershipPerChainInput {
+	inputs := make([]deploy.TransferOwnershipPerChainInput, 0, len(selectors))
+	for _, sel := range selectors {
+		inputs = append(inputs, deploy.TransferOwnershipPerChainInput{
+			ChainSelector: sel,
+			ContractRef: []datastore.AddressRef{
+				{
+					Type:    datastore.ContractType(rmnops2_1.ContractType),
+					Version: rmnops2_1.Version,
+				},
+			},
+			ProposedOwner: timelockAddrs[sel],
+		})
+	}
+	return inputs
+}
 
 func TestFastCurseSolanaAndEVM(t *testing.T) {
 	chain1 := chainsel.TEST_90000001.Selector
@@ -98,60 +156,14 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	SolanaTransferOwnership(t, env, chainsel.SOLANA_MAINNET.Selector)
 	ds := datastore.NewMemoryDataStore()
 	bundle := env.OperationsBundle
-	var rmnAddress, rmnRemoteAddress common.Address
-	// deploy RMN 1.5 on chain1 and RMN 1.6 on chain2, set up routers, etc.
-	chain := env.BlockChains.EVMChains()[chain1]
-	deployRMNOp, err := cldf_ops.ExecuteOperation(bundle, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
-		ChainSelector:  chain.Selector,
-		Args: rmnops1_5.ConstructorArgs{
-			RMNConfig: rmn_contract.RMNConfig{
-				BlessWeightThreshold: 2,
-				CurseWeightThreshold: 2,
-				// setting dummy voters
-				Voters: []rmn_contract.RMNVoter{
-					{
-						BlessWeight:   2,
-						CurseWeight:   2,
-						BlessVoteAddr: utils.RandomAddress(),
-						CurseVoteAddr: utils.RandomAddress(),
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-		Type:          datastore.ContractType(rmnops1_5.ContractType),
-		Version:       semver.MustParse("1.5.0"),
-		ChainSelector: chain1,
-		Address:       deployRMNOp.Output.Address,
-	}))
-	rmnAddress = common.HexToAddress(deployRMNOp.Output.Address)
-	// deploy RMNRemote 1.6 on chain2
-	chain = env.BlockChains.EVMChains()[chain2]
-	deployRMNRemoteOp, err := cldf_ops.ExecuteOperation(bundle, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *semver.MustParse("1.6.0")),
-		ChainSelector:  chain.Selector,
-		Args: rmnremoteops1_6.ConstructorArgs{
-			LocalChainSelector: chain.Selector,
-			LegacyRMN:          utils.RandomAddress(),
-		},
-	})
-	require.NoError(t, err)
-	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
-		Type:          datastore.ContractType(rmnremoteops1_6.ContractType),
-		Version:       semver.MustParse("1.6.0"),
-		ChainSelector: chain2,
-		Address:       deployRMNRemoteOp.Output.Address,
-	}))
-	rmnRemoteAddress = common.HexToAddress(deployRMNRemoteOp.Output.Address)
-	// deploy router in both chains
+	rmnAddresses := make(map[uint64]common.Address)
+	// deploy RMN 2.1 (behind its RMNProxy) and a router on both EVM chains
 	for _, sel := range []uint64{chain1, chain2} {
 		evmChain := env.BlockChains.EVMChains()[sel]
-		// mock wrapped native and rmnproxy address
+		rmnAddr, rmnProxy := deployRMN2_1WithProxy(t, bundle, evmChain, ds)
+		rmnAddresses[sel] = rmnAddr
+		// mock wrapped native
 		wNative := utils.RandomAddress()
-		rmnProxy := utils.RandomAddress()
 
 		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
 			ChainSelector:  evmChain.Selector,
@@ -244,30 +256,9 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	// update env datastore
 	require.NoError(t, ds.Merge(env.DataStore))
 	env.DataStore = ds.Seal()
-	// transfer ownership of RMN and RMNRemote to respective MCMS
+	// transfer ownership of the RMN deployments to respective MCMS
 	transferOwnershipInput := deploy.TransferOwnershipInput{
-		ChainInputs: []deploy.TransferOwnershipPerChainInput{
-			{
-				ChainSelector: chain1,
-				ContractRef: []datastore.AddressRef{
-					{
-						Type:    datastore.ContractType(rmnops1_5.ContractType),
-						Version: semver.MustParse("1.5.0"),
-					},
-				},
-				ProposedOwner: timelockAddrs[chain1],
-			},
-			{
-				ChainSelector: chain2,
-				ContractRef: []datastore.AddressRef{
-					{
-						Type:    datastore.ContractType(rmnremoteops1_6.ContractType),
-						Version: semver.MustParse("1.6.0"),
-					},
-				},
-				ProposedOwner: timelockAddrs[chain2],
-			},
-		},
+		ChainInputs:    rmnOwnershipTransferInput([]uint64{chain1, chain2}, timelockAddrs),
 		AdapterVersion: semver.MustParse("1.0.0"),
 		MCMS: mcms.Input{
 			OverridePreviousRoot: false,
@@ -285,7 +276,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	require.Greater(t, len(output.Reports), 0)
 	require.Equal(t, 1, len(output.MCMSTimelockProposals))
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
-	t.Logf("Transferred ownership of RMN and RMNRemote to respective MCMS")
+	t.Logf("Transferred ownership of RMN to respective MCMS")
 	// now generate a curse proposal
 	curseCfg := fastcurse.RMNCurseConfig{
 		CurseActions: []fastcurse.CurseActionInput{
@@ -293,19 +284,19 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 				IsGlobalCurse:        false,
 				ChainSelector:        chain1,
 				SubjectChainSelector: chain2,
-				Version:              semver.MustParse("1.5.0"),
+				Version:              rmnops2_1.Version,
 			},
 			{
 				IsGlobalCurse:        false,
 				ChainSelector:        chain2,
 				SubjectChainSelector: chain1,
-				Version:              semver.MustParse("1.6.0"),
+				Version:              rmnops2_1.Version,
 			},
 			{
 				IsGlobalCurse:        false,
 				ChainSelector:        chain2,
 				SubjectChainSelector: chainsel.SOLANA_MAINNET.Selector,
-				Version:              semver.MustParse("1.6.0"),
+				Version:              rmnops2_1.Version,
 			},
 			{
 				// Lane curse actions must be represented bidirectionally; reverse direction can be any version.
@@ -324,8 +315,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 			Description:          "Curse proposal for fast curse test",
 		},
 	}
-	adv1_6_0 := adaptersv1_6_0.NewCurseAdapter()
-	adv1_5_0 := adaptersv1_5_0.NewCurseAdapter()
+	adv2_1_0 := adaptersv2_1_0.NewCurseAdapter()
 
 	curseChangeset := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	output, err = curseChangeset.Apply(*env, curseCfg)
@@ -337,22 +327,22 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	// check that the subjects were actually cursed
 	evmChain1 := env.BlockChains.EVMChains()[chain1]
 	evmChain2 := env.BlockChains.EVMChains()[chain2]
-	rmnC, err := rmn_contract.NewRMNContract(rmnAddress, evmChain1.Client)
+	rmnC, err := rmnops2_1.NewRMNContract(rmnAddresses[chain1], evmChain1.Client)
 	require.NoError(t, err)
-	isCursed, err := rmnC.IsCursed(nil, adv1_5_0.SelectorToSubject(chain2))
+	isCursed, err := rmnC.IsCursed(nil, adv2_1_0.SelectorToSubject(chain2))
 	require.NoError(t, err)
 	require.True(t, isCursed, "subject on chain2 should be cursed on rmn in chain1")
 
-	rmnRemoteC, err := rmn_remote.NewRMNRemote(rmnRemoteAddress, evmChain2.Client)
+	rmnC2, err := rmnops2_1.NewRMNContract(rmnAddresses[chain2], evmChain2.Client)
 	require.NoError(t, err)
-	isCursed, err = rmnRemoteC.IsCursed(nil, adv1_6_0.SelectorToSubject(chain1))
+	isCursed, err = rmnC2.IsCursed(nil, adv2_1_0.SelectorToSubject(chain1))
 	require.NoError(t, err)
-	require.True(t, isCursed, "subject on chain1 should be cursed on rmnremote in chain2")
-	t.Logf("Subjects successfully cursed %x on chain1 %d and %x on chain2 %d", adv1_5_0.SelectorToSubject(chain2), chain1, adv1_6_0.SelectorToSubject(chain1), chain2)
+	require.True(t, isCursed, "subject on chain1 should be cursed on rmn in chain2")
+	t.Logf("Subjects successfully cursed %x on chain1 %d and %x on chain2 %d", adv2_1_0.SelectorToSubject(chain2), chain1, adv2_1_0.SelectorToSubject(chain1), chain2)
 
-	isCursed, err = rmnRemoteC.IsCursed(nil, adv1_6_0.SelectorToSubject(chainsel.SOLANA_MAINNET.Selector))
+	isCursed, err = rmnC2.IsCursed(nil, adv2_1_0.SelectorToSubject(chainsel.SOLANA_MAINNET.Selector))
 	require.NoError(t, err)
-	require.True(t, isCursed, "subject on solana chain should be cursed on rmnremote in chain2")
+	require.True(t, isCursed, "subject on solana chain should be cursed on rmn in chain2")
 	t.Logf("Subject successfully cursed %x on solana chain %d in rmnremote on chain2 %d", soladapterv1_6_0.NewCurseAdapter().SelectorToSubject(chainsel.SOLANA_MAINNET.Selector), chainsel.SOLANA_MAINNET.Selector, chain2)
 
 	/*
@@ -379,7 +369,7 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.True(t, isCursed, "subject on chain1 should be cursed on solana rmnremote")
-		t.Logf("Subject successfully cursed %x on chain1 %d in solana rmnremote on solana chain %d", adv1_5_0.SelectorToSubject(chain2), chain1, chainsel.SOLANA_MAINNET.Selector)
+		t.Logf("Subject successfully cursed %x on chain1 %d in solana rmnremote on solana chain %d", adv2_1_0.SelectorToSubject(chain2), chain1, chainsel.SOLANA_MAINNET.Selector)
 	*/
 	// Now uncurse the subjects
 	// reset the operation bundle to clear any cached values
@@ -392,14 +382,14 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 	// check that the subjects were actually uncursed
-	isCursed, err = rmnC.IsCursed(nil, adv1_5_0.SelectorToSubject(chain2))
+	isCursed, err = rmnC.IsCursed(nil, adv2_1_0.SelectorToSubject(chain2))
 	require.NoError(t, err)
 	require.False(t, isCursed, "subject on chain2 should be uncursed on rmn in chain1")
 
-	isCursed, err = rmnRemoteC.IsCursed(nil, adv1_6_0.SelectorToSubject(chain1))
+	isCursed, err = rmnC2.IsCursed(nil, adv2_1_0.SelectorToSubject(chain1))
 	require.NoError(t, err)
-	require.False(t, isCursed, "subject on chain1 should be uncursed on rmnremote in chain2")
-	t.Logf("Subjects successfully uncursed %x on chain1 %d and %x on chain2 %d", adv1_5_0.SelectorToSubject(chain2), chain1, adv1_6_0.SelectorToSubject(chain1), chain2)
+	require.False(t, isCursed, "subject on chain1 should be uncursed on rmn in chain2")
+	t.Logf("Subjects successfully uncursed %x on chain1 %d and %x on chain2 %d", adv2_1_0.SelectorToSubject(chain2), chain1, adv2_1_0.SelectorToSubject(chain1), chain2)
 	/*
 			 Enable Solana checks later
 		isCursed, err = solrmnremoteops.IsSubjectCursed(
@@ -411,6 +401,6 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.False(t, isCursed, "subject on chain1 should be cursed on solana rmnremote")
-		t.Logf("Subject successfully uncursed %x on chain1 %d in solana rmnremote on solana chain %d", adv1_5_0.SelectorToSubject(chain2), chain1, chainsel.SOLANA_MAINNET.Selector)
+		t.Logf("Subject successfully uncursed %x on chain1 %d in solana rmnremote on solana chain %d", adv2_1_0.SelectorToSubject(chain2), chain1, chainsel.SOLANA_MAINNET.Selector)
 	*/
 }
