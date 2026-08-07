@@ -102,22 +102,19 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		// example from the v2.0.0 sequence or from DeployAndActivateRMN). The legacy RMNRemote 1.6.0
 		// is no longer deployed here, so input.LegacyRMN is unused on this path.
 		//
-		// Use the Ultra Fast Curse MCMS timelock as the RMN's curse admin when it is available.
-		//
-		// Unlike the v2.0.0 sequence, a missing timelock is not fatal here: this sequence does not
-		// deploy MCMS (see the TODOs above) and the 1.6 flow runs it before MCMS exists, so requiring
-		// the timelock would make the ordering unsatisfiable. When it is absent the RMN deploys with
-		// no curse admin and can only be cursed by its owner -- there is no fast-curse path until one
-		// is added via ApplyAuthorizedCallerUpdates.
-		curseAdmins := []common.Address{}
-		if ultraFastCurseTimelock, ok := resolveUltraFastCurseTimelock(input.ExistingAddresses, chain.Selector); ok {
-			curseAdmins = append(curseAdmins, ultraFastCurseTimelock)
+		// The Ultra Fast Curse MCMS timelock is always the RMN's curse admin, matching the v2.0.0
+		// sequence. Without it the RMN has no fast-curse path and could only be cursed by its owner,
+		// so a missing timelock fails loudly rather than silently deploying an uncursable RMN. This
+		// sequence does not deploy MCMS itself, so the timelock must already be in ExistingAddresses.
+		ultraFastCurseTimelock, err := resolveUltraFastCurseTimelock(input.ExistingAddresses, chain.Selector)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
 		}
 
 		rmnRef, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
 			ChainSelector:  chain.Selector,
-			Args:           rmnops.ConstructorArgs{CurseAdmins: curseAdmins},
+			Args:           rmnops.ConstructorArgs{CurseAdmins: []common.Address{ultraFastCurseTimelock}},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -397,19 +394,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 	},
 )
 
-// resolveUltraFastCurseTimelock returns the Ultra Fast Curse RBACTimelock for the chain, reporting
-// false when it is not present or not a usable EVM address. Callers treat absence as "no curse
-// admin" rather than an error, since this sequence can run before MCMS is deployed.
-func resolveUltraFastCurseTimelock(refs []datastore.AddressRef, chainSelector uint64) (common.Address, bool) {
+// resolveUltraFastCurseTimelock returns the Ultra Fast Curse RBACTimelock for the chain. It is the
+// curse admin on every RMN this sequence deploys, so MCMS must already have been deployed.
+func resolveUltraFastCurseTimelock(refs []datastore.AddressRef, chainSelector uint64) (common.Address, error) {
 	ref := datastore_utils.GetAddressRef(
 		refs, chainSelector, common_utils.RBACTimelock, mcms_ops.MCMSVersion, common_utils.UltraFastCurseMCMSQualifier)
 	if ref.Address == "" {
-		return common.Address{}, false
+		return common.Address{}, fmt.Errorf(
+			"RMN deployment requires the Ultra Fast Curse MCMS timelock: RBACTimelock with qualifier %q not found in existing addresses for chain %d",
+			common_utils.UltraFastCurseMCMSQualifier, chainSelector)
 	}
 	addr, err := evm_datastore_utils.ToEVMAddress(ref)
 	if err != nil {
-		return common.Address{}, false
+		return common.Address{}, fmt.Errorf("invalid Ultra Fast Curse MCMS timelock address: %w", err)
 	}
 
-	return addr, true
+	return addr, nil
 }
