@@ -25,10 +25,10 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	seq2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -82,8 +82,8 @@ func (r *LaneMigrator) VerifyPreconditions(e deployment.Environment, cfg deploy.
 			Version: routerops.Version,
 		},
 		{
-			Type:    datastore.ContractType(rmn_remote.ContractType),
-			Version: rmn_remote.Version,
+			Type:    datastore.ContractType(rmn.ContractType),
+			Version: rmn.Version,
 		},
 		{
 			Type:    datastore.ContractType(rmn_proxy.ContractType),
@@ -246,7 +246,7 @@ func verifyOwnershipOfContracts(e deployment.Environment, chainSelector uint64, 
 				return fmt.Errorf("failed to load ownable contract %s (%s): %w", addr, ref.Type, err)
 			}
 			expectedTimelockAddr := cllCCIPTimelock
-			if ref.Type == datastore.ContractType(rmn_remote.ContractType) {
+			if ref.Type == datastore.ContractType(rmn.ContractType) {
 				expectedTimelockAddr = rmnTimelock
 			}
 			if currentOwner != expectedTimelockAddr {
