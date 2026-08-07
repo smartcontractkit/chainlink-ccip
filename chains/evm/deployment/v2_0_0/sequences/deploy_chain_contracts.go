@@ -735,7 +735,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			BatchOps:  batchOps,
 		}
 		if !input.DeployerKeyOwned {
-			output.RefsToTransferOwnership, err = filterContractsNeedingOwnershipTransfer(chain, ownableContracts, cllccipTimelockAddr, rmnTimelockAddr)
+			output.RefsToTransferOwnership, output.RefsToTransferOwnershipRMN, err = filterContractsNeedingOwnershipTransfer(chain, ownableContracts, cllccipTimelockAddr, rmnTimelockAddr)
 			if err != nil {
 				return output, fmt.Errorf("failed to filter ownable contracts: %w", err)
 			}
@@ -818,39 +818,41 @@ func filterContractsNeedingOwnershipTransfer(
 	chain evm.Chain,
 	refs []datastore.AddressRef,
 	cllccipTimelockAddr, rmnTimelockAddr common.Address,
-) ([]datastore.AddressRef, error) {
-	var filtered []datastore.AddressRef
+) (cllRefs []datastore.AddressRef, rmnRefs []datastore.AddressRef, err error) {
 	for _, ref := range refs {
-		currentOwner, _, err := mcms_seq.LoadOwnableContract(common.HexToAddress(ref.Address), chain.Client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load ownable contract %s (%s): %w", ref.Address, ref.Type, err)
+		currentOwner, _, loadErr := mcms_seq.LoadOwnableContract(common.HexToAddress(ref.Address), chain.Client)
+		if loadErr != nil {
+			return nil, nil, fmt.Errorf("failed to load ownable contract %s (%s): %w", ref.Address, ref.Type, loadErr)
 		}
 		switch ref.Type {
 		case datastore.ContractType(rmnops.ContractType):
+			// RMN is owned by the RMNMCMS timelock, not CLLCCIP, so it is returned in its own
+			// bucket. TransferToTimelock applies a single ProposedOwner to every ref it is handed,
+			// so mixing the two here would hand RMN to CLLCCIP and re-propose it on every run.
 			if currentOwner != rmnTimelockAddr {
-				filtered = append(filtered, ref)
+				rmnRefs = append(rmnRefs, ref)
 			}
 		case datastore.ContractType(common_utils.ProposerManyChainMultisig), datastore.ContractType(common_utils.BypasserManyChainMultisig), datastore.ContractType(common_utils.CancellerManyChainMultisig):
 			if ref.Qualifier == common_utils.CLLQualifier {
 				if currentOwner != cllccipTimelockAddr {
-					filtered = append(filtered, ref)
+					cllRefs = append(cllRefs, ref)
 				}
 			} else if ref.Qualifier == common_utils.RMNTimelockQualifier {
 				if currentOwner != rmnTimelockAddr {
-					filtered = append(filtered, ref)
+					cllRefs = append(cllRefs, ref)
 				}
 			} else {
 				if currentOwner != cllccipTimelockAddr && currentOwner != rmnTimelockAddr {
-					filtered = append(filtered, ref)
+					cllRefs = append(cllRefs, ref)
 				}
 			}
 		default:
 			if currentOwner != cllccipTimelockAddr {
-				filtered = append(filtered, ref)
+				cllRefs = append(cllRefs, ref)
 			}
 		}
 	}
-	return filtered, nil
+	return cllRefs, rmnRefs, nil
 }
 
 // ensureTimelockSelfGoverned checks that newAdmin holds ADMIN_ROLE on the given

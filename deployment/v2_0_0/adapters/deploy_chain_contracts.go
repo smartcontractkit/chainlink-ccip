@@ -172,6 +172,9 @@ type DeployChainConfigCreatorInput struct {
 type DeployChainContractsOutput struct {
 	sequences.OnChainOutput
 	RefsToTransferOwnership []datastore.AddressRef
+	// RefsToTransferOwnershipRMN lists contracts owned by the RMNMCMS timelock rather than CLLCCIP.
+	// They are transferred separately because a transfer applies one owner to every ref it is given.
+	RefsToTransferOwnershipRMN []datastore.AddressRef
 }
 
 // DeployChainResolvedAddresses is the result of DeployChainContractsAdapter.ResolveDeployAddresses.
