@@ -4,8 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -22,11 +20,9 @@ import (
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
-	rmnops1_5 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	rmn_latest "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/rmn"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -36,14 +32,6 @@ import (
 
 func TestActivateRMN_Apply(t *testing.T) {
 	testActivateRMNApplyWithLegacyContract(t, deployLegacyRMNV2AndCurse)
-}
-
-func TestActivateRMN_Apply_WithRMN15(t *testing.T) {
-	testActivateRMNApplyWithLegacyContract(t, deployLegacyRMN15AndCurse)
-}
-
-func TestActivateRMN_Apply_WithRMN16(t *testing.T) {
-	testActivateRMNApplyWithLegacyContract(t, deployLegacyRMN16AndCurse)
 }
 
 type legacyRMNDeployerForTest func(
@@ -168,75 +156,6 @@ func deployLegacyRMNV2AndCurse(
 	require.NoError(t, err)
 	legacyRMNAddr := common.HexToAddress(legacyRMNRef.Address)
 	_, err = operations.ExecuteOperation(b, rmnops.Curse0, chain, contract.FunctionInput[[][16]byte]{
-		ChainSelector: chainSelector,
-		Address:       legacyRMNAddr,
-		Args:          [][16]byte{curseSubject},
-	})
-	require.NoError(t, err)
-	return legacyRMNAddr
-}
-
-func deployLegacyRMN15AndCurse(
-	t *testing.T,
-	b operations.Bundle,
-	chain evm.Chain,
-	chainSelector uint64,
-	_ common.Address,
-	curseSubject [16]byte,
-) common.Address {
-	t.Helper()
-	legacyRMNRef, err := contract.MaybeDeployContract(b, rmnops1_5.Deploy, chain, contract.DeployInput[rmnops1_5.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(rmnops1_5.ContractType, *semver.MustParse("1.5.0")),
-		ChainSelector:  chainSelector,
-		Args: rmnops1_5.ConstructorArgs{
-			RMNConfig: rmn_contract.RMNConfig{
-				BlessWeightThreshold: 1,
-				CurseWeightThreshold: 1,
-				Voters: []rmn_contract.RMNVoter{{
-					BlessWeight:   1,
-					CurseWeight:   1,
-					BlessVoteAddr: common.HexToAddress("0x1111111111111111111111111111111111111111"),
-					CurseVoteAddr: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-				}},
-			},
-		},
-	}, nil)
-	require.NoError(t, err)
-	legacyRMNAddr := common.HexToAddress(legacyRMNRef.Address)
-
-	_, err = operations.ExecuteOperation(b, rmnops1_5.Curse, chain, contract.FunctionInput[rmnops1_5.CurseArgs]{
-		ChainSelector: chainSelector,
-		Address:       legacyRMNAddr,
-		Args: rmnops1_5.CurseArgs{
-			CurseID: [16]byte{1},
-			Subject: []fastcurse.Subject{curseSubject},
-		},
-	})
-	require.NoError(t, err)
-	return legacyRMNAddr
-}
-
-func deployLegacyRMN16AndCurse(
-	t *testing.T,
-	b operations.Bundle,
-	chain evm.Chain,
-	chainSelector uint64,
-	_ common.Address,
-	curseSubject [16]byte,
-) common.Address {
-	t.Helper()
-	legacyRMNRef, err := contract.MaybeDeployContract(b, rmnremoteops1_6.Deploy, chain, contract.DeployInput[rmnremoteops1_6.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(rmnremoteops1_6.ContractType, *rmnremoteops1_6.Version),
-		ChainSelector:  chainSelector,
-		Args: rmnremoteops1_6.ConstructorArgs{
-			LocalChainSelector: chainSelector,
-			LegacyRMN:          common.HexToAddress("0x3333333333333333333333333333333333333333"),
-		},
-	}, nil)
-	require.NoError(t, err)
-	legacyRMNAddr := common.HexToAddress(legacyRMNRef.Address)
-
-	_, err = operations.ExecuteOperation(b, rmnremoteops1_6.Curse0, chain, contract.FunctionInput[[][16]byte]{
 		ChainSelector: chainSelector,
 		Address:       legacyRMNAddr,
 		Args:          [][16]byte{curseSubject},
