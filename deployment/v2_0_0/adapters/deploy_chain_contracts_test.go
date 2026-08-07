@@ -24,7 +24,7 @@ func TestMergeIfNotEmpty(t *testing.T) {
 
 	t.Run("empty source returns base unchanged", func(t *testing.T) {
 		base := DeployContractParams{
-			RMNRemote: RMNRemoteDeployParams{Version: v170, LegacyRMN: "0xBase"},
+			RMN: RMNDeployParams{Version: v170, CurseAdmins: []string{"0xBase"}},
 			OnRamp:    OnRampDeployParams{Version: v170, FeeAggregator: "0xAgg"},
 		}
 		source := DeployContractParams{}
@@ -36,16 +36,16 @@ func TestMergeIfNotEmpty(t *testing.T) {
 
 	t.Run("source overwrites base for set struct fields", func(t *testing.T) {
 		base := DeployContractParams{
-			RMNRemote: RMNRemoteDeployParams{Version: v170, LegacyRMN: "0xBaseRMN"},
+			RMN: RMNDeployParams{Version: v170, CurseAdmins: []string{"0xBaseRMN"}},
 			OnRamp:    OnRampDeployParams{Version: v170, FeeAggregator: "0xBaseAgg"},
 		}
 		source := DeployContractParams{
-			RMNRemote: RMNRemoteDeployParams{Version: v170, LegacyRMN: "0xSourceRMN"},
+			RMN: RMNDeployParams{Version: v170, CurseAdmins: []string{"0xSourceRMN"}},
 		}
 
 		merged, err := base.MergeWithOverrideIfNotEmpty(source)
 		require.NoError(t, err)
-		assert.Equal(t, "0xSourceRMN", merged.RMNRemote.LegacyRMN, "RMNRemote should come from source")
+		assert.Equal(t, []string{"0xSourceRMN"}, merged.RMN.CurseAdmins, "RMN should come from source")
 		assert.Equal(t, "0xBaseAgg", merged.OnRamp.FeeAggregator, "OnRamp should be unchanged from base")
 	})
 
@@ -153,7 +153,7 @@ func TestMergeIfNotEmpty(t *testing.T) {
 
 	t.Run("merge is idempotent when base and source are equal", func(t *testing.T) {
 		params := DeployContractParams{
-			RMNRemote: RMNRemoteDeployParams{Version: v170, LegacyRMN: "0xSame"},
+			RMN: RMNDeployParams{Version: v170, CurseAdmins: []string{"0xSame"}},
 			OnRamp:    OnRampDeployParams{Version: v170, MaxUSDCentsPerMessage: 100},
 		}
 
@@ -185,14 +185,14 @@ func TestMergeIfNotEmpty(t *testing.T) {
 	})
 
 	// Test merge when source has the shape of output from importConfig (v1.5 RMN) + importConfigFromv1_6_0:
-	// RMNRemote.LegacyRMN, OffRamp.GasForCallExactCheck, OnRamp.FeeAggregator, and optionally
+	// RMN.CurseAdmins, OffRamp.GasForCallExactCheck, OnRamp.FeeAggregator, and optionally
 	// CommitteeVerifiers/Executors with FeeAggregator set.
-	t.Run("merge with importConfigFromv1_6_0-style source populates RMNRemote OffRamp CommitteeVerifiers OnRamp FeeQuoter Executors", func(t *testing.T) {
+	t.Run("merge with importConfigFromv1_6_0-style source populates RMN OffRamp CommitteeVerifiers OnRamp FeeQuoter Executors", func(t *testing.T) {
 		// Base: full params as from topology/defaults
 		base := DeployContractParams{
-			RMNRemote: RMNRemoteDeployParams{
-				Version:   v170,
-				LegacyRMN: "0xBaseLegacyRMN",
+			RMN: RMNDeployParams{
+				Version:     v170,
+				CurseAdmins: []string{"0xBaseCurseAdmin"},
 			},
 			OffRamp: OffRampDeployParams{
 				Version:                   v170,
@@ -220,14 +220,14 @@ func TestMergeIfNotEmpty(t *testing.T) {
 			},
 		}
 
-		// Source: values as populated by importConfig (RMNRemote.LegacyRMN from v1.5) and importConfigFromv1_6_0
+		// Source: values as populated by importConfig (RMN.CurseAdmins) and importConfigFromv1_6_0
 		// (OnRamp.FeeAggregator, OffRamp.GasForCallExactCheck; and FeeAggregator on CommitteeVerifiers/Executors when those slices exist)
-		importedLegacyRMN := "0xImportedLegacyRMN"
+		importedCurseAdmins := []string{"0xImportedCurseAdmin"}
 		importedGasForCallExactCheck := uint16(5000)
 		importedFeeAggregator := "0xImportedFeeAggregator"
 		source := DeployContractParams{
-			RMNRemote: RMNRemoteDeployParams{
-				LegacyRMN: importedLegacyRMN,
+			RMN: RMNDeployParams{
+				CurseAdmins: importedCurseAdmins,
 				// Version not set by import
 			},
 			OffRamp: OffRampDeployParams{
@@ -255,8 +255,8 @@ func TestMergeIfNotEmpty(t *testing.T) {
 		merged, err := base.MergeWithOverrideIfNotEmpty(source)
 		require.NoError(t, err)
 
-		// RMNRemote: merged should have source's LegacyRMN (as set by importConfig from v1.5)
-		assert.Equal(t, importedLegacyRMN, merged.RMNRemote.LegacyRMN, "RMNRemote.LegacyRMN should come from import")
+		// RMN: merged should have source's CurseAdmins
+		assert.Equal(t, importedCurseAdmins, merged.RMN.CurseAdmins, "RMN.CurseAdmins should come from import")
 
 		// OffRamp: merged should have source's GasForCallExactCheck (as set by importConfigFromv1_6_0)
 		assert.Equal(t, importedGasForCallExactCheck, merged.OffRamp.GasForCallExactCheck, "OffRamp.GasForCallExactCheck should come from import")

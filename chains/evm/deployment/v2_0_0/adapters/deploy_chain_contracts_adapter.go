@@ -133,12 +133,13 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		return sequences.DeployChainContractsInput{}, err
 	}
 
-	var legacyRMN common.Address
-	if input.ContractParams.RMNRemote.LegacyRMN != "" {
-		legacyRMN, err = parseHexAddress(input.ContractParams.RMNRemote.LegacyRMN, "RMNRemote.LegacyRMN")
-		if err != nil {
-			return sequences.DeployChainContractsInput{}, err
+	curseAdmins := make([]common.Address, 0, len(input.ContractParams.RMN.CurseAdmins))
+	for i, admin := range input.ContractParams.RMN.CurseAdmins {
+		parsed, parseErr := parseHexAddress(admin, fmt.Sprintf("RMN.CurseAdmins[%d]", i))
+		if parseErr != nil {
+			return sequences.DeployChainContractsInput{}, parseErr
 		}
+		curseAdmins = append(curseAdmins, parsed)
 	}
 
 	var onRampFeeAgg common.Address
@@ -158,9 +159,9 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		DeployTestRouter:  input.DeployTestRouter,
 		DeployerKeyOwned:  input.DeployerKeyOwned,
 		ContractParams: sequences.ContractParams{
-			RMNRemote: sequences.RMNRemoteParams{
-				Version:   input.ContractParams.RMNRemote.Version,
-				LegacyRMN: legacyRMN,
+			RMN: sequences.RMNParams{
+				Version:     input.ContractParams.RMN.Version,
+				CurseAdmins: curseAdmins,
 			},
 			OffRamp: sequences.OffRampParams{
 				Version:                   input.ContractParams.OffRamp.Version,

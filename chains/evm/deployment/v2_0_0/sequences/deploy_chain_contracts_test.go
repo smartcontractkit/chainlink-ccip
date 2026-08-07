@@ -26,7 +26,7 @@ import (
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
@@ -103,7 +103,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			require.Len(t, report.Output.BatchOps, 2, "Expected 2 batch operations")
 
 			exists := map[deployment.ContractType]bool{
-				rmn_remote.ContractType:                 false,
+				rmnops.ContractType:                     false,
 				router.ContractType:                     false,
 				executor.ContractType:                   false,
 				link.ContractType:                       false,
@@ -549,7 +549,7 @@ func TestDeployChainContracts_DefaultOwnershipTransfer(t *testing.T) {
 	// For Ownable2Step contracts, owner is still the deployer (pending transfer not yet
 	// accepted). For one-step Ownable contracts, owner is the timelock directly.
 	singleProductTypes := []deployment.ContractType{
-		rmn_remote.ContractType,
+		rmnops.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
 		fee_quoter.ContractType,
@@ -682,7 +682,7 @@ func TestDeployChainContracts_DefaultOwnershipTransfer_Idempotent(t *testing.T) 
 	// Verify ownership is still pointing to CLL timelock after second run.
 	outputDS := sealAddressRefs(t, secondReport.Output.Addresses)
 	singleProductTypes := []deployment.ContractType{
-		rmn_remote.ContractType,
+		rmnops.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
 		fee_quoter.ContractType,
@@ -739,7 +739,7 @@ func TestDeployChainContracts_DeployerKeyOwned(t *testing.T) {
 
 	// Verify product contracts are deployed but still owned by deployer (no transfer).
 	singleProductTypes := []deployment.ContractType{
-		rmn_remote.ContractType,
+		rmnops.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
 		fee_quoter.ContractType,
@@ -845,4 +845,73 @@ func TestDeployChainContracts_DefaultTransfer_FailsWithoutMCMS(t *testing.T) {
 		require.Error(t, err, "Expected error when timelocks exist but MCM contracts are missing")
 		require.Contains(t, err.Error(), "ownership transfer requires MCM contract")
 	})
+}
+
+// findDeployedAddress returns the address deployed for the given contract type.
+func findDeployedAddress(t *testing.T, refs []datastore.AddressRef, ctype deployment.ContractType) common.Address {
+	t.Helper()
+	for _, ref := range refs {
+		if ref.Type == datastore.ContractType(ctype) {
+			return common.HexToAddress(ref.Address)
+		}
+	}
+	require.FailNowf(t, "contract not found", "no deployed address for type %s", ctype)
+
+	return common.Address{}
+}
+
+// TestDeployChainContracts_RampsResolveRMNViaProxy pins the invariant that both ramps resolve RMN
+// through the RMNProxy rather than through a raw RMN implementation. Both store the address as an
+// immutable, so wiring either one to the implementation permanently pins it to whichever RMN was
+// live at deploy time: once the proxy is repointed (see DeployAndActivateRMN) that ramp stops
+// observing curses entirely and can only be corrected by redeploying it.
+func TestDeployChainContracts_RampsResolveRMNViaProxy(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	chain := e.BlockChains.EVMChains()[chainSelector]
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSelector,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{chain.DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:    chainSelector,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:   testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	rmnProxyAddr := findDeployedAddress(t, report.Output.Addresses, rmn_proxy.ContractType)
+	rmnImplAddr := findDeployedAddress(t, report.Output.Addresses, rmnops.ContractType)
+	require.NotEqual(t, rmnProxyAddr, rmnImplAddr, "proxy and implementation must be distinct for this test to be meaningful")
+
+	onRampStaticConfig, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetStaticConfig, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       findDeployedAddress(t, report.Output.Addresses, onramp.ContractType),
+	})
+	require.NoError(t, err, "failed to read OnRamp static config")
+	require.Equal(t, rmnProxyAddr, onRampStaticConfig.Output.RmnRemote,
+		"OnRamp must resolve RMN through the RMNProxy, not the RMN implementation")
+
+	offRampStaticConfig, err := operations.ExecuteOperation(e.OperationsBundle, offramp.GetStaticConfig, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       findDeployedAddress(t, report.Output.Addresses, offramp.ContractType),
+	})
+	require.NoError(t, err, "failed to read OffRamp static config")
+	require.Equal(t, rmnProxyAddr, offRampStaticConfig.Output.RmnRemote,
+		"OffRamp must resolve RMN through the RMNProxy, not the RMN implementation")
 }

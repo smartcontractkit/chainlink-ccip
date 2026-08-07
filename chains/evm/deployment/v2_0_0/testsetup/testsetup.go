@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -150,8 +150,8 @@ func CreateBasicContractParams() sequences.ContractParams {
 	usdPerWeth, _ := new(big.Int).SetString("2000000000000000000000", 10) // $2000
 
 	return sequences.ContractParams{
-		RMNRemote: sequences.RMNRemoteParams{
-			Version: rmn_remote.Version,
+		RMN: sequences.RMNParams{
+			Version: rmnops.Version,
 		},
 		OffRamp: sequences.OffRampParams{
 			Version:                   offramp.Version,

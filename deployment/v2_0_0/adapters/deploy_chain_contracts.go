@@ -28,9 +28,11 @@ type CommitteeVerifierDeployParams struct {
 	Qualifier        string
 }
 
-type RMNRemoteDeployParams struct {
-	Version   *semver.Version
-	LegacyRMN string
+// RMNDeployParams configures the RMN 2.1.0 deployment. CurseAdmins are hex addresses authorized to
+// curse in addition to the owner; the Ultra Fast Curse RBACTimelock is normally included here.
+type RMNDeployParams struct {
+	Version     *semver.Version
+	CurseAdmins []string
 }
 
 type OffRampDeployParams struct {
@@ -76,11 +78,11 @@ type MockReceiverDeployParams struct {
 	Qualifier             string
 }
 
-// RMNRemoteDeployParamsOverrides holds optional RMN remote deploy overrides.
+// RMNDeployParamsOverrides holds optional RMN deploy overrides.
 // Unset pointer fields use adapter defaults at apply time.
-type RMNRemoteDeployParamsOverrides struct {
-	Version   *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
-	LegacyRMN *string         `json:"legacyRMN,omitempty" yaml:"legacyRMN,omitempty"`
+type RMNDeployParamsOverrides struct {
+	Version     *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
+	CurseAdmins []string        `json:"curseAdmins,omitempty" yaml:"curseAdmins,omitempty"`
 }
 
 // OffRampDeployParamsOverrides holds optional off-ramp deploy overrides.
@@ -110,7 +112,7 @@ type FeeQuoterDeployParamsOverrides struct {
 // DeployContractParamsOverrides holds optional contract deploy overrides.
 // Unset pointer fields use adapter defaults at apply time.
 type DeployContractParamsOverrides struct {
-	RMNRemote     *RMNRemoteDeployParamsOverrides `json:"rmnRemote,omitempty" yaml:"rmnRemote,omitempty"`
+	RMN           *RMNDeployParamsOverrides       `json:"rmn,omitempty" yaml:"rmn,omitempty"`
 	OffRamp       *OffRampDeployParamsOverrides   `json:"offRamp,omitempty" yaml:"offRamp,omitempty"`
 	OnRamp        *OnRampDeployParamsOverrides    `json:"onRamp,omitempty" yaml:"onRamp,omitempty"`
 	FeeQuoter     *FeeQuoterDeployParamsOverrides `json:"feeQuoter,omitempty" yaml:"feeQuoter,omitempty"`
@@ -122,7 +124,7 @@ type DeployContractParamsOverrides struct {
 // BuildDeployContractParams produces this; DeployChainContracts consumes it via
 // DeployChainContractsInput.ContractParams.
 type DeployContractParams struct {
-	RMNRemote          RMNRemoteDeployParams
+	RMN                RMNDeployParams
 	OffRamp            OffRampDeployParams
 	CommitteeVerifiers []CommitteeVerifierDeployParams
 	OnRamp             OnRampDeployParams
@@ -200,10 +202,12 @@ func ApplyDeployContractParamsOverrides(params DeployContractParams, overrides *
 	if overrides == nil {
 		return params
 	}
-	if overrides.RMNRemote != nil {
-		o := overrides.RMNRemote
-		params.RMNRemote.Version = utils.CoalescePtr(o.Version, params.RMNRemote.Version)
-		params.RMNRemote.LegacyRMN = utils.Coalesce(o.LegacyRMN, params.RMNRemote.LegacyRMN)
+	if overrides.RMN != nil {
+		o := overrides.RMN
+		params.RMN.Version = utils.CoalescePtr(o.Version, params.RMN.Version)
+		if len(o.CurseAdmins) > 0 {
+			params.RMN.CurseAdmins = o.CurseAdmins
+		}
 	}
 	if overrides.OffRamp != nil {
 		o := overrides.OffRamp

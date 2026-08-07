@@ -5,13 +5,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
@@ -30,8 +30,8 @@ func defaultDeployContractParams() ccvadapters.DeployContractParams {
 		panic("invalid usdPerWeth constant")
 	}
 	return ccvadapters.DeployContractParams{
-		RMNRemote: ccvadapters.RMNRemoteDeployParams{
-			Version: rmn_remote.Version,
+		RMN: ccvadapters.RMNDeployParams{
+			Version: rmnops.Version,
 		},
 		OffRamp: ccvadapters.OffRampDeployParams{
 			Version:                   offramp.Version,
