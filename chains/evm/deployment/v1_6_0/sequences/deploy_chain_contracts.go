@@ -10,8 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -20,19 +19,24 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	pingpongdappops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/ping_pong_dapp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
-	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/nonce_manager"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
+	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -94,26 +98,38 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, linkRef)
 
-		// Deploy RMNRemote
-		rmnRemoteRef, err := contract.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract.DeployInput[rmn_remote.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *rmn_remote.Version),
+		// Deploy RMN 2.1.0, reusing the chain's existing one when the datastore already has it (for
+		// example from the v2.0.0 sequence or from DeployAndActivateRMN). The legacy RMNRemote 1.6.0
+		// is no longer deployed here, so input.LegacyRMN is unused on this path.
+		//
+		// Use the Ultra Fast Curse MCMS timelock as the RMN's curse admin when it is available.
+		//
+		// Unlike the v2.0.0 sequence, a missing timelock is not fatal here: this sequence does not
+		// deploy MCMS (see the TODOs above) and the 1.6 flow runs it before MCMS exists, so requiring
+		// the timelock would make the ordering unsatisfiable. When it is absent the RMN deploys with
+		// no curse admin and can only be cursed by its owner -- there is no fast-curse path until one
+		// is added via ApplyAuthorizedCallerUpdates.
+		curseAdmins := []common.Address{}
+		if ultraFastCurseTimelock, ok := resolveUltraFastCurseTimelock(input.ExistingAddresses, chain.Selector); ok {
+			curseAdmins = append(curseAdmins, ultraFastCurseTimelock)
+		}
+
+		rmnRef, err := contract.MaybeDeployContract(b, rmnops.Deploy, chain, contract.DeployInput[rmnops.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
 			ChainSelector:  chain.Selector,
-			Args: rmn_remote.ConstructorArgs{
-				LocalChainSelector: chain.Selector,
-				LegacyRMN:          common.HexToAddress(input.LegacyRMN),
-			},
+			Args:           rmnops.ConstructorArgs{CurseAdmins: curseAdmins},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		addresses = append(addresses, rmnRemoteRef)
+		addresses = append(addresses, rmnRef)
 
 		// Deploy RMNProxy
 		rmnProxyRef, err := contract.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
-				RMN: common.HexToAddress(rmnRemoteRef.Address),
+				RMN: common.HexToAddress(rmnRef.Address),
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -121,21 +137,30 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, rmnProxyRef)
 
-		// Set the RMNRemote on the RMNProxy
-		// Included in case the RMNRemote got deployed but the RMNProxy already existed.
-		// In this case, we would not have set the RMNRemote in the constructor.
-		// We would need to update the RMN on the existing RMNProxy.
-		setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract.FunctionInput[rmn_proxy.SetRMNArgs]{
+		// Point the RMNProxy at the RMN, for the case where the RMN was deployed but the RMNProxy
+		// already existed and so did not get it via the constructor. Guarded by a read: repointing a
+		// live proxy switches every RMN consumer on the chain at once and drops all active curses,
+		// since curse state does not carry across RMN instances, so it must not fire on a no-op run.
+		activeRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       common.HexToAddress(rmnProxyRef.Address),
-			Args: rmn_proxy.SetRMNArgs{
-				RMN: common.HexToAddress(rmnRemoteRef.Address),
-			},
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		writes = append(writes, setRMNReport.Output)
+		if activeRMNReport.Output != common.HexToAddress(rmnRef.Address) {
+			setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract.FunctionInput[rmn_proxy.SetRMNArgs]{
+				ChainSelector: chain.Selector,
+				Address:       common.HexToAddress(rmnProxyRef.Address),
+				Args: rmn_proxy.SetRMNArgs{
+					RMN: common.HexToAddress(rmnRef.Address),
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, setRMNReport.Output)
+		}
 
 		// Deploy Router
 		routerRef, err := contract.MaybeDeployContract(b, router.Deploy, chain, contract.DeployInput[router.ConstructorArgs]{
@@ -371,3 +396,20 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+// resolveUltraFastCurseTimelock returns the Ultra Fast Curse RBACTimelock for the chain, reporting
+// false when it is not present or not a usable EVM address. Callers treat absence as "no curse
+// admin" rather than an error, since this sequence can run before MCMS is deployed.
+func resolveUltraFastCurseTimelock(refs []datastore.AddressRef, chainSelector uint64) (common.Address, bool) {
+	ref := datastore_utils.GetAddressRef(
+		refs, chainSelector, common_utils.RBACTimelock, mcms_ops.MCMSVersion, common_utils.UltraFastCurseMCMSQualifier)
+	if ref.Address == "" {
+		return common.Address{}, false
+	}
+	addr, err := evm_datastore_utils.ToEVMAddress(ref)
+	if err != nil {
+		return common.Address{}, false
+	}
+
+	return addr, true
+}
