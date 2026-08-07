@@ -8,9 +8,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
 	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -223,4 +225,56 @@ func CreateBasicContractParams() sequences.ContractParams {
 // as you may inadvertently pull a report when you really want to re-check on-chain state.
 func BundleWithFreshReporter(bundle operations.Bundle) operations.Bundle {
 	return operations.NewBundle(bundle.GetContext, bundle.Logger, operations.NewMemoryReporter())
+}
+
+// UltraFastCurseMCMSRefs returns datastore refs seeding an Ultra Fast Curse RBACTimelock for the
+// given chain.
+//
+// DeployChainContracts resolves this timelock and passes it as the RMN's curse admin, so every
+// deployment needs one present. It is only ever used as a constructor argument — the sequence never
+// calls the timelock — so tests can stand in a plain address ref instead of deploying a real MCMS
+// instance. The address just has to be non-zero, since AuthorizedCallers rejects the zero address.
+func UltraFastCurseMCMSRefs(chainSelector uint64) []datastore.AddressRef {
+	return []datastore.AddressRef{
+		{
+			ChainSelector: chainSelector,
+			Type:          datastore.ContractType(common_utils.RBACTimelock),
+			Version:       mcms_ops.MCMSVersion,
+			Qualifier:     common_utils.UltraFastCurseMCMSQualifier,
+			Address:       common.HexToAddress("0x00000000000000000000000000000000000c0e5e").Hex(),
+		},
+	}
+}
+
+// SeedUltraFastCurseMCMS adds the Ultra Fast Curse RBACTimelock ref from UltraFastCurseMCMSRefs to
+// an in-memory datastore, for tests that drive DeployChainContracts through a changeset or adapter
+// (those read ExistingAddresses from the environment datastore rather than taking them directly).
+func SeedUltraFastCurseMCMS(ds *datastore.MemoryDataStore, chainSelector uint64) error {
+	for _, ref := range UltraFastCurseMCMSRefs(chainSelector) {
+		if err := ds.Addresses().Add(ref); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// WithUltraFastCurseMCMS returns a sealed datastore containing everything in base plus the Ultra
+// Fast Curse RBACTimelock ref for each given chain. Use it for tests that drive
+// DeployChainContracts through a changeset, which reads ExistingAddresses off the environment
+// datastore.
+func WithUltraFastCurseMCMS(base datastore.DataStore, chainSelectors ...uint64) (datastore.DataStore, error) {
+	ds := datastore.NewMemoryDataStore()
+	if base != nil {
+		if err := ds.Merge(base); err != nil {
+			return nil, err
+		}
+	}
+	for _, sel := range chainSelectors {
+		if err := SeedUltraFastCurseMCMS(ds, sel); err != nil {
+			return nil, err
+		}
+	}
+
+	return ds.Seal(), nil
 }

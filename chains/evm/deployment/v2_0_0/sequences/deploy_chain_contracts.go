@@ -83,11 +83,10 @@ type MockReceiverParams struct {
 	Qualifier string
 }
 
-// RMNParams configures the RMN 2.1.0 deployment. CurseAdmins are authorized to curse in addition
-// to the owner; the Ultra Fast Curse RBACTimelock is normally included here.
+// RMNParams configures the RMN 2.1.0 deployment. Curse admins are not configurable here: the Ultra
+// Fast Curse RBACTimelock is resolved from ExistingAddresses and is always the curse admin.
 type RMNParams struct {
-	Version     *semver.Version
-	CurseAdmins []common.Address
+	Version *semver.Version
 }
 
 type OffRampParams struct {
@@ -185,13 +184,21 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, linkRef)
 
+		// The Ultra Fast Curse MCMS timelock is always the curse admin on a newly deployed RMN.
+		var curseAdmins []common.Address
+		ultraFastCurseTimelock, resolveErr := resolveTimelockAddress(input.ExistingAddresses, chain.Selector, common_utils.UltraFastCurseMCMSQualifier)
+		if resolveErr != nil {
+			return output, fmt.Errorf("RMN deployment requires the Ultra Fast Curse MCMS timelock: %w", resolveErr)
+		}
+		curseAdmins = append(curseAdmins, ultraFastCurseTimelock)
+
 		// Deploy RMN. New chains always get RMN 2.1.0.
 		// Migrating a chain that still runs an older RMN is DeployAndActivateRMN's job (rmn.go).
 		rmnRef, err := contract_utils.MaybeDeployContract(b, rmnops.Deploy, chain, contract_utils.DeployInput[rmnops.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *input.ContractParams.RMN.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmnops.ConstructorArgs{
-				CurseAdmins: input.ContractParams.RMN.CurseAdmins,
+				CurseAdmins: curseAdmins,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {

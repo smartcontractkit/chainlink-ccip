@@ -26,7 +26,6 @@ import (
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
@@ -36,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -92,7 +92,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				e.BlockChains.EVMChains()[chainSelector],
 				sequences.DeployChainContractsInput{
 					ChainSelector:     chainSelector,
-					ExistingAddresses: test.existingAddresses,
+					ExistingAddresses: append(testsetup.UltraFastCurseMCMSRefs(chainSelector), test.existingAddresses...),
 					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					ContractParams:    testsetup.CreateBasicContractParams(),
 					DeployTestRouter:  true,
@@ -163,7 +163,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 			input := sequences.DeployChainContractsInput{
 				ChainSelector:     evmChain.Selector,
-				ExistingAddresses: nil,
+				ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(evmChain.Selector),
 				ContractParams:    testsetup.CreateBasicContractParams(),
 				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 				DeployerKeyOwned:  true,
@@ -216,7 +216,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 
 				input := sequences.DeployChainContractsInput{
 					ChainSelector:     chainSel,
-					ExistingAddresses: nil,
+					ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(evmChain.Selector),
 					ContractParams:    testsetup.CreateBasicContractParams(),
 					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					DeployerKeyOwned:  true,
@@ -322,7 +322,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 		e.BlockChains.EVMChains()[chainSelector],
 		sequences.DeployChainContractsInput{
 			ChainSelector:     chainSelector,
-			ExistingAddresses: nil,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
 			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 			ContractParams:    params,
 			DeployerKeyOwned:  true,
@@ -468,6 +468,11 @@ func deployAllMCMSForTest(
 
 	rmnTimelockAddr, rmnAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
 	addresses = append(addresses, rmnAddrs...)
+
+	// DeployChainContracts resolves this one to use as the RMN's curse admin, so a deployment that
+	// is not deployer-key-owned cannot succeed without it.
+	_, ultraFastCurseAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.UltraFastCurseMCMSQualifier)
+	addresses = append(addresses, ultraFastCurseAddrs...)
 
 	return cllTimelockAddr, rmnTimelockAddr, addresses
 }
@@ -819,6 +824,29 @@ func TestDeployChainContracts_DefaultTransfer_FailsWithoutMCMS(t *testing.T) {
 		require.Contains(t, err.Error(), common_utils.RMNTimelockQualifier)
 	})
 
+	t.Run("CLLCCIP and RMNMCMS deployed, missing UltraFastCurse", func(t *testing.T) {
+		var addrs []datastore.AddressRef
+		_, cllAddresses := deployMCMSInstanceForTest(t, e.OperationsBundle, chain, deployer, common_utils.CLLQualifier)
+		addrs = append(addrs, cllAddresses...)
+		_, rmnAddresses := deployMCMSInstanceForTest(t, e.OperationsBundle, chain, deployer, common_utils.RMNTimelockQualifier)
+		addrs = append(addrs, rmnAddresses...)
+
+		_, err = operations.ExecuteSequence(
+			e.OperationsBundle,
+			sequences.DeployChainContracts,
+			chain,
+			sequences.DeployChainContractsInput{
+				ChainSelector:     chainSelector,
+				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+				ContractParams:    testsetup.CreateBasicContractParams(),
+				ExistingAddresses: addrs,
+			},
+		)
+		// Without it the RMN would deploy with no curse admin and so no fast-curse path.
+		require.Error(t, err, "Expected error when the UltraFastCurse MCMS is not in ExistingAddresses")
+		require.Contains(t, err.Error(), common_utils.UltraFastCurseMCMSQualifier)
+	})
+
 	t.Run("timelocks present but MCM contracts missing", func(t *testing.T) {
 		_, _, allAddrs := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
 
@@ -887,10 +915,11 @@ func TestDeployChainContracts_RampsResolveRMNViaProxy(t *testing.T) {
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSelector,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")

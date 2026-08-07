@@ -28,11 +28,10 @@ type CommitteeVerifierDeployParams struct {
 	Qualifier        string
 }
 
-// RMNDeployParams configures the RMN 2.1.0 deployment. CurseAdmins are hex addresses authorized to
-// curse in addition to the owner; the Ultra Fast Curse RBACTimelock is normally included here.
+// RMNDeployParams configures the RMN 2.1.0 deployment. Curse admins are not configurable: the Ultra
+// Fast Curse RBACTimelock is resolved at deploy time and is always the curse admin.
 type RMNDeployParams struct {
-	Version     *semver.Version
-	CurseAdmins []string
+	Version *semver.Version
 }
 
 type OffRampDeployParams struct {
@@ -81,8 +80,7 @@ type MockReceiverDeployParams struct {
 // RMNDeployParamsOverrides holds optional RMN deploy overrides.
 // Unset pointer fields use adapter defaults at apply time.
 type RMNDeployParamsOverrides struct {
-	Version     *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
-	CurseAdmins []string        `json:"curseAdmins,omitempty" yaml:"curseAdmins,omitempty"`
+	Version *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 // OffRampDeployParamsOverrides holds optional off-ramp deploy overrides.
@@ -203,11 +201,7 @@ func ApplyDeployContractParamsOverrides(params DeployContractParams, overrides *
 		return params
 	}
 	if overrides.RMN != nil {
-		o := overrides.RMN
-		params.RMN.Version = utils.CoalescePtr(o.Version, params.RMN.Version)
-		if len(o.CurseAdmins) > 0 {
-			params.RMN.CurseAdmins = o.CurseAdmins
-		}
+		params.RMN.Version = utils.CoalescePtr(overrides.RMN.Version, params.RMN.Version)
 	}
 	if overrides.OffRamp != nil {
 		o := overrides.OffRamp

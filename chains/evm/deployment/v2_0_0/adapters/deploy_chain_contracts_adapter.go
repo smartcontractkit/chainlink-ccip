@@ -133,15 +133,6 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		return sequences.DeployChainContractsInput{}, err
 	}
 
-	curseAdmins := make([]common.Address, 0, len(input.ContractParams.RMN.CurseAdmins))
-	for i, admin := range input.ContractParams.RMN.CurseAdmins {
-		parsed, parseErr := parseHexAddress(admin, fmt.Sprintf("RMN.CurseAdmins[%d]", i))
-		if parseErr != nil {
-			return sequences.DeployChainContractsInput{}, parseErr
-		}
-		curseAdmins = append(curseAdmins, parsed)
-	}
-
 	var onRampFeeAgg common.Address
 	if input.ContractParams.OnRamp.FeeAggregator != "" {
 		onRampFeeAgg, err = parseHexAddress(input.ContractParams.OnRamp.FeeAggregator, "OnRamp.FeeAggregator")
@@ -160,8 +151,7 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		DeployerKeyOwned:  input.DeployerKeyOwned,
 		ContractParams: sequences.ContractParams{
 			RMN: sequences.RMNParams{
-				Version:     input.ContractParams.RMN.Version,
-				CurseAdmins: curseAdmins,
+				Version: input.ContractParams.RMN.Version,
 			},
 			OffRamp: sequences.OffRampParams{
 				Version:                   input.ContractParams.OffRamp.Version,
