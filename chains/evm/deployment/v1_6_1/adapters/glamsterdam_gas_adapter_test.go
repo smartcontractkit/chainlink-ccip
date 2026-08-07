@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 )
 
 // TestAdapterRegistration verifies the EVM adapter is correctly registered in the registry.
