@@ -54,6 +54,9 @@ func TestTokenExpansion_SiloedLockReleaseTokenPool(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
+	require.NoError(t, err)
+
 	deployChainOut, err := v2_0_0.DeployChainContracts(changesets.GetRegistry()).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
 		Cfg: v2_0_0.DeployChainContractsCfg{
 			ChainSel:         chainSel,

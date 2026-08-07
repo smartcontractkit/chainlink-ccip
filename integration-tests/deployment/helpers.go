@@ -520,10 +520,13 @@ func DeployChainContractsV2_0_0(t *testing.T, e *cldf_deployment.Environment, cu
 		sequencesV2_0_0.DeployChainContracts,
 		e.BlockChains.EVMChains()[chainSel],
 		sequencesV2_0_0.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetupV2_0_0.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:  chainSel,
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ContractParams: testsetupV2_0_0.CreateBasicContractParams(),
+			// The RMN is always deployed with the Ultra Fast Curse MCMS timelock as its curse admin,
+			// so the sequence requires that ref to be resolvable.
+			ExistingAddresses: testsetupV2_0_0.UltraFastCurseMCMSRefs(chainSel),
+			DeployerKeyOwned:  true,
 		},
 	)
 	require.NoError(t, err)

@@ -27,8 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	new_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -190,10 +190,11 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			DeployerKeyOwned: true,
+			ChainSelector:     chainSel,
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 		},
 	)
 	require.NoError(t, err)
@@ -656,10 +657,11 @@ func TestMigrateLockReleasePoolLiquidity_SiloedPool(t *testing.T) {
 	chainReport, err := operations.ExecuteSequence(
 		e.OperationsBundle, sequences.DeployChainContracts, chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			DeployerKeyOwned: true,
+			ChainSelector:     chainSel,
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 		},
 	)
 	require.NoError(t, err)
