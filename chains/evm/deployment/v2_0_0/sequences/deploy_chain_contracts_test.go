@@ -944,3 +944,85 @@ func TestDeployChainContracts_RampsResolveRMNViaProxy(t *testing.T) {
 	require.Equal(t, rmnProxyAddr, offRampStaticConfig.Output.RmnRemote,
 		"OffRamp must resolve RMN through the RMNProxy, not the RMN implementation")
 }
+
+// TestDeployChainContracts_RMNCurseAdminAndOwnership pins the two RMN properties a new chain must
+// end up with: the Ultra Fast Curse MCMS timelock is a curse admin on the deployed RMN, and the RMN
+// is routed to the RMNMCMS timelock for ownership rather than to CLLCCIP.
+func TestDeployChainContracts_RMNCurseAdminAndOwnership(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSelector,
+		Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+	cllTimelockAddr, rmnTimelockAddr, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
+
+	ultraFastCurseTimelock, err := datastore_utils.FindAndFormatRef(
+		sealAddressRefs(t, mcmsAddresses),
+		datastore.AddressRef{
+			Type:      datastore.ContractType(common_utils.RBACTimelock),
+			Qualifier: common_utils.UltraFastCurseMCMSQualifier,
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "test setup should deploy an UltraFastCurse timelock")
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			ExistingAddresses: mcmsAddresses,
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	rmnAddr := findDeployedAddress(t, report.Output.Addresses, rmnops.ContractType)
+
+	// The RMN must be deployed at 2.1.0 and nothing else.
+	var rmnVersion string
+	for _, ref := range report.Output.Addresses {
+		if ref.Type == datastore.ContractType(rmnops.ContractType) {
+			rmnVersion = ref.Version.String()
+		}
+	}
+	require.Equal(t, rmnops.Version.String(), rmnVersion, "a new chain must always get RMN 2.1.0")
+
+	// The Ultra Fast Curse timelock must be an authorized curse admin on the deployed RMN.
+	curseAdmins, err := operations.ExecuteOperation(e.OperationsBundle, rmnops.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       rmnAddr,
+	})
+	require.NoError(t, err, "failed to read authorized callers from RMN")
+	require.Contains(t, curseAdmins.Output, ultraFastCurseTimelock,
+		"the UltraFastCurse MCMS timelock must be a curse admin on the deployed RMN")
+
+	// Ownership must be routed to RMNMCMS, not CLLCCIP. Transfers are only proposed here, so assert
+	// on the routing buckets rather than the on-chain owner (which is still the deployer).
+	require.NotEqual(t, cllTimelockAddr, rmnTimelockAddr, "test setup must use distinct timelocks")
+	var inCLLBucket bool
+	for _, ref := range report.Output.RefsToTransferOwnership {
+		if ref.Type == datastore.ContractType(rmnops.ContractType) {
+			inCLLBucket = true
+		}
+	}
+	require.False(t, inCLLBucket, "RMN must not be transferred to the CLLCCIP timelock")
+
+	var inRMNBucket bool
+	for _, ref := range report.Output.RefsToTransferOwnershipRMN {
+		if ref.Type == datastore.ContractType(rmnops.ContractType) {
+			inRMNBucket = true
+		}
+	}
+	require.True(t, inRMNBucket, "RMN must be transferred to the RMNMCMS timelock")
+}

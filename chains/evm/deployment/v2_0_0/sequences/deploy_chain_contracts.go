@@ -83,12 +83,6 @@ type MockReceiverParams struct {
 	Qualifier string
 }
 
-// RMNParams configures the RMN 2.1.0 deployment. Curse admins are not configurable here: the Ultra
-// Fast Curse RBACTimelock is resolved from ExistingAddresses and is always the curse admin.
-type RMNParams struct {
-	Version *semver.Version
-}
-
 type OffRampParams struct {
 	Version                   *semver.Version
 	GasForCallExactCheck      uint16
@@ -120,7 +114,6 @@ type ExecutorParams struct {
 }
 
 type ContractParams struct {
-	RMN                RMNParams
 	OffRamp            OffRampParams
 	CommitteeVerifiers []CommitteeVerifierParams
 	OnRamp             OnRampParams
@@ -192,10 +185,11 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		curseAdmins = append(curseAdmins, ultraFastCurseTimelock)
 
-		// Deploy RMN. New chains always get RMN 2.1.0.
-		// Migrating a chain that still runs an older RMN is DeployAndActivateRMN's job (rmn.go).
+		// Deploy RMN. The version is deliberately not configurable: a new chain always gets RMN
+		// 2.1.0. Migrating a chain that still runs an older RMN is DeployAndActivateRMN's job
+		// (rmn.go).
 		rmnRef, err := contract_utils.MaybeDeployContract(b, rmnops.Deploy, chain, contract_utils.DeployInput[rmnops.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *input.ContractParams.RMN.Version),
+			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmnops.ConstructorArgs{
 				CurseAdmins: curseAdmins,

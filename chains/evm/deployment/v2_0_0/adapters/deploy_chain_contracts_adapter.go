@@ -150,9 +150,6 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		DeployTestRouter:  input.DeployTestRouter,
 		DeployerKeyOwned:  input.DeployerKeyOwned,
 		ContractParams: sequences.ContractParams{
-			RMN: sequences.RMNParams{
-				Version: input.ContractParams.RMN.Version,
-			},
 			OffRamp: sequences.OffRampParams{
 				Version:                   input.ContractParams.OffRamp.Version,
 				GasForCallExactCheck:      input.ContractParams.OffRamp.GasForCallExactCheck,

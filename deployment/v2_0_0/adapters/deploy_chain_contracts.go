@@ -28,12 +28,6 @@ type CommitteeVerifierDeployParams struct {
 	Qualifier        string
 }
 
-// RMNDeployParams configures the RMN 2.1.0 deployment. Curse admins are not configurable: the Ultra
-// Fast Curse RBACTimelock is resolved at deploy time and is always the curse admin.
-type RMNDeployParams struct {
-	Version *semver.Version
-}
-
 type OffRampDeployParams struct {
 	Version                   *semver.Version
 	GasForCallExactCheck      uint16
@@ -77,12 +71,6 @@ type MockReceiverDeployParams struct {
 	Qualifier             string
 }
 
-// RMNDeployParamsOverrides holds optional RMN deploy overrides.
-// Unset pointer fields use adapter defaults at apply time.
-type RMNDeployParamsOverrides struct {
-	Version *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
-}
-
 // OffRampDeployParamsOverrides holds optional off-ramp deploy overrides.
 type OffRampDeployParamsOverrides struct {
 	Version                   *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
@@ -110,7 +98,6 @@ type FeeQuoterDeployParamsOverrides struct {
 // DeployContractParamsOverrides holds optional contract deploy overrides.
 // Unset pointer fields use adapter defaults at apply time.
 type DeployContractParamsOverrides struct {
-	RMN           *RMNDeployParamsOverrides       `json:"rmn,omitempty" yaml:"rmn,omitempty"`
 	OffRamp       *OffRampDeployParamsOverrides   `json:"offRamp,omitempty" yaml:"offRamp,omitempty"`
 	OnRamp        *OnRampDeployParamsOverrides    `json:"onRamp,omitempty" yaml:"onRamp,omitempty"`
 	FeeQuoter     *FeeQuoterDeployParamsOverrides `json:"feeQuoter,omitempty" yaml:"feeQuoter,omitempty"`
@@ -122,7 +109,6 @@ type DeployContractParamsOverrides struct {
 // BuildDeployContractParams produces this; DeployChainContracts consumes it via
 // DeployChainContractsInput.ContractParams.
 type DeployContractParams struct {
-	RMN                RMNDeployParams
 	OffRamp            OffRampDeployParams
 	CommitteeVerifiers []CommitteeVerifierDeployParams
 	OnRamp             OnRampDeployParams
@@ -202,9 +188,6 @@ type BuildDeployContractParamsInput struct {
 func ApplyDeployContractParamsOverrides(params DeployContractParams, overrides *DeployContractParamsOverrides) DeployContractParams {
 	if overrides == nil {
 		return params
-	}
-	if overrides.RMN != nil {
-		params.RMN.Version = utils.CoalescePtr(overrides.RMN.Version, params.RMN.Version)
 	}
 	if overrides.OffRamp != nil {
 		o := overrides.OffRamp

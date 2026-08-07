@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	mcms_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -152,9 +151,6 @@ func CreateBasicContractParams() sequences.ContractParams {
 	usdPerWeth, _ := new(big.Int).SetString("2000000000000000000000", 10) // $2000
 
 	return sequences.ContractParams{
-		RMN: sequences.RMNParams{
-			Version: rmnops.Version,
-		},
 		OffRamp: sequences.OffRampParams{
 			Version:                   offramp.Version,
 			GasForCallExactCheck:      5_000,

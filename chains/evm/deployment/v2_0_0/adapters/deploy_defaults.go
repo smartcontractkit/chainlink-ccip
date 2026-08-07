@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
@@ -30,9 +29,6 @@ func defaultDeployContractParams() ccvadapters.DeployContractParams {
 		panic("invalid usdPerWeth constant")
 	}
 	return ccvadapters.DeployContractParams{
-		RMN: ccvadapters.RMNDeployParams{
-			Version: rmnops.Version,
-		},
 		OffRamp: ccvadapters.OffRampDeployParams{
 			Version:                   offramp.Version,
 			GasForCallExactCheck:      5_000,
