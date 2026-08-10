@@ -30,6 +30,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 )
 
+// NoExecutionAddress is Client.NO_EXECUTION_ADDRESS on EVM: the sentinel written into an
+// OnRamp's default-executor field for a lane whose destination executes messages manually,
+// so there is no real Executor contract to name. The OnRamp then charges no execution fee.
+const NoExecutionAddress = "0xEBa517d200000000000000000000000000000000"
+
 // ConfigureChainForLanes is the canonical sequence for configuring an EVM chain to participate
 // in CCIP 2.0 lanes with multiple remote chains. It is self-contained: all contract writes
 // (OffRamp, OnRamp, Executor, FeeQuoter, CommitteeVerifier, Router) are handled here.
@@ -176,18 +181,23 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// Executor: the input references the proxy address; we resolve through the
 			// proxy to group dest chains by their actual implementation, since multiple
 			// proxies may point to the same implementation.
-			defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
-			getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[struct{}]{
-				ChainSelector: chain.Selector,
-				Address:       defaultExecutor,
-			})
-			if err != nil {
-				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
+			// The remote family's adapter sets SkipExecutorConfig when the destination has
+			// no Executor contract at all (e.g. Canton, where messages are executed
+			// manually), so there is nothing to read or configure here.
+			if !remoteConfig.SkipExecutorConfig {
+				defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
+				getTargetReport, err := cldf_ops.ExecuteOperation(b, proxy.GetTarget, chain, contract.FunctionInput[struct{}]{
+					ChainSelector: chain.Selector,
+					Address:       defaultExecutor,
+				})
+				if err != nil {
+					return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get target address of Executor(%s) on chain %s: %w", defaultExecutor, chain, err)
+				}
+				destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
+					DestChainSelector: remoteSelector,
+					Config:            remoteConfig.ExecutorDestChainConfig,
+				})
 			}
-			destChainSelectorsPerExecutor[getTargetReport.Output] = append(destChainSelectorsPerExecutor[getTargetReport.Output], ExecutorRemoteChainConfigArgs{
-				DestChainSelector: remoteSelector,
-				Config:            remoteConfig.ExecutorDestChainConfig,
-			})
 
 			// FeeQuoter dest chain config: when OverrideExistingConfig is false, we skip
 			// chains that already have an enabled config to avoid accidentally overwriting
@@ -439,6 +449,15 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 		laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, common.HexToAddress(ccv))
 	}
 
+	// When the destination executes messages manually (SkipExecutorConfig), the executor
+	// address resolved from the datastore is a real contract that no one will call — the
+	// OnRamp would charge an execution fee against it. Write the EVM no-execution sentinel
+	// instead, which tells the OnRamp this lane has no executor.
+	defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
+	if remoteConfig.SkipExecutorConfig {
+		defaultExecutor = common.HexToAddress(NoExecutionAddress)
+	}
+
 	onRampAddr := common.BytesToAddress(input.OnRamp)
 	desired := onramp.DestChainConfigArgs{
 		Router:                    common.BytesToAddress(input.Router),
@@ -449,7 +468,7 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 		TokenNetworkFeeUSDCents:   remoteConfig.TokenNetworkFeeUSDCents,
 		DefaultCCVs:               defaultOutboundCCVs,
 		LaneMandatedCCVs:          laneMandatedOutboundCCVs,
-		DefaultExecutor:           common.HexToAddress(remoteConfig.DefaultExecutor),
+		DefaultExecutor:           defaultExecutor,
 		OffRamp:                   remoteConfig.OffRamp,
 	}
 	currentReport, err := cldf_ops.ExecuteOperation(b, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
