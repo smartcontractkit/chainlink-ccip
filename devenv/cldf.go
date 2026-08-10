@@ -187,10 +187,8 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 				return nil, nil, fmt.Errorf("failed to create TON client: %w", err)
 			}
 
-			// Use a deterministic deployer key so the provisioning process (ccip u) and the
-			// test process (go test) derive the SAME wallet. With a random seed, the pre-mint
-			// lands on the provisioning wallet while the test sends from a different wallet,
-			// causing a BalanceError. Mirrors EVM's DefaultAnvilKey and the fixed Solana key.
+			// Use a deterministic deployer key so the provisioning process and the
+			// test process derive the same wallet. 
 			privateKey, err := getTonDeployerKey()
 			if err != nil {
 				return nil, nil, err
