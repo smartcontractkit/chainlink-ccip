@@ -67,6 +67,11 @@ type RemoteChainDefaults struct {
 	// resolving a datastore executor ref via ResolveExecutor. This lets adapters
 	// supply family-specific executor addresses (e.g. a no-exec executor for Canton).
 	DefaultExecutor string
+	// SkipExecutorConfig tells the local chain's sequence not to configure an Executor
+	// contract for this lane. Adapters set it when DefaultExecutor is not a real
+	// Executor contract — e.g. Canton, where execution is manual and the address is a
+	// no-exec sentinel — so the sequence must not try to read or write it.
+	SkipExecutorConfig bool
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.
@@ -86,6 +91,9 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	DefaultExecutor           LocalContract
 	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
 	ExecutorDestChainConfig   ExecutorDestChainConfig
+	// SkipExecutorConfig mirrors RemoteChainDefaults.SkipExecutorConfig: when set, the
+	// local chain's sequence must not read or write an Executor contract for this lane.
+	SkipExecutorConfig bool
 	AddressBytesLength        uint8
 	BaseExecutionGasCost      uint32
 	TokenReceiverAllowed      *bool

@@ -30,10 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 )
 
-// cantonNoExecExecutor is the sentinel EVM executor address used for Canton no-exec lanes.
-// It is defined here to avoid an import cycle with the adapter package.
-const cantonNoExecExecutor = "0xEBa517d200000000000000000000000000000000"
-
 // ConfigureChainForLanes is the canonical sequence for configuring an EVM chain to participate
 // in CCIP 2.0 lanes with multiple remote chains. It is self-contained: all contract writes
 // (OffRamp, OnRamp, Executor, FeeQuoter, CommitteeVerifier, Router) are handled here.
@@ -183,9 +179,10 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// proxies may point to the same implementation.
 			defaultExecutor := common.HexToAddress(remoteConfig.DefaultExecutor)
 
-			// For Canton no-exec lanes the DefaultExecutor is a sentinel address that is not a
-			// real Executor contract. There is no EVM Executor to configure, so skip it.
-			if remoteConfig.DefaultExecutor == cantonNoExecExecutor {
+			// The remote family's adapter sets SkipExecutorConfig when DefaultExecutor is not a
+			// real Executor contract (e.g. Canton's no-exec sentinel), so there is nothing to
+			// read or configure here.
+			if remoteConfig.SkipExecutorConfig {
 				continue
 			}
 

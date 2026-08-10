@@ -403,7 +403,7 @@ func resolveRemoteChainConfig(
 		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve remote offRamp on chain %d: %w", remoteChainSelector, err)
 	}
 
-	defaults := localAdapter.GetDefaultRemoteChainConfig(localChainSelector, remoteChainSelector)
+	defaults := remoteAdapter.GetDefaultRemoteChainConfig(localChainSelector, remoteChainSelector)
 
 	var executorAddr string
 	if defaults.DefaultExecutor != "" {
@@ -437,7 +437,7 @@ func resolveRemoteChainConfig(
 	}
 
 	fqConfig := mergeFeeQuoterDestChainConfig(
-		localAdapter.GetDefaultFeeQuoterDestChainConfig(localChainSelector, remoteChainSelector, remoteAdapter.GetChainFamilySelector()),
+		remoteAdapter.GetDefaultFeeQuoterDestChainConfig(localChainSelector, remoteChainSelector, remoteAdapter.GetChainFamilySelector()),
 		inCfg.FeeQuoterDestChainConfig,
 	)
 	// ChainFamilySelector is always authoritative from the remote adapter, regardless of
@@ -460,6 +460,7 @@ func resolveRemoteChainConfig(
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
 		FeeQuoterDestChainConfig:  fqConfig,
 		ExecutorDestChainConfig:   utils.Coalesce(inCfg.ExecutorDestChainConfig, defaults.ExecutorDestChainConfig),
+		SkipExecutorConfig:        defaults.SkipExecutorConfig,
 		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
 		BaseExecutionGasCost:      utils.Coalesce(inCfg.BaseExecutionGasCost, defaults.BaseExecutionGasCost),
 		TokenReceiverAllowed:      &tokenReceiverAllowed,
