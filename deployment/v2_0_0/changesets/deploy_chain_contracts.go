@@ -162,6 +162,20 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry, chain
 				}
 				allReports = append(allReports, ownershipReports...)
 				allBatchOps = append(allBatchOps, ownershipBatchOps...)
+
+				// RMN belongs to the RMNMCMS timelock, so it needs its own transfer: a single
+				// TransferToTimelock call applies one ProposedOwner to every ref it is handed.
+				if len(report.Output.RefsToTransferOwnershipRMN) > 0 {
+					rmnMCMS := cfg.MCMS
+					rmnMCMS.Qualifier = utils.RMNTimelockQualifier
+					rmnBatchOps, rmnReports, rmnErr := deploy.TransferToTimelock(sel, e, rmnMCMS, report.Output.RefsToTransferOwnershipRMN)
+					if rmnErr != nil {
+						return deployment.ChangesetOutput{Reports: allReports},
+							fmt.Errorf("failed to transfer RMN to RMNMCMS timelock for chain %d: %w", sel, rmnErr)
+					}
+					allReports = append(allReports, rmnReports...)
+					allBatchOps = append(allBatchOps, rmnBatchOps...)
+				}
 			}
 
 			for _, ref := range resolved.NewAddressRefs {

@@ -12,7 +12,7 @@ contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
     assertEq(configs.length, 1);
 
     assertEq(selectors[0], SOURCE_CHAIN_SELECTOR);
-    assertEq(address(configs[0].router), address(s_sourceRouter));
+    assertEq(address(configs[0].router), address(s_destRouter));
     assertEq(configs[0].isEnabled, true);
     assertEq(configs[0].defaultCCVs.length, 1);
     assertEq(configs[0].defaultCCVs[0], s_defaultCCV);
@@ -26,7 +26,7 @@ contract OffRamp_getAllSourceChainConfigs is OffRampSetup {
 
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: chain2,
       isEnabled: true,
       onRamps: onRamps,

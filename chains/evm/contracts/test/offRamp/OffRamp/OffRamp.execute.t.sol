@@ -11,6 +11,8 @@ import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
+import {RouterFixture} from "../../RouterFixture.t.sol";
 import {ReentrantCCV} from "../../helpers/ReentrantCCV.sol";
 import {MockReceiverV2} from "../../mocks/MockReceiverV2.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
@@ -45,12 +47,16 @@ contract GasBoundedExecuteCaller {
   }
 }
 
-contract OffRamp_execute is OffRampSetup {
+contract OffRamp_execute is OffRampSetup, RouterFixture {
   uint256 internal constant PLENTY_OF_GAS = 1_000_000;
 
   GasBoundedExecuteCaller internal s_gasBoundedExecuteCaller;
 
-  function setUp() public virtual override {
+  function _setUpRouters() internal override(BaseTest, RouterFixture) {
+    RouterFixture._setUpRouters();
+  }
+
+  function setUp() public virtual override(BaseTest, OffRampSetup) {
     super.setUp();
 
     s_gasBoundedExecuteCaller = new GasBoundedExecuteCaller(address(s_offRamp));
@@ -133,7 +139,7 @@ contract OffRamp_execute is OffRampSetup {
     // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
     newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     // Expect execution state change event.
     vm.expectEmit();
@@ -166,7 +172,7 @@ contract OffRamp_execute is OffRampSetup {
     // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
     newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
     bytes32 messageId = keccak256(encodedMessage);
@@ -188,7 +194,7 @@ contract OffRamp_execute is OffRampSetup {
     });
 
     vm.expectCall(
-      address(s_sourceRouter),
+      address(s_destRouter),
       abi.encodeCall(IRouter.routeMessage, (any2EVMMessage, GAS_FOR_CALL_EXACT_CHECK, overrideGas, receiver))
     );
 
@@ -211,7 +217,7 @@ contract OffRamp_execute is OffRampSetup {
     // Set OffRamp as a valid OffRamp on the Router.
     Router.OffRamp[] memory newRamps = new Router.OffRamp[](1);
     newRamps[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), newRamps);
 
     (bytes memory encodedMessage, address[] memory ccvs, bytes[] memory verifierResults) = _getReportComponents(message);
     bytes32 messageId = keccak256(encodedMessage);
@@ -393,7 +399,7 @@ contract OffRamp_execute is OffRampSetup {
 
     OffRamp.SourceChainConfigArgs[] memory updates = new OffRamp.SourceChainConfigArgs[](1);
     updates[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,

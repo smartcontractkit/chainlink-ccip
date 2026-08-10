@@ -10,7 +10,6 @@ import (
 	burnmintwithlockreleaseflagtokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_mint_with_lock_release_flag_token_pool"
 	burnwithfromminttokenpoolv2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/executor"
 	v2feequoter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
@@ -21,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/cctp_verifier"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool_factory"
 
@@ -32,18 +32,20 @@ import (
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	evmseqV1_6 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	cctpthroughccvtokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 	committeeverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	executorops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
-	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
+	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
+	// Blank import so the RMN 2.1.0 fastcurse adapter registers itself for consumers that only
+	// import this package.
 	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	seq1_7 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	versionedverifierresolverops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/adapters"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/authorizedcallers"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -86,16 +88,6 @@ func init() {
 	tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v, NewTokenAdapter())
 	feeAggReg := fees.GetFeeAggregatorRegistry()
 	feeAggReg.RegisterFeeAggregatorAdapter(chainsel.FamilyEVM, v, NewFeeAggregatorAdapter())
-
-	curseRegistry := fastcurse.GetCurseRegistry()
-	// Keyed by RMN's own version (currently 2.1.0), not the surrounding EVM lane suite version `v`:
-	// RMN can be upgraded independently of the rest of the lane contracts behind the RMNProxy.
-	curseRegistry.RegisterNewCurse(fastcurse.CurseRegistryInput{
-		CursingFamily:       chainsel.FamilyEVM,
-		CursingVersion:      rmnops.Version,
-		CurseAdapter:        NewCurseAdapter(),
-		CurseSubjectAdapter: NewCurseAdapter(),
-	})
 
 	authCallersRegistry := authorizedcallers.GetAuthorizedCallersRegistry()
 	authCallersRegistry.RegisterAdapter(

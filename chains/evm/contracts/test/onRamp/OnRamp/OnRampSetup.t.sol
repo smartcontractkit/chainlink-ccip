@@ -5,8 +5,8 @@ import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
-import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {TokenSetup} from "../../TokenSetup.t.sol";
 import {FeeQuoterFeeSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 import {OnRampHelper} from "../../helpers/OnRampHelper.sol";
 import {MockExecutor} from "../../mocks/MockExecutor.sol";
@@ -14,7 +14,7 @@ import {MockVerifier} from "../../mocks/MockVerifier.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 
-contract OnRampSetup is FeeQuoterFeeSetup {
+contract OnRampSetup is FeeQuoterFeeSetup, TokenSetup {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
   uint16 internal constant MESSAGE_NETWORK_FEE_USD_CENTS = 1_00; // $1.00
   uint16 internal constant TOKEN_NETWORK_FEE_USD_CENTS = 2_00; // $2.00
@@ -32,7 +32,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   uint32 internal constant VERIFIER_BYTES = 256;
 
   OnRampHelper internal s_onRamp;
-  OffRamp internal s_offRampOnRemoteChain = OffRamp(makeAddr("OffRampRemote"));
+  address internal s_offRampOnRemoteChain = makeAddr("OffRampRemote");
 
   address internal s_defaultCCV;
   address internal s_defaultExecutor;
@@ -45,7 +45,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     uint32 executionGasLimit;
   }
 
-  function setUp() public virtual override {
+  function setUp() public virtual override(FeeQuoterFeeSetup, TokenSetup) {
     super.setUp();
 
     s_onRamp = new OnRampHelper(

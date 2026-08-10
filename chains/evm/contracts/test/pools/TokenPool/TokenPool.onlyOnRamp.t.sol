@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Router} from "../../../Router.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
@@ -10,9 +9,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     uint64 chainSelector = DEST_CHAIN_SELECTOR;
     address onRamp = makeAddr("onRamp");
 
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    _setMockRouterOnRamp(address(s_sourceRouter), chainSelector, onRamp);
 
     vm.startPrank(onRamp);
 
@@ -40,9 +37,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     });
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
 
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    _setMockRouterOnRamp(address(s_sourceRouter), chainSelector, onRamp);
 
     vm.startPrank(onRamp);
     // Should succeed now that we've added the chain

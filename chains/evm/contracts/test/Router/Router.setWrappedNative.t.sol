@@ -7,14 +7,14 @@ contract Router_setWrappedNative is RouterSetup {
   function testFuzz_SetWrappedNative_Success(
     address wrappedNative
   ) public {
-    s_sourceRouter.setWrappedNative(wrappedNative);
-    assertEq(wrappedNative, s_sourceRouter.getWrappedNative());
+    s_router.setWrappedNative(wrappedNative);
+    assertEq(wrappedNative, s_router.getWrappedNative());
   }
 
   // Reverts
   function test_RevertWhen_OnlyOwner() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
-    s_sourceRouter.setWrappedNative(address(1));
+    s_router.setWrappedNative(address(1));
   }
 }

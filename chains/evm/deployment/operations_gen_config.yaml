@@ -162,18 +162,15 @@ contracts:
         access: owner
       - name: withdrawSiloedLiquidity
         access: owner
-      - name: getToken
+      # provideLiquidity/provideSiloedLiquidity are rebalancer-gated on-chain rather than onlyOwner,
+      # and there is no rebalancer access alias, so they are declared public and rely on that check.
+      - name: provideLiquidity
         access: public
-
-  # 1.6.0
-  - contract_name: RMNRemote
-    version: "1.6.0"
-    functions:
-      - name: curse
+      - name: provideSiloedLiquidity
+        access: public
+      - name: updateSiloDesignations
         access: owner
-      - name: uncurse
-        access: owner
-      - name: isCursed
+      - name: getToken
         access: public
 
   - contract_name: FeeQuoter
@@ -412,6 +409,8 @@ contracts:
   - contract_name: SiloedLockReleaseTokenPool
     version: "2.0.0"
     functions:
+      - name: configureLockBoxes
+        access: owner
       - name: getLockBox
         access: public
       - name: getAllLockBoxConfigs
