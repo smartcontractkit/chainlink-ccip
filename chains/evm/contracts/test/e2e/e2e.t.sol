@@ -12,13 +12,15 @@ import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {RouterFixture} from "../RouterFixture.t.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract e2e is OnRampSetup {
+contract e2e is OnRampSetup, RouterFixture {
   bytes4 internal constant COMMITTEE_VERSION_TAG_V2_0_0 = bytes4(keccak256("CommitteeVerifier 2.0.0"));
 
   OffRampHelper internal s_offRamp;
@@ -28,12 +30,16 @@ contract e2e is OnRampSetup {
   address internal s_feeAggregator;
   CommitteeVerifier internal s_sourceCommitteeVerifier;
 
-  function setUp() public virtual override {
+  function _setUpRouters() internal override(BaseTest, RouterFixture) {
+    RouterFixture._setUpRouters();
+  }
+
+  function setUp() public virtual override(BaseTest, OnRampSetup) {
     super.setUp();
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    Router(address(s_sourceRouter)).applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     s_sourceCommitteeVerifier = new CommitteeVerifier(
       CommitteeVerifier.DynamicConfig({feeAggregator: address(1), allowlistAdmin: address(0)}),
@@ -117,7 +123,7 @@ contract e2e is OnRampSetup {
 
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: address(s_offRamp)});
-    s_destRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+    Router(address(s_destRouter)).applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
 
     // Seed existing fee recipients so ERC20 transfers reflect real deployments where
     // verifiers/executors already hold a balance (avoids the first 20k gas cold-init cost).
@@ -177,7 +183,7 @@ contract e2e is OnRampSetup {
     });
 
     vm.resumeGasMetering();
-    s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
+    Router(address(s_sourceRouter)).ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
     assertEq(s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber, expectedMsgNum);
@@ -196,5 +202,46 @@ contract e2e is OnRampSetup {
 
     vm.resumeGasMetering();
     s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 0);
+  }
+
+  /// @notice Transfers a 6 decimal token, like USDC, through the full lane. The delivered amount must equal the sent
+  /// amount in the token's own 6 decimal denomination: any hidden 18 decimal assumption in the message path would
+  /// inflate or truncate the delivered amount.
+  function test_e2e_SixDecimalTokenTransfer() public {
+    address sourceUsdc = s_sourceTokens[2];
+    address destUsdc = s_destTokens[2];
+    uint256 sendAmount = 1000e6; // $1000 with 6 decimals.
+    uint64 expectedMsgNum = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).messageNumber + 1;
+
+    IERC20(s_sourceFeeToken).approve(address(s_sourceRouter), type(uint256).max);
+    IERC20(sourceUsdc).approve(address(s_sourceRouter), type(uint256).max);
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(STRANGER),
+      data: "",
+      tokenAmounts: new Client.EVMTokenAmount[](1),
+      feeToken: s_sourceFeeToken,
+      extraArgs: ""
+    });
+    message.tokenAmounts[0] = Client.EVMTokenAmount({token: sourceUsdc, amount: sendAmount});
+
+    (, bytes memory encodedMessage,,) = _evmMessageToEvent({
+      message: message, destChainSelector: DEST_CHAIN_SELECTOR, msgNum: expectedMsgNum, originalSender: OWNER
+    });
+
+    uint256 sourceBalanceBefore = IERC20(sourceUsdc).balanceOf(OWNER);
+    uint256 destBalanceBefore = IERC20(destUsdc).balanceOf(STRANGER);
+
+    Router(address(s_sourceRouter)).ccipSend(DEST_CHAIN_SELECTOR, message);
+
+    // The burn/mint pool burns the full amount on the source chain.
+    assertEq(IERC20(sourceUsdc).balanceOf(OWNER), sourceBalanceBefore - sendAmount);
+
+    address[] memory ccvAddresses = new address[](1);
+    ccvAddresses[0] = s_destVerifier;
+
+    s_offRamp.execute(encodedMessage, ccvAddresses, new bytes[](1), 0);
+
+    assertEq(IERC20(destUsdc).balanceOf(STRANGER), destBalanceBefore + sendAmount);
   }
 }

@@ -8,7 +8,7 @@ contract OffRamp_getSourceChainConfig is OffRampSetup {
   function test_getSourceChainConfig_ReturnsCorrectConfig() public view {
     OffRamp.SourceChainConfig memory config = s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
 
-    assertEq(address(config.router), address(s_sourceRouter));
+    assertEq(address(config.router), address(s_destRouter));
     assertEq(config.isEnabled, true);
     assertEq(config.defaultCCVs.length, 1);
     assertEq(config.defaultCCVs[0], s_defaultCCV);

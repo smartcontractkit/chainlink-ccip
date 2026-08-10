@@ -61,6 +61,33 @@ type DeployTokenPoolInput struct {
 	ConstructorArgs ConstructorArgs
 	// AdvancedPoolHooksConfig contains optional configuration for AdvancedPoolHooks.
 	AdvancedPoolHooksConfig AdvancedPoolHooksConfig
+	// LockBoxGroups declares the liquidity topology for a SiloedLockReleaseTokenPool: each group is a
+	// set of remote chain selectors sharing one ERC20LockBox, so chains in different groups have
+	// isolated liquidity. Required for SiloedLockReleaseTokenPool, ignored by all other pool types.
+	LockBoxGroups [][]uint64
+}
+
+// ValidateLockBoxGroups checks that the declared silo topology is well formed: at least one group,
+// no empty groups, and no chain in more than one group (which would make the lockbox mapping
+// ambiguous, since configureLockBoxes is last-write-wins per chain).
+func (c DeployTokenPoolInput) ValidateLockBoxGroups() error {
+	if len(c.LockBoxGroups) == 0 {
+		return fmt.Errorf("lock box groups must be defined for pool type %s", c.TokenPoolType)
+	}
+	seen := make(map[uint64]int, len(c.LockBoxGroups))
+	for i, group := range c.LockBoxGroups {
+		if len(group) == 0 {
+			return fmt.Errorf("lock box group %d is empty", i)
+		}
+		for _, sel := range group {
+			if prev, dup := seen[sel]; dup {
+				return fmt.Errorf("remote chain selector %d appears in lock box groups %d and %d", sel, prev, i)
+			}
+			seen[sel] = i
+		}
+	}
+
+	return nil
 }
 
 func (c DeployTokenPoolInput) ChainSelector() uint64 {

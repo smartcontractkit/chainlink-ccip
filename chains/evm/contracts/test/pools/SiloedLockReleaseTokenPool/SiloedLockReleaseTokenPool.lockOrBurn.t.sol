@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ILockBox} from "../../../interfaces/ILockBox.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 
-import {Router} from "../../../Router.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -180,9 +179,7 @@ contract SiloedLockReleaseTokenPool_lockOrBurn is SiloedLockReleaseTokenPoolSetu
     s_siloedLockReleaseTokenPool.applyChainUpdates(new uint64[](0), chainUpdates);
 
     // Add onRamp for the test chain.
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: testChainSelector, onRamp: s_allowedOnRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    _setMockRouterOnRamp(address(s_sourceRouter), testChainSelector, s_allowedOnRamp);
 
     // Fund the pool.
     deal(address(s_token), address(s_siloedLockReleaseTokenPool), AMOUNT);

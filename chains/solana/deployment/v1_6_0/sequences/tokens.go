@@ -597,6 +597,69 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 	)
 }
 
+var _ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
+
+// SetTokenPoolAdmins updates the rate limit admin on a Solana 1.6 token pool. Solana pools
+// have no fee admin concept, so a non-nil FeeAdmin is rejected. The pool address is a program
+// ID shared across mints, so the token mint comes from input.TokenRef and the pool type from
+// input.TokenPoolRef. The underlying operation performs the read-compare no-op check and
+// emits an MCMS batch operation when the pool authority is not the deployer key.
+func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"SetTokenPoolAdmins",
+		common_utils.Version_1_6_0,
+		"Sets the rate limit admin on a Solana 1.6 token pool; no-op when the value already matches",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
+			if input.FeeAdmin != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("fee admin is not supported on Solana 1.6 token pools (pool %s on chain %d)", input.TokenPoolRef.Address, input.Selector)
+			}
+			if input.RateLimitAdmin == nil {
+				return sequences.OnChainOutput{}, nil
+			}
+
+			chain, ok := chains.SolanaChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
+			}
+
+			rlAdmin, err := solana.PublicKeyFromBase58(*input.RateLimitAdmin)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s: %w", input.Selector, *input.RateLimitAdmin, err)
+			}
+
+			var op = tokenpoolops.UpdateRateLimitAdminBurnMint
+			switch input.TokenPoolRef.Type.String() {
+			case common_utils.BurnMintTokenPool.String():
+				op = tokenpoolops.UpdateRateLimitAdminBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				op = tokenpoolops.UpdateRateLimitAdminLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
+			}
+
+			tokenPool, err := solana.PublicKeyFromBase58(input.TokenPoolRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s: %w", input.Selector, input.TokenPoolRef.Address, err)
+			}
+			tokenMint, err := solana.PublicKeyFromBase58(input.TokenRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token mint address for chain %d: %s: %w", input.Selector, input.TokenRef.Address, err)
+			}
+
+			rlOut, err := operations.ExecuteOperation(b, op, chain, tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:   tokenPool,
+				TokenMint: tokenMint,
+				NewOwner:  rlAdmin,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
+			}
+
+			return sequences.OnChainOutput{BatchOps: rlOut.Output.BatchOps}, nil
+		},
+	)
+}
+
 // GetOnchainRateLimits implements tokenapi.RateLimitReaderAdapter. It needs the token mint to
 // derive the remote-chain config PDA, so tokenRef must resolve to the token. Solana pools have a
 // single bucket per remote lane; fastFinality=true is not supported.

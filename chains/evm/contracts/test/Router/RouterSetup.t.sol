@@ -3,13 +3,16 @@ pragma solidity ^0.8.24;
 
 import {Router} from "../../Router.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {RouterFixture} from "../RouterFixture.t.sol";
+import {TokenSetup} from "../TokenSetup.t.sol";
 import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MockExecutor} from "../mocks/MockExecutor.sol";
 import {MockVerifier} from "../mocks/MockVerifier.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract RouterSetup is FeeQuoterSetup {
+contract RouterSetup is FeeQuoterSetup, TokenSetup, RouterFixture {
   address internal constant FEE_AGGREGATOR = 0xa33CDB32eAEce34F6affEfF4899cef45744EDea3;
   uint16 internal constant MESSAGE_NETWORK_FEE_USD_CENTS = 1_00;
   uint16 internal constant TOKEN_NETWORK_FEE_USD_CENTS = 2_00;
@@ -17,9 +20,17 @@ contract RouterSetup is FeeQuoterSetup {
 
   OnRamp internal s_onRamp;
   address internal s_offRamp;
+  /// @dev The real source router deployed by RouterFixture, typed as Router for admin functions.
+  Router internal s_router;
 
-  function setUp() public virtual override {
+  function _setUpRouters() internal override(BaseTest, RouterFixture) {
+    RouterFixture._setUpRouters();
+  }
+
+  function setUp() public virtual override(BaseTest, FeeQuoterSetup, TokenSetup) {
     super.setUp();
+
+    s_router = Router(payable(address(s_sourceRouter)));
 
     s_onRamp = new OnRamp(
       OnRamp.StaticConfig({
@@ -58,7 +69,7 @@ contract RouterSetup is FeeQuoterSetup {
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](2);
     offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: makeAddr("offRamp0")});
     offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: makeAddr("offRamp1")});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     // Pre approve the first token so the gas estimates of the tests only cover actual gas usage from the ramps.
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 2 ** 128);

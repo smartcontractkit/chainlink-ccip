@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {DefensiveExample} from "../../../applications/DefensiveExample.sol";
+import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {RouterSetup} from "../../Router/RouterSetup.t.sol";
@@ -15,7 +16,7 @@ contract DefensiveExampleTest is RouterSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_receiver = new DefensiveExample(s_destRouter, IERC20(s_destFeeToken));
+    s_receiver = new DefensiveExample(IRouterClient(address(s_destRouter)), IERC20(s_destFeeToken));
     s_receiver.enableChain(s_sourceChainSelector, abi.encode(""), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 

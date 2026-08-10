@@ -112,7 +112,7 @@ var DeployCommitteeVerifier = cldf_ops.NewSequence(
 		var resolverRef *datastore.AddressRef
 		for _, ref := range input.ExistingAddresses {
 			if ref.Type == datastore.ContractType(CommitteeVerifierResolverType) &&
-				ref.Version.String() == semver.MustParse("2.0.0").String() &&
+				ref.Version != nil && ref.Version.String() == semver.MustParse("2.0.0").String() &&
 				ref.Qualifier == input.Params.Qualifier {
 				resolverRef = &ref
 			}

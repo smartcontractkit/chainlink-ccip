@@ -19,7 +19,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
 
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](2);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: chain1,
       isEnabled: true,
       onRamps: onRamps1,
@@ -29,7 +29,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     configs[0].defaultCCVs[0] = makeAddr("ccv1");
 
     configs[1] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: chain2,
       isEnabled: false,
       onRamps: onRamps2,
@@ -74,7 +74,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
 
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: false,
       onRamps: onRamps,
@@ -96,7 +96,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: 0,
       isEnabled: true,
       onRamps: new bytes[](0),
@@ -128,7 +128,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_DefaultCCV() public {
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       onRamps: new bytes[](0),
@@ -143,7 +143,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_ZeroAddressInDefaultCCVsArray() public {
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       onRamps: new bytes[](0),
@@ -159,7 +159,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroAddressNotAllowed_ZeroInLaneMandatedCCVsArray() public {
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       onRamps: new bytes[](0),
@@ -179,7 +179,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
 
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
       onRamps: onRamps,

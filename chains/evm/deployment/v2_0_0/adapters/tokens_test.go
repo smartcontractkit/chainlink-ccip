@@ -113,6 +113,9 @@ func TestTokenAdapter(t *testing.T) {
 				}, nil)
 				require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
+				e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
+				require.NoError(t, err)
+
 				deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
 					Cfg: v2_0_0.DeployChainContractsCfg{
 						ChainSel:         chainSel,
@@ -400,6 +403,9 @@ func TestTokenExpansion(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
+		e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
+		require.NoError(t, err)
+
 		deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
 			Cfg: v2_0_0.DeployChainContractsCfg{
 				ChainSel:         chainSel,
@@ -557,6 +563,9 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
 	}, nil)
+	require.NoError(t, err)
+
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
 	require.NoError(t, err)
 
 	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
@@ -722,6 +731,9 @@ func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
+	require.NoError(t, err)
+
 	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
 		Cfg: v2_0_0.DeployChainContractsCfg{
 			ChainSel:         chainSel,
@@ -828,6 +840,9 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
 		}, nil)
+		require.NoError(t, err)
+
+		e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
 		require.NoError(t, err)
 
 		deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{

@@ -73,4 +73,39 @@ contract TokenPool_applyFee is AdvancedPoolHooksSetup {
     uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     assertEq(amountAfterFee, amount - ((amount * finalityTransferFeeBps) / BPS_DIVIDER));
   }
+
+  /// @notice Bps fees round down, so transfers small enough that the fee rounds to zero must still succeed and
+  /// forward the full amount. Documents that dust transfers, e.g. of low decimal tokens like USDC, pay no bps fee.
+  function test_applyFee_RoundsFeeDownToZeroOnDustAmounts() public {
+    uint16 finalityTransferFeeBps = 250; // 2.5%
+    // With 250 bps, any amount below 40 smallest units rounds the fee down to zero.
+    uint256 amount = 39;
+
+    vm.startPrank(OWNER);
+    TokenPool.TokenTransferFeeConfigArgs[] memory feeConfigArgs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+    feeConfigArgs[0] = TokenPool.TokenTransferFeeConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
+        destGasOverhead: 50_000,
+        destBytesOverhead: Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        finalityFeeUSDCents: 0,
+        fastFinalityFeeUSDCents: 0,
+        finalityTransferFeeBps: finalityTransferFeeBps,
+        fastFinalityTransferFeeBps: 0,
+        isEnabled: true
+      })
+    });
+    s_tokenPool.applyTokenTransferFeeConfigUpdates(feeConfigArgs, new uint64[](0));
+
+    Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
+      originalSender: s_sender,
+      receiver: s_receiver,
+      amount: amount,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
+      localToken: address(s_token)
+    });
+
+    uint256 amountAfterFee = s_tokenPool.applyFee(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    assertEq(amountAfterFee, amount);
+  }
 }

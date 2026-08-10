@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Router} from "../../../Router.sol";
 import {AdvancedPoolHooks} from "../../../pools/AdvancedPoolHooks.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {BaseERC20} from "../../../tokens/BaseERC20.sol";
@@ -76,10 +75,7 @@ contract AdvancedPoolHooksSetup is BaseTest {
 
     s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
 
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_allowedOnRamp});
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_allowedOffRamp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    _setMockRouterOnRamp(address(s_sourceRouter), DEST_CHAIN_SELECTOR, s_allowedOnRamp);
+    _setMockRouterOffRamp(address(s_sourceRouter), DEST_CHAIN_SELECTOR, s_allowedOffRamp, true);
   }
 }

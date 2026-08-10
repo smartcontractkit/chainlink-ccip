@@ -3,7 +3,7 @@ package tokens
 import (
 	"fmt"
 	"math/big"
-	"strings"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +23,7 @@ import (
 	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
@@ -63,7 +64,9 @@ var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 		}
 		tokenAddr := tokenReport.Output
 
-		isSiloed := strings.Contains(oldPoolType, "Siloed")
+		// Only the generic siloed lock-release pool is handled here. A substring match on "Siloed"
+		// would also catch SiloedUSDCTokenPool, which migrates through the CCTP hybrid path instead.
+		isSiloed := oldPoolType == utils.SiloedLockReleaseTokenPool.String()
 
 		if isSiloed {
 			if input.Amount != nil {
@@ -217,7 +220,45 @@ func migrateSiloedPool(
 
 	lockboxByChain := make(map[uint64]common.Address)
 	for _, config := range lockboxConfigsReport.Output {
+		if config.LockBox == (common.Address{}) {
+			continue
+		}
 		lockboxByChain[config.RemoteChainSelector] = config.LockBox
+	}
+
+	// Resolve which of the old pool's chains are siloed once; used both for the coverage check below
+	// and for the rebalancer handover further down.
+	isSiloedByChain := make(map[uint64]bool, len(supportedChains))
+	for _, remoteChain := range supportedChains {
+		isSiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.IsSiloed, evmChain, evm_contract.FunctionInput[uint64]{
+			ChainSelector: chainSel,
+			Address:       oldPoolAddr,
+			Args:          remoteChain,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if chain %d is siloed on old pool %s: %w", remoteChain, oldPoolAddr, err)
+		}
+		isSiloedByChain[remoteChain] = isSiloedReport.Output
+	}
+
+	// Check lockbox coverage before emitting any writes. Without this the batch is built chain by
+	// chain and a gap surfaces partway through - after the rebalancer has already been repointed at
+	// the timelock - leaving the operator to work out which silo was missing.
+	var chainsWithoutLockBox []uint64
+	for _, remoteChain := range supportedChains {
+		if !isSiloedByChain[remoteChain] {
+			continue
+		}
+		if _, ok := lockboxByChain[remoteChain]; !ok {
+			chainsWithoutLockBox = append(chainsWithoutLockBox, remoteChain)
+		}
+	}
+	if len(chainsWithoutLockBox) > 0 {
+		slices.Sort(chainsWithoutLockBox)
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"new siloed pool %s has no lockbox configured for siloed chains %v of old pool %s; the new pool's lockBoxGroups must cover every siloed chain being migrated",
+			newPoolAddr, chainsWithoutLockBox, oldPoolAddr,
+		)
 	}
 
 	rebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
@@ -247,16 +288,7 @@ func migrateSiloedPool(
 	var siloInfos []chainRebalancerInfo
 
 	for _, remoteChain := range supportedChains {
-		isSiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.IsSiloed, evmChain, evm_contract.FunctionInput[uint64]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
-			Args:          remoteChain,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if chain %d is siloed on old pool %s: %w", remoteChain, oldPoolAddr, err)
-		}
-
-		if isSiloedReport.Output {
+		if isSiloedByChain[remoteChain] {
 			chainRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetChainRebalancer, evmChain, evm_contract.FunctionInput[uint64]{
 				ChainSelector: chainSel,
 				Address:       oldPoolAddr,

@@ -26,11 +26,11 @@ import (
 	burn_mint_with_lock_release_flag_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	cctp_message_transmitter_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
 	cctp_through_ccv_token_pool_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_through_ccv_token_pool"
-	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/cctp_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_usdc_token_transmitter"
 	usdc_token_pool_proxy_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/usdc_token_pool_proxy"
 	versioned_verifier_resolver_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
+	cctp_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -44,10 +44,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 )
 
 const (
@@ -97,10 +97,11 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSelector,
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			DeployerKeyOwned: true, // Set DeployerKeyOwned to true to skip ownership transfer steps since this is a test environment and we don't have MCMS or timelocks set up
+			ChainSelector:     chainSelector,
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			DeployerKeyOwned:  true, // Set DeployerKeyOwned to true to skip ownership transfer steps since this is a test environment and we don't have MCMS or timelocks set up
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
 		},
 	)
 	require.NoError(t, err, "Failed to deploy chain contracts")

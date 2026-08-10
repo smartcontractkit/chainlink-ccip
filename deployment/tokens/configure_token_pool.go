@@ -41,7 +41,9 @@ type ConfigureTokenPoolPerChain struct {
 // Every field other than TokenPoolRef is optional: absent fields leave on-chain state
 // untouched. To clear a value, provide it explicitly (e.g. the zero address).
 type PoolConfigUpdate struct {
-	// TokenPoolRef is a reference to the token pool in the datastore.
+	// TokenPoolRef is a reference to the token pool in the datastore. For Solana, this must be
+	// the pool's config PDA, not the pool program ID: a Solana pool address is a program ID
+	// shared across many mints, so it cannot alone identify the token being configured.
 	TokenPoolRef datastore.AddressRef `yaml:"tokenPoolRef" json:"tokenPoolRef"`
 	// FinalityConfig, if set, is the allowed finality config to set on the pool (v2+ only).
 	FinalityConfig *finality.Config `yaml:"finalityConfig,omitempty" json:"finalityConfig,omitempty"`
@@ -182,9 +184,10 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 					}
 					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
 						Selector:       selector,
-						PoolAddress:    fullPoolRef.Address,
 						RateLimitAdmin: pool.RateLimitAdmin,
 						FeeAdmin:       pool.FeeAdmin,
+						TokenPoolRef:   fullPoolRef,
+						TokenRef:       fullTokenRef,
 					})
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to set admin roles on pool %s: %w", fullPoolRef.Address, err)
