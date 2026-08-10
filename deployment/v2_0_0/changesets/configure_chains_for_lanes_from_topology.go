@@ -403,20 +403,13 @@ func resolveRemoteChainConfig(
 		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve remote offRamp on chain %d: %w", remoteChainSelector, err)
 	}
 
-	defaults := remoteAdapter.GetDefaultRemoteChainConfig(localChainSelector, remoteChainSelector)
-
-	var executorAddr string
-	if defaults.DefaultExecutor != "" {
-		executorAddr = defaults.DefaultExecutor
-	} else {
-		executorQualifier := inCfg.DefaultExecutorQualifier
-		if executorQualifier == nil {
-			executorQualifier = ptr.To(defaultQualifier)
-		}
-		executorAddr, err = localAdapter.ResolveExecutor(e.DataStore, localChainSelector, *executorQualifier)
-		if err != nil {
-			return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", *executorQualifier, localChainSelector, err)
-		}
+	executorQualifier := inCfg.DefaultExecutorQualifier
+	if executorQualifier == nil {
+		executorQualifier = ptr.To(defaultQualifier)
+	}
+	executorAddr, err := localAdapter.ResolveExecutor(e.DataStore, localChainSelector, *executorQualifier)
+	if err != nil {
+		return adapters.RemoteChainConfig[[]byte, string]{}, fmt.Errorf("failed to resolve executor (qualifier %q) on chain %d: %w", *executorQualifier, localChainSelector, err)
 	}
 
 	defaultInboundCCVs, err := resolveDefaultCCVs(e, localChainSelector, inCfg.DefaultInboundCCVs, committeeVerifierContractRegistry)
@@ -443,6 +436,8 @@ func resolveRemoteChainConfig(
 	// ChainFamilySelector is always authoritative from the remote adapter, regardless of
 	// what the defaults or user-supplied overrides contain.
 	fqConfig.ChainFamilySelector = remoteAdapter.GetChainFamilySelector()
+
+	defaults := remoteAdapter.GetDefaultRemoteChainConfig(localChainSelector, remoteChainSelector)
 
 	// Apply per-field user overrides on top of adapter defaults via coalesce.
 	// Pointer fields: nil = keep adapter default; non-nil = use caller value.

@@ -62,15 +62,12 @@ type RemoteChainDefaults struct {
 	TokenReceiverAllowed      bool
 	MessageNetworkFeeUSDCents uint16
 	TokenNetworkFeeUSDCents   uint16
-	// DefaultExecutor is an optional address override returned by an adapter. When
-	// non-empty, it is used directly as the OnRamp default executor instead of
-	// resolving a datastore executor ref via ResolveExecutor. This lets adapters
-	// supply family-specific executor addresses (e.g. a no-exec executor for Canton).
-	DefaultExecutor string
 	// SkipExecutorConfig tells the local chain's sequence not to configure an Executor
-	// contract for this lane. Adapters set it when DefaultExecutor is not a real
-	// Executor contract — e.g. Canton, where execution is manual and the address is a
-	// no-exec sentinel — so the sequence must not try to read or write it.
+	// contract for this lane. A remote adapter sets it when that destination has no
+	// executor because its messages are executed manually. The local chain's sequence
+	// decides what that means in its own terms — an EVM source, for example, writes its
+	// own no-execution sentinel into the OnRamp — so no family-specific address crosses
+	// this boundary.
 	SkipExecutorConfig bool
 }
 
