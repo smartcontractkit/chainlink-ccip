@@ -250,7 +250,10 @@ func TestFastCurseSolanaAndEVM(t *testing.T) {
 	timelockAddrs := make(map[uint64]string)
 	for _, addrRef := range allAddrRefs {
 		require.NoError(t, ds.Addresses().Add(addrRef))
-		if addrRef.Type == datastore.ContractType(deploymentutils.RBACTimelock) {
+		// Qualifier-scoped on purpose: the datastore also holds the UltraFastCurse RBACTimelock, and
+		// an unqualified match would let it win this loop and become the proposed owner.
+		if addrRef.Type == datastore.ContractType(deploymentutils.RBACTimelock) &&
+			addrRef.Qualifier == deploymentutils.CLLQualifier {
 			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
 		}
 	}

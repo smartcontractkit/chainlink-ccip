@@ -316,7 +316,10 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 	chain := e.BlockChains.EVMChains()[selector]
 	timelockAddrs := make(map[uint64]string)
 	for _, addrRef := range e.DataStore.Addresses().Filter() {
-		if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) {
+		// Qualifier-scoped on purpose: the datastore also holds the UltraFastCurse RBACTimelock, and
+		// an unqualified match would let it win this loop and become the proposed owner.
+		if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) &&
+			addrRef.Qualifier == common_utils.CLLQualifier {
 			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
 		}
 	}
