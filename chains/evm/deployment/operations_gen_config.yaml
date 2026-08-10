@@ -173,17 +173,6 @@ contracts:
       - name: getToken
         access: public
 
-  # 1.6.0
-  - contract_name: RMNRemote
-    version: "1.6.0"
-    functions:
-      - name: curse
-        access: owner
-      - name: uncurse
-        access: owner
-      - name: isCursed
-        access: public
-
   - contract_name: FeeQuoter
     version: "1.6.0"
     functions:

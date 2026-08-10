@@ -41,6 +41,7 @@ func TestSetFeeAggregatorEVM_V1_6_0(t *testing.T) {
 	// Adapter is registered via init() in the adapters package import above.
 	feeAggAdapter := evmadaptersV1_6_0.NewFeeAggregatorAdapter(&evmAdapter)
 
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deploy.ContractDeploymentConfigPerChain{
@@ -145,6 +146,7 @@ func TestSetFeeAggregatorSolana_V1_6_0(t *testing.T) {
 	// Adapter is registered via init() in the adapters package import above.
 	feeAggAdapter := soladaptersV1_6_0.NewFeeAggregatorAdapter(&solAdapter)
 
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deploy.ContractDeploymentConfigPerChain{

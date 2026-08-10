@@ -44,6 +44,7 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 
 	dReg := mcmsapi.GetRegistry()
 	version := semver.MustParse("1.6.0")
+	SeedUltraFastCurseMCMS(t, e)
 	_, err = mcmsapi.DeployContracts(dReg).Apply(*e, mcmsapi.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]mcmsapi.ContractDeploymentConfigPerChain{
