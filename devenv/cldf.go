@@ -187,14 +187,17 @@ func NewCLDFOperationsEnvironment(bc []*blockchain.Input, dataStore datastore.Da
 				return nil, nil, fmt.Errorf("failed to create TON client: %w", err)
 			}
 
-			seed := wallet.NewSeed()
-			w, err := wallet.FromSeed(client, seed, wallet.ConfigV5R1Final{NetworkGlobalID: wallet.MainnetGlobalID, Workchain: 0})
+			// Use a deterministic deployer key so the provisioning process (ccip u) and the
+			// test process (go test) derive the SAME wallet. With a random seed, the pre-mint
+			// lands on the provisioning wallet while the test sends from a different wallet,
+			// causing a BalanceError. Mirrors EVM's DefaultAnvilKey and the fixed Solana key.
+			privateKey, err := getTonDeployerKey()
+			if err != nil {
+				return nil, nil, err
+			}
+			w, err := wallet.FromPrivateKey(client, privateKey, wallet.ConfigV5R1Final{NetworkGlobalID: wallet.MainnetGlobalID, Workchain: 0})
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create TON wallet: %w", err)
-			}
-			privateKey, err := wallet.SeedToPrivateKey(seed /*password=*/, "" /*isBIP39=*/, false)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get private key from seed: %w", err)
 			}
 			walletVersion := "V5R1"
 			deployerSignerGen := cldf_ton_provider.PrivateKeyFromRaw(hex.EncodeToString(privateKey))

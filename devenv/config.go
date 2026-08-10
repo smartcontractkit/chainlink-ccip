@@ -11,6 +11,8 @@ LoadCache[T] is used if you need to write outputs the second time.
 */
 
 import (
+	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,6 +38,12 @@ const (
 	DefaultLokiURL    = "http://localhost:3030/loki/api/v1/push"
 	DefaultTempoURL   = "http://localhost:4318/v1/traces"
 	CLDDomain         = "ccip"
+	// DefaultTonDeployerSeed is the fixed 32-byte ed25519 seed (hex) used to derive the
+	// local TON deployer wallet. Using a fixed key (overridable via TON_DEPLOYER_SEED)
+	// makes the deployer address deterministic across the provisioning process (ccip u)
+	// and the test process (go test), so pre-minted token balances are available to the
+	// test sender. This mirrors DefaultAnvilKey for EVM and the fixed Solana deployer key.
+	DefaultTonDeployerSeed = "c1c0de00c1c0de00c1c0de00c1c0de00c1c0de00c1c0de00c1c0de00c1c0de00"
 )
 
 var (
@@ -145,4 +153,23 @@ func getNetworkPrivateKey() string {
 		return DefaultAnvilKey
 	}
 	return pk
+}
+
+// getTonDeployerKey returns the deterministic ed25519 private key for the local TON
+// deployer wallet, derived from a fixed 32-byte seed (overridable via TON_DEPLOYER_SEED).
+// A fixed key ensures the provisioning process and the test process derive the same
+// wallet, so the pre-mint recipient equals the test sender. Mirrors getNetworkPrivateKey.
+func getTonDeployerKey() (ed25519.PrivateKey, error) {
+	seedHex := os.Getenv("TON_DEPLOYER_SEED")
+	if seedHex == "" {
+		seedHex = DefaultTonDeployerSeed
+	}
+	seed, err := hex.DecodeString(seedHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid TON deployer seed hex %q: %w", seedHex, err)
+	}
+	if len(seed) != ed25519.SeedSize {
+		return nil, fmt.Errorf("TON deployer seed must be %d bytes, got %d", ed25519.SeedSize, len(seed))
+	}
+	return ed25519.NewKeyFromSeed(seed), nil
 }
