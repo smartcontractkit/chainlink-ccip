@@ -153,6 +153,7 @@ func TestRevokeTokenAdminRoleTimelock(t *testing.T) {
 	customer := chain.Users[0].From
 
 	// Deploy contracts
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deployapi.DeployContracts(deployapi.GetRegistry()).Apply(*env,
 		deployapi.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
@@ -336,6 +337,7 @@ func TestRevokeTokenAdminRoleDeployer(t *testing.T) {
 	customer := chain.Users[0].From
 
 	// Deploy contracts
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deployapi.DeployContracts(deployapi.GetRegistry()).Apply(*env,
 		deployapi.ContractDeploymentConfig{
 			MCMS: mcms.Input{},

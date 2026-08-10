@@ -2,6 +2,7 @@ package testsetup
 
 import (
 	"encoding/binary"
+	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -247,7 +248,9 @@ func UltraFastCurseMCMSRefs(chainSelector uint64) []datastore.AddressRef {
 // (those read ExistingAddresses from the environment datastore rather than taking them directly).
 func SeedUltraFastCurseMCMS(ds *datastore.MemoryDataStore, chainSelector uint64) error {
 	for _, ref := range UltraFastCurseMCMSRefs(chainSelector) {
-		if err := ds.Addresses().Add(ref); err != nil {
+		// Idempotent on purpose: a test that deploys more than once seeds the same ref each time, and
+		// the ref may already have been carried in from a merged datastore.
+		if err := ds.Addresses().Add(ref); err != nil && !errors.Is(err, datastore.ErrAddressRefExists) {
 			return err
 		}
 	}

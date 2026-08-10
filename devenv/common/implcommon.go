@@ -89,6 +89,15 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	if contractVersion == "" {
 		contractVersion = "github.com/smartcontractkit/chainlink-ton@contracts/1.6.0" // Feb 19 2026
 	}
+	// MCMS first. The chain-contract deploy uses the UltraFastCurse timelock as the RMN's curse
+	// admin and fails without it, and the UltraFastCurse instance in turn needs the CLLCCIP
+	// timelock as its admin, so the two must be deployed in that order before any contracts.
+	for _, qualifier := range []string{cciputils.CLLQualifier, cciputils.UltraFastCurseMCMSQualifier} {
+		if err := deployMCMSInstance(env, runningDS, dReg, version, selector, qualifier); err != nil {
+			return nil, err
+		}
+	}
+
 	out, err := deployops.DeployContracts(dReg).Apply(*env, deployops.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
@@ -175,11 +184,34 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	tmp.Merge(env.DataStore)
 	tmp.Merge(out.DataStore.Seal())
 	runningDS.Merge(out.DataStore.Seal())
+	// Publish the deployed contract addresses back onto the environment. Later steps resolve LINK and
+	// friends from here.
+	env.DataStore = tmp.Seal()
 
-	qualifier := "CLLCCIP"
-	cs := deployops.DeployMCMS(dReg, nil)
-	fcs := deployops.FinalizeDeployMCMS(dReg, nil)
-	output, err := cs.Apply(*env, deployops.MCMSDeploymentConfig{
+	return runningDS.Seal(), nil
+}
+
+// deployMCMSInstance deploys and finalizes one MCMS instance for the qualifier, merging its
+// addresses into env.DataStore and runningDS so later steps can resolve them.
+func deployMCMSInstance(
+	env *deployment.Environment,
+	runningDS *datastore.MemoryDataStore,
+	dReg *deployops.DeployerRegistry,
+	version *semver.Version,
+	selector uint64,
+	qualifier string,
+) error {
+	perChain := map[uint64]deployops.MCMSDeploymentConfigPerChain{
+		selector: {
+			Canceller:        SingleGroupMCMS(),
+			Bypasser:         SingleGroupMCMS(),
+			Proposer:         SingleGroupMCMS(),
+			TimelockMinDelay: big.NewInt(1),
+			Qualifier:        ptr.String(qualifier),
+		},
+	}
+
+	output, err := deployops.DeployMCMS(dReg, nil).Apply(*env, deployops.MCMSDeploymentConfig{
 		AdapterVersion: version,
 		MCMS: mcms.Input{
 			Qualifier:      qualifier,
@@ -187,41 +219,31 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 			ValidUntil:     math.MaxUint32,
 			Description:    "Accept MCM contract ownership on timelock",
 		},
-		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
-			selector: {
-				Canceller:        SingleGroupMCMS(),
-				Bypasser:         SingleGroupMCMS(),
-				Proposer:         SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(1),
-				Qualifier:        ptr.String(qualifier),
-			},
-		},
+		Chains: perChain,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("deploying MCMS: %w", err)
+		return fmt.Errorf("deploying MCMS %q: %w", qualifier, err)
 	}
 	runningDS.Merge(output.DataStore.Seal())
-	tmp.Merge(output.DataStore.Seal())
-	env.DataStore = tmp.Seal()
+	merged := datastore.NewMemoryDataStore()
+	merged.Merge(env.DataStore)
+	merged.Merge(output.DataStore.Seal())
+	env.DataStore = merged.Seal()
 
-	finalizeOutput, err := fcs.Apply(*env, deployops.MCMSDeploymentConfig{
+	finalizeOutput, err := deployops.FinalizeDeployMCMS(dReg, nil).Apply(*env, deployops.MCMSDeploymentConfig{
 		AdapterVersion: version,
-		Chains: map[uint64]deployops.MCMSDeploymentConfigPerChain{
-			selector: {
-				Canceller:        SingleGroupMCMS(),
-				Bypasser:         SingleGroupMCMS(),
-				Proposer:         SingleGroupMCMS(),
-				TimelockMinDelay: big.NewInt(1),
-				Qualifier:        ptr.String(qualifier),
-			},
-		},
+		Chains:         perChain,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("finalizing MCMS deployment: %w", err)
+		return fmt.Errorf("finalizing MCMS %q deployment: %w", qualifier, err)
 	}
 	runningDS.Merge(finalizeOutput.DataStore.Seal())
+	merged = datastore.NewMemoryDataStore()
+	merged.Merge(env.DataStore)
+	merged.Merge(finalizeOutput.DataStore.Seal())
+	env.DataStore = merged.Seal()
 
-	return runningDS.Seal(), nil
+	return nil
 }
 
 // UpgradeEVMFeeQuotersTo2_0AfterLanes runs FeeQuoter 2.0 deployment + ramp repoint for each selector (1.6 MCMS path).

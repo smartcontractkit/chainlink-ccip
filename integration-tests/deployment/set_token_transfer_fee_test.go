@@ -72,6 +72,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, mcmsAdapter)
 
 	// Deploy FeeQuoter + other contracts
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deploy.DeployContracts(deployRegistry).Apply(*env, deploy.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deploy.ContractDeploymentConfigPerChain{
@@ -259,6 +260,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	}
 
 	// Deploy FeeQuoter + other contracts
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deploy.DeployContracts(dplyRegistry).Apply(*e, deploy.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
