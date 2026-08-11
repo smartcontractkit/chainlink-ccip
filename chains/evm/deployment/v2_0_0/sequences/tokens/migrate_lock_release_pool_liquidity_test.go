@@ -434,7 +434,7 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 	require.Equal(t, common.Address{}, rebalancerReport.Output,
 		"Rebalancer should be restored to original value (zero address)")
 
-	// Verify timelock was removed from lockbox authorized callers
+	// Verify timelock was never added to lockbox authorized callers
 	authCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		erc20_lock_box.GetAllAuthorizedCallers,
@@ -446,7 +446,7 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 	)
 	require.NoError(t, err)
 	require.NotContains(t, authCallersReport.Output, s.deployer,
-		"Timelock should be removed from lockbox authorized callers after migration")
+		"Timelock should not be in lockbox authorized callers (transfer-only flow)")
 }
 
 func TestMigrateLockReleasePoolLiquidity_UnsiloedFullBasisPoints(t *testing.T) {
@@ -960,7 +960,7 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	require.Equal(t, 0, totalLiquidity.Cmp(lockboxBal.Output), "Lockbox should hold all liquidity")
 }
 
-func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
+func TestMigrateLockReleasePoolLiquidity_DoesNotTamperWithAuthorizedCallers(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	totalLiquidity := big.NewInt(5000)
 	s := setupMigrationTest(t, chainSel, totalLiquidity)
@@ -987,7 +987,7 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 	require.Contains(t, preCallersReport.Output, preExistingCaller,
 		"Pre-existing caller should be present before migration")
 
-	// Run migration
+	// Run migration (transfer-based, never touches authorized callers)
 	basisPoints := uint16(10000)
 	executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
@@ -1007,11 +1007,11 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.lockBoxAddr})
 	require.NoError(t, err)
 	require.Contains(t, postCallersReport.Output, preExistingCaller,
-		"Pre-existing authorized caller should be preserved after migration")
+		"Pre-existing authorized caller should be preserved after migration (transfer does not touch authorized callers)")
 
-	// Verify timelock (deployer) was removed from authorized callers
+	// Verify timelock was never added to authorized callers
 	require.NotContains(t, postCallersReport.Output, s.deployer,
-		"Timelock should be removed from lockbox authorized callers after migration")
+		"Timelock should not be in lockbox authorized callers (transfer-only flow)")
 }
 
 func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T) {
