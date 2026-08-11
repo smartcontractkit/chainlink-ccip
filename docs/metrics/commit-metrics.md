@@ -1,7 +1,5 @@
 ## Metrics coverage assessment — commit plugin
 
-I read through `commit/metrics`, `commit/merkleroot` (+ `rmn`), `commit/chainfee`, `commit/tokenprice`, and the top-level `commit/plugin.go` / `report.go` / `factory.go`. There's a real gap, and it's structural, not just a few missing gauges.
-
 **Ground rule for everything below: the presence of a log line — even a "stable identifier" some log-analysis tooling already keys on — is never a reason to exclude a metric.** Logs are exactly the noisy, low-signal, un-queryable thing motivating this work; a few items here are genuinely *only* visible at `Debugw`, which is worse than a "stable" log, not better. Nothing was cut from the list below because it was already logged.
 
 ### What exists today (`commit/metrics/prom.go`)
@@ -9,12 +7,7 @@ I read through `commit/metrics`, `commit/merkleroot` (+ `rmn`), `commit/chainfee
 - Generic per-processor instrumentation via `TrackedProcessor` (wraps merkleroot/chainfee/tokenprice): latency histogram, error counter, and an **output-size counter** driven by each type's `Stats()` — but `Stats()` only returns `len(map)`-style item counts (e.g. `gasPrices: 3`), never the actual values.
 - `ccip_commit_max_sequence_number` gauge — but only fed from `MerkleRootChain.SeqNumsRange.End()` in `TrackObservation`/`TrackOutcome`, i.e. **only when a root is actually being built for a report**.
 - `ccip_commit_latest_round_id`, `ccip_commit_config_digest_mismatch`, `ccip_commit_loopp_ccip_provider_supported`.
-- RMN-specific: `TrackRmnReport` (build latency/success) and `TrackRmnRequest` (per-node request latency/error) — merkleroot and its `rmn` subpackage are the only parts of the plugin with a dedicated `MetricsReporter` sub-interface.
 - **`chainfee` and `tokenprice` have no dedicated metrics interface at all** — they only get the generic latency/error/size instrumentation above. Token prices, gas prices, and their staleness/deviation/failure states are otherwise 100% log-only.
-
-### Your example, confirmed
-
-`merkleroot.Observation` has `OnRampMaxSeqNums` and `OffRampNextSeqNums` fields (`commit/merkleroot/types.go:34-35`) populated **every round**, but no `Reporter` method ever reads them — the only sequence-number gauge (`ccip_commit_max_sequence_number`) comes from `MerkleRootChain.SeqNumsRange.End()`, which only exists once a root is already being built. So if the plugin is stuck reading a chain (RPC lag, stuck in `selectingRangesForReport`), there's no gauge showing it — the one gauge that looks related lags or is absent during exactly the failure mode you'd want visibility into.
 
 ### Cross-cutting themes (repeat in every processor)
 
@@ -37,12 +30,14 @@ Severity is about production-triage value, independent of whether something is l
 These aren't owned by any single processor — they're the outer round loop and the report-acceptance path — but two gaps here turned out to matter as much as anything processor-specific once an actual incident was traced end-to-end.
 
 **High**
-- **No heartbeat / liveness signal.** `commit/plugin.go:434` (`Outcome()`). If the whole round pipeline wedges (deadlock, a panic-recovery masking a crash loop, OCR itself failing to schedule rounds), every metric in this doc simply stops updating instead of showing a bad value. A stale gauge and a valid-but-bad gauge look identical unless you specifically alert on absence/staleness — easy to forget when every other alert here is threshold-based. This should be step 0 of any triage tree, and today it isn't answerable from commit-plugin metrics at all. → Gauge/counter, e.g. `ccip_commit_last_successful_round_timestamp`, set unconditionally near the top of `Outcome()` (and ideally `Observation()` too) regardless of what happens downstream.
-- **Report-acceptance / transmission-validation rejections have zero metrics.** `commit/report.go:126-247` (`validateReport`, called from both `ShouldAcceptAttestedReport` and `ShouldTransmitAcceptedReport`) has eight distinct rejection paths — empty/invalid merkle root, duplicate RMN signature, insufficient RMN signatures, cursed report, dest chain unsupported, config digest mismatch, stale report, root-blessing mismatch — every one of them `Warnw`/`Errorw`/`Debugf` only. This sits directly upstream of merkleroot's own `ReportTransmissionGaveUp` counter: if every oracle's local `validateReport` call rejects a report before anyone ever calls transmit, "gave up" fires with **zero on-chain trace at all** (no tx ever submitted) — a completely different remediation path than "tx submitted but reverted" or "tx stuck in mempool." Without per-reason counts here, those scenarios are indistinguishable from `ccip_commit_report_transmission_gave_up_total` alone. → Counter `ccip_commit_report_validation_rejected_total{phase="should_accept"|"should_transmit", reason="empty_root|invalid_seqnum_range|duplicate_rmn_sig|insufficient_rmn_sigs|cursed|dest_not_supported|config_digest_mismatch|stale|root_blessing_mismatch"}`.
+- **No heartbeat / liveness signal.** `commit/plugin.go:434` (`Outcome()`). If the whole round pipeline wedges (deadlock, a panic-recovery masking a crash loop, OCR itself failing to schedule rounds), every metric in this doc simply stops updating instead of showing a bad value. A stale gauge and a valid-but-bad gauge look identical unless you specifically alert on absence/staleness — easy to forget when every other alert here is threshold-based. This should be step 0 of any triage tree, and today it isn't answerable from commit-plugin metrics at all. → **Implemented**: counter `ccip_commit_plugin_heartbeat{chainFamily, chainID, phase="observation"|"outcome"}`, incremented unconditionally at the very top of `Observation()`/`Outcome()`, before any decode, state check, or early return.
+
+  **Why this isn't already covered by the pre-existing `ccip_commit_latest_round_id` gauge**, since at a glance both look like "something updates roughly once per round": `ccip_commit_latest_round_id` is set by `trackLatestRoundID`, called from inside `TrackObservation`/`TrackOutcome` — but only while looping over `obs.MerkleRootObs.MerkleRoots` / `outcome.MerkleRootOutcome.RootsToReport`. Per `merkleroot.getObservation` (`merkleroot/observation.go:281-331`), that field is only populated in the `buildingReport` state; it's empty in `selectingRangesForReport` and `waitingForReportTransmission`, i.e. for most of the state machine's time. It's also labeled per **source chain**, not per plugin instance. So it only moves during the fraction of rounds where the processor happens to be actively building a report with at least one root in it — a perfectly healthy processor sitting in `selectingRangesForReport` because a lane has no new messages will let this gauge go stale for entirely benign reasons. You can't tell "no traffic on this lane" apart from "plugin is wedged" by watching it alone. `ccip_commit_plugin_heartbeat` is unconditional and per-instance precisely to remove that ambiguity: the two are complementary, not overlapping — `latest_round_id` tells you about a specific chain's last-reported root, `plugin_heartbeat` tells you the process is alive at all, and you need the second to safely interpret staleness in the first (or in any other gauge in this doc).
+- **Report-acceptance / transmission-validation rejections have zero metrics.** `commit/report.go:126-247` (`validateReport`, called from both `ShouldAcceptAttestedReport` and `ShouldTransmitAcceptedReport`) has several distinct rejection paths — decode failures, empty/invalid merkle root, cursed report, dest chain unsupported, config digest mismatch, stale report, root-blessing mismatch — every one of them `Warnw`/`Errorw`/`Debugf` only. (The RMN-signature rejection paths in the same function — duplicate/insufficient RMN signatures — aren't instrumented: RMN blessing/signing is effectively dead code now that `RMNEnabled` is hardcoded off, so they shouldn't occur.) This sits directly upstream of merkleroot's own `ReportTransmissionGaveUp` counter: if every oracle's local `validateReport` call rejects a report before anyone ever calls transmit, "gave up" fires with **zero on-chain trace at all** (no tx ever submitted) — a completely different remediation path than "tx submitted but reverted" or "tx stuck in mempool." Without per-reason counts here, those scenarios are indistinguishable from `ccip_commit_report_transmission_gave_up_total` alone. → **Implemented**: counter `ccip_commit_report_validation_rejected{phase="should_accept"|"should_transmit", reason="decode_report|decode_report_info|empty_root|invalid_seqnum_range|cursed_check_error|cursed|dest_support_check_error|dest_not_supported|config_digest_check_error|config_digest_mismatch|stale|root_blessing_mismatch"}`.
 
 ### Shared: consensus aggregation (`internal/plugincommon/consensus/consensus.go`)
 
-Used by commit (`chainfee`, `merkleroot`, `merkleroot/rmn/controller.go`, `plugin.go`, `report.go`), `execute/plugin_functions.go`, **and** `internal/plugincommon/discovery/processor.go` — this is genuinely shared infra, not commit-specific, which shapes the recommended fix below. Reviewed design, not yet implemented.
+Used by commit (`chainfee`, `merkleroot`, `plugin.go`, `report.go`), `execute/plugin_functions.go`, **and** `internal/plugincommon/discovery/processor.go` — this is genuinely shared infra, not commit-specific, which shapes the recommended fix below. Reviewed design, not yet implemented.
 
 **High**
 - **`GetConsensusMap` collapses three distinguishable outcomes into one `Debugw`/`Warnw` line, both marked `// TODO: metrics`** (`consensus.go:34-56`). `NewMinObservation.GetValid()` (`min_observation.go:57-66`) buckets observations by identical value and returns every distinct value that independently cleared the threshold, which means there are three cases today, not two:
@@ -74,7 +69,7 @@ Used by commit (`chainfee`, `merkleroot`, `merkleroot/rmn/controller.go`, `plugi
 
   **Consistency note:** `GetConsensusMapAggregator` (`consensus.go:62-81`) and `GetOrderedConsensus` (`consensus.go:113-148`) have the same unmetriced pattern but structurally can't produce case 3 — the aggregator combines all values regardless of agreement, and ordered-consensus just needs a count, not matching values. `GetOrderedConsensus` does have its own distinct third case (`consensus.go:127-133`, "found a negative or 0 threshold" — a config-error class, currently silently skipped). If this file is being touched, apply the same additive `(result, reasons)` pattern to all three for one coherent `{objectName, key, reason}` metric family instead of fixing `GetConsensusMap` alone and leaving the other two as later follow-ups.
 
-### Merkle root processor (`commit/merkleroot`, `commit/merkleroot/rmn`)
+### Merkle root processor (`commit/merkleroot`)
 
 **High**
 - **Raw onramp max seq num / offramp next seq num per source chain, every round** (your example). `observation.go:287-288` (`ObserveLatestOnRampSeqNums`/`ObserveOffRampNextSeqNums`), logged at `Debugw` only. → Gauge `{sourceChain}`, both series, distinct from the existing `ccip_commit_max_sequence_number`.
@@ -85,26 +80,14 @@ Used by commit (`chainfee`, `merkleroot`, `merkleroot/rmn/controller.go`, `plugi
 - **`GetFChain` failure** — literally has `// TODO: metrics` in the source. `observation.go:862-871`. Degrades to empty FChain map, which then fails consensus and stalls the round. → Counter.
 - **Consensus-observation-failed round** (`ConsensusObservationFailed`, entire outcome empty) — `outcome.go:88-92`, gated entirely by `getConsensusObservation`'s upfront requirement that the DON reach 2·fRoleDON+1 agreement on a *single* FChain value for the **destination chain** (`outcome.go:471-480`); every other per-chain consensus computation (roots, onramp/offramp seq nums, RMN config) degrades gracefully per-chain and cannot trigger this path. Two consequences for the runbook: (1) this failure is inherently **destination-chain-wide, not lane-specific** — if it's firing, every source chain reporting into this dest chain should be stalling simultaneously, not just one lane, which is a fast way to rule this branch in or out; (2) the counter alone only tells you *that* consensus failed, not *why*. Pair it with the shared `consensus.go` fix above (`objectName="fChain", key=<destChain>`) to see the drop directly, and with the `GetFChain`-failure counter to distinguish "too few oracles could even read it" (home-chain RPC/read outage) from "oracles disagree" (home-chain config mid-rollout/desynced across the DON — corroborate with `ccip_commit_config_digest_mismatch` flipping around the same time). Already a "stable log identifier" the team log-mines — evidence a metric is overdue, not a reason to skip one. → Counter, `{chain_family, chain_id}` (destination chain, matching labels used elsewhere in this reporter).
 - **Report transmission gives up / retry cost.** `outcome.go` (`ReportTransmissionGaveUp`), `Outcome.ReportTransmissionCheckAttempts`. One of the most common on-call pages; today `Warnw` with no counter. → Counter + histogram of attempts.
-- **RMN-enabled roots dropped wholesale** (signed-roots-not-subset / parse error) — an entire round's RMN-protected chains get zero inclusion. `outcome.go:270-299`, `Errorw`. → Counter `{reason}`.
-- **RMN chain-level quorum result** (zero roots / insufficient votes / success) per source chain — `controller.go:557-603`, `Infow` only, easily lost in volume. → Counter `{sourceChain, result}`.
-- **Byzantine root disagreement** (`"more than one valid root for chain"` / `"no valid root for chain"`) — a security/integrity signal currently indistinguishable from a mundane timeout. `controller.go:848-876`. → Counter `{reason}`.
 
 **Medium**
 - Truncation due to `MaxMerkleTreeSize` (chain throughput-bound). `outcome.go:174-178`, `Debugf`. → Counter `{sourceChain}`.
 - Offramp lane misconfiguration bucket (live / skipped-not-a-lane / skipped-disabled / rmn-misconfigured); `rmnMisconfigured` in particular indicates config drift. `observation.go:53-89,634-646`. → Gauge `{sourceChain, status}`.
 - OnRamp/OffRamp invariant violations (offramp-ahead-of-onramp, onramp-max-zero, offramp-seqnum-regression) — explicitly documented in-package as stall signals. `outcome.go:43-44,152-161,421-428`. → Counter `{sourceChain, type}`.
 - Insufficient consensus on `OffRampNextSeqNums` for a chain — chain silently stops progressing, looks identical to "no new messages" from outside. `outcome.go:515-531`. → Counter `{sourceChain}`.
-- Per-root inclusion/exclusion reason (rmn-enabled-unsigned vs rmn-disabled-unexpectedly-signed) — answers "why didn't chain X's root make the report." `outcome.go:342-378`. → Counter `{sourceChain, reason}`.
-- `ValidateRootBlessings` mismatches at report-acceptance time (`commit/report.go:234` → `merkleroot/transmission_checks.go:28-52`) — distinct from the existing config-digest-mismatch gauge. → Counter `{reason}`.
-- RMN node-coverage shortfall per chain (dropped from signature request entirely). `controller.go:188-203`. → Counter/gauge `{sourceChain}`.
-- RMN internal-error classes currently unlabeled or folded into a generic `invalid_response` (dest==source config bug, sanity-check failure, node-info-not-found / stale registry). `controller.go:395-398,358-367,421-425,908-909,1010-1013`. → Counter `{reason}`.
-- Signature-verification failure conflated with generic "invalid response" (crypto mismatch vs. malformed-but-honest data are very different security signals), both in the RMN controller (`crypto.go:36-63`, `controller.go:1052-1089`) and on the plugin/query side (`observation.go:245-248`). → Split the existing label or add a dedicated counter.
-- `ErrSignaturesNotProvidedByLeader` recurrence — points to a leader-side RMN problem invisible to followers today. `observation.go:41-42,118-125`. → Counter.
-- RMN `ObserveRMNRemoteCfg` failures — blocks RMN controller init and outcome's RMN report building. `observation.go:846-856`, `Errorw`. → Counter.
 
-**Low**
-- RMN peer/stream connectivity state (active streams, peer-group connected) — currently only per-message `Infow` (log noise, no aggregate). `rmn/peerclient.go:57-183`. → Gauge.
-- RMN controller re-initialization churn (should be rare; frequent churn = config flapping or bug). `observation.go:143-185`. → Counter. Also worth a static `ccip_commit_rmn_enabled{chain_id}` gauge since RMN is now hardcoded off — useful for dashboard filtering / confirming the deprecation.
+(RMN blessing/signing findings — signed-roots-dropped, per-root signed/unsigned filtering, chain quorum result, Byzantine root disagreement, RMN controller node-coverage/internal-errors, signature-verification conflation, `ErrSignaturesNotProvidedByLeader`, `ObserveRMNRemoteCfg` failures, peer/stream connectivity, controller re-init churn, and the standalone `ValidateRootBlessings` proposal (now covered by the implemented `root_blessing_mismatch` reason above) — were all dropped from this doc. All of these sit behind `if rmnEnabled` in `buildMerkleRootsOutcome` or are otherwise part of the RMN controller/signing path, which is effectively dead code now that `RMNEnabled` is hardcoded off and the controller is slated for removal; cursing, covered above, is the one RMN-adjacent signal still live in production.)
 
 ### Chain fee processor (`commit/chainfee`)
 
@@ -149,18 +132,6 @@ Also no dedicated `MetricsReporter`. Note `ValidateObservation` isn't even wrapp
 
 **Low, but flagged as a miss in my first pass — don't let "it's Debug" read as "low priority"**
 - **Token-price reporting silently disabled by config** (`TokenPriceBatchWriteFrequency == 0`) is logged at `Debugw` — *less* visible in prod than a "stable" Info/Warn log, since Debug is typically off entirely. `processor.go:102-106`. This is exactly the pattern the existing `ccip_commit_loopp_ccip_provider_supported` boolean gauge was built for, and it's a cheap, precedented fix. → Gauge `{destChain}` (1/0).
-
----
-
-## Suggested next step
-
-This is large enough to be its own workstream. I'd sequence it as:
-1. **Shared infra first** (benefits all three processors): fix `internal/plugincommon/consensus/consensus.go`'s `// TODO: metrics`, and add a timeout counter in `internal/libs/asynclib/goroutines.go`. Small, high-leverage, no processor-specific design needed.
-2. **Merkleroot high-severity list** — directly answers your stated pain point (onramp/offramp liveness, curse state, transmission give-up).
-3. **Chainfee + tokenprice high-severity list** — both need a dedicated `MetricsReporter` sub-interface first (mirroring `merkleroot.MetricsReporter`), then the per-value gauges/staleness/failure counters.
-4. Medium/low tiers as follow-up passes.
-
-Want me to turn this into an implementation plan (starting with #1), or file it as a ticket first?
 
 ---
 
