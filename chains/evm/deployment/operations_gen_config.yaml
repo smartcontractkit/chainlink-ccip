@@ -634,6 +634,18 @@ contracts:
       - name: versionTag
         access: public
 
+  - contract_name: VerifierTestHelper
+    version: "2.0.0"
+    functions:
+      - name: getTestRouter
+        access: public
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: withdrawFeeTokens
+        access: public
+
   - contract_name: RMN
     version: "2.1.0"
     functions:
