@@ -12,16 +12,25 @@ contract VerifierTestHelper is BaseVerifier, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error MessageCannotHaveSideEffects();
+  error MustUseAllowlist();
+  error MustUseTestRouter();
 
   function typeAndVersion() external pure override returns (string memory) {
     return "VerifierTestHelper 2.0.0";
   }
 
+  /// @notice This value is the test router, not a real production router. It is asserted all chains configured
+  /// for this contract are this exact test router address.
+  address internal immutable i_testRouter;
+
   constructor(
+    address testRouter,
     string[] memory storageLocations,
     address rmn,
     bytes4 versionTag
-  ) BaseVerifier(storageLocations, rmn, versionTag) {}
+  ) BaseVerifier(storageLocations, rmn, versionTag) {
+    i_testRouter = testRouter;
+  }
 
   function forwardToVerifier(
     MessageV1Codec.MessageV1 calldata message,
@@ -69,11 +78,25 @@ contract VerifierTestHelper is BaseVerifier, Ownable2StepMsgSender {
     }
   }
 
+  function getTestRouter() public view returns (address) {
+    return i_testRouter;
+  }
+
   /// @notice Updates remote chains specific configs.
   /// @param remoteChainConfigArgs Array of remote chain specific configs.
   function applyRemoteChainConfigUpdates(
     RemoteChainConfigArgs[] calldata remoteChainConfigArgs
   ) external onlyOwner {
+    for (uint256 i = 0; i < remoteChainConfigArgs.length; ++i) {
+      RemoteChainConfigArgs calldata args = remoteChainConfigArgs[i];
+      if (!args.allowlistEnabled) {
+        revert MustUseAllowlist();
+      }
+
+      if (address(args.router) != getTestRouter()) {
+        revert MustUseTestRouter();
+      }
+    }
     _applyRemoteChainConfigUpdates(remoteChainConfigArgs);
   }
 
