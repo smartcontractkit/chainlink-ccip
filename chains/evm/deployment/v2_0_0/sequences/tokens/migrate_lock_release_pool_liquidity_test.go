@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	new_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	seqtypes "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	latest_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_lock_release_token_pool"
@@ -326,7 +327,7 @@ func executeMigrationSequence(
 	bundle operations.Bundle,
 	blockChains chain.BlockChains,
 	input tokens_core.MigrateLockReleasePoolLiquidityInput,
-) {
+) seqtypes.OnChainOutput {
 	t.Helper()
 
 	report, err := operations.ExecuteSequence(
@@ -367,6 +368,8 @@ func executeMigrationSequence(
 			require.NoError(t, err)
 		}
 	}
+
+	return report.Output
 }
 
 func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T) {
@@ -989,7 +992,7 @@ func TestMigrateLockReleasePoolLiquidity_DoesNotTamperWithAuthorizedCallers(t *t
 
 	// Run migration (transfer-based, never touches authorized callers)
 	basisPoints := uint16(10000)
-	executeMigrationSequence(t,
+	output := executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
@@ -1000,6 +1003,19 @@ func TestMigrateLockReleasePoolLiquidity_DoesNotTamperWithAuthorizedCallers(t *t
 			BasisPoints:     &basisPoints,
 		},
 	)
+
+	// Verify no applyAuthorizedCallerUpdates calls appear in any batch transaction
+	parsedABI, err := abi.JSON(strings.NewReader(erc20_lock_box.ERC20LockBoxABI))
+	require.NoError(t, err)
+	authSelector := parsedABI.Methods["applyAuthorizedCallerUpdates"].ID
+	for _, batch := range output.BatchOps {
+		for _, tx := range batch.Transactions {
+			if len(tx.Data) >= 4 {
+				require.NotEqual(t, authSelector[:], tx.Data[:4],
+					"migration batch should not contain applyAuthorizedCallerUpdates calls")
+			}
+		}
+	}
 
 	// Verify pre-existing caller is still present after migration
 	postCallersReport, err := operations.ExecuteOperation(

@@ -164,7 +164,7 @@ func migrateUnsiloedPool(
 		return sequences.OnChainOutput{}, err
 	}
 
-	transferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.Transfer, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
+	transferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
 		ChainSelector: chainSel,
 		Address:       tokenAddr,
 		Args: erc20_ops.TransferArgs{
@@ -378,7 +378,7 @@ func migrateSiloedPool(
 		}
 		ops = append(ops, withdrawReport.Output)
 
-		siloTransferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.Transfer, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
+		siloTransferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
 			ChainSelector: chainSel,
 			Address:       tokenAddr,
 			Args: erc20_ops.TransferArgs{
@@ -424,7 +424,7 @@ func migrateSiloedPool(
 		}
 		ops = append(ops, withdrawUnsiloedReport.Output)
 
-		unsiloedTransferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.Transfer, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
+		unsiloedTransferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
 			ChainSelector: chainSel,
 			Address:       tokenAddr,
 			Args: erc20_ops.TransferArgs{
