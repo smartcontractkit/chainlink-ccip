@@ -57,6 +57,10 @@ type Reporter interface {
 	TrackConsensusObservationFailed()
 	TrackReportTransmissionGaveUp(sourceChain cciptypes.ChainSelector)
 	TrackReportTransmissionAttempts(attempts uint, success bool)
+	TrackRangeTruncated(sourceChain cciptypes.ChainSelector)
+	TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelector, status string, active bool)
+	TrackSeqNumInvariantViolation(sourceChain cciptypes.ChainSelector, violationType string)
+	TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector)
 }
 
 type CommitPluginReporter interface {
@@ -106,6 +110,14 @@ func (n *Noop) TrackConsensusObservationFailed() {}
 func (n *Noop) TrackReportTransmissionGaveUp(cciptypes.ChainSelector) {}
 
 func (n *Noop) TrackReportTransmissionAttempts(uint, bool) {}
+
+func (n *Noop) TrackRangeTruncated(cciptypes.ChainSelector) {}
+
+func (n *Noop) TrackOffRampLaneStatus(cciptypes.ChainSelector, string, bool) {}
+
+func (n *Noop) TrackSeqNumInvariantViolation(cciptypes.ChainSelector, string) {}
+
+func (n *Noop) TrackOffRampConsensusInsufficient(cciptypes.ChainSelector) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}

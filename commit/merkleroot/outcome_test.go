@@ -1464,7 +1464,7 @@ func Test_getOffRampNextSequenceNumbersConsensus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res := getOffRampNextSequenceNumbersConsensus(lggr, tc.fDestChain, tc.observationsPerChain)
+			res := getOffRampNextSequenceNumbersConsensus(lggr, tc.fDestChain, tc.observationsPerChain, NoopMetrics{})
 			require.Equal(t, tc.expRes, res)
 		})
 	}

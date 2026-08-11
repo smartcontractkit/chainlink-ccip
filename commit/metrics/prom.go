@@ -139,6 +139,10 @@ type PromReporter struct {
 	bhConsensusObservationFailed metric.Int64Counter
 	bhReportTransmissionGaveUp   metric.Int64Counter
 	bhReportTransmissionAttempts metric.Int64Histogram
+	bhRangeTruncated             metric.Int64Counter
+	bhOffRampLaneStatus          metric.Int64Gauge
+	bhSeqNumInvariantViolation   metric.Int64Counter
+	bhOffRampConsensusInsuff     metric.Int64Counter
 }
 
 func NewPromReporter(
@@ -225,6 +229,22 @@ func NewPromReporter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_report_transmission_attempts histogram: %w", err)
 	}
+	rangeTruncated, err := bhClient.Meter.Int64Counter("ccip_commit_range_truncated")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_range_truncated counter: %w", err)
+	}
+	offRampLaneStatus, err := bhClient.Meter.Int64Gauge("ccip_commit_offramp_lane_status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_offramp_lane_status gauge: %w", err)
+	}
+	seqNumInvariantViolation, err := bhClient.Meter.Int64Counter("ccip_commit_seqnum_invariant_violation")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_seqnum_invariant_violation counter: %w", err)
+	}
+	offRampConsensusInsuff, err := bhClient.Meter.Int64Counter("ccip_commit_offramp_consensus_insufficient")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_offramp_consensus_insufficient counter: %w", err)
+	}
 
 	return &PromReporter{
 		lggr:        lggr,
@@ -264,6 +284,10 @@ func NewPromReporter(
 		bhConsensusObservationFailed: consensusObservationFailed,
 		bhReportTransmissionGaveUp:   reportTransmissionGaveUp,
 		bhReportTransmissionAttempts: reportTransmissionAttempts,
+		bhRangeTruncated:             rangeTruncated,
+		bhOffRampLaneStatus:          offRampLaneStatus,
+		bhSeqNumInvariantViolation:   seqNumInvariantViolation,
+		bhOffRampConsensusInsuff:     offRampConsensusInsuff,
 	}, nil
 }
 
@@ -550,4 +574,26 @@ func (p *PromReporter) TrackReportTransmissionAttempts(attempts uint, success bo
 		attribute.String("chainID", p.chainID),
 		attribute.Bool("success", success),
 	))
+}
+
+func (p *PromReporter) TrackRangeTruncated(sourceChain cciptypes.ChainSelector) {
+	p.bhRangeTruncated.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelector, status string, active bool) {
+	var value int64
+	if active {
+		value = 1
+	}
+	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("status", status))
+	p.bhOffRampLaneStatus.Record(context.Background(), value, metric.WithAttributes(attrs...))
+}
+
+func (p *PromReporter) TrackSeqNumInvariantViolation(sourceChain cciptypes.ChainSelector, violationType string) {
+	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("type", violationType))
+	p.bhSeqNumInvariantViolation.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+func (p *PromReporter) TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector) {
+	p.bhOffRampConsensusInsuff.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
 }

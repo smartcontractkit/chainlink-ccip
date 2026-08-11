@@ -55,10 +55,11 @@ Every metric proposed in this doc, with a one/two-line "why" — the full ration
 
 | Metric | Status | Why |
 |---|---|---|
-| Truncation counter `{sourceChain}` (`MaxMerkleTreeSize`) | Proposed | Chain-throughput ceiling being hit is currently `Debugf`-only. |
-| Offramp lane misconfiguration gauge `{sourceChain,status}` | Proposed | `rmn-misconfigured` in particular now flags real config drift, since a lane still expecting RMN blessing while RMN is globally off is permanently broken. |
-| Onramp/offramp invariant-violation counter `{sourceChain,type}` | Proposed | These are already documented in-code as stall signals but were never counted. |
-| Insufficient-consensus-on-`OffRampNextSeqNums` counter `{sourceChain}` | Proposed | Looks identical to "no new messages" from the outside without it. |
+| `ccip_commit_range_truncated{sourceChain}` (`MaxMerkleTreeSize`) | ✅ Implemented | Chain-throughput ceiling being hit was previously `Debugf`-only. |
+| `ccip_commit_offramp_lane_status{sourceChain,status}` | ✅ Implemented | `rmn_misconfigured` in particular now flags real config drift, since a lane still expecting RMN blessing while RMN is globally off is permanently broken. |
+| `ccip_commit_seqnum_invariant_violation{sourceChain,type}` | ✅ Implemented | These are already documented in-code as stall signals but were never counted. |
+| `ccip_commit_offramp_consensus_insufficient{sourceChain}` | ✅ Implemented | Looks identical to "no new messages" from the outside without it. |
+
 ---
 
 ## War games: incident walkthroughs
@@ -175,10 +176,10 @@ Used by commit (`chainfee`, `merkleroot`, `plugin.go`, `report.go`), `execute/pl
 - **Report transmission gives up / retry cost.** `outcome.go` (`ReportTransmissionGaveUp`), `Outcome.ReportTransmissionCheckAttempts`. One of the most common on-call pages; today `Warnw` with no counter. → Counter + histogram of attempts.
 
 **Medium**
-- Truncation due to `MaxMerkleTreeSize` (chain throughput-bound). `outcome.go:174-178`, `Debugf`. → Counter `{sourceChain}`.
-- Offramp lane misconfiguration bucket (live / skipped-not-a-lane / skipped-disabled / rmn-misconfigured); `rmnMisconfigured` in particular indicates config drift. `observation.go:53-89,634-646`. → Gauge `{sourceChain, status}`.
-- OnRamp/OffRamp invariant violations (offramp-ahead-of-onramp, onramp-max-zero, offramp-seqnum-regression) — explicitly documented in-package as stall signals. `outcome.go:43-44,152-161,421-428`. → Counter `{sourceChain, type}`.
-- Insufficient consensus on `OffRampNextSeqNums` for a chain — chain silently stops progressing, looks identical to "no new messages" from outside. `outcome.go:515-531`. → Counter `{sourceChain}`.
+- Truncation due to `MaxMerkleTreeSize` (chain throughput-bound). `outcome.go:174-178`, `Debugf`. → **Implemented**: counter `ccip_commit_range_truncated{sourceChain}`.
+- Offramp lane misconfiguration bucket (live / skipped-not-a-lane / skipped-disabled / rmn-misconfigured); `rmnMisconfigured` in particular indicates config drift. `observation.go:53-89,634-646`. → **Implemented**: gauge `ccip_commit_offramp_lane_status{sourceChain, status="live"|"skipped_not_a_lane"|"skipped_disabled"|"rmn_misconfigured"}` (1/0), reported for all four statuses every round so a chain moving between buckets can't leave a stale "still active" value behind.
+- OnRamp/OffRamp invariant violations (offramp-ahead-of-onramp, onramp-max-zero, offramp-seqnum-regression) — explicitly documented in-package as stall signals. `outcome.go:43-44,152-161,421-428`. → **Implemented**: counter `ccip_commit_seqnum_invariant_violation{sourceChain, type="offramp_ahead_of_onramp"|"onramp_max_zero"|"offramp_seqnum_regression"}`.
+- Insufficient consensus on `OffRampNextSeqNums` for a chain — chain silently stops progressing, looks identical to "no new messages" from outside. `outcome.go:515-531`. → **Implemented**: counter `ccip_commit_offramp_consensus_insufficient{sourceChain}`.
 
 (RMN blessing/signing findings — signed-roots-dropped, per-root signed/unsigned filtering, chain quorum result, Byzantine root disagreement, RMN controller node-coverage/internal-errors, signature-verification conflation, `ErrSignaturesNotProvidedByLeader`, `ObserveRMNRemoteCfg` failures, peer/stream connectivity, controller re-init churn, and the standalone `ValidateRootBlessings` proposal (now covered by the implemented `root_blessing_mismatch` reason above) — were all dropped from this doc. All of these sit behind `if rmnEnabled` in `buildMerkleRootsOutcome` or are otherwise part of the RMN controller/signing path, which is effectively dead code now that `RMNEnabled` is hardcoded off and the controller is slated for removal; cursing, covered above, is the one RMN-adjacent signal still live in production.)
 

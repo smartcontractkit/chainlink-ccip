@@ -85,7 +85,7 @@ func (p *Processor) getOutcome(
 ) (Outcome, processorState, error) {
 	nextState := previousOutcome.nextState()
 
-	consObservation, err := getConsensusObservation(lggr, p.reportingCfg.F, p.destChain, aos)
+	consObservation, err := getConsensusObservation(lggr, p.reportingCfg.F, p.destChain, aos, p.metricsReporter)
 	if err != nil {
 		lggr.Warnw(ConsensusObservationFailed, "err", err)
 		p.metricsReporter.TrackConsensusObservationFailed()
@@ -164,10 +164,12 @@ func reportRangesOutcome(
 				lggr.Infow(OnRampMaxSeqNumZero,
 					logutil.FieldChain, chainSel,
 					"note", "not necessarily an issue, but if it persists without progress investigate why oracles observe 0")
+				metricsReporter.TrackSeqNumInvariantViolation(chainSel, "onramp_max_zero")
 			} else {
 				lggr.Errorw(ImpossibleSeqNumsOnOffRamp,
 					"detail", "offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
 					logutil.FieldChain, chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+				metricsReporter.TrackSeqNumInvariantViolation(chainSel, "offramp_ahead_of_onramp")
 			}
 		}
 
@@ -183,6 +185,7 @@ func reportRangesOutcome(
 
 			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
 				lggr.Debugf("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
+				metricsReporter.TrackRangeTruncated(chainSel)
 			} else {
 				lggr.Debugf("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
 			}
@@ -440,6 +443,7 @@ func checkForReportTransmission(
 					logutil.FieldSeqNum, previousSeqNumChain.SeqNum,
 					"currentSeqNum", currentSeqNum,
 				)
+				metricsReporter.TrackSeqNumInvariantViolation(previousSeqNumChain.ChainSel, "offramp_seqnum_regression")
 			}
 		}
 	}
@@ -483,6 +487,7 @@ func getConsensusObservation(
 	fRoleDON int,
 	destChain cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[Observation],
+	metricsReporter MetricsReporter,
 ) (consensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
@@ -519,9 +524,10 @@ func getConsensusObservation(
 			"OnRamp Max Seq Nums",
 			aggObs.OnRampMaxSeqNums,
 			fChain),
-		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(lggr, uint(fDestChain), aggObs.OffRampNextSeqNums),
-		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
-		FChain:             fChains,
+		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(
+			lggr, uint(fDestChain), aggObs.OffRampNextSeqNums, metricsReporter),
+		RMNRemoteConfig: consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
+		FChain:          fChains,
 	}
 
 	return consensusObs, nil
@@ -536,6 +542,7 @@ func getOffRampNextSequenceNumbersConsensus(
 	lggr logger.Logger,
 	fDestChain uint,
 	observationsPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
+	metricsReporter MetricsReporter,
 ) map[cciptypes.ChainSelector]cciptypes.SeqNum {
 	lggr = logger.With(lggr, "fDestChain", fDestChain)
 
@@ -548,6 +555,7 @@ func getOffRampNextSequenceNumbersConsensus(
 				"numObservations", len(observedNextSeqNums),
 				"requiredObservations", 2*fDestChain+1,
 			)
+			metricsReporter.TrackOffRampConsensusInsufficient(sourceChain)
 			continue
 		}
 

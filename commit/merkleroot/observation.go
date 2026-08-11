@@ -50,6 +50,19 @@ func isLiveOffRampSourceLane(cfg readerpkg.StaticSourceChainConfig, exists bool)
 	return exists && cfg.IsEnabled && len(cfg.OnRamp) > 0
 }
 
+// Offramp lane status labels used with MetricsReporter.TrackOffRampLaneStatus. Mutually exclusive: a
+// source chain is in exactly one of these buckets every round.
+const (
+	laneStatusLive             = "live"
+	laneStatusSkippedNotALane  = "skipped_not_a_lane"
+	laneStatusSkippedDisabled  = "skipped_disabled"
+	laneStatusRMNMisconfigured = "rmn_misconfigured"
+)
+
+var allOffRampLaneStatuses = []string{
+	laneStatusLive, laneStatusSkippedNotALane, laneStatusSkippedDisabled, laneStatusRMNMisconfigured,
+}
+
 // offRampLaneClassification buckets source chains by their offramp lane status.
 type offRampLaneClassification struct {
 	// live lanes are enabled, have an onRamp, and have RMN verification disabled (queryable).
@@ -60,6 +73,25 @@ type offRampLaneClassification struct {
 	skippedDisabled []cciptypes.ChainSelector
 	// rmnMisconfigured are live lanes that unexpectedly have RMN verification enabled.
 	rmnMisconfigured []cciptypes.ChainSelector
+}
+
+// statusByChain returns the single status bucket each source chain landed in.
+func (c offRampLaneClassification) statusByChain() map[cciptypes.ChainSelector]string {
+	statuses := make(map[cciptypes.ChainSelector]string,
+		len(c.live)+len(c.skippedNotALane)+len(c.skippedDisabled)+len(c.rmnMisconfigured))
+	for _, chain := range c.live {
+		statuses[chain] = laneStatusLive
+	}
+	for _, chain := range c.skippedNotALane {
+		statuses[chain] = laneStatusSkippedNotALane
+	}
+	for _, chain := range c.skippedDisabled {
+		statuses[chain] = laneStatusSkippedDisabled
+	}
+	for _, chain := range c.rmnMisconfigured {
+		statuses[chain] = laneStatusRMNMisconfigured
+	}
+	return statuses
 }
 
 // classifyOffRampSourceLanes buckets the supported source chains based on their offramp source chain
@@ -643,6 +675,14 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 	}
 
 	classification := classifyOffRampSourceLanes(supportedSourceChains, sourceChainsCfg)
+
+	// Report unconditionally (all four statuses, active and inactive) so the gauge can't get stuck
+	// showing an old status as "still active" once a chain moves to a different bucket.
+	for chain, actualStatus := range classification.statusByChain() {
+		for _, status := range allOffRampLaneStatuses {
+			o.metricsReporter.TrackOffRampLaneStatus(chain, status, status == actualStatus)
+		}
+	}
 
 	if len(classification.skippedNotALane) > 0 || len(classification.skippedDisabled) > 0 {
 		logutil.LogWhenExceedFrequency(&lastSkippedLanesLog, skippedLanesLogFrequency, func() {

@@ -286,6 +286,23 @@ type MetricsReporter interface {
 	// TrackReportTransmissionAttempts records how many check-attempts were consumed by the time a report
 	// resolved (transmitted or gave up), so operators can see typical/creeping transmission latency.
 	TrackReportTransmissionAttempts(attempts uint, success bool)
+
+	// TrackRangeTruncated reports a source chain's selected sequence-number range being cut short by
+	// MaxMerkleTreeSize, i.e. the chain has more new messages than fit in a single report.
+	TrackRangeTruncated(sourceChain cciptypes.ChainSelector)
+	// TrackOffRampLaneStatus reports, for every round and every known offRamp lane status, whether a
+	// source chain is currently in that status. Reported unconditionally (active and inactive) for every
+	// status so the four buckets stay mutually exclusive and none of them can silently go stale.
+	TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelector, status string, active bool)
+	// TrackSeqNumInvariantViolation reports a violation of the invariants the plugin relies on to make
+	// progress: offRamp ahead of onRamp, onRamp max seq num observed as 0, or offRamp's next seq num
+	// regressing between rounds. violationType is "offramp_ahead_of_onramp", "onramp_max_zero", or
+	// "offramp_seqnum_regression".
+	TrackSeqNumInvariantViolation(sourceChain cciptypes.ChainSelector, violationType string)
+	// TrackOffRampConsensusInsufficient reports a source chain being dropped from this round's outcome
+	// because fewer than 2*fDestChain+1 oracles agreed on its offRamp next sequence number. From outside,
+	// this looks identical to "no new messages on this lane".
+	TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector)
 }
 
 type NoopMetrics struct{}
@@ -315,3 +332,11 @@ func (n NoopMetrics) TrackConsensusObservationFailed() {}
 func (n NoopMetrics) TrackReportTransmissionGaveUp(cciptypes.ChainSelector) {}
 
 func (n NoopMetrics) TrackReportTransmissionAttempts(uint, bool) {}
+
+func (n NoopMetrics) TrackRangeTruncated(cciptypes.ChainSelector) {}
+
+func (n NoopMetrics) TrackOffRampLaneStatus(cciptypes.ChainSelector, string, bool) {}
+
+func (n NoopMetrics) TrackSeqNumInvariantViolation(cciptypes.ChainSelector, string) {}
+
+func (n NoopMetrics) TrackOffRampConsensusInsufficient(cciptypes.ChainSelector) {}
