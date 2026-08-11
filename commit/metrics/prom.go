@@ -145,6 +145,7 @@ type PromReporter struct {
 	bhOffRampConsensusInsuff     metric.Int64Counter
 }
 
+//nolint:gocyclo
 func NewPromReporter(
 	lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error,
 ) {
