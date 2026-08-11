@@ -62,6 +62,13 @@ type RemoteChainDefaults struct {
 	TokenReceiverAllowed      bool
 	MessageNetworkFeeUSDCents uint16
 	TokenNetworkFeeUSDCents   uint16
+	// SkipExecutorConfig tells the local chain's sequence not to configure an Executor
+	// contract for this lane. A remote adapter sets it when that destination has no
+	// executor because its messages are executed manually. The local chain's sequence
+	// decides what that means in its own terms — an EVM source, for example, writes its
+	// own no-execution sentinel into the OnRamp — so no family-specific address crosses
+	// this boundary.
+	SkipExecutorConfig bool
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.
@@ -81,6 +88,9 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	DefaultExecutor           LocalContract
 	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
 	ExecutorDestChainConfig   ExecutorDestChainConfig
+	// SkipExecutorConfig mirrors RemoteChainDefaults.SkipExecutorConfig: when set, the
+	// local chain's sequence must not read or write an Executor contract for this lane.
+	SkipExecutorConfig bool
 	AddressBytesLength        uint8
 	BaseExecutionGasCost      uint32
 	TokenReceiverAllowed      *bool
