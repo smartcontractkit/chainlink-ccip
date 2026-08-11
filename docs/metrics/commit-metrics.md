@@ -21,9 +21,102 @@ Merkleroot, chainfee, and tokenprice each independently:
 
 ---
 
+## Proposed metrics at a glance (merkle root processor)
+
+Every metric proposed in this doc, with a one/two-line "why" — the full rationale, exact file:line evidence, and severity ranking live in [Full findings](#full-findings) below. ✅ = implemented and merged; everything else is proposed/reviewed only.
+
+#### Top-level plugin orchestration
+
+| Metric | Status | Why |
+|---|---|---|
+| `ccip_commit_plugin_heartbeat{chainFamily,chainID,phase="observation"\|"outcome"}` | ✅ Implemented | Unconditional per-round liveness signal — the only way to tell "process wedged" apart from "valid but stale gauge" for every other metric in this doc. |
+| `ccip_commit_report_validation_rejected{phase="should_accept"\|"should_transmit",reason}` | ✅ Implemented | Distinguishes "report never submitted" (rejected locally) from "submitted but stuck/reverted on-chain" — different remediation paths entirely. |
+
+#### Shared: consensus aggregation
+
+| Metric | Status | Why |
+|---|---|---|
+| `ccip_commit_consensus_dropped{objectName,key,reason}` (needs an additive `GetConsensusMap` return value) | Reviewed design, not implemented | Splits "no threshold configured" (config bug) from "insufficient agreement" (routine) from "split vote" (integrity signal) — currently collapsed into one `TODO: metrics` log line. |
+
+#### Merkle root processor — High
+
+| Metric | Status | Why |
+|---|---|---|
+| `ccip_commit_onramp_max_seq_num{sourceChain}` / `ccip_commit_offramp_next_seq_num{sourceChain}` | ✅ Implemented | Direct per-lane chain-read liveness — the original motivating gap for this whole assessment. |
+| `ccip_commit_pending_messages{sourceChain}` | ✅ Implemented | Quantifies "how far behind" instead of forcing on-call to mentally subtract the two seq-num gauges. |
+| `ccip_commit_rmn_curse_active{chain_id,curse_type="global"\|"destination"}` | ✅ Implemented | Curse halts all reporting for the dest chain; needs to be page-visible, not a per-round `Warnw`. |
+| `ccip_commit_source_chain_cursed{sourceChain}` | ✅ Implemented | Distinguishes "this lane is cursed" (expected, hand off) from "plugin is wedged" (page). |
+| `ccip_commit_merkleroot_observation_errors{sourceChain,reason}` | ✅ Implemented | Surfaces per-goroutine RPC/read failures that are swallowed and never trip the generic processor-error counter. |
+| `ccip_commit_fchain_read_errors` | ✅ Implemented | Distinguishes "can't read home chain" from "DON disagrees" — the two root causes of a consensus-failed round. |
+| `ccip_commit_consensus_observation_failed{chain_family,chain_id}` | ✅ Implemented | Flags a destination-chain-wide stall immediately instead of looking like N independent lane stalls. |
+| `ccip_commit_report_transmission_gave_up{sourceChain}` + `ccip_commit_report_transmission_attempts` (histogram) | ✅ Implemented | One of the most common on-call pages today; previously only a `Warnw` with no counter. |
+
+#### Merkle root processor — Medium
+
+| Metric | Status | Why |
+|---|---|---|
+| Truncation counter `{sourceChain}` (`MaxMerkleTreeSize`) | Proposed | Chain-throughput ceiling being hit is currently `Debugf`-only. |
+| Offramp lane misconfiguration gauge `{sourceChain,status}` | Proposed | `rmn-misconfigured` in particular now flags real config drift, since a lane still expecting RMN blessing while RMN is globally off is permanently broken. |
+| Onramp/offramp invariant-violation counter `{sourceChain,type}` | Proposed | These are already documented in-code as stall signals but were never counted. |
+| Insufficient-consensus-on-`OffRampNextSeqNums` counter `{sourceChain}` | Proposed | Looks identical to "no new messages" from the outside without it. |
+---
+
+## War games: incident walkthroughs
+
+Three scenarios worked through against the metric set above (some referencing not-yet-implemented items, noted inline) to validate the design before building it: does an on-call engineer actually get a straight-line diagnosis, or just more noise? Each starts from the same alert: **message `0xabc...def`, onramp sequence number `X`, chain A (source) → chain B (dest), reported in-flight for 15 minutes.**
+
+### Scenario 1 — full decision tree
+
+1. **Is this even a commit-plugin problem?** Check `ccip_commit_offramp_next_seq_num{source_network_name="chain-a", dest_network_name="chain-b"}`.
+   - `> X` → a root covering X already landed on the offramp. Commit plugin's job is done; hand off to exec on-call. Stop.
+   - `<= X` → continue.
+2. **Has the plugin observed X on-chain yet?** Check `ccip_commit_onramp_max_seq_num{sourceChain="chain-a"}`.
+   - `< X` → onramp read is lagging. Check `ccip_commit_merkleroot_observation_errors{sourceChain="chain-a"}` by reason (no_bindings/timeout/rpc_error). Source-chain read/infra issue, not commit logic.
+   - `>= X` → plugin has seen it; continue.
+3. **Is the round producing outcomes at all?** Check `rate(ccip_commit_consensus_observation_failed[5m])`.
+   - Incrementing → destination-chain-wide consensus failure — see Scenario 3 deep dive.
+   - Flat → continue.
+4. **Is chain A or B cursed?** Check `ccip_commit_rmn_curse_active{chain_id="chain-b", curse_type="global"|"destination"}` and `ccip_commit_source_chain_cursed{sourceChain="chain-a"}`.
+   - Any `== 1` → found it; likely intentional/incident-flagged, hand off to whoever owns the curse. Stop.
+   - All `0` → continue.
+5. **Is a report being built but never landing?** Check `ccip_commit_report_transmission_gave_up{sourceChain="chain-a"}` and `ccip_commit_report_transmission_attempts`.
+   - Incrementing/maxed → see Scenario 2 deep dive.
+   - Otherwise → likely just backlog size; check `ccip_commit_pending_messages{sourceChain="chain-a"}` and estimate ETA from round cadence.
+
+(RMN-signature-specific branches — signed-roots-dropped, chain quorum result, Byzantine root disagreement — were dropped from the implementation scope: RMN blessing/signing is effectively dead code now that `RMNEnabled` is hardcoded off. Cursing is the one RMN-adjacent signal still live in production, hence Step 4.)
+
+### Scenario 2 — deep dive: report transmission stuck (Step 5)
+
+Three hypotheses, in order of how cheap they are to check:
+
+- **A — never transmitted (rejected pre-send).** `sum by (reason) (rate(ccip_commit_report_validation_rejected{phase="should_transmit"}[15m]))`.
+  - `config_digest_mismatch` climbing → cross-check `ccip_commit_config_digest_mismatch`; config sync issue.
+  - `stale` climbing → often benign — a different, overlapping report already landed; re-check Step 1's gauge, it may have just moved.
+  - `dest_not_supported` → transmission-schedule/config bug.
+  - `cursed` → converges with Step 4.
+  - All flat → move to B.
+- **B — transmitted, reverted/stuck on-chain.** Outside commit-plugin metrics: check chain B's TXM/tx-sender dashboards for the assigned transmitter (nonce gap, underpriced gas, wallet balance, revert reason). A revert here for the same reasons as A but caught on-chain instead of locally usually means a race between the pre-check and the tx landing (config rollout, chain congestion).
+- **C — actually succeeded, read is lagging.** `ccip_commit_offramp_next_seq_num` is sourced from the plugin's own chain-B reader; if that's behind, "no change" can persist for a few rounds after a real success. Cross-check chain B's block explorer / chain-reader health directly before escalating further.
+
+### Scenario 3 — deep dive: consensus never completes (Step 3)
+
+Grounded in `getConsensusObservation` (`merkleroot/outcome.go:461-508`): the *only* way the whole round fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value for the **destination chain** — every other field degrades per-chain gracefully. Two implications:
+
+- **This is destination-chain-wide, not lane-specific.** Before going further, check whether *other* source chains reporting into chain B are also stalled (their `ccip_commit_pending_messages` also climbing). If only chain A is affected, this branch is the wrong one — back to Scenario 1, Step 4/5.
+- **The counter alone can't tell you why.** Two sub-hypotheses, using the not-yet-implemented shared `consensus.go` fix:
+  - **H1 — too few oracles could read it.** `ccip_commit_fchain_read_errors` spiking broadly across oracles → home-chain RPC/read outage.
+  - **H2 — oracles disagree.** `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}` firing while H1 stays flat → home-chain config (e.g. CCIPHome update, DON membership change) mid-rollout/desynced across the DON. Corroborate with `ccip_commit_config_digest_mismatch` flipping for a subset of oracles around the same time.
+
+### Gaps this exercise surfaced (already folded into the findings above)
+- No plugin-level heartbeat — added to "Top-level plugin orchestration."
+- No reason breakdown for report-acceptance/transmission-validation rejections — added to "Top-level plugin orchestration."
+- `GetConsensusMap`'s two-vs-three-outcome ambiguity — added to "Shared: consensus aggregation" (not yet implemented — reviewed design only).
+
+---
+
 ## Full findings
 
-Severity is about production-triage value, independent of whether something is logged today.
+Severity is about production-triage value, independent of whether something is logged today. This section is the deep dive backing the brief table above: full rationale, file:line evidence, and severity ranking for each metric.
 
 ### Top-level plugin orchestration (`commit/plugin.go`, `commit/report.go`)
 
@@ -89,6 +182,54 @@ Used by commit (`chainfee`, `merkleroot`, `plugin.go`, `report.go`), `execute/pl
 
 (RMN blessing/signing findings — signed-roots-dropped, per-root signed/unsigned filtering, chain quorum result, Byzantine root disagreement, RMN controller node-coverage/internal-errors, signature-verification conflation, `ErrSignaturesNotProvidedByLeader`, `ObserveRMNRemoteCfg` failures, peer/stream connectivity, controller re-init churn, and the standalone `ValidateRootBlessings` proposal (now covered by the implemented `root_blessing_mismatch` reason above) — were all dropped from this doc. All of these sit behind `if rmnEnabled` in `buildMerkleRootsOutcome` or are otherwise part of the RMN controller/signing path, which is effectively dead code now that `RMNEnabled` is hardcoded off and the controller is slated for removal; cursing, covered above, is the one RMN-adjacent signal still live in production.)
 
+---
+
+## (Other Processors) Proposed metrics at a glance
+
+#### Chain fee processor — High
+
+| Metric | Status | Why |
+|---|---|---|
+| `ccip_commit_chainfee_update_aborted_total{chain_id,scope="dest"\|"source"}` | Proposed | A single dest-chain `GetChainConfig` failure silently aborts gas-price updates for *every* chain that round — flagged as likely the single highest-value item to alert on. |
+| Async-op-timeout counter `{operation}` | Proposed | A hung RPC call today produces zero log and zero metric anywhere. |
+| Per-chain USD gas fee gauge `{chain_id,component="exec"\|"da"}` | Proposed | The actual fee value is only ever logged (`Infow`), never gauged. |
+| Fee staleness gauge (seconds) `{chain_id}` | Proposed | Staleness is computed then discarded down to a bare heartbeat boolean. |
+| Whole-round no-consensus-on-any-fee-component counter `{chain_id}` | Proposed | A DON-wide health signal that stalls every chain's fee update that round; currently `Warnw` only. |
+| Consensus-map dropped-chain counter `{objectName,chain_id,reason}` | Proposed | Same shared-infra fix as above; benefits tokenprice too. |
+
+#### Chain fee processor — Medium / Low
+
+| Metric | Status | Why |
+|---|---|---|
+| Missing-native-token-price gauge/counter `{chain_id}` | Proposed | Chains silently dropped from the fee update entirely. |
+| Per-oracle missing-price counter (pre-consensus) `{chain_id}` | Proposed | Could isolate a single bad node's fee-quoter reader before it's masked by consensus. |
+| Update-decision reason-breakdown counter `{chain_id,reason}` | Proposed | Another "stable log identifier" already log-mined — reason to graduate it, not skip it. |
+| Deviation-magnitude gauge `{chain_id,component}` | Proposed | Only a boolean ("exceeded threshold") survives today; the magnitude is discarded. |
+| Async-cache last-success-timestamp gauge | Proposed | A stuck background `sync()` currently looks healthy indefinitely. |
+| Reader-error-branch counter `{operation,chain_id}` | Proposed | Real errors collapse into the same empty map as "legitimately zero chains configured." |
+| Disabled/unsupported chain-count gauge | Proposed (Low) | Config-drift detection across a large DON. |
+
+#### Token price processor — High
+
+| Metric | Status | Why |
+|---|---|---|
+| `ValidateObservation` rejection counter `{oracleID,reason}` | Proposed | Zero logs *and* zero metrics today for the exact signal that detects a misbehaving/misconfigured oracle. |
+| Fetch-failure counter `{source="feed"\|"feequoter"\|"fchain"}` | Proposed | Failures degrade to empty maps indistinguishable from "legitimately nothing to report." |
+| Per-token USD price gauge `{token,destChain}` | Proposed | Feed/fee-quoter price is never gauged, only logged. |
+| Token price staleness gauge (seconds) `{token}` | Proposed | Same discard-the-number-keep-the-bool pattern as chainfee. |
+| Consensus-dropped counter `{objectName,key,reason}` | Proposed | Shared fix with chainfee/merkleroot above — the closest thing to "outlier rejection" in this codebase, currently silent. |
+
+#### Token price processor — Medium / Low
+
+| Metric | Status | Why |
+|---|---|---|
+| Missing-`TokenInfo` counter `{token}` | Proposed | Logged per-token per-round (`Warnw`) with no aggregate view. |
+| Update-decision reason-breakdown counter `{token,reason}` | Proposed | Same "graduate, don't skip" logic as chainfee's version. |
+| Deviation-magnitude gauge `{token}` | Proposed | `mathslib.Deviates` computes a ppb diff internally and returns only a bool. |
+| Async cache staleness gauge `{source}` | Proposed | Same stuck-`sync()`-looks-healthy risk as chainfee. |
+| Oracle feed/dest-chain support gauge `{oracleID,chainRole}` | Proposed | Per-node capability info that explains *why* consensus on `fFeedChain` might fail. |
+| Token-price-reporting-disabled gauge `{destChain}` (1/0) | Proposed (Low, but don't deprioritize) | Currently `Debugw`-only — *less* visible than a "stable" Info/Warn log, since Debug is typically off entirely in prod. |
+
 ### Chain fee processor (`commit/chainfee`)
 
 No dedicated `MetricsReporter` exists for this package at all (unlike merkleroot) — everything below is currently 100% log-only.
@@ -132,56 +273,3 @@ Also no dedicated `MetricsReporter`. Note `ValidateObservation` isn't even wrapp
 
 **Low, but flagged as a miss in my first pass — don't let "it's Debug" read as "low priority"**
 - **Token-price reporting silently disabled by config** (`TokenPriceBatchWriteFrequency == 0`) is logged at `Debugw` — *less* visible in prod than a "stable" Info/Warn log, since Debug is typically off entirely. `processor.go:102-106`. This is exactly the pattern the existing `ccip_commit_loopp_ccip_provider_supported` boolean gauge was built for, and it's a cheap, precedented fix. → Gauge `{destChain}` (1/0).
-
----
-
-## War games: incident walkthroughs
-
-Three scenarios worked through against the merkleroot-high-severity metric set above (some referencing not-yet-implemented items, noted inline) to validate the design before building it: does an on-call engineer actually get a straight-line diagnosis, or just more noise? Each starts from the same alert: **message `0xabc...def`, onramp sequence number `X`, chain A (source) → chain B (dest), reported in-flight for 15 minutes.**
-
-### Scenario 1 — full decision tree
-
-1. **Is this even a commit-plugin problem?** Check `ccip_commit_offramp_next_seq_num{source_network_name="chain-a", dest_network_name="chain-b"}`.
-   - `> X` → a root covering X already landed on the offramp. Commit plugin's job is done; hand off to exec on-call. Stop.
-   - `<= X` → continue.
-2. **Has the plugin observed X on-chain yet?** Check `ccip_commit_onramp_max_seq_num{source_network_name="chain-a"}`.
-   - `< X` → onramp read is lagging. Check `ccip_commit_merkleroot_observation_errors{sourceChain="chain-a"}` by reason (no_bindings/timeout/rpc_error). Source-chain read/infra issue, not commit logic.
-   - `>= X` → plugin has seen it; continue.
-3. **Is the round producing outcomes at all?** Check `rate(ccip_commit_consensus_observation_failed[5m])`.
-   - Incrementing → destination-chain-wide consensus failure — see Scenario 3 deep dive.
-   - Flat → continue.
-4. **Is chain A or B cursed?** Check `ccip_commit_rmn_curse_active{chain_id="chain-b", curse_type="global"|"destination"}` and `ccip_commit_source_chain_cursed{sourceChain="chain-a"}`.
-   - Any `== 1` → found it; likely intentional/incident-flagged, hand off to whoever owns the curse. Stop.
-   - All `0` → continue.
-5. **Is a report being built but never landing?** Check `ccip_commit_report_transmission_gave_up{sourceChain="chain-a"}` and `ccip_commit_report_transmission_attempts`.
-   - Incrementing/maxed → see Scenario 2 deep dive.
-   - Otherwise → likely just backlog size; check `ccip_commit_pending_messages{sourceChain="chain-a"}` and estimate ETA from round cadence.
-
-(RMN-signature-specific branches — signed-roots-dropped, chain quorum result, Byzantine root disagreement — were dropped from the implementation scope: RMN blessing/signing is effectively dead code now that `RMNEnabled` is hardcoded off. Cursing is the one RMN-adjacent signal still live in production, hence Step 4.)
-
-### Scenario 2 — deep dive: report transmission stuck (Step 5)
-
-Three hypotheses, in order of how cheap they are to check:
-
-- **A — never transmitted (rejected pre-send).** `sum by (reason) (rate(ccip_commit_report_validation_rejected{phase="should_transmit"}[15m]))`.
-  - `config_digest_mismatch` climbing → cross-check `ccip_commit_config_digest_mismatch`; config sync issue.
-  - `stale` climbing → often benign — a different, overlapping report already landed; re-check Step 1's gauge, it may have just moved.
-  - `dest_not_supported` → transmission-schedule/config bug.
-  - `cursed` → converges with Step 4.
-  - All flat → move to B.
-- **B — transmitted, reverted/stuck on-chain.** Outside commit-plugin metrics: check chain B's TXM/tx-sender dashboards for the assigned transmitter (nonce gap, underpriced gas, wallet balance, revert reason). A revert here for the same reasons as A but caught on-chain instead of locally usually means a race between the pre-check and the tx landing (config rollout, chain congestion).
-- **C — actually succeeded, read is lagging.** `ccip_commit_offramp_next_seq_num` is sourced from the plugin's own chain-B reader; if that's behind, "no change" can persist for a few rounds after a real success. Cross-check chain B's block explorer / chain-reader health directly before escalating further.
-
-### Scenario 3 — deep dive: consensus never completes (Step 3)
-
-Grounded in `getConsensusObservation` (`merkleroot/outcome.go:461-508`): the *only* way the whole round fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value for the **destination chain** — every other field degrades per-chain gracefully. Two implications:
-
-- **This is destination-chain-wide, not lane-specific.** Before going further, check whether *other* source chains reporting into chain B are also stalled (their `ccip_commit_pending_messages` also climbing). If only chain A is affected, this branch is the wrong one — back to Scenario 1, Step 4/5.
-- **The counter alone can't tell you why.** Two sub-hypotheses, using the not-yet-implemented shared `consensus.go` fix:
-  - **H1 — too few oracles could read it.** `ccip_commit_fchain_read_errors` spiking broadly across oracles → home-chain RPC/read outage.
-  - **H2 — oracles disagree.** `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}` firing while H1 stays flat → home-chain config (e.g. CCIPHome update, DON membership change) mid-rollout/desynced across the DON. Corroborate with `ccip_commit_config_digest_mismatch` flipping for a subset of oracles around the same time.
-
-### Gaps this exercise surfaced (already folded into the findings above)
-- No plugin-level heartbeat — added to "Top-level plugin orchestration."
-- No reason breakdown for report-acceptance/transmission-validation rejections — added to "Top-level plugin orchestration."
-- `GetConsensusMap`'s two-vs-three-outcome ambiguity — added to "Shared: consensus aggregation" (not yet implemented — reviewed design only).
