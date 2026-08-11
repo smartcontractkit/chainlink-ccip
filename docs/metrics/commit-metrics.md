@@ -1,15 +1,40 @@
-## Metrics coverage assessment — commit plugin
+- [Metrics coverage assessment — commit plugin](#metrics-coverage-assessment--commit-plugin)
+   * [What exists today (`commit/metrics/prom.go`)](#what-exists-today-commitmetricspromgo)
+   * [Cross-cutting themes (repeat in every processor)](#cross-cutting-themes-repeat-in-every-processor)
+   * [Proposed metrics at a glance (merkle root processor)](#proposed-metrics-at-a-glance-merkle-root-processor)
+      + [Top-level plugin orchestration](#top-level-plugin-orchestration)
+      + [Shared: consensus aggregation](#shared-consensus-aggregation)
+      + [Merkle root processor — High](#merkle-root-processor--high)
+      + [Merkle root processor — Medium](#merkle-root-processor--medium)
+   * [War games: incident walkthroughs](#war-games-incident-walkthroughs)
+      + [Scenario 1 — full decision tree](#scenario-1--full-decision-tree)
+      + [Scenario 2 — deep dive: report transmission stuck (Step 5)](#scenario-2--deep-dive-report-transmission-stuck-step-5)
+      + [Scenario 3 — deep dive: consensus never completes (Step 3)](#scenario-3--deep-dive-consensus-never-completes-step-3)
+      + [Gaps this exercise surfaced (already folded into the findings above)](#gaps-this-exercise-surfaced-already-folded-into-the-findings-above)
+   * [Full findings](#full-findings)
+      + [Top-level plugin orchestration (`commit/plugin.go`, `commit/report.go`)](#top-level-plugin-orchestration-commitplugingo-commitreportgo)
+      + [Shared: consensus aggregation (`internal/plugincommon/consensus/consensus.go`)](#shared-consensus-aggregation-internalplugincommonconsensusconsensusgo)
+      + [Merkle root processor (`commit/merkleroot`)](#merkle-root-processor-commitmerkleroot)
+   * [(Other Processors) Proposed metrics at a glance](#other-processors-proposed-metrics-at-a-glance)
+         - [Chain fee processor — High](#chain-fee-processor--high)
+         - [Chain fee processor — Medium / Low](#chain-fee-processor--medium--low)
+         - [Token price processor — High](#token-price-processor--high)
+         - [Token price processor — Medium / Low](#token-price-processor--medium--low)
+      + [Chain fee processor (`commit/chainfee`)](#chain-fee-processor-commitchainfee)
+      + [Token price processor (`commit/tokenprice`)](#token-price-processor-committokenprice)
+
+# Metrics coverage assessment — commit plugin
 
 **Ground rule for everything below: the presence of a log line — even a "stable identifier" some log-analysis tooling already keys on — is never a reason to exclude a metric.** Logs are exactly the noisy, low-signal, un-queryable thing motivating this work; a few items here are genuinely *only* visible at `Debugw`, which is worse than a "stable" log, not better. Nothing was cut from the list below because it was already logged.
 
-### What exists today (`commit/metrics/prom.go`)
+## What exists today (`commit/metrics/prom.go`)
 
 - Generic per-processor instrumentation via `TrackedProcessor` (wraps merkleroot/chainfee/tokenprice): latency histogram, error counter, and an **output-size counter** driven by each type's `Stats()` — but `Stats()` only returns `len(map)`-style item counts (e.g. `gasPrices: 3`), never the actual values.
 - `ccip_commit_max_sequence_number` gauge — but only fed from `MerkleRootChain.SeqNumsRange.End()` in `TrackObservation`/`TrackOutcome`, i.e. **only when a root is actually being built for a report**.
 - `ccip_commit_latest_round_id`, `ccip_commit_config_digest_mismatch`, `ccip_commit_loopp_ccip_provider_supported`.
 - **`chainfee` and `tokenprice` have no dedicated metrics interface at all** — they only get the generic latency/error/size instrumentation above. Token prices, gas prices, and their staleness/deviation/failure states are otherwise 100% log-only.
 
-### Cross-cutting themes (repeat in every processor)
+## Cross-cutting themes (repeat in every processor)
 
 Merkleroot, chainfee, and tokenprice each independently:
 1. Compute a **per-item value** (seq num / fee / price) that's never gauged — only counted.
@@ -25,20 +50,20 @@ Merkleroot, chainfee, and tokenprice each independently:
 
 Every metric proposed in this doc, with a one/two-line "why" — the full rationale, exact file:line evidence, and severity ranking live in [Full findings](#full-findings) below. ✅ = implemented and merged; everything else is proposed/reviewed only.
 
-#### Top-level plugin orchestration
+### Top-level plugin orchestration
 
 | Metric | Status | Why |
 |---|---|---|
 | `ccip_commit_plugin_heartbeat{chainFamily,chainID,phase="observation"\|"outcome"}` | ✅ Implemented | Unconditional per-round liveness signal — the only way to tell "process wedged" apart from "valid but stale gauge" for every other metric in this doc. |
 | `ccip_commit_report_validation_rejected{phase="should_accept"\|"should_transmit",reason}` | ✅ Implemented | Distinguishes "report never submitted" (rejected locally) from "submitted but stuck/reverted on-chain" — different remediation paths entirely. |
 
-#### Shared: consensus aggregation
+### Shared: consensus aggregation
 
 | Metric | Status | Why |
 |---|---|---|
 | `ccip_commit_consensus_dropped{objectName,key,reason}` (needs an additive `GetConsensusMap` return value) | Reviewed design, not implemented | Splits "no threshold configured" (config bug) from "insufficient agreement" (routine) from "split vote" (integrity signal) — currently collapsed into one `TODO: metrics` log line. |
 
-#### Merkle root processor — High
+### Merkle root processor — High
 
 | Metric | Status | Why |
 |---|---|---|
@@ -51,7 +76,7 @@ Every metric proposed in this doc, with a one/two-line "why" — the full ration
 | `ccip_commit_consensus_observation_failed{chain_family,chain_id}` | ✅ Implemented | Flags a destination-chain-wide stall immediately instead of looking like N independent lane stalls. |
 | `ccip_commit_report_transmission_gave_up{sourceChain}` + `ccip_commit_report_transmission_attempts` (histogram) | ✅ Implemented | One of the most common on-call pages today; previously only a `Warnw` with no counter. |
 
-#### Merkle root processor — Medium
+### Merkle root processor — Medium
 
 | Metric | Status | Why |
 |---|---|---|
