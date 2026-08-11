@@ -54,7 +54,9 @@ func commitObservationSummary(logs []*parse.Data) string {
 				var obs merkleroot.Observation
 				err := mapstructure.Decode(raw, &obs)
 				if err != nil {
-					// ignore errors -- it complains about non-string map keys (e.g. FChain)
+					// ignore errors -- it complains about non-string map keys:
+					//   * RMNEnabledChains
+					//   * FChain
 				}
 				var parts []string
 				if len(obs.OnRampMaxSeqNums) > 0 {

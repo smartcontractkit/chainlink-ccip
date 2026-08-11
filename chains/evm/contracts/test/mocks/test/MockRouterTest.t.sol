@@ -2,12 +2,12 @@ pragma solidity ^0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {ExtraArgsCodec} from "../../../libraries/ExtraArgsCodec.sol";
-import {TokenSetup} from "../../TokenSetup.t.sol";
+import {TokenFixture} from "../../TokenFixture.t.sol";
 import {IRouterClient, MockCCIPRouter} from "../MockRouter.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-contract MockRouterTest is TokenSetup {
+contract MockRouterTest is TokenFixture {
   MockCCIPRouter public mockRouter;
 
   uint64 public constant MOCK_CHAIN_SELECTOR = 123456;

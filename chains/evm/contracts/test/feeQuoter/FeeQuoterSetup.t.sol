@@ -5,10 +5,10 @@ import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
-import {TokenSetup} from "../TokenSetup.t.sol";
+import {TokenFixture} from "../TokenFixture.t.sol";
 import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
 
-contract FeeQuoterSetup is TokenSetup {
+contract FeeQuoterSetup is TokenFixture {
   uint112 internal constant USD_PER_GAS = 1e12;
   uint112 internal constant USD_PER_DATA_AVAILABILITY_GAS = 1e9; // 1 gwei
 
@@ -61,7 +61,6 @@ contract FeeQuoterSetup is TokenSetup {
   FeeQuoterHelper internal s_feeQuoter;
   // Cheat to store the price updates in storage since struct arrays aren't supported.
   bytes internal s_encodedInitialPriceUpdates;
-  address internal s_weth;
 
   address[] internal s_sourceFeeTokens;
   uint224[] internal s_sourceTokenPrices;
@@ -73,29 +72,27 @@ contract FeeQuoterSetup is TokenSetup {
   function setUp() public virtual override {
     super.setUp();
 
-    s_weth = s_sourceRouter.getWrappedNative();
-
     address[] memory sourceFeeTokens = new address[](3);
     sourceFeeTokens[0] = s_sourceTokens[0];
     sourceFeeTokens[1] = s_sourceTokens[1];
-    sourceFeeTokens[2] = s_sourceRouter.getWrappedNative();
+    sourceFeeTokens[2] = s_weth;
     s_sourceFeeTokens = sourceFeeTokens;
 
     uint224[] memory sourceTokenPrices = new uint224[](3);
-    sourceTokenPrices[0] = 5e18;
-    sourceTokenPrices[1] = 2000e18;
-    sourceTokenPrices[2] = 2000e18;
+    sourceTokenPrices[0] = 20e18;
+    sourceTokenPrices[1] = 3500e18;
+    sourceTokenPrices[2] = 3500e18;
     s_sourceTokenPrices = sourceTokenPrices;
 
     address[] memory destFeeTokens = new address[](3);
     destFeeTokens[0] = s_destTokens[0];
     destFeeTokens[1] = s_destTokens[1];
-    destFeeTokens[2] = s_destRouter.getWrappedNative();
+    destFeeTokens[2] = s_destWeth;
 
     uint224[] memory destTokenPrices = new uint224[](3);
-    destTokenPrices[0] = 5e18;
-    destTokenPrices[1] = 2000e18;
-    destTokenPrices[2] = 2000e18;
+    destTokenPrices[0] = 20e18;
+    destTokenPrices[1] = 3500e18;
+    destTokenPrices[2] = 3500e18;
 
     uint256 sourceTokenCount = sourceFeeTokens.length;
     uint256 destTokenCount = destFeeTokens.length;

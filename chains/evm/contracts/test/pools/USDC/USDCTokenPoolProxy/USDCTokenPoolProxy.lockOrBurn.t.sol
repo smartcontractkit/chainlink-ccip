@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {ICrossChainVerifierResolver} from "../../../../interfaces/ICrossChainVerifierResolver.sol";
 import {IPoolV1} from "../../../../interfaces/IPool.sol";
 import {IPoolV2} from "../../../../interfaces/IPoolV2.sol";
+import {IRouter} from "../../../../interfaces/IRouter.sol";
 
-import {Router} from "../../../../Router.sol";
 import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {Pool} from "../../../../libraries/Pool.sol";
 import {USDCTokenPoolProxy} from "../../../../pools/USDC/USDCTokenPoolProxy.sol";
@@ -27,12 +27,10 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     super.setUp();
 
     // Set the OnRamp on the router for each of the chain selectors.
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](4);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: s_chainSelForV1, onRamp: s_routerAllowedOnRamp});
-    onRampUpdates[1] = Router.OnRamp({destChainSelector: s_chainSelForV2, onRamp: s_routerAllowedOnRamp});
-    onRampUpdates[2] = Router.OnRamp({destChainSelector: s_chainSelFoLockRelease, onRamp: s_routerAllowedOnRamp});
-    onRampUpdates[3] = Router.OnRamp({destChainSelector: s_chainSelForCCV, onRamp: s_routerAllowedOnRamp});
-    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+    _setMockRouterOnRamp(s_router, s_chainSelForV1, s_routerAllowedOnRamp);
+    _setMockRouterOnRamp(s_router, s_chainSelForV2, s_routerAllowedOnRamp);
+    _setMockRouterOnRamp(s_router, s_chainSelFoLockRelease, s_routerAllowedOnRamp);
+    _setMockRouterOnRamp(s_router, s_chainSelForCCV, s_routerAllowedOnRamp);
 
     // Enable ERC165 for the lock release pool.
     _enableERC165InterfaceChecks(s_lockReleasePool, type(IPoolV1).interfaceId);
@@ -321,7 +319,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
     );
 
     vm.mockCall(
-      address(s_router), abi.encodeCall(Router.getOnRamp, s_chainSelForCCV), abi.encode(s_routerAllowedOnRamp)
+      address(s_router), abi.encodeCall(IRouter.getOnRamp, s_chainSelForCCV), abi.encode(s_routerAllowedOnRamp)
     );
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPoolProxy.NoLockOrBurnMechanismSet.selector, s_chainSelForCCV));
@@ -498,7 +496,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     // Mock the router to allow the call.
     vm.mockCall(
-      address(s_router), abi.encodeCall(Router.getOnRamp, invalidChainSelector), abi.encode(s_routerAllowedOnRamp)
+      address(s_router), abi.encodeCall(IRouter.getOnRamp, invalidChainSelector), abi.encode(s_routerAllowedOnRamp)
     );
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
@@ -524,7 +522,7 @@ contract USDCTokenPoolProxy_lockOrBurn is USDCTokenPoolProxySetup {
 
     // Mock the router to allow the call.
     vm.mockCall(
-      address(s_router), abi.encodeCall(Router.getOnRamp, lockReleaseChainSelector), abi.encode(s_routerAllowedOnRamp)
+      address(s_router), abi.encodeCall(IRouter.getOnRamp, lockReleaseChainSelector), abi.encode(s_routerAllowedOnRamp)
     );
 
     // First, configure LOCK_RELEASE mechanism for the chain while pool is set.

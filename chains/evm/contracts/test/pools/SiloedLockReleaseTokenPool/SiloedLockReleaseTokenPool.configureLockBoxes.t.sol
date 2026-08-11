@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Router} from "../../../Router.sol";
 import {ERC20LockBox} from "../../../pools/ERC20LockBox.sol";
 import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
@@ -34,11 +33,8 @@ contract SiloedLockReleaseTokenPool_configureLockBoxes is BaseTest {
     );
 
     // Basic router config to allow on/off ramps.
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: SILOED_CHAIN_SELECTOR, onRamp: address(123)});
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SILOED_CHAIN_SELECTOR, offRamp: address(234)});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    _setMockRouterOnRamp(address(s_sourceRouter), SILOED_CHAIN_SELECTOR, address(123));
+    _setMockRouterOffRamp(address(s_sourceRouter), SILOED_CHAIN_SELECTOR, address(234), true);
 
     // Register the siloed chain as supported.
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);

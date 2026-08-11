@@ -30,7 +30,7 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
       DEFAULT_TOKEN_DECIMALS,
       address(0),
       address(s_mockRMNRemote),
-      address(s_sourceRouter)
+      address(s_destRouter)
     );
     CrossChainToken(address(s_token)).grantMintAndBurnRoles(address(s_pool));
     _applyChainUpdates(address(s_pool));
@@ -46,8 +46,8 @@ contract OffRamp_releaseOrMintSingleToken is TokenPoolSetup {
     );
 
     vm.mockCall(
-      address(s_sourceRouter),
-      abi.encodeCall(s_sourceRouter.isOffRamp, (DEST_CHAIN_SELECTOR, address(s_offRamp))),
+      address(s_destRouter),
+      abi.encodeCall(s_destRouter.isOffRamp, (DEST_CHAIN_SELECTOR, address(s_offRamp))),
       abi.encode(true)
     );
     vm.mockCall(

@@ -14,7 +14,7 @@ contract Router_recoverTokens is RouterSetup {
     uint256 balanceBefore = token.balanceOf(OWNER);
     token.transfer(address(s_sourceRouter), 1);
     assertEq(token.balanceOf(address(s_sourceRouter)), 1);
-    s_sourceRouter.recoverTokens(address(token), OWNER, 1);
+    s_router.recoverTokens(address(token), OWNER, 1);
     assertEq(token.balanceOf(address(s_sourceRouter)), 0);
     assertEq(token.balanceOf(OWNER), balanceBefore);
 
@@ -22,7 +22,7 @@ contract Router_recoverTokens is RouterSetup {
     balanceBefore = OWNER.balance;
     deal(address(s_sourceRouter), 10);
     assertEq(address(s_sourceRouter).balance, 10);
-    s_sourceRouter.recoverTokens(address(0), OWNER, 10);
+    s_router.recoverTokens(address(0), OWNER, 10);
     assertEq(OWNER.balance, balanceBefore + 10);
     assertEq(address(s_sourceRouter).balance, 0);
   }
@@ -31,18 +31,18 @@ contract Router_recoverTokens is RouterSetup {
     // Reverts if not owner
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_sourceRouter.recoverTokens(address(0), STRANGER, 1);
+    s_router.recoverTokens(address(0), STRANGER, 1);
   }
 
   function test_RevertWhen_RecoverTokensInvalidRecipient() public {
     vm.expectRevert(abi.encodeWithSelector(Router.InvalidRecipientAddress.selector, address(0)));
-    s_sourceRouter.recoverTokens(address(0), address(0), 1);
+    s_router.recoverTokens(address(0), address(0), 1);
   }
 
   function test_RevertWhen_RecoverTokensNoFunds() public {
     // Reverts if no funds present
     vm.expectRevert();
-    s_sourceRouter.recoverTokens(address(0), OWNER, 10);
+    s_router.recoverTokens(address(0), OWNER, 10);
   }
 
   function test_RevertWhen_RecoverTokensValueReceiver() public {
@@ -51,6 +51,6 @@ contract Router_recoverTokens is RouterSetup {
 
     // Value receiver reverts
     vm.expectRevert(Router.FailedToSendValue.selector);
-    s_sourceRouter.recoverTokens(address(0), address(revertingValueReceiver), 10);
+    s_router.recoverTokens(address(0), address(revertingValueReceiver), 10);
   }
 }

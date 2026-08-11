@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 // Imports to any non-library are not allowed due to the significant cascading
 // compile time increase they cause when imported into this base test.
 import {IRMN} from "../interfaces/IRMN.sol";
+import {IRouter} from "../interfaces/IRouter.sol";
 
-import {Router} from "../Router.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 
@@ -16,14 +16,18 @@ contract BaseTest is Test {
   address internal constant OWNER = 0x00007e64E1fB0C487F25dd6D3601ff6aF8d32e4e;
   address internal constant STRANGER = address(999999);
 
-  // Message info
-  uint64 internal constant SOURCE_CHAIN_SELECTOR = 1;
-  uint64 internal constant DEST_CHAIN_SELECTOR = 2;
+  // Message info. Real CCIP chain selectors are random-looking uint64 values, using real ones ensures the full value
+  // range is exercised, e.g. Base's selector does not fit in an int64.
+  // Ethereum mainnet chain selector.
+  uint64 internal constant SOURCE_CHAIN_SELECTOR = 5009297550715157269;
+  // Base mainnet chain selector.
+  uint64 internal constant DEST_CHAIN_SELECTOR = 15971525489660198786;
   uint32 internal constant GAS_LIMIT = 200_000;
   uint32 internal constant BASE_EXEC_GAS_COST = 80_000;
 
   uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 90_000;
   uint8 internal constant DEFAULT_TOKEN_DECIMALS = 18;
+  uint8 internal constant USDC_TOKEN_DECIMALS = 6;
   uint16 internal constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
   uint32 internal constant DEFAULT_MAX_GAS_BUFFER_TO_UPDATE_STATE = 5000 + 5000 + 2000;
 
@@ -32,8 +36,10 @@ contract BaseTest is Test {
   bool private s_baseTestInitialized;
 
   IRMN internal s_mockRMNRemote;
-  Router internal s_sourceRouter;
-  Router internal s_destRouter;
+  IRouter internal s_sourceRouter;
+  IRouter internal s_destRouter;
+  address internal s_weth;
+  address internal s_destWeth;
 
   function setUp() public virtual {
     // BaseTest.setUp is often called multiple times from tests' setUp due to inheritance.
@@ -52,11 +58,51 @@ contract BaseTest is Test {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed()"), abi.encode(false));
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(false)); // no curses by defaule
 
-    s_sourceRouter = new Router(address(new WETH9()), address(s_mockRMNRemote));
+    s_weth = address(new WETH9());
+    vm.label(s_weth, "sWETH");
+    s_destWeth = address(new WETH9());
+    vm.label(s_destWeth, "dWETH");
+
+    _setUpRouters();
+  }
+
+  /// @dev Provisions s_sourceRouter and s_destRouter as mocked addresses. Calls to functions that are not explicitly
+  /// mocked by a test revert. Suites that require real routing inherit RouterFixture, which overrides this hook to
+  /// deploy real Router contracts without pulling the Router bytecode into every test's compile scope.
+  function _setUpRouters() internal virtual {
+    s_sourceRouter = IRouter(makeAddr("sourceRouter"));
+    s_destRouter = IRouter(makeAddr("destRouter"));
+
+    // Mocked routers mirror a freshly deployed, unconfigured Router: no onRamps and no offRamps. Any function that is
+    // not explicitly mocked reverts due to the etched non-executable bytecode, so tests fail loudly instead of
+    // silently decoding empty return data.
+    for (uint256 i = 0; i < 2; ++i) {
+      address router = i == 0 ? address(s_sourceRouter) : address(s_destRouter);
+      vm.etch(router, bytes("fake bytecode"));
+      vm.mockCall(router, abi.encodeWithSelector(IRouter.getOnRamp.selector), abi.encode(address(0)));
+      vm.mockCall(router, abi.encodeWithSelector(IRouter.isOffRamp.selector), abi.encode(false));
+    }
     vm.label(address(s_sourceRouter), "sourceRouter");
-    // Deploy a destination router
-    s_destRouter = new Router(address(new WETH9()), address(s_mockRMNRemote));
     vm.label(address(s_destRouter), "destRouter");
+  }
+
+  /// @notice Mocks the router's onRamp lookup, mirroring Router.applyRampUpdates on a real router.
+  function _setMockRouterOnRamp(
+    address router,
+    uint64 destChainSelector,
+    address onRamp
+  ) internal {
+    vm.mockCall(router, abi.encodeCall(IRouter.getOnRamp, (destChainSelector)), abi.encode(onRamp));
+  }
+
+  /// @notice Mocks the router's offRamp authorization, mirroring Router.applyRampUpdates on a real router.
+  function _setMockRouterOffRamp(
+    address router,
+    uint64 sourceChainSelector,
+    address offRamp,
+    bool isOffRamp
+  ) internal {
+    vm.mockCall(router, abi.encodeCall(IRouter.isOffRamp, (sourceChainSelector, offRamp)), abi.encode(isOffRamp));
   }
 
   function _setMockRMNChainCurse(
