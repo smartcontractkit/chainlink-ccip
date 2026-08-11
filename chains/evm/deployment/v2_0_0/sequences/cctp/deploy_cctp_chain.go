@@ -427,7 +427,7 @@ func deployOrResolveCCTPVerifierResolver(
 		report, err := cldf_ops.ExecuteSequence(b, v2_0_0_sequences.DeployVerifierResolverViaCREATE2, chain, v2_0_0_sequences.DeployVerifierResolverViaCREATE2Input{
 			ChainSelector:  chainSelector,
 			Type:           datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
-			Version:        cctp_verifier.Version,
+			Version:        versioned_verifier_resolver.Version,
 			CREATE2Factory: create2FactoryAddress,
 		})
 		if err != nil {
