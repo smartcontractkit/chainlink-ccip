@@ -88,12 +88,14 @@ func (p *Processor) getOutcome(
 	consObservation, err := getConsensusObservation(lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
 		lggr.Warnw(ConsensusObservationFailed, "err", err)
+		p.metricsReporter.TrackConsensusObservationFailed()
 		return Outcome{}, nextState, nil
 	}
 
 	switch nextState {
 	case selectingRangesForReport:
-		return reportRangesOutcome(q, lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
+		return reportRangesOutcome(
+				q, lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain, p.metricsReporter),
 			nextState,
 			nil
 	case buildingReport:
@@ -115,7 +117,8 @@ func (p *Processor) getOutcome(
 	case waitingForReportTransmission:
 		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
 		multipleReports := p.offchainCfg.MultipleReportsEnabled
-		outcome := checkForReportTransmission(lggr, attempts, multipleReports, previousOutcome, consObservation)
+		outcome := checkForReportTransmission(
+			lggr, attempts, multipleReports, previousOutcome, consObservation, p.metricsReporter)
 		return outcome, nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
@@ -129,6 +132,7 @@ func reportRangesOutcome(
 	consObservation consensusObservation,
 	maxMerkleTreeSize uint64,
 	dstChain cciptypes.ChainSelector,
+	metricsReporter MetricsReporter,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
@@ -148,6 +152,12 @@ func reportRangesOutcome(
 		if !exists {
 			continue
 		}
+
+		var pending uint64
+		if onRampMaxSeqNum >= offRampNextSeqNum {
+			pending = uint64(onRampMaxSeqNum-offRampNextSeqNum) + 1
+		}
+		metricsReporter.TrackPendingMessages(chainSel, pending)
 
 		if onRampMaxSeqNum < offRampNextSeqNum-1 {
 			if onRampMaxSeqNum == 0 {
@@ -397,6 +407,7 @@ func checkForReportTransmission(
 	multipleReports bool,
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
+	metricsReporter MetricsReporter,
 ) Outcome {
 	// Check that all sources have been updates using a set initialized from the previous outcome.
 	// Check that all have been updated in case there were multiple reports generated in the previous round.
@@ -405,11 +416,15 @@ func checkForReportTransmission(
 		pendingSources[root.ChainSel] = struct{}{}
 	}
 
+	// Attempts consumed as of, and including, this check.
+	checksSoFar := previousOutcome.ReportTransmissionCheckAttempts + 1
+
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
 				// if there is only one report, any single update means the report has been transmitted.
 				if !multipleReports {
+					metricsReporter.TrackReportTransmissionAttempts(checksSoFar, true)
 					return Outcome{
 						OutcomeType: ReportTransmitted,
 					}
@@ -431,17 +446,22 @@ func checkForReportTransmission(
 
 	// All pending sources have been updated, we can move to the next state.
 	if len(pendingSources) == 0 {
+		metricsReporter.TrackReportTransmissionAttempts(checksSoFar, true)
 		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
 	}
 
-	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
+	if checksSoFar >= maxReportTransmissionCheckAttempts {
 		lggr.Warnw(
 			ReportTransmissionGaveUp,
 			"maxReportTransmissionCheckAttempts", maxReportTransmissionCheckAttempts,
 			"abandonedSourceChains", slices.Collect(maps.Keys(pendingSources)),
 		)
+		for chainSel := range pendingSources {
+			metricsReporter.TrackReportTransmissionGaveUp(chainSel)
+		}
+		metricsReporter.TrackReportTransmissionAttempts(checksSoFar, false)
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
 		}

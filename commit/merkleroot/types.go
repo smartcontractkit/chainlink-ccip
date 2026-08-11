@@ -249,6 +249,43 @@ type MetricsReporter interface {
 	TrackRmnReport(latency float64, success bool)
 	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
 	TrackProcessorOutput(processor string, method plugincommon.MethodType, obs plugintypes.Trackable)
+
+	// TrackOnRampMaxSeqNum reports this oracle's own raw view of the latest onRamp sequence number for a
+	// source chain, every round it's read (selectingRangesForReport state) -- independent of whether a
+	// report ends up including that chain. This is the "is my reading of chain X up to date" signal.
+	TrackOnRampMaxSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum)
+	// TrackOffRampNextSeqNum reports this oracle's own raw view of the offRamp's next expected sequence
+	// number for a source chain, every round it's read.
+	TrackOffRampNextSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum)
+	// TrackPendingMessages reports the consensus backlog (onRampMaxSeqNum - offRampNextSeqNum + 1) per
+	// source chain, computed once per round from the DON's agreed values.
+	TrackPendingMessages(sourceChain cciptypes.ChainSelector, pending uint64)
+
+	// TrackRmnCurseActive reports whether a global or destination-wide RMN curse is currently blocking all
+	// reporting for this destination chain. curseType is "global" or "destination".
+	TrackRmnCurseActive(curseType string, active bool)
+	// TrackSourceChainCursed reports whether a specific source chain is currently cursed (and therefore
+	// excluded from offRamp reads this round).
+	TrackSourceChainCursed(sourceChain cciptypes.ChainSelector, cursed bool)
+
+	// TrackObservationError reports a per-source-chain failure while reading onRamp sequence numbers or
+	// computing a merkle root for a chain range. These failures are swallowed per-goroutine today and
+	// never reach the generic processor-error counter since the outer Observation() call still succeeds.
+	TrackObservationError(sourceChain cciptypes.ChainSelector, reason string)
+	// TrackFChainReadError reports a failure to read FChain from the home chain.
+	TrackFChainReadError()
+	// TrackConsensusObservationFailed reports a round where the DON failed to reach consensus on FChain
+	// for the destination chain, producing an empty outcome. This is destination-chain-wide, not
+	// lane-specific -- see docs/metrics/commit-metrics.md.
+	TrackConsensusObservationFailed()
+
+	// TrackReportTransmissionGaveUp reports a source chain being abandoned (moving back to
+	// selectingRangesForReport) after MaxReportTransmissionCheckAttempts were exhausted without the
+	// offRamp's next sequence number moving.
+	TrackReportTransmissionGaveUp(sourceChain cciptypes.ChainSelector)
+	// TrackReportTransmissionAttempts records how many check-attempts were consumed by the time a report
+	// resolved (transmitted or gave up), so operators can see typical/creeping transmission latency.
+	TrackReportTransmissionAttempts(attempts uint, success bool)
 }
 
 type NoopMetrics struct{}
@@ -258,3 +295,23 @@ func (n NoopMetrics) TrackRmnReport(float64, bool) {}
 func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration, error) {}
 
 func (n NoopMetrics) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}
+
+func (n NoopMetrics) TrackOnRampMaxSeqNum(cciptypes.ChainSelector, cciptypes.SeqNum) {}
+
+func (n NoopMetrics) TrackOffRampNextSeqNum(cciptypes.ChainSelector, cciptypes.SeqNum) {}
+
+func (n NoopMetrics) TrackPendingMessages(cciptypes.ChainSelector, uint64) {}
+
+func (n NoopMetrics) TrackRmnCurseActive(string, bool) {}
+
+func (n NoopMetrics) TrackSourceChainCursed(cciptypes.ChainSelector, bool) {}
+
+func (n NoopMetrics) TrackObservationError(cciptypes.ChainSelector, string) {}
+
+func (n NoopMetrics) TrackFChainReadError() {}
+
+func (n NoopMetrics) TrackConsensusObservationFailed() {}
+
+func (n NoopMetrics) TrackReportTransmissionGaveUp(cciptypes.ChainSelector) {}
+
+func (n NoopMetrics) TrackReportTransmissionAttempts(uint, bool) {}

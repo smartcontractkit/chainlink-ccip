@@ -501,12 +501,13 @@ func (o *asyncObserver) Close() error {
 }
 
 type observerImpl struct {
-	lggr         logger.Logger
-	homeChain    reader.HomeChain
-	oracleID     commontypes.OracleID
-	chainSupport plugincommon.ChainSupport
-	ccipReader   readerpkg.CCIPReader
-	msgHasher    cciptypes.MessageHasher
+	lggr            logger.Logger
+	homeChain       reader.HomeChain
+	oracleID        commontypes.OracleID
+	chainSupport    plugincommon.ChainSupport
+	ccipReader      readerpkg.CCIPReader
+	msgHasher       cciptypes.MessageHasher
+	metricsReporter MetricsReporter
 }
 
 func newObserverImpl(
@@ -516,14 +517,16 @@ func newObserverImpl(
 	chainSupport plugincommon.ChainSupport,
 	ccipReader readerpkg.CCIPReader,
 	msgHasher cciptypes.MessageHasher,
+	metricsReporter MetricsReporter,
 ) observerImpl {
 	return observerImpl{
-		lggr:         lggr,
-		homeChain:    homeChain,
-		oracleID:     oracleID,
-		chainSupport: chainSupport,
-		ccipReader:   ccipReader,
-		msgHasher:    msgHasher,
+		lggr:            lggr,
+		homeChain:       homeChain,
+		oracleID:        oracleID,
+		chainSupport:    chainSupport,
+		ccipReader:      ccipReader,
+		msgHasher:       msgHasher,
+		metricsReporter: metricsReporter,
 	}
 }
 
@@ -559,6 +562,15 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		)
 		return nil
 	}
+
+	// Report curse state unconditionally (including "not cursed") so the gauges reflect the current
+	// round rather than sticking at a stale "1" from a curse that has since cleared.
+	o.metricsReporter.TrackRmnCurseActive("global", curseInfo.GlobalCurse)
+	o.metricsReporter.TrackRmnCurseActive("destination", curseInfo.CursedDestination)
+	for _, sourceChain := range allSourceChains {
+		o.metricsReporter.TrackSourceChainCursed(sourceChain, curseInfo.CursedSourceChains[sourceChain])
+	}
+
 	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
 		lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
 		return nil
@@ -590,6 +602,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	result := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
 	for chainSelector, seqNum := range offRampNextSeqNums {
 		result = append(result, plugintypes.NewSeqNumChain(chainSelector, seqNum))
+		o.metricsReporter.TrackOffRampNextSeqNum(chainSelector, seqNum)
 	}
 
 	sort.Slice(result, func(i, j int) bool { return result[i].ChainSel < result[j].ChainSel })
@@ -659,14 +672,18 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
+					o.metricsReporter.TrackObservationError(sourceChain, "no_bindings")
 				} else if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain)
+					o.metricsReporter.TrackObservationError(sourceChain, "timeout")
 				} else {
 					lggr.Errorw("failed to get latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain, "err", err)
+					o.metricsReporter.TrackObservationError(sourceChain, "rpc_error")
 				}
 				return
 			}
 
+			o.metricsReporter.TrackOnRampMaxSeqNum(sourceChain, latestOnRampSeqNum)
 			mu.Lock()
 			latestOnRampSeqNums = append(
 				latestOnRampSeqNums,
@@ -712,8 +729,10 @@ func (o observerImpl) ObserveMerkleRoots(
 							logutil.FieldSourceChain, chainRange.ChainSel,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, "timeout")
 					} else {
 						lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, "rpc_error")
 					}
 					return
 				}
@@ -725,6 +744,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
 						"actual", len(msgs),
 					)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, "msg_count_mismatch")
 					return
 				}
 
@@ -740,6 +760,7 @@ func (o observerImpl) ObserveMerkleRoots(
 							"msgSeqNum", msgSeqNum,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, "seq_num_mismatch")
 						return
 					}
 					msgIdx++
@@ -748,6 +769,7 @@ func (o observerImpl) ObserveMerkleRoots(
 				root, err := o.computeMerkleRoot(ctx, lggr, msgs)
 				if err != nil {
 					lggr.Warnw("call to computeMerkleRoot failed", "err", err)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, "hash_error")
 					return
 				}
 
@@ -758,6 +780,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"err", err,
 						logutil.FieldSourceChain, chainRange.ChainSel,
 					)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, "address_lookup_error")
 					return
 				}
 
@@ -864,8 +887,8 @@ func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSele
 
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
-		// TODO: metrics
 		lggr.Errorw("call to GetFChain failed", "err", err)
+		o.metricsReporter.TrackFChainReadError()
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
