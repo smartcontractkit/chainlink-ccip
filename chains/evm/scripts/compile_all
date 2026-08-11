@@ -132,6 +132,7 @@ compileContract test/helpers/USDCReaderTester
 compileContract test/helpers/receivers/MaybeRevertMessageReceiver
 compileContract test/helpers/receivers/LogMessageDataReceiver
 compileContract test/helpers/MessageHasher
+compileContract test/helpers/VerifierTestHelper
 
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockTokenMinter
