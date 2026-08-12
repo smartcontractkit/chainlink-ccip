@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	new_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	seqtypes "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	latest_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_lock_release_token_pool"
@@ -326,7 +327,7 @@ func executeMigrationSequence(
 	bundle operations.Bundle,
 	blockChains chain.BlockChains,
 	input tokens_core.MigrateLockReleasePoolLiquidityInput,
-) {
+) seqtypes.OnChainOutput {
 	t.Helper()
 
 	report, err := operations.ExecuteSequence(
@@ -367,6 +368,8 @@ func executeMigrationSequence(
 			require.NoError(t, err)
 		}
 	}
+
+	return report.Output
 }
 
 func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T) {
@@ -434,7 +437,7 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 	require.Equal(t, common.Address{}, rebalancerReport.Output,
 		"Rebalancer should be restored to original value (zero address)")
 
-	// Verify timelock was removed from lockbox authorized callers
+	// Verify timelock was never added to lockbox authorized callers
 	authCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		erc20_lock_box.GetAllAuthorizedCallers,
@@ -446,7 +449,7 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 	)
 	require.NoError(t, err)
 	require.NotContains(t, authCallersReport.Output, s.deployer,
-		"Timelock should be removed from lockbox authorized callers after migration")
+		"Timelock should not be in lockbox authorized callers (transfer-only flow)")
 }
 
 func TestMigrateLockReleasePoolLiquidity_UnsiloedFullBasisPoints(t *testing.T) {
@@ -960,7 +963,7 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	require.Equal(t, 0, totalLiquidity.Cmp(lockboxBal.Output), "Lockbox should hold all liquidity")
 }
 
-func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
+func TestMigrateLockReleasePoolLiquidity_DoesNotTamperWithAuthorizedCallers(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	totalLiquidity := big.NewInt(5000)
 	s := setupMigrationTest(t, chainSel, totalLiquidity)
@@ -987,9 +990,9 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 	require.Contains(t, preCallersReport.Output, preExistingCaller,
 		"Pre-existing caller should be present before migration")
 
-	// Run migration
+	// Run migration (transfer-based, never touches authorized callers)
 	basisPoints := uint16(10000)
-	executeMigrationSequence(t,
+	output := executeMigrationSequence(t,
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
@@ -1001,17 +1004,30 @@ func TestMigrateLockReleasePoolLiquidity_AuthorizedCallerCleanup(t *testing.T) {
 		},
 	)
 
+	// Verify no applyAuthorizedCallerUpdates calls appear in any batch transaction
+	parsedABI, err := abi.JSON(strings.NewReader(erc20_lock_box.ERC20LockBoxABI))
+	require.NoError(t, err)
+	authSelector := parsedABI.Methods["applyAuthorizedCallerUpdates"].ID
+	for _, batch := range output.BatchOps {
+		for _, tx := range batch.Transactions {
+			if len(tx.Data) >= 4 {
+				require.NotEqual(t, authSelector[:], tx.Data[:4],
+					"migration batch should not contain applyAuthorizedCallerUpdates calls")
+			}
+		}
+	}
+
 	// Verify pre-existing caller is still present after migration
 	postCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20_lock_box.GetAllAuthorizedCallers, chain,
 		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.lockBoxAddr})
 	require.NoError(t, err)
 	require.Contains(t, postCallersReport.Output, preExistingCaller,
-		"Pre-existing authorized caller should be preserved after migration")
+		"Pre-existing authorized caller should be preserved after migration (transfer does not touch authorized callers)")
 
-	// Verify timelock (deployer) was removed from authorized callers
+	// Verify timelock was never added to authorized callers
 	require.NotContains(t, postCallersReport.Output, s.deployer,
-		"Timelock should be removed from lockbox authorized callers after migration")
+		"Timelock should not be in lockbox authorized callers (transfer-only flow)")
 }
 
 func TestMigrateLockReleasePoolLiquidity_MultiplePartialMigrations(t *testing.T) {
