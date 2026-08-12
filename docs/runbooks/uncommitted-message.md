@@ -352,12 +352,14 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))
   ```
   Spiking broadly across oracles → home-chain RPC/read outage.
-- **H2 — oracles disagree (split vote).** Check `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}`. This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all."
-  Corroborate with:
+- **H2 — oracles disagree (split vote).** Check `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}`:
+  ```promql
+  sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain", objectName="fChain", reason="split"}[5m])) by (key)
+  ```
+  This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all." Corroborate with `ccip_commit_config_digest_mismatch` flipping for a subset of oracles around the same time:
   ```promql
   ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}
   ```
-  flipping for a subset of oracles around the same time.
 
 ## Metric reference
 
