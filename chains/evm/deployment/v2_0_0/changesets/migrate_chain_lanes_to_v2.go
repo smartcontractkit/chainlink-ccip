@@ -11,12 +11,20 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -60,7 +68,9 @@ type MigrateChainLanesToV2Input struct {
 	// tokens are configured requires a non-nil fee-quoter/ramp updater registry.
 	ExcludeLanesWithTokenSymbols []string   `json:"excludeLanesWithTokenSymbols,omitempty" yaml:"excludeLanesWithTokenSymbols,omitempty"`
 	MCMS                         mcms.Input `json:"mcms" yaml:"mcms"`
-	TestRouter                   *bool      `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	// TestRouter migrates the lanes onto the TestRouter instead of the production Router, and
+	// configures a TESTTR test token behind the TestRouter on every migrated chain.
+	TestRouter *bool `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
 }
 
 // MigrateChainLanesToV2Config is the full changeset config: the durable-pipeline payload plus the
@@ -157,10 +167,184 @@ func MigrateChainLanesToV2(
 		if err := underlying.VerifyPreconditions(e, resolvedCfg); err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("resolved lane config failed preconditions: %w", err)
 		}
-		return underlying.Apply(e, resolvedCfg)
+		laneOut, err := underlying.Apply(e, resolvedCfg)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+
+		// Lane migrations to the TestRouter also get a TESTTR test token wired behind it.
+		if cfg.TestRouter == nil || !*cfg.TestRouter {
+			return laneOut, nil
+		}
+
+		tokenInput, err := buildTestTokenExpansionInput(e, cfg, lanes)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to build test token config: %w", err)
+		}
+		tokenExpansion := tokens.TokenExpansion()
+		if err := tokenExpansion.VerifyPreconditions(e, tokenInput); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("test token expansion failed preconditions: %w", err)
+		}
+		tokenOut, err := tokenExpansion.Apply(e, tokenInput)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+		return mergeTestTokenOutput(e, laneOut, tokenOut)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
+}
+
+const testTokenSymbol = "TESTTR" // Note: a TEST token already exists on some chains behind the PROD Router
+const testTokenDecimals = 18
+
+func mergeTestTokenOutput(e deployment.Environment, laneOut, tokenOut deployment.ChangesetOutput) (deployment.ChangesetOutput, error) {
+	merged := laneOut
+	if err := deployment.MergeChangesetOutput(e, &merged, tokenOut); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge test token output: %w", err)
+	}
+	// MergeChangesetOutput does not carry the DataStore.
+	switch {
+	case merged.DataStore == nil:
+		merged.DataStore = tokenOut.DataStore
+	case tokenOut.DataStore != nil:
+		if err := merged.DataStore.Merge(tokenOut.DataStore.Seal()); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge test token datastore: %w", err)
+		}
+	}
+	return merged, nil
+}
+
+// testTokenRef returns the datastore ref identifying the TESTTR token on a chain.
+func testTokenRef(sel uint64) datastore.AddressRef {
+	return datastore.AddressRef{
+		ChainSelector: sel,
+		Qualifier:     testTokenSymbol,
+		Type:          datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+		Version:       burn_mint_erc20_with_drip.Version,
+	}
+}
+
+// buildTestTokenExpansionInput builds the TokenExpansion input for the migrated lanes: every
+// participating chain gets a TESTTR token + pool behind the TestRouter with each lane partner as a
+// remote chain (rate limits disabled). Existing TESTTR tokens are reused, not redeployed.
+func buildTestTokenExpansionInput(e deployment.Environment, cfg MigrateChainLanesToV2Config, lanes []v2changesets.CrossFamilyLanePair) (tokens.TokenExpansionInput, error) {
+	// remotesOf maps each chain to the set of remote chains it shares a (migrated) lane with.
+	remotesOf := make(map[uint64]map[uint64]struct{})
+	for _, lane := range lanes {
+		if !isEVMChain(lane.ChainA) || !isEVMChain(lane.ChainB) {
+			continue
+		}
+		if remotesOf[lane.ChainA] == nil {
+			remotesOf[lane.ChainA] = make(map[uint64]struct{})
+		}
+		if remotesOf[lane.ChainB] == nil {
+			remotesOf[lane.ChainB] = make(map[uint64]struct{})
+		}
+		remotesOf[lane.ChainA][lane.ChainB] = struct{}{}
+		remotesOf[lane.ChainB][lane.ChainA] = struct{}{}
+	}
+	if len(remotesOf) == 0 {
+		return tokens.TokenExpansionInput{}, fmt.Errorf("no EVM lanes found to configure test tokens on")
+	}
+
+	perChain := make(map[uint64]tokens.TokenExpansionInputPerChain, len(remotesOf))
+	for sel, remotes := range remotesOf {
+		perChainConfig, err := newTestTokenPerChainConfig(e, sel, remotes)
+		if err != nil {
+			return tokens.TokenExpansionInput{}, err
+		}
+		perChain[sel] = perChainConfig
+	}
+
+	return tokens.TokenExpansionInput{
+		ChainAdapterVersion:         utils.Version_2_0_0,
+		TokenExpansionInputPerChain: perChain,
+		MCMS:                        cfg.MCMS,
+	}, nil
+}
+
+// newTestTokenPerChainConfig builds the per-chain TESTTR config. A TESTTR token already in the
+// datastore is reused (no DeployTokenInput); otherwise a fresh burn-mint token is deployed.
+func newTestTokenPerChainConfig(e deployment.Environment, sel uint64, remotes map[uint64]struct{}) (tokens.TokenExpansionInputPerChain, error) {
+	remoteChains := make(map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef], len(remotes))
+	disabledRateLimiter := &tokens.RateLimiterConfigFloatInput{IsEnabled: false}
+	for remote := range remotes {
+		remoteChains[remote] = tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+			OutboundRateLimiterConfig: disabledRateLimiter,
+		}
+	}
+	tokenRef := testTokenRef(sel)
+
+	perChain := tokens.TokenExpansionInputPerChain{
+		TokenPoolVersion: utils.Version_2_0_0,
+		// Pools stay deployer-owned so the test flow does not depend on timelock ownership.
+		SkipOwnershipTransfer: true,
+		DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+			TokenRef:           &tokenRef,
+			TokenPoolQualifier: testTokenSymbol,
+			PoolType:           string(utils.BurnMintTokenPool),
+			TokenPoolVersion:   utils.Version_2_0_0,
+			RouterRef: &datastore.AddressRef{
+				ChainSelector: sel,
+				Type:          datastore.ContractType(router.TestRouterContractType),
+				Version:       router.Version,
+			},
+		},
+		TokenTransferConfig: &tokens.TokenTransferConfig{
+			RegistryRef: datastore.AddressRef{
+				ChainSelector: sel,
+				Type:          datastore.ContractType(token_admin_registry.ContractType),
+				Version:       token_admin_registry.Version,
+			},
+			TokenRef: testTokenRef(sel),
+			TokenPoolRef: datastore.AddressRef{
+				ChainSelector: sel,
+				Qualifier:     testTokenSymbol,
+				Type:          datastore.ContractType(utils.BurnMintTokenPool),
+				Version:       utils.Version_2_0_0,
+			},
+			AllowedFinalityConfig: finality.Config{
+				WaitForFinality: false,
+				WaitForSafe:     false,
+				BlockDepth:      1,
+			},
+			RemoteChains: remoteChains,
+		},
+	}
+
+	existing, err := findTestTokenRefs(e, sel)
+	if err != nil {
+		return tokens.TokenExpansionInputPerChain{}, err
+	}
+	if len(existing) == 0 {
+		perChain.DeployTokenInput = &tokens.DeployTokenInput{
+			Name:     testTokenSymbol,
+			Symbol:   testTokenSymbol,
+			Decimals: testTokenDecimals,
+			Type:     deployment.ContractType(burn_mint_erc20_with_drip.ContractType),
+		}
+	} else if e.Logger != nil {
+		e.Logger.Infof("reusing existing %s token at %s on chain with selector %d", testTokenSymbol, existing[0].Address, sel)
+	}
+	return perChain, nil
+}
+
+// findTestTokenRefs returns the chain's TESTTR token refs from the datastore (at most one expected).
+func findTestTokenRefs(e deployment.Environment, sel uint64) ([]datastore.AddressRef, error) {
+	if e.DataStore == nil {
+		return nil, nil
+	}
+	matches := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(sel),
+		datastore.AddressRefByType(datastore.ContractType(burn_mint_erc20_with_drip.ContractType)),
+		datastore.AddressRefByVersion(burn_mint_erc20_with_drip.Version),
+		datastore.AddressRefByQualifier(testTokenSymbol),
+	)
+	if len(matches) > 1 {
+		return nil, fmt.Errorf("multiple %s tokens found in datastore on chain with selector %d", testTokenSymbol, sel)
+	}
+	return matches, nil
 }
 
 // laneDiscoverer resolves, from live on-chain state, the set of lanes to migrate to CCIP 2.0. It

@@ -11,13 +11,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	v2changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
 
@@ -466,6 +470,62 @@ func TestDiscoverLanesToMigrate_SkipsLaneWithExcludedTokenOnlyInReverseDirection
 	)
 	require.NoError(t, err)
 	require.Empty(t, lanes)
+}
+
+func TestBuildTestTokenExpansionInput_DeploysTestTokenPerEVMChain(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	chainB := chainsel.TEST_90000002.Selector
+	chainSolana := chainsel.SOLANA_DEVNET.Selector
+
+	in, err := buildTestTokenExpansionInput(cldf.Environment{}, MigrateChainLanesToV2Config{}, []v2changesets.CrossFamilyLanePair{
+		{ChainA: chainA, ChainB: chainB},
+		{ChainA: chainA, ChainB: chainSolana}, // non-EVM lane: no test token wiring
+	})
+	require.NoError(t, err)
+	require.Len(t, in.TokenExpansionInputPerChain, 2, "only EVM chains participating in EVM lanes get a test token")
+
+	for _, sel := range []uint64{chainA, chainB} {
+		perChain := in.TokenExpansionInputPerChain[sel]
+		require.NotNil(t, perChain.DeployTokenInput)
+		assert.Equal(t, testTokenSymbol, perChain.DeployTokenInput.Symbol)
+		assert.Equal(t, testTokenSymbol, perChain.DeployTokenInput.Name)
+		assert.Equal(t, uint8(testTokenDecimals), perChain.DeployTokenInput.Decimals)
+		assert.Equal(t, cldf.ContractType(burn_mint_erc20_with_drip.ContractType), perChain.DeployTokenInput.Type)
+
+		require.NotNil(t, perChain.DeployTokenPoolInput)
+		assert.Equal(t, testTokenSymbol, perChain.DeployTokenPoolInput.TokenPoolQualifier)
+		require.NotNil(t, perChain.DeployTokenPoolInput.RouterRef)
+		assert.Equal(t, datastore.ContractType(router.TestRouterContractType), perChain.DeployTokenPoolInput.RouterRef.Type)
+
+		require.NotNil(t, perChain.TokenTransferConfig)
+		assert.Equal(t, testTokenSymbol, perChain.TokenTransferConfig.TokenRef.Qualifier)
+		assert.True(t, perChain.SkipOwnershipTransfer)
+	}
+	assert.Contains(t, in.TokenExpansionInputPerChain[chainA].TokenTransferConfig.RemoteChains, chainB)
+	assert.Contains(t, in.TokenExpansionInputPerChain[chainB].TokenTransferConfig.RemoteChains, chainA)
+	assert.NotContains(t, in.TokenExpansionInputPerChain[chainA].TokenTransferConfig.RemoteChains, chainSolana)
+}
+
+func TestBuildTestTokenExpansionInput_ReusesExistingToken(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	chainB := chainsel.TEST_90000002.Selector
+
+	// chainA already has the TESTTR token in the datastore; chainB does not.
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: chainA,
+		Type:          datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+		Version:       burn_mint_erc20_with_drip.Version,
+		Qualifier:     testTokenSymbol,
+		Address:       "0x000000000000000000000000000000000000babe",
+	}))
+
+	in, err := buildTestTokenExpansionInput(cldf.Environment{DataStore: ds.Seal()}, MigrateChainLanesToV2Config{}, []v2changesets.CrossFamilyLanePair{
+		{ChainA: chainA, ChainB: chainB},
+	})
+	require.NoError(t, err)
+	assert.Nil(t, in.TokenExpansionInputPerChain[chainA].DeployTokenInput, "existing TESTTR token must be reused, not redeployed")
+	assert.NotNil(t, in.TokenExpansionInputPerChain[chainB].DeployTokenInput, "chain without TESTTR must deploy a fresh token")
 }
 
 func TestDiscoverLanesToMigrate_SkipsVersionWithoutConfigImporter(t *testing.T) {
