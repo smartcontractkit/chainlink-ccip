@@ -60,6 +60,10 @@ func (a *EVMTokenBase) RevokeTokenAdminRole() *cldf_ops.Sequence[tokensapi.Revok
 	return v1_0_0_seq.RevokeTokenAdminRole
 }
 
+func (a *EVMTokenBase) GrantTokenAdminRole() *cldf_ops.Sequence[tokensapi.GrantTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return v1_0_0_seq.GrantTokenAdminRole
+}
+
 func (a *EVMTokenBase) DeployTokenVerify(e deployment.Environment, input tokensapi.DeployTokenInput) error {
 	tokenAddr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore,
 		datastore.AddressRef{
