@@ -69,6 +69,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -181,6 +182,7 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 			FeeQuoterVersion: semver.MustParse("2.0.0"),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -289,6 +291,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 			FeeQuoterVersion: semver.MustParse("2.0.0"),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,

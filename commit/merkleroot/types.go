@@ -6,23 +6,35 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 const (
-	processorLabel = "merkleroot"
-	rootsLabel     = "roots"
-	messagesLabel  = "messages"
+	processorLabel    = "merkleroot"
+	rootsLabel        = "roots"
+	messagesLabel     = "messages"
+	rmnSignatureLabel = "rmnSignatures"
 )
 
-type Query struct{}
+type Query struct {
+	RetryRMNSignatures bool
+	RMNSignatures      *rmn.ReportSignatures
+}
+
+// ContainsRmnSignatures returns true if the query contains RMN signatures.
+func (q Query) ContainsRmnSignatures() bool {
+	return q.RMNSignatures != nil && len(q.RMNSignatures.Signatures) > 0
+}
 
 type Observation struct {
-	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
-	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
-	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
-	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
+	MerkleRoots        []cciptypes.MerkleRootChain      `json:"merkleRoots"`
+	RMNEnabledChains   map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
+	OnRampMaxSeqNums   []plugintypes.SeqNumChain        `json:"onRampMaxSeqNums"`
+	OffRampNextSeqNums []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
+	RMNRemoteConfig    cciptypes.RemoteConfig           `json:"rmnRemoteConfig"`
+	FChain             map[cciptypes.ChainSelector]int  `json:"fChain"`
 }
 
 func (o Observation) Stats() map[string]int {
@@ -40,6 +52,7 @@ func (o Observation) IsEmpty() bool {
 	return len(o.MerkleRoots) == 0 &&
 		len(o.OnRampMaxSeqNums) == 0 &&
 		len(o.OffRampNextSeqNums) == 0 &&
+		o.RMNRemoteConfig.IsEmpty() &&
 		len(o.FChain) == 0
 }
 
@@ -48,11 +61,17 @@ type aggregatedObservation struct {
 	// A map from chain selectors to the list of merkle roots observed for each chain
 	MerkleRoots map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain
 
+	// RMNEnabledChains is a map of the RMN-enabled source chains.
+	RMNEnabledChains map[cciptypes.ChainSelector][]bool
+
 	// A map from chain selectors to the list of OnRamp max sequence numbers observed for each chain
 	OnRampMaxSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
 
 	// A map from chain selectors to the list of OffRamp next sequence numbers observed for each chain
 	OffRampNextSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
+
+	// The RMNRemoteConfig observed
+	RMNRemoteConfigs []cciptypes.RemoteConfig
 
 	// A map from chain selectors to the list of f (failure tolerance) observed for each chain
 	FChain map[cciptypes.ChainSelector][]int
@@ -62,8 +81,10 @@ type aggregatedObservation struct {
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) aggregatedObservation {
 	aggObs := aggregatedObservation{
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
+		RMNEnabledChains:   make(map[cciptypes.ChainSelector][]bool),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
+		RMNRemoteConfigs:   make([]cciptypes.RemoteConfig, 0),
 		FChain:             make(map[cciptypes.ChainSelector][]int),
 	}
 
@@ -73,6 +94,11 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		for _, merkleRoot := range obs.MerkleRoots {
 			aggObs.MerkleRoots[merkleRoot.ChainSel] =
 				append(aggObs.MerkleRoots[merkleRoot.ChainSel], merkleRoot)
+		}
+
+		// RMNEnabledChains
+		for chainSel, enabled := range obs.RMNEnabledChains {
+			aggObs.RMNEnabledChains[chainSel] = append(aggObs.RMNEnabledChains[chainSel], enabled)
 		}
 
 		// OnRampMaxSeqNums
@@ -85,6 +111,11 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		for _, seqNumChain := range obs.OffRampNextSeqNums {
 			aggObs.OffRampNextSeqNums[seqNumChain.ChainSel] =
 				append(aggObs.OffRampNextSeqNums[seqNumChain.ChainSel], seqNumChain.SeqNum)
+		}
+
+		// RMNRemoteConfig
+		if !obs.RMNRemoteConfig.IsEmpty() {
+			aggObs.RMNRemoteConfigs = append(aggObs.RMNRemoteConfigs, obs.RMNRemoteConfig)
 		}
 
 		// FChain
@@ -102,11 +133,17 @@ type consensusObservation struct {
 	// A map from chain selectors to each chain's consensus merkle root
 	MerkleRoots map[cciptypes.ChainSelector]cciptypes.MerkleRootChain
 
+	// RMNEnabledChains holds the consensus of RMNEnabledChains
+	RMNEnabledChains map[cciptypes.ChainSelector]bool
+
 	// A map from chain selectors to each chain's consensus OnRamp max sequence number
 	OnRampMaxSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
 
 	// A map from chain selectors to each chain's consensus OffRamp next sequence number
 	OffRampNextSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
+
+	// The consensus RMNRemoteConfig
+	RMNRemoteConfig map[cciptypes.ChainSelector]cciptypes.RemoteConfig
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
 	FChain map[cciptypes.ChainSelector]int
@@ -124,17 +161,21 @@ const (
 )
 
 type Outcome struct {
-	OutcomeType                     OutcomeType                 `json:"outcomeType"`
-	RangesSelectedForReport         []plugintypes.ChainRange    `json:"rangesSelectedForReport"`
-	RootsToReport                   []cciptypes.MerkleRootChain `json:"rootsToReport"`
-	OffRampNextSeqNums              []plugintypes.SeqNumChain   `json:"offRampNextSeqNums"`
-	ReportTransmissionCheckAttempts uint                        `json:"reportTransmissionCheckAttempts"`
+	OutcomeType                     OutcomeType                      `json:"outcomeType"`
+	RangesSelectedForReport         []plugintypes.ChainRange         `json:"rangesSelectedForReport"`
+	RootsToReport                   []cciptypes.MerkleRootChain      `json:"rootsToReport"`
+	RMNEnabledChains                map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
+	OffRampNextSeqNums              []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
+	ReportTransmissionCheckAttempts uint                             `json:"reportTransmissionCheckAttempts"`
+	RMNReportSignatures             []cciptypes.RMNECDSASignature    `json:"rmnReportSignatures"`
+	RMNRemoteCfg                    cciptypes.RemoteConfig           `json:"rmnRemoteCfg"`
 }
 
 func (o Outcome) Stats() map[string]int {
 	counts := map[string]int{
-		rootsLabel:    len(o.RootsToReport),
-		messagesLabel: 0,
+		rootsLabel:        len(o.RootsToReport),
+		rmnSignatureLabel: len(o.RMNReportSignatures),
+		messagesLabel:     0,
 	}
 	for _, root := range o.RootsToReport {
 		counts[messagesLabel] += root.SeqNumsRange.Length()
@@ -205,12 +246,97 @@ func (p processorState) String() string {
 
 // MetricsReporter exposes only relevant methods for reporting merkle roots from metrics.Reporter
 type MetricsReporter interface {
+	TrackRmnReport(latency float64, success bool)
 	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
 	TrackProcessorOutput(processor string, method plugincommon.MethodType, obs plugintypes.Trackable)
+
+	// TrackOnRampMaxSeqNum reports this oracle's own raw view of the latest onRamp sequence number for a
+	// source chain, every round it's read (selectingRangesForReport state) -- independent of whether a
+	// report ends up including that chain. This is the "is my reading of chain X up to date" signal.
+	TrackOnRampMaxSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum)
+	// TrackOffRampNextSeqNum reports this oracle's own raw view of the offRamp's next expected sequence
+	// number for a source chain, every round it's read.
+	TrackOffRampNextSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum)
+	// TrackPendingMessages reports the consensus backlog (onRampMaxSeqNum - offRampNextSeqNum + 1) per
+	// source chain, computed once per round from the DON's agreed values.
+	TrackPendingMessages(sourceChain cciptypes.ChainSelector, pending uint64)
+
+	// TrackRmnCurseActive reports whether a global or destination-wide RMN curse is currently blocking all
+	// reporting for this destination chain. curseType is "global" or "destination".
+	TrackRmnCurseActive(curseType string, active bool)
+	// TrackSourceChainCursed reports whether a specific source chain is currently cursed (and therefore
+	// excluded from offRamp reads this round).
+	TrackSourceChainCursed(sourceChain cciptypes.ChainSelector, cursed bool)
+
+	// TrackObservationError reports a per-source-chain failure while reading onRamp sequence numbers or
+	// computing a merkle root for a chain range. These failures are swallowed per-goroutine today and
+	// never reach the generic processor-error counter since the outer Observation() call still succeeds.
+	TrackObservationError(sourceChain cciptypes.ChainSelector, reason string)
+	// TrackFChainReadError reports a failure to read FChain from the home chain.
+	TrackFChainReadError()
+	// TrackConsensusObservationFailed reports a round where the DON failed to reach consensus on FChain
+	// for the destination chain, producing an empty outcome. This is destination-chain-wide, not
+	// lane-specific -- see docs/metrics/commit-metrics.md.
+	TrackConsensusObservationFailed()
+
+	// TrackReportTransmissionGaveUp reports a source chain being abandoned (moving back to
+	// selectingRangesForReport) after MaxReportTransmissionCheckAttempts were exhausted without the
+	// offRamp's next sequence number moving.
+	TrackReportTransmissionGaveUp(sourceChain cciptypes.ChainSelector)
+	// TrackReportTransmissionAttempts records how many check-attempts were consumed by the time a report
+	// resolved (transmitted or gave up), so operators can see typical/creeping transmission latency.
+	TrackReportTransmissionAttempts(attempts uint, success bool)
+
+	// TrackRangeTruncated reports a source chain's selected sequence-number range being cut short by
+	// MaxMerkleTreeSize, i.e. the chain has more new messages than fit in a single report.
+	TrackRangeTruncated(sourceChain cciptypes.ChainSelector)
+	// TrackOffRampLaneStatus reports, for every round and every known offRamp lane status, whether a
+	// source chain is currently in that status. Reported unconditionally (active and inactive) for every
+	// status so the four buckets stay mutually exclusive and none of them can silently go stale.
+	TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelector, status string, active bool)
+	// TrackSeqNumInvariantViolation reports a violation of the invariants the plugin relies on to make
+	// progress: offRamp ahead of onRamp, onRamp max seq num observed as 0, or offRamp's next seq num
+	// regressing between rounds. violationType is "offramp_ahead_of_onramp", "onramp_max_zero", or
+	// "offramp_seqnum_regression".
+	TrackSeqNumInvariantViolation(sourceChain cciptypes.ChainSelector, violationType string)
+	// TrackOffRampConsensusInsufficient reports a source chain being dropped from this round's outcome
+	// because fewer than 2*fDestChain+1 oracles agreed on its offRamp next sequence number. From outside,
+	// this looks identical to "no new messages on this lane".
+	TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector)
 }
 
 type NoopMetrics struct{}
 
+func (n NoopMetrics) TrackRmnReport(float64, bool) {}
+
 func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration, error) {}
 
 func (n NoopMetrics) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}
+
+func (n NoopMetrics) TrackOnRampMaxSeqNum(cciptypes.ChainSelector, cciptypes.SeqNum) {}
+
+func (n NoopMetrics) TrackOffRampNextSeqNum(cciptypes.ChainSelector, cciptypes.SeqNum) {}
+
+func (n NoopMetrics) TrackPendingMessages(cciptypes.ChainSelector, uint64) {}
+
+func (n NoopMetrics) TrackRmnCurseActive(string, bool) {}
+
+func (n NoopMetrics) TrackSourceChainCursed(cciptypes.ChainSelector, bool) {}
+
+func (n NoopMetrics) TrackObservationError(cciptypes.ChainSelector, string) {}
+
+func (n NoopMetrics) TrackFChainReadError() {}
+
+func (n NoopMetrics) TrackConsensusObservationFailed() {}
+
+func (n NoopMetrics) TrackReportTransmissionGaveUp(cciptypes.ChainSelector) {}
+
+func (n NoopMetrics) TrackReportTransmissionAttempts(uint, bool) {}
+
+func (n NoopMetrics) TrackRangeTruncated(cciptypes.ChainSelector) {}
+
+func (n NoopMetrics) TrackOffRampLaneStatus(cciptypes.ChainSelector, string, bool) {}
+
+func (n NoopMetrics) TrackSeqNumInvariantViolation(cciptypes.ChainSelector, string) {}
+
+func (n NoopMetrics) TrackOffRampConsensusInsufficient(cciptypes.ChainSelector) {}

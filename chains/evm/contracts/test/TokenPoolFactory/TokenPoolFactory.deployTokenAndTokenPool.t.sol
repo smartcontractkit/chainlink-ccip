@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IOwner} from "../../interfaces/IOwner.sol";
 
-import {Router} from "../../Router.sol";
 import {TokenPoolFactory} from "../../TokenPoolFactory.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BurnFromMintTokenPool} from "../../pools/BurnFromMintTokenPool.sol";
@@ -36,9 +35,7 @@ contract TokenPoolFactory_deployTokenAndTokenPool is TokenPoolFactorySetup {
   function setUp() public override {
     super.setUp();
 
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_SELECTOR, offRamp: s_burnMintOffRamp});
-    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+    _setMockRouterOffRamp(address(s_sourceRouter), DEST_CHAIN_SELECTOR, s_burnMintOffRamp, true);
 
     vm.startPrank(OWNER);
   }

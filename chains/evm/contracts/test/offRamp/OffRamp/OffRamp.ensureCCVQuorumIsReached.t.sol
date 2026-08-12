@@ -49,7 +49,7 @@ contract OffRamp_ensureCCVQuorumIsReached is OffRampSetup {
 
     OffRamp.SourceChainConfigArgs[] memory configs = new OffRamp.SourceChainConfigArgs[](1);
     configs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_sourceRouter,
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       onRamps: onRamps,

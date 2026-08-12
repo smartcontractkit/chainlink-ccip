@@ -2,6 +2,7 @@ package merkleroot
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,34 +18,53 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/ragep2p/types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
+	rmn_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func TestObservation(t *testing.T) {
 	mockObserver := merkleroot.NewMockObserver(t)
+	mockCCIPReader := readerpkg_mock.NewMockCCIPReader(t)
 	chainSupport := common_mock.NewMockChainSupport(t)
 
 	destChain := cciptypes.ChainSelector(909606746561742123)
 
+	offchainAddress := []byte(rand.RandomAddress())
+
 	p := &Processor{
 		lggr:            logger.Test(t),
 		observer:        mockObserver,
-		chainSupport:    chainSupport,
+		rmnCrypto:       signatureVerifierAlwaysTrue{},
+		ccipReader:      mockCCIPReader,
 		destChain:       destChain,
+		offchainCfg:     pluginconfig.CommitOffchainConfig{RMNEnabled: true},
+		chainSupport:    chainSupport,
 		metricsReporter: NoopMetrics{},
 	}
 
+	thirtyTwoBytes := [32]byte{1, 2, 3}
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -66,11 +86,13 @@ func TestObservation(t *testing.T) {
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}}).Once()
 				mockObserver.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}})
+				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything).Return(cciptypes.RemoteConfig{})
 				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
 			expectedObs: Observation{
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}},
 				OnRampMaxSeqNums:   []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}},
+				RMNRemoteConfig:    cciptypes.RemoteConfig{},
 				FChain:             map[cciptypes.ChainSelector]int{1: 3},
 			},
 		},
@@ -81,8 +103,13 @@ func TestObservation(t *testing.T) {
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: destChain, SeqNumRange: cciptypes.SeqNumRange{5, 10}},
 				},
+				RMNRemoteCfg: testhelpers.CreateRMNRemoteCfg(),
 			},
-			query: Query{},
+			query: Query{
+				RMNSignatures: &rmn.ReportSignatures{
+					Signatures: []*serialization.EcdsaSignature{{R: thirtyTwoBytes[:], S: thirtyTwoBytes[:]}},
+				},
+			},
 			setupMocks: func() {
 				mockObserver.EXPECT().ObserveMerkleRoots(mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
 					{
@@ -91,6 +118,7 @@ func TestObservation(t *testing.T) {
 						MerkleRoot:   [32]byte{1},
 					}})
 				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
+				mockCCIPReader.EXPECT().GetContractAddress(mock.Anything, mock.Anything).Return(offchainAddress, nil)
 			},
 			expectedObs: Observation{
 				MerkleRoots: []cciptypes.MerkleRootChain{
@@ -99,13 +127,15 @@ func TestObservation(t *testing.T) {
 						SeqNumsRange: [2]cciptypes.SeqNum{5, 10},
 						MerkleRoot:   [32]byte{1}},
 				},
-				FChain: map[cciptypes.ChainSelector]int{1: 3},
+				RMNEnabledChains: map[cciptypes.ChainSelector]bool{1: true},
+				FChain:           map[cciptypes.ChainSelector]int{1: 3},
 			},
 		},
 		{
 			name: "WaitingForReportTransmission",
 			prevOutcome: Outcome{
-				OutcomeType: ReportInFlight,
+				OutcomeType:  ReportInFlight,
+				RMNRemoteCfg: testhelpers.CreateRMNRemoteCfg(),
 			},
 			query: Query{},
 			setupMocks: func() {
@@ -119,30 +149,17 @@ func TestObservation(t *testing.T) {
 			},
 		},
 		{
-			name: "BuildingReport ignores retry query flag",
+			name: "BuildingReport with RetryRMNSignatures",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
-				RangesSelectedForReport: []plugintypes.ChainRange{
-					{ChainSel: destChain, SeqNumRange: cciptypes.SeqNumRange{5, 10}},
-				},
 			},
-			query: Query{},
+			query: Query{
+				RetryRMNSignatures: true,
+			},
 			setupMocks: func() {
-				mockObserver.EXPECT().ObserveMerkleRoots(mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
-					{
-						ChainSel:     1,
-						SeqNumsRange: [2]cciptypes.SeqNum{5, 10},
-						MerkleRoot:   [32]byte{1},
-					}})
 				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
 			expectedObs: Observation{
-				MerkleRoots: []cciptypes.MerkleRootChain{
-					{
-						ChainSel:     1,
-						SeqNumsRange: [2]cciptypes.SeqNum{5, 10},
-						MerkleRoot:   [32]byte{1}},
-				},
 				FChain: map[cciptypes.ChainSelector]int{1: 3},
 			},
 		},
@@ -152,6 +169,12 @@ func TestObservation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
+			rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
+			rmnHomeReader.EXPECT().GetRMNEnabledSourceChains(tc.prevOutcome.RMNRemoteCfg.ConfigDigest).
+				Return(map[cciptypes.ChainSelector]bool{1: true}, nil).Maybe()
+
+			p.rmnHomeReader = rmnHomeReader
+			p.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller setup
 			obs, err := p.Observation(ctx, tc.prevOutcome, tc.query)
 
 			if tc.expectedErr != "" {
@@ -162,6 +185,7 @@ func TestObservation(t *testing.T) {
 			}
 
 			mockObserver.AssertExpectations(t)
+			mockCCIPReader.AssertExpectations(t)
 		})
 	}
 }
@@ -353,6 +377,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport,
 				ccipReader,
 				mocks.NewMessageHasher(),
+				NoopMetrics{},
 			)
 
 			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx))
@@ -366,9 +391,12 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 	nextSeqNums := map[cciptypes.ChainSelector]cciptypes.SeqNum{4: 345, 7: 608, 19: 7713}
 	supportedChains := mapset.NewSet(knownSourceChains...)
 
-	liveLane := readerpkg.StaticSourceChainConfig{
-		IsEnabled: true,
-		OnRamp:    []byte{0x01},
+	liveLane := func(rmnDisabled bool) readerpkg.StaticSourceChainConfig {
+		return readerpkg.StaticSourceChainConfig{
+			IsEnabled:                 true,
+			OnRamp:                    []byte{0x01},
+			IsRMNVerificationDisabled: rmnDisabled,
+		}
 	}
 
 	testCases := []struct {
@@ -382,9 +410,9 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4):  liveLane,
-						cciptypes.ChainSelector(7):  liveLane,
-						cciptypes.ChainSelector(19): liveLane,
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  liveLane(true),
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -402,13 +430,37 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 			},
 		},
 		{
+			name: "rmn verification misconfigured, should ignore observations",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  liveLane(true),
+						cciptypes.ChainSelector(19): liveLane(false),
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(7, 608),
+			},
+		},
+		{
 			name: "source configuration missing, should not break",
 			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4):  liveLane,
-						cciptypes.ChainSelector(19): liveLane,
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -425,14 +477,61 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 			},
 		},
 		{
+			name: "multiple rmn misconfigurations, should not break",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4):  liveLane(false),
+						cciptypes.ChainSelector(7):  liveLane(false),
+						cciptypes.ChainSelector(19): liveLane(true),
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					)
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name: "should only ask for seq nums for rmn disabled chains",
+			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
+
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
+						cciptypes.ChainSelector(4):  liveLane(false),
+						cciptypes.ChainSelector(7):  liveLane(false),
+						cciptypes.ChainSelector(19): liveLane(true),
+					}, nil)
+				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, cciptypes.ChainSelector(19)).
+					RunAndReturn(
+						func(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+							require.True(t, supportedChains.Contains(chain))
+							return nextSeqNums[chain], nil
+						},
+					).Once()
+				return ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
 			name: "disabled source chain is skipped without querying",
 			getDeps: func(t *testing.T) *reader_mock.MockCCIPReader {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4):  liveLane,
-						cciptypes.ChainSelector(7):  {IsEnabled: false, OnRamp: []byte{0x01}},
-						cciptypes.ChainSelector(19): liveLane,
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  {IsEnabled: false, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -454,9 +553,9 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, knownSourceChains).
 					Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-						cciptypes.ChainSelector(4):  liveLane,
-						cciptypes.ChainSelector(7):  {IsEnabled: true},
-						cciptypes.ChainSelector(19): liveLane,
+						cciptypes.ChainSelector(4):  liveLane(true),
+						cciptypes.ChainSelector(7):  {IsEnabled: true, IsRMNVerificationDisabled: true},
+						cciptypes.ChainSelector(19): liveLane(true),
 					}, nil)
 				ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 					RunAndReturn(
@@ -491,6 +590,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				chainSupport,
 				ccipReader,
 				mocks.NewMessageHasher(),
+				NoopMetrics{},
 			)
 
 			assert.Equal(t, tc.expResult, o.ObserveLatestOnRampSeqNums(ctx))
@@ -511,8 +611,8 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 		ccipReader := reader_mock.NewMockCCIPReader(t)
 		ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, hungRPCChains).
 			Return(map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-				cciptypes.ChainSelector(4): liveLane,
-				cciptypes.ChainSelector(7): liveLane,
+				cciptypes.ChainSelector(4): liveLane(true),
+				cciptypes.ChainSelector(7): liveLane(true),
 			}, nil)
 		ccipReader.EXPECT().LatestMsgSeqNum(mock.Anything, mock.Anything).
 			RunAndReturn(func(callCtx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
@@ -536,6 +636,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 			chainSupport,
 			ccipReader,
 			mocks.NewMessageHasher(),
+			NoopMetrics{},
 		)
 
 		result := o.ObserveLatestOnRampSeqNums(ctx)
@@ -545,8 +646,9 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 
 func Test_isLiveOffRampSourceLane(t *testing.T) {
 	live := readerpkg.StaticSourceChainConfig{
-		IsEnabled: true,
-		OnRamp:    []byte{0x01},
+		IsEnabled:                 true,
+		OnRamp:                    []byte{0x01},
+		IsRMNVerificationDisabled: true,
 	}
 	assert.True(t, isLiveOffRampSourceLane(live, true))
 	assert.False(t, isLiveOffRampSourceLane(live, false))
@@ -560,29 +662,30 @@ func Test_isLiveOffRampSourceLane(t *testing.T) {
 
 func Test_classifyOffRampSourceLanes(t *testing.T) {
 	const (
-		live                    cciptypes.ChainSelector = 1
-		disabled                cciptypes.ChainSelector = 2
-		noConfig                cciptypes.ChainSelector = 3
-		noOnRamp                cciptypes.ChainSelector = 4
-		liveWithRMNVerification cciptypes.ChainSelector = 5
-		liveTwo                 cciptypes.ChainSelector = 6
+		live         cciptypes.ChainSelector = 1
+		disabled     cciptypes.ChainSelector = 2
+		noConfig     cciptypes.ChainSelector = 3
+		noOnRamp     cciptypes.ChainSelector = 4
+		rmnMisconfig cciptypes.ChainSelector = 5
+		liveTwo      cciptypes.ChainSelector = 6
 	)
 
-	supported := []cciptypes.ChainSelector{live, disabled, noConfig, noOnRamp, liveWithRMNVerification, liveTwo}
+	supported := []cciptypes.ChainSelector{live, disabled, noConfig, noOnRamp, rmnMisconfig, liveTwo}
 	cfgs := map[cciptypes.ChainSelector]readerpkg.StaticSourceChainConfig{
-		live:                    {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
-		disabled:                {IsEnabled: false, OnRamp: []byte{0x01}},
-		noOnRamp:                {IsEnabled: true},
-		liveWithRMNVerification: {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: false},
-		liveTwo:                 {IsEnabled: true, OnRamp: []byte{0x02}},
+		live:         {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+		disabled:     {IsEnabled: false, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: true},
+		noOnRamp:     {IsEnabled: true, IsRMNVerificationDisabled: true},
+		rmnMisconfig: {IsEnabled: true, OnRamp: []byte{0x01}, IsRMNVerificationDisabled: false},
+		liveTwo:      {IsEnabled: true, OnRamp: []byte{0x02}, IsRMNVerificationDisabled: true},
 		// noConfig deliberately absent from the map
 	}
 
 	c := classifyOffRampSourceLanes(supported, cfgs)
 
-	assert.Equal(t, []cciptypes.ChainSelector{live, liveWithRMNVerification, liveTwo}, c.live)
+	assert.Equal(t, []cciptypes.ChainSelector{live, liveTwo}, c.live)
 	assert.Equal(t, []cciptypes.ChainSelector{noConfig, noOnRamp}, c.skippedNotALane)
 	assert.Equal(t, []cciptypes.ChainSelector{disabled}, c.skippedDisabled)
+	assert.Equal(t, []cciptypes.ChainSelector{rmnMisconfig}, c.rmnMisconfigured)
 }
 
 func Test_ObserveMerkleRoots(t *testing.T) {
@@ -839,6 +942,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				chainSupport,
 				mockCCIPReader,
 				mocks.NewMessageHasher(),
+				NoopMetrics{},
 			)
 
 			roots := o.ObserveMerkleRoots(ctx, tc.ranges)
@@ -903,6 +1007,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 			chainSupport,
 			mockCCIPReader,
 			mocks.NewMessageHasher(),
+			NoopMetrics{},
 		)
 
 		roots := o.ObserveMerkleRoots(ctx, ranges)
@@ -1019,6 +1124,52 @@ func Test_computeMerkleRoot(t *testing.T) {
 	}
 }
 
+func Test_Processor_initializeRMNController(t *testing.T) {
+	ctx := t.Context()
+
+	p := &Processor{
+		lggr:        logger.Test(t),
+		offchainCfg: pluginconfig.CommitOffchainConfig{RMNEnabled: false},
+	}
+
+	err := p.prepareRMNController(ctx, p.lggr, Outcome{})
+	assert.NoError(t, err, "rmn is not enabled")
+
+	p.offchainCfg.RMNEnabled = true
+	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
+	err = p.prepareRMNController(ctx, p.lggr, Outcome{})
+	assert.NoError(t, err, "rmn enabled but controller already initialized")
+
+	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
+	err = p.prepareRMNController(ctx, p.lggr, Outcome{})
+	assert.NoError(t, err, "previous outcome does not contain remote config digest")
+
+	rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
+	rmnController := rmn_mock.NewMockController(t)
+	p.rmnHomeReader = rmnHomeReader
+	p.rmnController = rmnController
+
+	cfg := testhelpers.CreateRMNRemoteCfg()
+	rmnNodes := []rmntypes.HomeNodeInfo{
+		{ID: 1, PeerID: types.PeerID{1, 2, 3}},
+		{ID: 10, PeerID: types.PeerID{1, 2, 31}},
+	}
+	oracleIDs := []ragep2ptypes.PeerID{}
+	rmnHomeReader.EXPECT().GetRMNNodesInfo(cfg.ConfigDigest).Return(rmnNodes, nil)
+
+	rmnController.EXPECT().InitConnection(
+		ctx,
+		cciptypes.Bytes32(p.reportingCfg.ConfigDigest),
+		cfg.ConfigDigest,
+		oracleIDs,
+		rmnNodes,
+	).Return(nil)
+
+	err = p.prepareRMNController(ctx, p.lggr, Outcome{RMNRemoteCfg: cfg})
+	assert.NoError(t, err, "rmn controller initialized")
+	assert.Equal(t, cfg.ConfigDigest, p.rmnControllerCfgDigest)
+}
+
 func Test_Processor_ObservationQuorum(t *testing.T) {
 	testCases := []struct {
 		name                      string
@@ -1098,6 +1249,88 @@ func Test_Processor_ObservationQuorum(t *testing.T) {
 	}
 }
 
+func Test_shouldSkipRMNVerification(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		nextProcessorState         processorState
+		queryContainsRmnSigs       bool
+		queryIndicatesSigsRetrying bool
+		rmnRemoteConfigEmpty       bool
+		expErr                     bool
+		expSkip                    bool
+	}{
+		{
+			name:    "all empty should skip rmn verification",
+			expSkip: true,
+		},
+		{
+			name:                 "happy path proceed with verification",
+			nextProcessorState:   buildingReport,
+			queryContainsRmnSigs: true,
+		},
+		{
+			name:               "rmn sigs missing but error is not expected since chains might be rmn-disabled",
+			nextProcessorState: buildingReport,
+			expErr:             false,
+		},
+		{
+			name:                       "rmn sigs are present while we retry sigs in the next round this is invalid",
+			nextProcessorState:         buildingReport,
+			queryContainsRmnSigs:       true,
+			queryIndicatesSigsRetrying: true,
+			expErr:                     true,
+		},
+		{
+			name:                       "retrying sigs in the next round sig verification should be skipped",
+			nextProcessorState:         buildingReport,
+			queryIndicatesSigsRetrying: true,
+			expSkip:                    true,
+		},
+		{
+			name:                 "rmn remote config from previous outcome is empty error is expected",
+			nextProcessorState:   buildingReport,
+			queryContainsRmnSigs: true,
+			rmnRemoteConfigEmpty: true,
+			expErr:               true,
+		},
+		{
+			name:                 "signatures were provided but we are not in the right state",
+			nextProcessorState:   selectingRangesForReport,
+			queryContainsRmnSigs: true,
+			expErr:               true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q := Query{}
+
+			if tc.queryContainsRmnSigs {
+				q.RMNSignatures = &rmn.ReportSignatures{
+					Signatures: make([]*serialization.EcdsaSignature, 1),
+				}
+			}
+
+			if tc.queryIndicatesSigsRetrying {
+				q.RetryRMNSignatures = true
+			}
+
+			prevOutcome := Outcome{}
+			if !tc.rmnRemoteConfigEmpty {
+				prevOutcome.RMNRemoteCfg = cciptypes.RemoteConfig{FSign: 1}
+			}
+
+			shouldSkip, err := shouldSkipRMNVerification(tc.nextProcessorState, q, prevOutcome)
+			if tc.expErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expSkip, shouldSkip)
+		})
+	}
+}
+
 func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {
 	msgID, err := cciptypes.NewBytes32FromString(msgIDHex)
 	if err != nil {
@@ -1115,4 +1348,16 @@ func NewBadMessageHasher() *BadMessageHasher {
 // Always returns an error
 func (m *BadMessageHasher) Hash(ctx context.Context, msg cciptypes.Message) (cciptypes.Bytes32, error) {
 	return cciptypes.Bytes32{}, fmt.Errorf("failed to hash")
+}
+
+// signatureVerifierAlwaysTrue is a signature verifier that always returns true.
+type signatureVerifierAlwaysTrue struct{}
+
+func (a signatureVerifierAlwaysTrue) Verify(_ ed25519.PublicKey, _, _ []byte) bool {
+	return true
+}
+
+func (a signatureVerifierAlwaysTrue) VerifyReportSignatures(
+	_ context.Context, _ []cciptypes.RMNECDSASignature, _ cciptypes.RMNReport, _ []cciptypes.UnknownAddress) error {
+	return nil
 }

@@ -14,6 +14,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/sync/errgroup"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/rpctimeout"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -32,7 +34,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
+
+var ErrSignaturesNotProvidedByLeader = errors.New("rmn signatures were not provided by the leader, " +
+	"in most cases this indicates that the RMN nodes did not include any chain in their response")
 
 const skippedLanesLogFrequency = 30 * time.Minute
 
@@ -43,14 +50,69 @@ func isLiveOffRampSourceLane(cfg readerpkg.StaticSourceChainConfig, exists bool)
 	return exists && cfg.IsEnabled && len(cfg.OnRamp) > 0
 }
 
+// Offramp lane status labels used with MetricsReporter.TrackOffRampLaneStatus. Mutually exclusive: a
+// source chain is in exactly one of these buckets every round.
+const (
+	laneStatusLive             = "live"
+	laneStatusSkippedNotALane  = "skipped_not_a_lane"
+	laneStatusSkippedDisabled  = "skipped_disabled"
+	laneStatusRMNMisconfigured = "rmn_misconfigured"
+)
+
+var allOffRampLaneStatuses = []string{
+	laneStatusLive, laneStatusSkippedNotALane, laneStatusSkippedDisabled, laneStatusRMNMisconfigured,
+}
+
+// Reasons passed to MetricsReporter.TrackObservationError. Named here, rather than left as inline
+// literals, because these are effectively a stable label-value contract for dashboards/runbooks/alerts
+// (see docs/runbooks/uncommitted-message.md's metric reference table) with no test asserting on the
+// literal spelling -- a typo at a call site would silently create an unmonitored label value instead of
+// failing to compile.
+const (
+	obsErrNoBindings         = "no_bindings"
+	obsErrTimeout            = "timeout"
+	obsErrRPCError           = "rpc_error"
+	obsErrMsgCountMismatch   = "msg_count_mismatch"
+	obsErrSeqNumMismatch     = "seq_num_mismatch"
+	obsErrHashError          = "hash_error"
+	obsErrAddressLookupError = "address_lookup_error"
+)
+
+// Curse-type labels used with MetricsReporter.TrackRmnCurseActive.
+const (
+	curseTypeGlobal      = "global"
+	curseTypeDestination = "destination"
+)
+
 // offRampLaneClassification buckets source chains by their offramp lane status.
 type offRampLaneClassification struct {
-	// live lanes are enabled and have an onRamp configured.
+	// live lanes are enabled, have an onRamp, and have RMN verification disabled (queryable).
 	live []cciptypes.ChainSelector
 	// skippedNotALane have no offramp config or no onRamp configured.
 	skippedNotALane []cciptypes.ChainSelector
 	// skippedDisabled have an offramp config but are disabled.
 	skippedDisabled []cciptypes.ChainSelector
+	// rmnMisconfigured are live lanes that unexpectedly have RMN verification enabled.
+	rmnMisconfigured []cciptypes.ChainSelector
+}
+
+// statusByChain returns the single status bucket each source chain landed in.
+func (c offRampLaneClassification) statusByChain() map[cciptypes.ChainSelector]string {
+	statuses := make(map[cciptypes.ChainSelector]string,
+		len(c.live)+len(c.skippedNotALane)+len(c.skippedDisabled)+len(c.rmnMisconfigured))
+	for _, chain := range c.live {
+		statuses[chain] = laneStatusLive
+	}
+	for _, chain := range c.skippedNotALane {
+		statuses[chain] = laneStatusSkippedNotALane
+	}
+	for _, chain := range c.skippedDisabled {
+		statuses[chain] = laneStatusSkippedDisabled
+	}
+	for _, chain := range c.rmnMisconfigured {
+		statuses[chain] = laneStatusRMNMisconfigured
+	}
+	return statuses
 }
 
 // classifyOffRampSourceLanes buckets the supported source chains based on their offramp source chain
@@ -70,6 +132,8 @@ func classifyOffRampSourceLanes(
 			c.skippedDisabled = append(c.skippedDisabled, sourceChain)
 		case len(cfg.OnRamp) == 0:
 			c.skippedNotALane = append(c.skippedNotALane, sourceChain)
+		case !cfg.IsRMNVerificationDisabled:
+			c.rmnMisconfigured = append(c.rmnMisconfigured, sourceChain)
 		default:
 			c.live = append(c.live, sourceChain)
 		}
@@ -92,15 +156,31 @@ func (p *Processor) ObservationQuorum(
 const SendingObservation = "sending merkle root processor observation"
 
 // Observation makes external calls to observe information according to the current processor state.
+// According to the state it either observes sequence numbers, root hashes, RMN remote config, etc...
 func (p *Processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
-	_ Query,
+	q Query,
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
+	if err := p.prepareRMNController(ctx, lggr, prevOutcome); err != nil {
+		return Observation{}, fmt.Errorf("initialize RMN controller: %w", err)
+	}
+
+	if err := p.verifyQuery(ctx, prevOutcome, q); err != nil {
+		if errors.Is(err, ErrSignaturesNotProvidedByLeader) {
+			lggr.Warnw("RMN signatures not available, returning only fChain", "err", err)
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nil
+		}
+		return Observation{}, fmt.Errorf("verify query: %w", err)
+	}
+
 	tStart := time.Now()
-	observation, nextState, err := p.getObservation(ctx, prevOutcome)
+	observation, nextState, err := p.getObservation(ctx, lggr, q, prevOutcome)
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
@@ -109,20 +189,187 @@ func (p *Processor) Observation(
 	return observation, nil
 }
 
+// prepareRMNController initializes the RMN controller iff:
+// 1. RMN is enabled.
+// 2. RMN controller is not already initialized with the same cfg digest.
+// 3. RMN remote config is available from previous outcome.
+func (p *Processor) prepareRMNController(ctx context.Context, lggr logger.Logger, prevOutcome Outcome) error {
+	if !p.offchainCfg.RMNEnabled {
+		return nil
+	}
+
+	if prevOutcome.RMNRemoteCfg.IsEmpty() {
+		lggr.Debug("RMN remote config is empty, skipping RMN controller initialization in this round")
+		return nil
+	}
+
+	if prevOutcome.RMNRemoteCfg.ConfigDigest == p.rmnControllerCfgDigest {
+		lggr.Debugw("RMN controller already initialized with the same config digest",
+			"configDigest", p.rmnControllerCfgDigest)
+		return nil
+	}
+
+	rmnNodesInfo, err := p.rmnHomeReader.GetRMNNodesInfo(prevOutcome.RMNRemoteCfg.ConfigDigest)
+	if err != nil {
+		return fmt.Errorf("failed to get RMN nodes info: %w", err)
+	}
+
+	oraclePeerIDs := make([]ragep2ptypes.PeerID, 0, len(p.oracleIDToP2pID))
+	for _, p2pID := range p.oracleIDToP2pID {
+		oraclePeerIDs = append(oraclePeerIDs, p2pID)
+	}
+
+	lggr.Debugw("Initializing RMN controller", "oraclePeerIDs", oraclePeerIDs,
+		"rmnRemoteConfig", prevOutcome.RMNRemoteCfg, "rmnNodesInfo", rmnNodesInfo)
+
+	if err := p.rmnController.InitConnection(
+		ctx,
+		cciptypes.Bytes32(p.reportingCfg.ConfigDigest),
+		prevOutcome.RMNRemoteCfg.ConfigDigest,
+		oraclePeerIDs,
+		rmnNodesInfo,
+	); err != nil {
+		return fmt.Errorf("failed to init connection to RMN: %w", err)
+	}
+
+	p.rmnControllerCfgDigest = prevOutcome.RMNRemoteCfg.ConfigDigest
+
+	return nil
+}
+
+// verifyQuery verifies the query based on the following rules.
+// 1. If RMN is enabled, RMN signatures are required in the BuildingReport state but not expected in other states.
+// 2. If RMN signatures are provided, they are verified against the current RMN node configuration.
+func (p *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Query) error {
+	if !p.offchainCfg.RMNEnabled {
+		return nil
+	}
+
+	nextState := prevOutcome.nextState()
+
+	skipVerification, err := shouldSkipRMNVerification(nextState, q, prevOutcome)
+	if skipVerification {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	ch, exists := chainsel.ChainBySelector(uint64(p.destChain))
+	if !exists {
+		return fmt.Errorf("get chain by selector %d", p.destChain)
+	}
+
+	offRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOffRamp, p.destChain)
+	if err != nil {
+		return fmt.Errorf("get offramp contract address: %w", err)
+	}
+
+	sigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+	if err != nil {
+		return fmt.Errorf("parse protobuf signatures %v: %w", q.RMNSignatures.Signatures, err)
+	}
+
+	rmnRemoteCfg := prevOutcome.RMNRemoteCfg
+	if rmnRemoteCfg.IsEmpty() {
+		return fmt.Errorf("RMN remote configuration was not provided by the previous outcome")
+	}
+
+	signerAddresses := make([]cciptypes.UnknownAddress, 0, len(sigs))
+	for _, rmnNode := range rmnRemoteCfg.Signers {
+		signerAddresses = append(signerAddresses, rmnNode.OnchainPublicKey)
+	}
+
+	laneUpdates, err := rmn.NewLaneUpdatesFromPB(q.RMNSignatures.LaneUpdates)
+	if err != nil {
+		return fmt.Errorf("parse protobuf lane updates %v: %w", q.RMNSignatures.LaneUpdates, err)
+	}
+
+	rmnReport := cciptypes.NewRMNReport(
+		rmnRemoteCfg.RmnReportVersion,
+		cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
+		cciptypes.ChainSelector(ch.Selector),
+		rmnRemoteCfg.ContractAddress,
+		offRampAddress,
+		rmnRemoteCfg.ConfigDigest,
+		laneUpdates,
+	)
+
+	if err := p.rmnCrypto.VerifyReportSignatures(ctx, sigs, rmnReport, signerAddresses); err != nil {
+		return fmt.Errorf("failed to verify RMN signatures: %w", err)
+	}
+	return nil
+}
+
+// shouldSkipRMNVerification checks whether RMN verification should be skipped based on the current state and query.
+func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Outcome) (bool, error) {
+	emptySigs := !q.ContainsRmnSignatures()
+
+	switch nextState {
+	case buildingReport:
+		if q.RetryRMNSignatures {
+			if emptySigs {
+				return true, nil
+			}
+			return false, fmt.Errorf("RMN signatures are provided but not expected if retrying is set to true")
+		}
+
+		if prevOutcome.RMNRemoteCfg.IsEmpty() {
+			return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
+		}
+
+		// we don't want to check for empty sigs since at this point we don't know which chains are RMN-disabled.
+		// if signatures are missing for specific chains they will be caught in the outcome phase.
+
+		return false, nil
+	default:
+		if emptySigs {
+			return true, nil // Sigs not expected
+		}
+		// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
+		return false, fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
+	}
+}
+
 func (p *Processor) getObservation(
-	ctx context.Context, previousOutcome Outcome) (Observation, processorState, error) {
+	ctx context.Context, lggr logger.Logger, q Query, previousOutcome Outcome) (Observation, processorState, error) {
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
 		return Observation{
 			OnRampMaxSeqNums:   p.observer.ObserveLatestOnRampSeqNums(ctx),
 			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
+			RMNRemoteConfig:    p.observer.ObserveRMNRemoteCfg(ctx),
 			FChain:             p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	case buildingReport:
+		if q.RetryRMNSignatures {
+			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
+			// So there's nothing to observe except for fChain, i.e. we don't want to build the report yet.
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				// We check q.RetryRMNSignatures there and return the appropriate state and outcome
+				// in order to retry.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nextState, nil
+		}
+
+		rmnEnabledChains := make(map[cciptypes.ChainSelector]bool)
+
+		if p.offchainCfg.RMNEnabled {
+			var err error
+			rmnEnabledChains, err = p.rmnHomeReader.GetRMNEnabledSourceChains(previousOutcome.RMNRemoteCfg.ConfigDigest)
+			if err != nil {
+				return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
+					previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
+			}
+			lggr.Debugw("fetched RMN-enabled chains from rmnHome", "rmnEnabledChains", rmnEnabledChains)
+		}
+
 		return Observation{
-			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			FChain:      p.observer.ObserveFChain(ctx),
+			MerkleRoots:      p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			FChain:           p.observer.ObserveFChain(ctx),
+			RMNEnabledChains: rmnEnabledChains,
 		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{
@@ -136,7 +383,7 @@ func (p *Processor) getObservation(
 	}
 }
 
-// Observer is an interface for observing data from the offRamp, onRamp, etc...
+// Observer is an interface for observing data from the offRamp, onRamp, RMN remote config, etc...
 type Observer interface {
 	// ObserveOffRampNextSeqNums observes the next OffRamp sequence numbers for each source chain.
 	// If the destination chain is cursed it returns nil or
@@ -151,6 +398,11 @@ type Observer interface {
 	// ObserveMerkleRoots computes and returns the merkle roots for the provided sequence number ranges.
 	// NOTE: Make sure that caller supports the provided chains.
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
+
+	// ObserveRMNRemoteCfg observes the RMN remote config from the configured destination chain.
+	// Check implementation specific details to learn if external calls are made, if values are cached, etc...
+	// NOTE: Make sure that caller supports the destination chain.
+	ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig
 
 	// ObserveFChain observes the FChain for each supported chain. Check implementation specific details to learn
 	// if external calls are made, if values are cached, etc...
@@ -282,6 +534,11 @@ func (o *asyncObserver) ObserveMerkleRoots(
 	return o.syncObserver.ObserveMerkleRoots(ctx, ranges)
 }
 
+// ObserveRMNRemoteCfg observes the RMN Remote Config by directly calling the base observer since this value is cached.
+func (o *asyncObserver) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
+	return o.syncObserver.ObserveRMNRemoteCfg(ctx)
+}
+
 // ObserveFChain observes the FChain by directly calling the base observer since this value is cached.
 func (o *asyncObserver) ObserveFChain(ctx context.Context) map[cciptypes.ChainSelector]int {
 	return o.syncObserver.ObserveFChain(ctx)
@@ -297,12 +554,13 @@ func (o *asyncObserver) Close() error {
 }
 
 type observerImpl struct {
-	lggr         logger.Logger
-	homeChain    reader.HomeChain
-	oracleID     commontypes.OracleID
-	chainSupport plugincommon.ChainSupport
-	ccipReader   readerpkg.CCIPReader
-	msgHasher    cciptypes.MessageHasher
+	lggr            logger.Logger
+	homeChain       reader.HomeChain
+	oracleID        commontypes.OracleID
+	chainSupport    plugincommon.ChainSupport
+	ccipReader      readerpkg.CCIPReader
+	msgHasher       cciptypes.MessageHasher
+	metricsReporter MetricsReporter
 }
 
 func newObserverImpl(
@@ -312,14 +570,16 @@ func newObserverImpl(
 	chainSupport plugincommon.ChainSupport,
 	ccipReader readerpkg.CCIPReader,
 	msgHasher cciptypes.MessageHasher,
+	metricsReporter MetricsReporter,
 ) observerImpl {
 	return observerImpl{
-		lggr:         lggr,
-		homeChain:    homeChain,
-		oracleID:     oracleID,
-		chainSupport: chainSupport,
-		ccipReader:   ccipReader,
-		msgHasher:    msgHasher,
+		lggr:            lggr,
+		homeChain:       homeChain,
+		oracleID:        oracleID,
+		chainSupport:    chainSupport,
+		ccipReader:      ccipReader,
+		msgHasher:       msgHasher,
+		metricsReporter: metricsReporter,
 	}
 }
 
@@ -355,6 +615,15 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		)
 		return nil
 	}
+
+	// Report curse state unconditionally (including "not cursed") so the gauges reflect the current
+	// round rather than sticking at a stale "1" from a curse that has since cleared.
+	o.metricsReporter.TrackRmnCurseActive(curseTypeGlobal, curseInfo.GlobalCurse)
+	o.metricsReporter.TrackRmnCurseActive(curseTypeDestination, curseInfo.CursedDestination)
+	for _, sourceChain := range allSourceChains {
+		o.metricsReporter.TrackSourceChainCursed(sourceChain, curseInfo.CursedSourceChains[sourceChain])
+	}
+
 	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
 		lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
 		return nil
@@ -386,6 +655,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	result := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
 	for chainSelector, seqNum := range offRampNextSeqNums {
 		result = append(result, plugintypes.NewSeqNumChain(chainSelector, seqNum))
+		o.metricsReporter.TrackOffRampNextSeqNum(chainSelector, seqNum)
 	}
 
 	sort.Slice(result, func(i, j int) bool { return result[i].ChainSel < result[j].ChainSel })
@@ -393,6 +663,8 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 }
 
 // ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
+//
+//nolint:gocyclo
 func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
@@ -427,6 +699,14 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	classification := classifyOffRampSourceLanes(supportedSourceChains, sourceChainsCfg)
 
+	// Report unconditionally (all four statuses, active and inactive) so the gauge can't get stuck
+	// showing an old status as "still active" once a chain moves to a different bucket.
+	for chain, actualStatus := range classification.statusByChain() {
+		for _, status := range allOffRampLaneStatuses {
+			o.metricsReporter.TrackOffRampLaneStatus(chain, status, status == actualStatus)
+		}
+	}
+
 	if len(classification.skippedNotALane) > 0 || len(classification.skippedDisabled) > 0 {
 		logutil.LogWhenExceedFrequency(&lastSkippedLanesLog, skippedLanesLogFrequency, func() {
 			lggr.Debugw("skipping onRamp seq num observations for non-live lanes",
@@ -434,6 +714,11 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				"disabled", classification.skippedDisabled,
 			)
 		})
+	}
+	if len(classification.rmnMisconfigured) > 0 {
+		lggr.Warnw("rmn enablement is misconfigured on these lanes, skipping observations",
+			"sources", classification.rmnMisconfigured,
+		)
 	}
 
 	mu := &sync.Mutex{}
@@ -450,14 +735,18 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrNoBindings)
 				} else if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain)
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrTimeout)
 				} else {
 					lggr.Errorw("failed to get latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain, "err", err)
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrRPCError)
 				}
 				return
 			}
 
+			o.metricsReporter.TrackOnRampMaxSeqNum(sourceChain, latestOnRampSeqNum)
 			mu.Lock()
 			latestOnRampSeqNums = append(
 				latestOnRampSeqNums,
@@ -503,8 +792,10 @@ func (o observerImpl) ObserveMerkleRoots(
 							logutil.FieldSourceChain, chainRange.ChainSel,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrTimeout)
 					} else {
 						lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrRPCError)
 					}
 					return
 				}
@@ -516,6 +807,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
 						"actual", len(msgs),
 					)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrMsgCountMismatch)
 					return
 				}
 
@@ -531,6 +823,7 @@ func (o observerImpl) ObserveMerkleRoots(
 							"msgSeqNum", msgSeqNum,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrSeqNumMismatch)
 						return
 					}
 					msgIdx++
@@ -539,6 +832,7 @@ func (o observerImpl) ObserveMerkleRoots(
 				root, err := o.computeMerkleRoot(ctx, lggr, msgs)
 				if err != nil {
 					lggr.Warnw("call to computeMerkleRoot failed", "err", err)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrHashError)
 					return
 				}
 
@@ -549,6 +843,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"err", err,
 						logutil.FieldSourceChain, chainRange.ChainSel,
 					)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrAddressLookupError)
 					return
 				}
 
@@ -619,6 +914,35 @@ func (o observerImpl) computeMerkleRoot(
 	return root, nil
 }
 
+// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
+// NOTE: At least two external calls are made.
+func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) cciptypes.RemoteConfig {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
+
+	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
+	if err != nil {
+		lggr.Errorw("call to SupportsDestChain failed", "err", err)
+		return cciptypes.RemoteConfig{}
+	}
+
+	if !supportsDestChain {
+		lggr.Debugw("cannot observe RMN remote config since destination chain is not supported")
+		return cciptypes.RemoteConfig{}
+	}
+
+	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
+	if err != nil {
+		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
+			// destination chain not supported
+			return cciptypes.RemoteConfig{}
+		}
+		// legitimate error
+		lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
+		return cciptypes.RemoteConfig{}
+	}
+	return rmnRemoteCfg
+}
+
 // ObserveFChain observes the FChain for each supported chain.
 // NOTE: It does not make any external calls, values are cached.
 func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSelector]int {
@@ -626,8 +950,8 @@ func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSele
 
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
-		// TODO: metrics
 		lggr.Errorw("call to GetFChain failed", "err", err)
+		o.metricsReporter.TrackFChainReadError()
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

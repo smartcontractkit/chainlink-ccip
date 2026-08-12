@@ -51,6 +51,7 @@ func TestMigrateTo1_6_0(t *testing.T) {
 			GasForCallExactCheck:                    uint16(5000),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -68,9 +69,9 @@ func TestMigrateTo1_6_0(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, testRouterRefChain1)
 	chain1 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.ETHEREUM_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
-		Router:                   testRouterRefChain1.Bytes(),
+		Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
+		Router:   testRouterRefChain1.Bytes(),
 	}
 	testRouterRefChain2, err := datastore_utils.FindAndFormatRef(
 		e.DataStore,
@@ -81,9 +82,9 @@ func TestMigrateTo1_6_0(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, testRouterRefChain2)
 	chain2 := lanesapi.ChainDefinition{
-		Selector:                 chain_selectors.AVALANCHE_MAINNET.Selector,
-		GasPrice:                 big.NewInt(1e9),
-		Router:                   testRouterRefChain2.Bytes(),
+		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
+		GasPrice: big.NewInt(1e9),
+		Router:   testRouterRefChain2.Bytes(),
 	}
 	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{

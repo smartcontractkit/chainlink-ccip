@@ -10,6 +10,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -85,13 +86,17 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		{
 			desc: "empty datastore",
 			makeDatastore: func() *datastore.MemoryDataStore {
-				return datastore.NewMemoryDataStore()
+				ds := datastore.NewMemoryDataStore()
+				_ = testsetup.SeedUltraFastCurseMCMS(ds, chain_selectors.ETHEREUM_MAINNET.Selector)
+
+				return ds
 			},
 		},
 		{
 			desc: "non-empty datastore",
 			makeDatastore: func() *datastore.MemoryDataStore {
 				ds := datastore.NewMemoryDataStore()
+				_ = testsetup.SeedUltraFastCurseMCMS(ds, chain_selectors.ETHEREUM_MAINNET.Selector)
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: chain_selectors.ETHEREUM_MAINNET.Selector,
 					Type:          datastore.ContractType(link.ContractType),

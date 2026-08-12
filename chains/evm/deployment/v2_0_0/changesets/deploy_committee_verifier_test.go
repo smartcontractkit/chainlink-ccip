@@ -4,20 +4,22 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
-	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/stretchr/testify/require"
+
+	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
+	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 func basicDeployCommitteeVerifierParams() sequences.CommitteeVerifierParams {
@@ -38,8 +40,8 @@ func TestDeployCommitteeVerifier_VerifyPreconditions(t *testing.T) {
 	ds := datastore.NewMemoryDataStore()
 	rmnAddressRef := datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
-		Type:          datastore.ContractType(rmn_remote.ContractType),
-		Version:       rmn_remote.Version,
+		Type:          datastore.ContractType(rmn.ContractType),
+		Version:       rmn.Version,
 		Address:       common.HexToAddress("0x01").Hex(),
 	}
 	err = ds.Addresses().Add(rmnAddressRef)
@@ -92,8 +94,8 @@ func TestDeployCommitteeVerifier_Apply_MultipleQualifiersOnSameChain(t *testing.
 	}
 	rmnAddressRef := datastore.AddressRef{
 		ChainSelector: 5009297550715157269,
-		Type:          datastore.ContractType(rmn_remote.ContractType),
-		Version:       rmn_remote.Version,
+		Type:          datastore.ContractType(rmn.ContractType),
+		Version:       rmn.Version,
 		Address:       common.HexToAddress("0x02").Hex(),
 	}
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{

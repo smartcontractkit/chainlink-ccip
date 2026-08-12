@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {IPoolV1} from "../../../interfaces/IPool.sol";
 
-import {Router} from "../../../Router.sol";
 import {Pool} from "../../../libraries/Pool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {CCTPMessageTransmitterProxy} from "../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
@@ -64,7 +63,7 @@ contract USDCSetup is BaseTest {
   address internal s_routerAllowedOffRamp = address(234);
   address internal s_previousPool = makeAddr("previousPool");
   address internal s_previousPoolMessageTransmitterProxy = makeAddr("previousPoolMessageTransmitterProxy");
-  Router internal s_router;
+  address internal s_router;
 
   TokenAdminRegistry internal s_tokenAdminRegistry;
 
@@ -164,16 +163,10 @@ contract USDCSetup is BaseTest {
   }
 
   function _setUpRamps() internal {
-    s_router = new Router(address(s_USDCToken), address(s_mockRMNRemote));
+    s_router = address(s_sourceRouter);
 
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_routerAllowedOnRamp});
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
-    address[] memory offRamps = new address[](1);
-    offRamps[0] = s_routerAllowedOffRamp;
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: offRamps[0]});
-
-    s_router.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+    _setMockRouterOnRamp(s_router, DEST_CHAIN_SELECTOR, s_routerAllowedOnRamp);
+    _setMockRouterOffRamp(s_router, SOURCE_CHAIN_SELECTOR, s_routerAllowedOffRamp, true);
   }
 
   function _generateUSDCMessage(
