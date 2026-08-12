@@ -12,12 +12,15 @@ import (
 
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	bnmERC20DripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evmtokensseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	lnrpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/lock_release_token_pool"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -29,7 +32,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	bnmERC20DripBindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 
+	evmadpV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 
@@ -543,4 +548,181 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	cfgAfter, err := tarA.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, s.tokAddrA)
 	require.NoError(t, err)
 	require.Equal(t, newPoolAddrA, cfgAfter.TokenPool, "TAR should be switched to the new v2.0 pool")
+}
+
+// TestTokenExpansionMigration_DeployWithSeed verifies that deploying a LockRelease pool with
+// LiquidityMigrationBasisPoints on DeployTokenPoolInput seeds liquidity from a legacy pool
+// into the new lockbox without configuring the new pool on TAR or transferring ownership.
+func TestTokenExpansionMigration_DeployWithSeed(t *testing.T) {
+	const (
+		totalLiquidity = 1
+		oldPoolQual    = "MIG_LNR_A_V1"
+		dummyPoolQual  = "MIG_LNR_B_V1"
+		tokenSymbol    = "MIG_SEED_TOK"
+		newPoolQual    = "MIG_LNR_A_V2"
+		migrateAll     = uint16(10000)
+	)
+
+	// Setup test environment
+	selA := chainsel.TEST_90000001.Selector
+	selB := chainsel.TEST_90000002.Selector
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{selA, selB}))
+	require.NoError(t, err)
+	chainA, ok := e.BlockChains.EVMChains()[selA]
+	require.True(t, ok)
+
+	// Deploy chain contracts
+	SeedUltraFastCurseMCMS(t, e)
+	cumulative := datastore.NewMemoryDataStore()
+	DeployChainContractsV2_0_0(t, e, cumulative, selA)
+	DeployChainContractsV2_0_0(t, e, cumulative, selB)
+	e.DataStore = cumulative.Seal()
+	DeployMCMS(t, e, selA, []string{cciputils.CLLQualifier})
+	DeployMCMS(t, e, selB, []string{cciputils.CLLQualifier})
+
+	// Deploy legacy pools and tokens - RemoteChains naturally registers both pools on TAR
+	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
+	out1, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: cciputils.Version_1_6_1,
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selA: {
+				SkipOwnershipTransfer: false,
+				TokenPoolVersion:      cciputils.Version_1_6_1,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Name:          "Seed Test Token",
+					Type:          bnmERC20DripOps.ContractType,
+					Symbol:        tokenSymbol,
+					Decimals:      18,
+					Supply:        new(uint64(totalLiquidity * 100)),
+					ExternalAdmin: chainA.DeployerKey.From.Hex(),
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier: oldPoolQual,
+					PoolType:           cciputils.LockReleaseTokenPool.String(),
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						selB: {OutboundRateLimiterConfig: &tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}},
+					},
+				},
+			},
+			selB: {
+				SkipOwnershipTransfer: true,
+				TokenPoolVersion:      cciputils.Version_1_6_1,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Name:          "Dummy Test Token",
+					Type:          bnmERC20DripOps.ContractType,
+					Symbol:        tokenSymbol,
+					Decimals:      18,
+					Supply:        new(uint64(totalLiquidity * 100)),
+					ExternalAdmin: chainA.DeployerKey.From.Hex(),
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier: dummyPoolQual,
+					PoolType:           cciputils.LockReleaseTokenPool.String(),
+				},
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						selA: {OutboundRateLimiterConfig: &tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *e, out1.MCMSTimelockProposals, false)
+	MergeAddresses(t, e, out1.DataStore)
+
+	// Resolve the deployed token and old pool A
+	tokenFilter := datastore.AddressRef{
+		Type:          datastore.ContractType(bnmERC20DripOps.ContractType),
+		Qualifier:     tokenSymbol,
+		ChainSelector: selA,
+	}
+	tokenResults := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(tokenFilter)...)
+	require.Len(t, tokenResults, 1)
+	tokenAddr := common.HexToAddress(tokenResults[0].Address)
+
+	oldPoolFilter := datastore.AddressRef{
+		Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
+		Qualifier:     oldPoolQual,
+		ChainSelector: selA,
+		Version:       cciputils.Version_1_6_1,
+	}
+	oldPoolResults := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(oldPoolFilter)...)
+	require.Len(t, oldPoolResults, 1)
+	oldPoolAddr := common.HexToAddress(oldPoolResults[0].Address)
+
+	// Fund the old pool A with tokens
+	bnmERC20Drip, err := bnmERC20DripBindings.NewBurnMintERC20WithDrip(tokenAddr, chainA.Client)
+	require.NoError(t, err)
+	tx, err := bnmERC20Drip.Drip(chainA.DeployerKey, oldPoolAddr)
+	require.NoError(t, err)
+	_, err = chainA.Confirm(tx)
+	require.NoError(t, err)
+
+	// Deploy v2 LockRelease pool with seed — no TokenTransferConfig
+	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
+	out2, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: cciputils.Version_2_0_0,
+		MCMS:                NewDefaultInputForMCMS("Deploy v2 pool with seed"),
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selA: {
+				SkipOwnershipTransfer: true,
+				TokenPoolVersion:      cciputils.Version_2_0_0,
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+					TokenPoolQualifier:            newPoolQual,
+					PoolType:                      cciputils.LockReleaseTokenPool.String(),
+					TokenRef:                      &datastore.AddressRef{Address: tokenAddr.Hex()},
+					LiquidityMigrationBasisPoints: new(migrateAll),
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *e, out2.MCMSTimelockProposals, false)
+	MergeAddresses(t, e, out2.DataStore)
+
+	// Resolve the new pool address
+	newPoolFilter := datastore.AddressRef{
+		Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
+		Qualifier:     newPoolQual,
+		ChainSelector: selA,
+		Version:       cciputils.Version_2_0_0,
+	}
+	newPoolResults := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(newPoolFilter)...)
+	require.Len(t, newPoolResults, 1)
+	newPoolAddr := common.HexToAddress(newPoolResults[0].Address)
+
+	// Resolve TAR address from datastore
+	tarAddr, err := (&evmadpV1_0_0.EVMTokenBase{}).GetTokenAdminRegistryAddress(e.DataStore, selA)
+	require.NoError(t, err)
+
+	// 1. Lockbox holds the seed amount
+	v2Pool, err := lnrpoolV2_0_0.NewLockReleaseTokenPool(newPoolAddr, chainA.Client)
+	require.NoError(t, err)
+	lockboxAddr, err := v2Pool.GetLockBox(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.NotEqual(t, common.Address{}, lockboxAddr)
+	lockboxBal, err := bnmERC20Drip.BalanceOf(&bind.CallOpts{Context: t.Context()}, lockboxAddr)
+	require.NoError(t, err)
+	require.Equal(t, new(big.Int).SetUint64(1e18), lockboxBal, "lockbox should hold the seed amount")
+
+	// 2. Old pool drained
+	oldPoolBal, err := bnmERC20Drip.BalanceOf(&bind.CallOpts{Context: t.Context()}, oldPoolAddr)
+	require.NoError(t, err)
+	require.Zero(t, oldPoolBal.Uint64(), "old pool should be fully drained")
+
+	// 3. TAR still points at old pool A (v2 pool's configure did not run)
+	tar, err := tarbindings.NewTokenAdminRegistry(tarAddr, chainA.Client)
+	require.NoError(t, err)
+	tarPool, err := tar.GetPool(&bind.CallOpts{Context: t.Context()}, tokenAddr)
+	require.NoError(t, err)
+	require.Equal(t, oldPoolAddr, tarPool, "TAR should still point at old pool (configure did not run)")
+
+	// 4. New pool is deployer-owned (UpdateAuthorities did not run)
+	owner, err := v2Pool.Owner(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, chainA.DeployerKey.From, owner, "new pool should be deployer-owned")
 }
