@@ -23,8 +23,9 @@ status: living
    * [Steps](#steps)
       + [step0 — is the plugin alive at all?](#step0-is-the-plugin-alive-at-all)
       + [step1 — is this even a commit-plugin problem?](#step1-is-this-even-a-commit-plugin-problem)
-      + [step2 — has the plugin observed it on-chain yet?](#step2-has-the-plugin-observed-it-on-chain-yet)
-      + [step3 — is the round producing outcomes at all?](#step3-is-the-round-producing-outcomes-at-all)
+       + [step2 — has the plugin observed it on-chain yet?](#step2-has-the-plugin-observed-it-on-chain-yet)
+       + [step2b — can the DON agree on this chain's per-chain values?](#step2b-can-the-don-agree-on-this-chains-per-chain-values)
+       + [step3 — is the round producing outcomes at all?](#step3-is-the-round-producing-outcomes-at-all)
       + [step4 — is chain A or B cursed?](#step4-is-chain-a-or-b-cursed)
       + [step5 — is a report being built but never landing?](#step5-is-a-report-being-built-but-never-landing)
    * [Deep dives](#deep-dives)
@@ -105,6 +106,16 @@ steps:
     query: 'max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain"})'
     condition: "result < $seqNum"
     if_true:  {action: "REPORT:chain-infra-oncall", reason: "onramp read is lagging; check ccip_commit_merkleroot_observation_errors_total by reason (no_bindings/timeout/rpc_error) for the source-chain read/infra issue", followup_query: 'sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain"}[5m])) by (reason)'}
+    if_false: {action: "CONTINUE:step2b"}
+    automatable: true
+
+  - id: step2b
+    check: per_chain_consensus_dropped
+    queries:
+      - 'sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)'
+      - 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain"}[5m]))'
+    condition: "any result > 0"
+    if_true:  {action: "REPORT:ccip-commit-oncall", reason: "DON could not reach consensus on a per-chain value for this lane. For ccip_commit_consensus_dropped: reason='split' means disagreeing oracles, reason='insufficient_agreement' means too few oracles observed the key, reason='threshold_not_defined' is a config/data mismatch. ccip_commit_offramp_consensus_insufficient means the DON could not agree on OffRampNextSeqNums for this lane. The message cannot advance until the disagreement resolves."}
     if_false: {action: "CONTINUE:step3"}
     automatable: true
 
@@ -238,6 +249,31 @@ sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$
 (`no_bindings` / `timeout` / `rpc_error` / `msg_count_mismatch` / `hash_error` /
 `address_lookup_error`). This is a source-chain read/infra issue, not commit logic — report and
 stop. `>= $seqNum` → plugin has seen it; continue.
+
+### step2b — can the DON agree on this chain's per-chain values?
+
+The onramp has been observed, but the DON still has to agree on the source-chain values that go
+into the merkle root (onramp max seq nums and merkle roots themselves). If consensus on these
+fails for this lane, the message will not advance even though the onramp read is healthy.
+
+Per-chain consensus failures:
+```promql
+sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)
+```
+
+`ccip_commit_consensus_dropped` `reason` values:
+- `split` — two or more distinct values each cleared the threshold (oracles disagree)
+- `insufficient_agreement` — no single value reached the threshold (too few oracles observed the key)
+- `threshold_not_defined` — the consensus code had no threshold configured for this key (config/data mismatch)
+
+OffRampNextSeqNums consensus failures use a dedicated counter (same path conceptually, but a
+custom consensus helper):
+```promql
+sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain"}[5m]))
+```
+
+Any of these `> 0` for the lane → the message cannot advance until the disagreement resolves.
+Report and stop. All flat (including empty) → continue.
 
 ### step3 — is the round producing outcomes at all?
 
@@ -392,7 +428,7 @@ everything else is Beholder-only.
 | `ccip_commit_processor_errors` | Counter | `chainFamily,chainID,processor,method` | dual |
 | `ccip_commit_processor_latency` | Histogram | `chainFamily,chainID,processor,method` | dual |
 | `ccip_commit_loopp_ccip_provider_supported` | Gauge | `chain_family` | dual |
-| `ccip_commit_consensus_dropped` | Counter | `chainFamily,chainID,objectName,key,reason` | beholder-only |
+| `ccip_commit_consensus_dropped` | Counter | `chainFamily,chainID,objectName,key,reason,source_network_name` | beholder-only |
 
 Note the label-casing inconsistency in the source (`chainFamily`/`chainID` vs.
 `chain_family`/`chain_id`) — copy the exact casing from this table per metric, it's not

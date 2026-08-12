@@ -605,12 +605,18 @@ func (p *PromReporter) TrackOffRampConsensusInsufficient(sourceChain cciptypes.C
 	p.bhOffRampConsensusInsuff.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
 }
 
-func (p *PromReporter) TrackConsensusDropped(objectName string, key string, reason string) {
-	p.bhConsensusDropped.Add(context.Background(), 1, metric.WithAttributes(
+func (p *PromReporter) TrackConsensusDropped(
+	objectName string, key string, reason string, sourceChain cciptypes.ChainSelector,
+) {
+	attrs := []attribute.KeyValue{
 		attribute.String("chainFamily", p.chainFamily),
 		attribute.String("chainID", p.chainID),
 		attribute.String("objectName", objectName),
 		attribute.String("key", key),
 		attribute.String("reason", reason),
-	))
+	}
+	if sourceChain != 0 {
+		attrs = append(attrs, p.sourceChainAttrs(sourceChain)...)
+	}
+	p.bhConsensusDropped.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }

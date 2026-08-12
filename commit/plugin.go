@@ -602,7 +602,7 @@ func (p *Plugin) getMainOutcomeAndCacheInvalidation(
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.reportingCfg.F))
 	fChainConsensus, fChainDrops := consensus.GetConsensusMap(lggr, "mainFChain", fChainObservations, donThresh)
 	for chain, reason := range fChainDrops {
-		p.metricsReporter.TrackConsensusDropped("mainFChain", fmt.Sprintf("%d", chain), reason.String())
+		p.metricsReporter.TrackConsensusDropped("mainFChain", fmt.Sprintf("%d", chain), reason.String(), chain)
 	}
 	fDestChain, ok := fChainConsensus[p.destChain]
 	if !ok {

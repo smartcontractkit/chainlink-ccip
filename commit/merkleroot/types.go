@@ -307,7 +307,9 @@ type MetricsReporter interface {
 	// TrackConsensusDropped reports a key that was dropped during shared consensus
 	// aggregation (e.g. fChain, Merkle Root, OnRamp Max Seq Nums). The reason
 	// distinguishes "threshold not defined", "insufficient agreement", and "split".
-	TrackConsensusDropped(objectName string, key string, reason string)
+	// sourceChain is the chain selector the key represents, if any, so the metric can
+	// carry a human-readable source_network_name label for chain-keyed objectNames.
+	TrackConsensusDropped(objectName string, key string, reason string, sourceChain cciptypes.ChainSelector)
 }
 
 type NoopMetrics struct{}
@@ -346,4 +348,4 @@ func (n NoopMetrics) TrackSeqNumInvariantViolation(cciptypes.ChainSelector, stri
 
 func (n NoopMetrics) TrackOffRampConsensusInsufficient(cciptypes.ChainSelector) {}
 
-func (n NoopMetrics) TrackConsensusDropped(string, string, string) {}
+func (n NoopMetrics) TrackConsensusDropped(string, string, string, cciptypes.ChainSelector) {}

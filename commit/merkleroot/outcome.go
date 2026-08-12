@@ -569,6 +569,7 @@ func reportChainSelectorDrops(
 			objectName,
 			strconv.FormatUint(uint64(chain), 10),
 			reason.String(),
+			chain,
 		)
 	}
 }

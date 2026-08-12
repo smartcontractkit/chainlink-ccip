@@ -108,7 +108,7 @@ func reportTokenPriceConsensusDrops[K comparable](
 	keyToString func(K) string,
 ) {
 	for key, reason := range drops {
-		reporter.TrackConsensusDropped(objectName, keyToString(key), reason.String())
+		reporter.TrackConsensusDropped(objectName, keyToString(key), reason.String(), 0)
 	}
 }
 

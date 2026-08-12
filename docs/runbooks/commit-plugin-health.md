@@ -222,7 +222,7 @@ checks:
     query: 'sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain"}[5m])) by (objectName, reason)'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
-    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. Empty result is OK, not UNKNOWN"
+    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries source_network_name, so you can drill down to the affected lane. Empty result is OK, not UNKNOWN"
 
   - id: live_oracle_count
     group: cursing_consensus

@@ -57,7 +57,7 @@ Every metric proposed in this doc, with a one/two-line "why" — the full ration
 
 | Metric | Status | Why |
 |---|---|---|
-| `ccip_commit_consensus_dropped{objectName,key,reason}` | ✅ Implemented | Splits "no threshold configured" (config bug) from "insufficient agreement" (routine) from "split vote" (integrity signal) — previously collapsed into one `TODO: metrics` log line. |
+| `ccip_commit_consensus_dropped{objectName,key,reason,source_network_name}` | ✅ Implemented | Splits "no threshold configured" (config bug) from "insufficient agreement" (routine) from "split vote" (integrity signal) — previously collapsed into one `TODO: metrics` log line. `source_network_name` is included for chain-keyed objectNames. |
 
 ### Merkle root processor — High
 
