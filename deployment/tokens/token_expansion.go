@@ -319,7 +319,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenPoolInput.TokenPoolVersion = input.TokenPoolVersion
 				deployTokenPoolInput.ExistingDataStore = e.DataStore
 				deployTokenPoolInput.ChainSelector = selector
-				if cfg.MCMS.TimelockAction != "" {
+				if cfg.MCMS.TimelockAction != "" || deployTokenPoolInput.LiquidityMigrationAmount != nil || deployTokenPoolInput.LiquidityMigrationBasisPoints != nil {
 					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
