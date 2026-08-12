@@ -530,21 +530,21 @@ func getConsensusObservation(
 		return consensusObservation{}, fmt.Errorf("no consensus value for fDestChain(%d): %v", fDestChain, fChain)
 	}
 
-	merkleRoots, merkleRootDrops := consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1)
-	reportChainSelectorDrops(metricsReporter, "Merkle Root", merkleRootDrops)
+	merkleRoots, merkleRootDrops := consensus.GetConsensusMap(lggr, "MerkleRoot", aggObs.MerkleRoots, twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "MerkleRoot", merkleRootDrops)
 
 	rmnEnabledChains, rmnEnabledDrops := consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1)
 	reportChainSelectorDrops(metricsReporter, "RMNEnabledChains", rmnEnabledDrops)
 
 	onRampMaxSeqNums, onRampDrops := consensus.GetOrderedConsensus(
 		lggr,
-		"OnRamp Max Seq Nums",
+		"OnRampMaxSeqNums",
 		aggObs.OnRampMaxSeqNums,
 		fChain)
-	reportChainSelectorDrops(metricsReporter, "OnRamp Max Seq Nums", onRampDrops)
+	reportChainSelectorDrops(metricsReporter, "OnRampMaxSeqNums", onRampDrops)
 
-	rmnRemoteConfig, rmnRemoteDrops := consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1)
-	reportChainSelectorDrops(metricsReporter, "RMNRemote cfg", rmnRemoteDrops)
+	rmnRemoteConfig, rmnRemoteDrops := consensus.GetConsensusMap(lggr, "RMNRemoteConfig", rmnRemoteConfigs, twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "RMNRemoteConfig", rmnRemoteDrops)
 
 	consensusObs := consensusObservation{
 		MerkleRoots:      merkleRoots,

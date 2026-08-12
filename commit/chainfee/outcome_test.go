@@ -415,7 +415,7 @@ func TestProcessor_Outcome(t *testing.T) {
 				cfg: pluginconfig.CommitOffchainConfig{
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
 				},
-				metricsReporter: plugincommon.NoopReporter{},
+				metricsReporter: NoopMetrics{},
 				homeChain:       homeChainMock,
 			}
 

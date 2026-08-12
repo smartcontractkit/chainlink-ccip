@@ -142,7 +142,7 @@ func TestOutcome(t *testing.T) {
 		destChain:       destChainSel,
 		offChainCfg:     offChainCfg,
 		fRoleDON:        1,
-		metricsReporter: plugincommon.NoopReporter{},
+		metricsReporter: NoopMetrics{},
 	}
 
 	outcome, err := p.Outcome(ctx, Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{
@@ -176,7 +176,7 @@ func TestOutcome_EmptyObservations(t *testing.T) {
 		destChain:       destChainSel,
 		offChainCfg:     offChainCfg,
 		fRoleDON:        fChains[destChainSel], // Use f from fChains for the destination chain
-		metricsReporter: plugincommon.NoopReporter{},
+		metricsReporter: NoopMetrics{},
 	}
 
 	// Prepare attributed observations with only minimal data

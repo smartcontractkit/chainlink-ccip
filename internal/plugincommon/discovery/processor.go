@@ -367,7 +367,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	// TODO: report metrics (discovery equivalent of ccip_commit_consensus_dropped).
 	feeQuoterConsensus, _ := consensus.GetConsensusMap(
 		lggr,
-		"fee quoter",
+		"feeQuoter",
 		agg.feeQuoterAddrs,
 		fChainThresh,
 	)

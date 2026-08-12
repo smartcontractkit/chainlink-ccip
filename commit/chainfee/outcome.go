@@ -211,18 +211,12 @@ func (p *processor) getConsensusObservation(
 }
 
 func reportChainFeeConsensusDrops(
-	reporter plugincommon.MetricsReporter,
+	reporter MetricsReporter,
 	objectName string,
 	drops map[cciptypes.ChainSelector]consensus.ConsensusDropReason,
 ) {
-	r, ok := reporter.(interface {
-		TrackConsensusDropped(objectName string, key string, reason string)
-	})
-	if !ok {
-		return
-	}
 	for chain, reason := range drops {
-		r.TrackConsensusDropped(
+		reporter.TrackConsensusDropped(
 			objectName,
 			strconv.FormatUint(uint64(chain), 10),
 			reason.String(),

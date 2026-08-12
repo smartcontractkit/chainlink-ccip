@@ -102,19 +102,13 @@ func (p *processor) getConsensusObservation(
 }
 
 func reportTokenPriceConsensusDrops[K comparable](
-	reporter plugincommon.MetricsReporter,
+	reporter MetricsReporter,
 	objectName string,
 	drops map[K]consensus.ConsensusDropReason,
 	keyToString func(K) string,
 ) {
-	r, ok := reporter.(interface {
-		TrackConsensusDropped(objectName string, key string, reason string)
-	})
-	if !ok {
-		return
-	}
 	for key, reason := range drops {
-		r.TrackConsensusDropped(objectName, keyToString(key), reason.String())
+		reporter.TrackConsensusDropped(objectName, keyToString(key), reason.String())
 	}
 }
 
