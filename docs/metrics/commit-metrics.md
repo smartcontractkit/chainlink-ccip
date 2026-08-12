@@ -6,11 +6,7 @@
       + [Shared: consensus aggregation](#shared-consensus-aggregation)
       + [Merkle root processor — High](#merkle-root-processor--high)
       + [Merkle root processor — Medium](#merkle-root-processor--medium)
-   * [War games: incident walkthroughs](#war-games-incident-walkthroughs)
-      + [Scenario 1 — full decision tree](#scenario-1--full-decision-tree)
-      + [Scenario 2 — deep dive: report transmission stuck (Step 5)](#scenario-2--deep-dive-report-transmission-stuck-step-5)
-      + [Scenario 3 — deep dive: consensus never completes (Step 3)](#scenario-3--deep-dive-consensus-never-completes-step-3)
-      + [Gaps this exercise surfaced (already folded into the findings above)](#gaps-this-exercise-surfaced-already-folded-into-the-findings-above)
+   * [Incident triage](#incident-triage)
    * [Full findings](#full-findings)
       + [Top-level plugin orchestration (`commit/plugin.go`, `commit/report.go`)](#top-level-plugin-orchestration-commitplugingo-commitreportgo)
       + [Shared: consensus aggregation (`internal/plugincommon/consensus/consensus.go`)](#shared-consensus-aggregation-internalplugincommonconsensusconsensusgo)
@@ -87,56 +83,21 @@ Every metric proposed in this doc, with a one/two-line "why" — the full ration
 
 ---
 
-## War games: incident walkthroughs
+## Incident triage
 
-Three scenarios worked through against the metric set above (some referencing not-yet-implemented items, noted inline) to validate the design before building it: does an on-call engineer actually get a straight-line diagnosis, or just more noise? Each starts from the same alert: **message `0xabc...def`, onramp sequence number `X`, chain A (source) → chain B (dest), reported in-flight for 15 minutes.**
+The metrics above were validated against simulated incidents before being built (does an
+on-call engineer actually get a straight-line diagnosis, or just more noise?), and that
+walkthrough has since been extracted, hardened, and kept current as its own pair of runbooks
+rather than living here as a point-in-time exercise:
 
-### Scenario 1 — full decision tree
+- [`docs/runbooks/uncommitted-message.md`](../runbooks/uncommitted-message.md) — triage for a
+  specific stuck message (the full decision tree and both deep dives that used to be here).
+- [`docs/runbooks/commit-plugin-health.md`](../runbooks/commit-plugin-health.md) — point-in-time
+  health check, no specific incident required.
 
-1. **Is this even a commit-plugin problem?** Check `ccip_commit_offramp_next_seq_num{source_network_name="chain-a", dest_network_name="chain-b"}`.
-   - `> X` → a root covering X already landed on the offramp. Commit plugin's job is done; hand off to exec on-call. Stop.
-   - `<= X` → continue.
-2. **Has the plugin observed X on-chain yet?** Check `ccip_commit_onramp_max_seq_num{sourceChain="chain-a"}`.
-   - `< X` → onramp read is lagging. Check `ccip_commit_merkleroot_observation_errors{sourceChain="chain-a"}` by reason (no_bindings/timeout/rpc_error). Source-chain read/infra issue, not commit logic.
-   - `>= X` → plugin has seen it; continue.
-3. **Is the round producing outcomes at all?** Check `rate(ccip_commit_consensus_observation_failed[5m])`.
-   - Incrementing → destination-chain-wide consensus failure — see Scenario 3 deep dive.
-   - Flat → continue.
-4. **Is chain A or B cursed?** Check `ccip_commit_rmn_curse_active{chain_id="chain-b", curse_type="global"|"destination"}` and `ccip_commit_source_chain_cursed{sourceChain="chain-a"}`.
-   - Any `== 1` → found it; likely intentional/incident-flagged, hand off to whoever owns the curse. Stop.
-   - All `0` → continue.
-5. **Is a report being built but never landing?** Check `ccip_commit_report_transmission_gave_up{sourceChain="chain-a"}` and `ccip_commit_report_transmission_attempts`.
-   - Incrementing/maxed → see Scenario 2 deep dive.
-   - Otherwise → likely just backlog size; check `ccip_commit_pending_messages{sourceChain="chain-a"}` and estimate ETA from round cadence.
-
-(RMN-signature-specific branches — signed-roots-dropped, chain quorum result, Byzantine root disagreement — were dropped from the implementation scope: RMN blessing/signing is effectively dead code now that `RMNEnabled` is hardcoded off. Cursing is the one RMN-adjacent signal still live in production, hence Step 4.)
-
-### Scenario 2 — deep dive: report transmission stuck (Step 5)
-
-Three hypotheses, in order of how cheap they are to check:
-
-- **A — never transmitted (rejected pre-send).** `sum by (reason) (rate(ccip_commit_report_validation_rejected{phase="should_transmit"}[15m]))`.
-  - `config_digest_mismatch` climbing → cross-check `ccip_commit_config_digest_mismatch`; config sync issue.
-  - `stale` climbing → often benign — a different, overlapping report already landed; re-check Step 1's gauge, it may have just moved.
-  - `dest_not_supported` → transmission-schedule/config bug.
-  - `cursed` → converges with Step 4.
-  - All flat → move to B.
-- **B — transmitted, reverted/stuck on-chain.** Outside commit-plugin metrics: check chain B's TXM/tx-sender dashboards for the assigned transmitter (nonce gap, underpriced gas, wallet balance, revert reason). A revert here for the same reasons as A but caught on-chain instead of locally usually means a race between the pre-check and the tx landing (config rollout, chain congestion).
-- **C — actually succeeded, read is lagging.** `ccip_commit_offramp_next_seq_num` is sourced from the plugin's own chain-B reader; if that's behind, "no change" can persist for a few rounds after a real success. Cross-check chain B's block explorer / chain-reader health directly before escalating further.
-
-### Scenario 3 — deep dive: consensus never completes (Step 3)
-
-Grounded in `getConsensusObservation` (`merkleroot/outcome.go:461-508`): the *only* way the whole round fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value for the **destination chain** — every other field degrades per-chain gracefully. Two implications:
-
-- **This is destination-chain-wide, not lane-specific.** Before going further, check whether *other* source chains reporting into chain B are also stalled (their `ccip_commit_pending_messages` also climbing). If only chain A is affected, this branch is the wrong one — back to Scenario 1, Step 4/5.
-- **The counter alone can't tell you why.** Two sub-hypotheses, using the not-yet-implemented shared `consensus.go` fix:
-  - **H1 — too few oracles could read it.** `ccip_commit_fchain_read_errors` spiking broadly across oracles → home-chain RPC/read outage.
-  - **H2 — oracles disagree.** `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}` firing while H1 stays flat → home-chain config (e.g. CCIPHome update, DON membership change) mid-rollout/desynced across the DON. Corroborate with `ccip_commit_config_digest_mismatch` flipping for a subset of oracles around the same time.
-
-### Gaps this exercise surfaced (already folded into the findings above)
-- No plugin-level heartbeat — added to "Top-level plugin orchestration."
-- No reason breakdown for report-acceptance/transmission-validation rejections — added to "Top-level plugin orchestration."
-- `GetConsensusMap`'s two-vs-three-outcome ambiguity — added to "Shared: consensus aggregation" (not yet implemented — reviewed design only).
+Both are written to be followed mechanically by a human or an AI agent (see
+[`docs/runbooks/README.md`](../runbooks/README.md)) and have been tested against a live devenv
+DON under two independently forced failure modes, not just read for plausibility.
 
 ---
 
