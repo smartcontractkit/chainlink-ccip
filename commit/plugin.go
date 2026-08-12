@@ -254,6 +254,10 @@ func (p *Plugin) ObservationQuorum(
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
+	// Unconditional heartbeat: fires before anything below can fail, so its absence -- not a bad value --
+	// is the "is the plugin scheduling rounds at all" signal. See docs/metrics/commit-metrics.md.
+	p.metricsReporter.TrackPluginHeartbeat(plugincommon.ObservationMethod)
+
 	if p.offchainCfg.DonBreakingChangesVersion < pluginconfig.DonBreakingChangesVersion1RoleDonSupport {
 		p.lggr.Info("running old observation")
 		return p.observationOld(ctx, outCtx, q)
@@ -434,6 +438,9 @@ func (p *Plugin) trackConfigDigestMismatch(ctx context.Context, lggr logger.Logg
 func (p *Plugin) Outcome(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	// Unconditional heartbeat: see the matching comment in Observation().
+	p.metricsReporter.TrackPluginHeartbeat(plugincommon.OutcomeMethod)
+
 	if p.offchainCfg.DonBreakingChangesVersion < pluginconfig.DonBreakingChangesVersion1RoleDonSupport {
 		p.lggr.Info("running old outcome")
 		return p.outcomeOld(ctx, outCtx, q, aos)
