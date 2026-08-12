@@ -7,6 +7,7 @@ owner: ccip-commit-oncall
 inputs:
   destChain: {type: string, description: "chainID/chain_id label value of the node's destination chain"}
   sourceChains: {type: string, description: "source_network_name regex filter; defaults to all lanes into destChain", default: ".*"}
+  fRoleDON: {type: integer, required: false, description: "optional. If known, expected live oracle count for destChain's DON is 3*fRoleDON+1 and the consensus threshold is 2*fRoleDON+1. Omit if uncertain (e.g. local devenvs with a possible bootstrap-node offset) -- live_oracle_count reports the raw count either way, it just can't grade it against a threshold without this."}
 related:
   - docs/runbooks/uncommitted-message.md   # incident triage for one specific stuck message
   - docs/metrics/commit-metrics.md         # design rationale + full metric-by-metric findings
@@ -18,6 +19,7 @@ status: living
    * [For agents](#for-agents)
       + [Label key cheat sheet](#label-key-cheat-sheet)
       + [Empty result sets: the rule that actually matters](#empty-result-sets-the-rule-that-actually-matters)
+      + [rate() detection lag: found by live testing, not designed in](#rate-detection-lag-found-by-live-testing-not-designed-in)
    * [Checklist](#checklist)
    * [Groups](#groups)
       + [Liveness](#liveness)
@@ -48,9 +50,14 @@ label key from each check's own query; don't assume one spelling applies file-wi
 
 | label key | checks that use it |
 |---|---|
-| `chainID` | `heartbeat_observation`, `heartbeat_outcome`, `processor_errors`, `processor_latency_p95`, `fchain_read_errors`, `report_validation_rejected`, `report_transmission_attempts_p95` |
+| `chainID` | `heartbeat_observation`, `heartbeat_outcome`, `processor_errors`, `processor_latency_p95`, `live_oracle_count`, `fchain_read_errors`, `report_validation_rejected`, `report_transmission_attempts_p95` |
 | `chain_id` | `config_digest_mismatch`, `rmn_curse_active`, `consensus_observation_failed` |
 | `source_network_name` | every check under `lane_throughput`, plus `source_chain_cursed`, `report_transmission_gave_up` |
+
+`csa_public_key` is a different kind of label — it's not used to filter by chain, it's a
+per-node identity present on *every* commit metric series (confirmed against a live devenv, not
+just inferred). `live_oracle_count` is the only check that groups by it; nothing else in this
+checklist needs to.
 
 ### Empty result sets: the rule that actually matters
 
@@ -81,6 +88,23 @@ For metric types, label sets, and the `_total`/`_bucket` suffix caveat, see
 
 Produce the [output contract](#output-contract) at the end — don't just narrate findings inline.
 
+### `rate()` detection lag: found by live testing, not designed in
+
+This was found by actually forcing a failure and running this checklist against it, not by
+reading the doc carefully — worth internalizing before you edit any check's window size.
+`rate(metric[Nm])` extrapolates across its *whole* window using the oldest and newest samples it
+finds inside it. That means a `crit_if: result == 0` check (or a headcount built on
+`rate(...) > 0`) does not go bad the instant the underlying process dies — it stays looking
+healthy for up to `N` more minutes, because there were still real samples earlier in the window.
+Confirmed empirically: with a `[5m]` window, `live_oracle_count` kept reporting the pre-outage
+oracle count for several minutes after 3 of 5 oracles were actually stopped; only a `[1m]` window
+(or, better, a `timestamp()`-based staleness check — what `live_oracle_count` now uses) reflected
+the real state promptly. Every liveness check in this checklist uses a short window (`[1m]`) or a
+direct staleness check specifically because of this. If you widen one, you're trading detection
+speed for smoothing against transient blips — that's a real tradeoff, not a free cleanup, and any
+resulting delay should be [re-tested against a forced failure](README.md#re-testing-a-runbook-after-editing-it),
+not assumed correct because the query still reads sensibly.
+
 ## Checklist
 
 ```yaml
@@ -89,18 +113,18 @@ checks:
   - id: heartbeat_observation
     group: liveness
     always_emitted: true
-    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}[5m]))'
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}[1m]))'
     severity: {crit_if: "result == 0", ok_if: "result > 0"}
     owner: ccip-commit-oncall
-    note: "unconditional per-round liveness signal for Observation(); 0 or empty means every other check below may simply be stale, not bad"
+    note: "unconditional per-round liveness signal for Observation(); 0 or empty means every other check below may simply be stale, not bad. Window is deliberately 1m, not 5m -- rate() extrapolates across its whole window, so a plugin that died N minutes ago still reads as alive for up to [window] more minutes; confirmed empirically (see live_oracle_count's note) that a 5m window delays detecting a real outage by up to 5 minutes. Don't widen this window without re-checking that tradeoff"
 
   - id: heartbeat_outcome
     group: liveness
     always_emitted: true
-    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="outcome"}[5m]))'
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="outcome"}[1m]))'
     severity: {crit_if: "result == 0", ok_if: "result > 0"}
     owner: ccip-commit-oncall
-    note: "same signal for Outcome(); flat while observation is healthy means OCR is failing to schedule/deliver to the outcome stage"
+    note: "same signal for Outcome(); flat while observation is healthy means OCR is failing to schedule/deliver to the outcome stage. Same 1m-window rationale as heartbeat_observation"
 
   - id: config_digest_mismatch
     group: liveness
@@ -192,6 +216,14 @@ checks:
     owner: ccip-commit-oncall
     note: "the only way a whole round fails: DON can't reach 2*fRoleDON+1 agreement on FChain for the dest chain. Destination-chain-wide by construction, not lane-specific"
 
+  - id: live_oracle_count
+    group: cursing_consensus
+    always_emitted: true
+    query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))'
+    severity: {crit_if: "$fRoleDON known and result < 2*$fRoleDON+1", warn_if: "$fRoleDON known and 2*$fRoleDON+1 <= result < 3*$fRoleDON+1", ok_if: "$fRoleDON known and result >= 3*$fRoleDON+1", info: "$fRoleDON not supplied -- report the raw count, no verdict"}
+    owner: ccip-commit-oncall
+    note: "csa_public_key uniquely identifies each node in every commit metric series (confirmed empirically against a live devenv, not just inferred from source). This deliberately uses timestamp()-vs-time(), not rate()>0: confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops, because rate() extrapolates across its whole window using the oldest and newest samples it finds -- a node that died 3 minutes ago still reports a positive rate at the 5m window size, making the headcount silently wrong for the first several minutes of a real outage. timestamp() answers 'did this series get a sample in the last 60s' directly, with no extrapolation lag. This is the ONLY check in this file that can detect 'not enough oracles are even running' -- fchain_read_errors below only reports a *surviving* oracle's own read failures, it has no visibility into oracles that never started. If this comes back CRIT, it likely explains consensus_observation_failed on its own; don't let fchain_read_errors being flat push you toward blaming a split vote instead (see the aggregation rule)"
+
   - id: fchain_read_errors
     group: cursing_consensus
     always_emitted: false
@@ -252,7 +284,11 @@ already-known state (see `uncommitted-message.md` step4), and a health check tha
 expected state trains people to ignore it. `consensus_observation_failed` is unambiguous `CRIT`
 when it fires — by construction it can only mean the DON-wide FChain agreement failed for this
 destination chain, which cannot happen for benign reasons — but it's `always_emitted: false`, so
-absence is the expected/healthy state, not a gap in coverage.
+absence is the expected/healthy state, not a gap in coverage. If it does fire, check
+`live_oracle_count` before `fchain_read_errors`: an oracle that never started can't emit
+`fchain_read_errors` at all (only a *surviving* oracle's own read failures are counted there), so
+a low oracle count is a root cause `fchain_read_errors` is structurally unable to surface on its
+own.
 
 ### Report transmission
 
@@ -263,11 +299,19 @@ a fully empty result is `OK`, not `UNKNOWN`.
 ## Aggregation rule
 
 Overall status is the worst individual status, `CRIT` > `WARN` > `UNKNOWN` > `INFO`/`OK`, with
-one explicit combination rule: **`fchain_read_errors` (`WARN`) firing at the same time as
-`consensus_observation_failed` (`CRIT`) doesn't change the overall verdict (already `CRIT`) but
-should be called out together in `concerns` as one finding, not two** — they're the same
-incident (H1 in `uncommitted-message.md`'s Scenario 3), and reporting them separately reads as
-two problems instead of one with corroborating evidence.
+two explicit combination rules:
+
+- **`fchain_read_errors` (`WARN`) firing at the same time as `consensus_observation_failed`
+  (`CRIT`) doesn't change the overall verdict (already `CRIT`) but should be called out together
+  in `concerns` as one finding, not two** — they're the same incident (H1 in
+  `uncommitted-message.md`'s Scenario 3), and reporting them separately reads as two problems
+  instead of one with corroborating evidence.
+- **`live_oracle_count` resolving `CRIT` (or `WARN`) takes priority over whatever
+  `fchain_read_errors` says, when both are present in the same `concerns` entry.** A low oracle
+  count fully explains `consensus_observation_failed` on its own; `fchain_read_errors` being flat
+  in that situation is expected (dead oracles can't emit it), not evidence that points elsewhere.
+  Don't report "H1 ruled out, likely a split vote" if `live_oracle_count` already found the real
+  cause — that conclusion would be actively wrong, not just unconfirmed.
 
 `UNKNOWN` is never silently dropped to `OK` — but per the [empty-result rule](#empty-result-sets-the-rule-that-actually-matters),
 most checks should legitimately resolve `UNKNOWN` only when an `always_emitted: true` check comes

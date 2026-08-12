@@ -9,6 +9,7 @@ inputs:
   destChain: {type: string, description: "chainID/chain_id label value of the destination chain, e.g. chain-b"}
   seqNum: {type: integer, description: "onramp sequence number of the message under investigation (X)"}
   msgID: {type: string, description: "message ID, hex, for cross-referencing logs/explorers"}
+  fRoleDON: {type: integer, required: false, description: "optional. If known, expected live oracle count for destChain's DON is 3*fRoleDON+1 and the consensus threshold is 2*fRoleDON+1. Omit if uncertain (e.g. local devenvs with a possible bootstrap-node offset) -- scenario3's H0 check reports the raw live oracle count either way, it just can't grade it against a threshold without this."}
 related:
   - docs/metrics/commit-metrics.md        # design rationale + full metric-by-metric findings
   - devenv/dashboards/commit-plugin.json  # Grafana rendering of this runbook (Guided Debug section)
@@ -85,11 +86,12 @@ against your actual datasource's metric browser before trusting the rest; don't 
 steps:
   - id: step0
     check: plugin_heartbeat
-    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain"}[5m]))'
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain"}[1m]))'
     condition: "result == 0"
-    if_true:  {action: "REPORT:ccip-commit-oncall", reason: "plugin process is not running rounds at all; every other metric below may simply be stale, not bad"}
+    if_true:  {action: "REPORT:ccip-commit-oncall", reason: "plugin process is not running rounds at all; every other metric below may simply be stale, not bad. Always run followup_query before reporting -- a bare 'not running' is a real but unsatisfyingly blunt finding on its own (confirmed by live testing: an agent that stopped here reported a correct but generic conclusion, then went and ran this exact followup_query anyway 'out of curiosity' because the plain heartbeat result didn't feel actionable)", followup_query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))', followup_meaning: "live oracle headcount -- this is a DON-level signal, same trust tier as heartbeat itself, safe to check here even though lane-specific metrics below are not (yet) trustworthy. A low count turns 'plugin not running' into 'N of the DON's oracles are actually alive', which is what an on-call needs next regardless of whether it's below consensus threshold -- grade it against $fRoleDON per scenario3b's rule if known, otherwise report the raw number"}
     if_false: {action: "CONTINUE:step1"}
     automatable: true
+    note: "window is deliberately 1m, not 5m -- confirmed by live testing (see scenario3b's note) that rate() extrapolates across its whole window, so a plugin that died N minutes ago still reads as alive for up to [window] more minutes. Don't widen this without re-testing against a forced failure."
 
   - id: step1
     check: offramp_next_seq_num
@@ -167,11 +169,23 @@ steps:
     automatable: true
 
   - id: scenario3b
+    check: h0_live_oracle_count
+    query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))'
+    condition: "compare result against 2*fRoleDON+1 (consensus threshold) and 3*fRoleDON+1 (full DON), if fRoleDON was supplied as an input"
+    if_true:
+      below_threshold:   {action: "REPORT:ccip-commit-oncall", reason: "H0 — result < 2*fRoleDON+1: too few oracles are even running to reach consensus, full stop. This is the answer; don't proceed to H1/H2, they're checks for a *different* failure mode (an oracle that's running but can't read its home chain, or oracles that disagree) and will likely read as flat/inconclusive here even though they're not the cause."}
+      degraded_but_over_threshold: {action: "CONTINUE:scenario3c", reason: "some oracles down but still >= 2*fRoleDON+1; consensus should theoretically still be possible, so if it's failing anyway H1/H2 are still the right next check"}
+      full_don:          {action: "CONTINUE:scenario3c", reason: "oracle count isn't the explanation; proceed to H1/H2"}
+    if_false: {action: "CONTINUE:scenario3c", reason: "fRoleDON wasn't supplied — report the raw count as context (see note) and proceed to H1/H2 regardless; a human/agent should sanity-check the count against what they know the DON size to be before trusting H1/H2's conclusion"}
+    automatable: true
+    note: "csa_public_key uniquely identifies each node in every commit metric series (confirmed empirically, not just in the source) -- this is a direct headcount, not a proxy. Deliberately uses timestamp()-vs-time(), not rate()>0: confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops (rate() extrapolates across its whole window using the oldest/newest samples it finds), which silently under-counts a fresh outage. timestamp() answers 'did this series get a sample in the last 60s' directly, no extrapolation lag. Distinguishes 'not enough oracles are online' (a category H1/H2 cannot detect at all, since fchain_read_errors only reports a *surviving* oracle's own read failures and has no way to see oracles that never started) from the H1/H2 failure modes below. This is exactly the gap docs/metrics/commit-metrics.md's unimplemented ccip_commit_consensus_dropped{reason=\"insufficient_agreement\"} would otherwise close at the source instead of needing to be inferred from heartbeat cardinality."
+
+  - id: scenario3c
     check: h1_vs_h2
     query: 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
     condition: "result spiking broadly across oracles"
     if_true:  {action: "REPORT:home-chain-infra-oncall", reason: "H1 — too few oracles could read FChain; home-chain RPC/read outage"}
-    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Needs ccip_commit_consensus_dropped{reason=\"split\"}, NOT IMPLEMENTED as of this writing — see Known gaps. Corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}'}
+    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Needs ccip_commit_consensus_dropped{reason=\"split\"}, NOT IMPLEMENTED as of this writing — see Known gaps. Corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}'}
     automatable: true
 ```
 
@@ -184,9 +198,17 @@ reports "no signal" identically whether the plugin is healthy-and-idle or wedged
 that out before reading anything else as a bad value.
 
 ```promql
-sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain"}[5m]))
+sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain"}[1m]))
 ```
-`0` → nothing else here is trustworthy; report and stop. `> 0` → continue.
+`0` → before reporting, also run the oracle headcount (same query as scenario3b's H0 —
+it's a DON-level signal, safe to check even though lane-specific metrics aren't trustworthy yet):
+```promql
+count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))
+```
+Report both numbers together. "Plugin not running rounds" on its own is a real but blunt
+finding — confirmed by live testing that it's unsatisfying enough that whoever's investigating
+will go run this exact query anyway; do it here instead of making them rediscover it. `> 0` →
+continue to step1.
 
 ### step1 — is this even a commit-plugin problem?
 
@@ -282,12 +304,30 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   max by (source_network_name) (ccip_commit_pending_messages{dest_network_name=~".*"})
   ```
   If only `$sourceChain` is affected, this branch is wrong — back to step4/step5.
+- **H0 — not enough oracles are even running.** *(Check this before H1/H2 — it's a distinct
+  failure mode neither of them can detect, not a variant of either.)* `fchain_read_errors` below
+  only reports a *surviving* oracle's own read failures; it has no way to see an oracle that
+  never started at all. Count oracles that got an Observation-phase heartbeat sample in the last
+  60s — `csa_public_key` uniquely identifies each node in every commit metric series. Uses
+  `timestamp()`, not `rate()>0`: `rate()` extrapolates across its whole window, so it stays
+  `> 0` for up to that window's length after a node actually dies — confirmed by live testing,
+  this genuinely produced a stale headcount at `[5m]` that only corrected itself once enough
+  time had passed:
+  ```promql
+  count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))
+  ```
+  If `$fRoleDON` is known: `< 2*$fRoleDON+1` → this **is** the answer, stop here — don't let a
+  flat H1 push you toward H2 below, H1/H2 are checks for a different failure mode and will likely
+  look inconclusive here even though they're not the cause. `>= 2*$fRoleDON+1` → oracle count
+  isn't the explanation, continue. If `$fRoleDON` is unknown, report the raw count as context and
+  continue regardless — but treat whatever H1/H2 concludes below as lower-confidence, since you
+  haven't ruled this out.
 - **H1 — too few oracles could read it.**
   ```promql
   sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))
   ```
   Spiking broadly across oracles → home-chain RPC/read outage.
-- **H2 — oracles disagree (split vote).** *(Needs `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}` — **not implemented**, reviewed design only, see [Known gaps](#known-gaps).)*
+- **H2 — oracles disagree (split vote).** *(Needs `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}` — **not implemented**, reviewed design only, see [Known gaps](#known-gaps). This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all.")*
   Corroborate with:
   ```promql
   ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}
