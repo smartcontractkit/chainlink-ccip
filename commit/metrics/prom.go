@@ -123,8 +123,29 @@ type PromReporter struct {
 
 	configDigestMismatch   *prometheus.GaugeVec
 	bhConfigDigestMismatch metric.Int64Gauge
+
+	// Beholder-only metrics (no prometheus equivalent): mainnet NOP nodes aren't scraped by our
+	// prometheus, only ingested via beholder, so anything meant to give us visibility into NOP-run
+	// nodes should be defined here rather than as a promauto metric.
+	bhPluginHeartbeat            metric.Int64Counter
+	bhReportValidationRejected   metric.Int64Counter
+	bhOnRampMaxSeqNum            metric.Int64Gauge
+	bhOffRampNextSeqNum          metric.Int64Gauge
+	bhPendingMessages            metric.Int64Gauge
+	bhRmnCurseActive             metric.Int64Gauge
+	bhSourceChainCursed          metric.Int64Gauge
+	bhMerkleRootObservationErrs  metric.Int64Counter
+	bhFChainReadErrors           metric.Int64Counter
+	bhConsensusObservationFailed metric.Int64Counter
+	bhReportTransmissionGaveUp   metric.Int64Counter
+	bhReportTransmissionAttempts metric.Int64Histogram
+	bhRangeTruncated             metric.Int64Counter
+	bhOffRampLaneStatus          metric.Int64Gauge
+	bhSeqNumInvariantViolation   metric.Int64Counter
+	bhOffRampConsensusInsuff     metric.Int64Counter
 }
 
+//nolint:gocyclo
 func NewPromReporter(
 	lggr logger.Logger, selector cciptypes.ChainSelector, bhClient beholder.Client) (*PromReporter, error,
 ) {
@@ -161,6 +182,71 @@ func NewPromReporter(
 		return nil, fmt.Errorf("failed to register ccip_commit_config_digest_mismatch gauge: %w", err)
 	}
 
+	pluginHeartbeat, err := bhClient.Meter.Int64Counter("ccip_commit_plugin_heartbeat")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_plugin_heartbeat counter: %w", err)
+	}
+	reportValidationRejected, err := bhClient.Meter.Int64Counter("ccip_commit_report_validation_rejected")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_report_validation_rejected counter: %w", err)
+	}
+	onRampMaxSeqNum, err := bhClient.Meter.Int64Gauge("ccip_commit_onramp_max_seq_num")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_onramp_max_seq_num gauge: %w", err)
+	}
+	offRampNextSeqNum, err := bhClient.Meter.Int64Gauge("ccip_commit_offramp_next_seq_num")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_offramp_next_seq_num gauge: %w", err)
+	}
+	pendingMessages, err := bhClient.Meter.Int64Gauge("ccip_commit_pending_messages")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_pending_messages gauge: %w", err)
+	}
+	rmnCurseActive, err := bhClient.Meter.Int64Gauge("ccip_commit_rmn_curse_active")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_rmn_curse_active gauge: %w", err)
+	}
+	sourceChainCursed, err := bhClient.Meter.Int64Gauge("ccip_commit_source_chain_cursed")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_source_chain_cursed gauge: %w", err)
+	}
+	merkleRootObservationErrs, err := bhClient.Meter.Int64Counter("ccip_commit_merkleroot_observation_errors")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_merkleroot_observation_errors counter: %w", err)
+	}
+	fChainReadErrors, err := bhClient.Meter.Int64Counter("ccip_commit_fchain_read_errors")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_fchain_read_errors counter: %w", err)
+	}
+	consensusObservationFailed, err := bhClient.Meter.Int64Counter("ccip_commit_consensus_observation_failed")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_consensus_observation_failed counter: %w", err)
+	}
+	reportTransmissionGaveUp, err := bhClient.Meter.Int64Counter("ccip_commit_report_transmission_gave_up")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_report_transmission_gave_up counter: %w", err)
+	}
+	reportTransmissionAttempts, err := bhClient.Meter.Int64Histogram("ccip_commit_report_transmission_attempts")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_report_transmission_attempts histogram: %w", err)
+	}
+	rangeTruncated, err := bhClient.Meter.Int64Counter("ccip_commit_range_truncated")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_range_truncated counter: %w", err)
+	}
+	offRampLaneStatus, err := bhClient.Meter.Int64Gauge("ccip_commit_offramp_lane_status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_offramp_lane_status gauge: %w", err)
+	}
+	seqNumInvariantViolation, err := bhClient.Meter.Int64Counter("ccip_commit_seqnum_invariant_violation")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_seqnum_invariant_violation counter: %w", err)
+	}
+	offRampConsensusInsuff, err := bhClient.Meter.Int64Counter("ccip_commit_offramp_consensus_insufficient")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_offramp_consensus_insufficient counter: %w", err)
+	}
+
 	return &PromReporter{
 		lggr:        lggr,
 		bhClient:    bhClient,
@@ -186,6 +272,23 @@ func NewPromReporter(
 		bhCommitLatestRound:         commitLatestRoundID,
 		bhLooppProviderSupported:    looppProviderSupported,
 		bhConfigDigestMismatch:      configDigestMismatch,
+
+		bhPluginHeartbeat:            pluginHeartbeat,
+		bhReportValidationRejected:   reportValidationRejected,
+		bhOnRampMaxSeqNum:            onRampMaxSeqNum,
+		bhOffRampNextSeqNum:          offRampNextSeqNum,
+		bhPendingMessages:            pendingMessages,
+		bhRmnCurseActive:             rmnCurseActive,
+		bhSourceChainCursed:          sourceChainCursed,
+		bhMerkleRootObservationErrs:  merkleRootObservationErrs,
+		bhFChainReadErrors:           fChainReadErrors,
+		bhConsensusObservationFailed: consensusObservationFailed,
+		bhReportTransmissionGaveUp:   reportTransmissionGaveUp,
+		bhReportTransmissionAttempts: reportTransmissionAttempts,
+		bhRangeTruncated:             rangeTruncated,
+		bhOffRampLaneStatus:          offRampLaneStatus,
+		bhSeqNumInvariantViolation:   seqNumInvariantViolation,
+		bhOffRampConsensusInsuff:     offRampConsensusInsuff,
 	}, nil
 }
 
@@ -364,4 +467,134 @@ func (p *PromReporter) TrackConfigDigestMismatch(mismatch bool) {
 		attribute.String("chain_family", p.chainFamily),
 		attribute.String("chain_id", p.chainID),
 	))
+}
+
+func (p *PromReporter) TrackPluginHeartbeat(phase string) {
+	p.bhPluginHeartbeat.Add(context.Background(), 1, metric.WithAttributes(
+		attribute.String("chainFamily", p.chainFamily),
+		attribute.String("chainID", p.chainID),
+		attribute.String("phase", phase),
+	))
+}
+
+func (p *PromReporter) TrackReportValidationRejected(phase string, reason string) {
+	p.bhReportValidationRejected.Add(context.Background(), 1, metric.WithAttributes(
+		attribute.String("chainFamily", p.chainFamily),
+		attribute.String("chainID", p.chainID),
+		attribute.String("phase", phase),
+		attribute.String("reason", reason),
+	))
+}
+
+// sourceChainAttrs resolves a source chain selector into the same family/ID/network-name attributes
+// used elsewhere in this reporter (see trackMaxSequenceNumber), so dashboards can join on network name
+// consistently across metrics.
+func (p *PromReporter) sourceChainAttrs(sourceChainSelector cciptypes.ChainSelector) []attribute.KeyValue {
+	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
+	if !ok {
+		p.lggr.Errorw("failed to get chain ID from selector", "selector", sourceChainSelector)
+		return []attribute.KeyValue{
+			attribute.String("sourceChainSelector", strconv.FormatUint(uint64(sourceChainSelector), 10)),
+		}
+	}
+	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
+	if err != nil {
+		p.lggr.Errorw("failed to get chain name from ID and family", "chainID",
+			sourceChainID, "family", sourceFamily, "err", err)
+	}
+	return []attribute.KeyValue{
+		attribute.String("sourceChainFamily", sourceFamily),
+		attribute.String("sourceChainID", sourceChainID),
+		attribute.String("source_network_name", sourceName),
+	}
+}
+
+func (p *PromReporter) TrackOnRampMaxSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum) {
+	p.bhOnRampMaxSeqNum.Record(context.Background(), int64(seqNum),
+		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackOffRampNextSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum) {
+	p.bhOffRampNextSeqNum.Record(context.Background(), int64(seqNum),
+		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackPendingMessages(sourceChain cciptypes.ChainSelector, pending uint64) {
+	p.bhPendingMessages.Record(context.Background(), int64(pending),
+		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackRmnCurseActive(curseType string, active bool) {
+	var value int64
+	if active {
+		value = 1
+	}
+	p.bhRmnCurseActive.Record(context.Background(), value, metric.WithAttributes(
+		attribute.String("chain_family", p.chainFamily),
+		attribute.String("chain_id", p.chainID),
+		attribute.String("curse_type", curseType),
+	))
+}
+
+func (p *PromReporter) TrackSourceChainCursed(sourceChain cciptypes.ChainSelector, cursed bool) {
+	var value int64
+	if cursed {
+		value = 1
+	}
+	p.bhSourceChainCursed.Record(context.Background(), value,
+		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackObservationError(sourceChain cciptypes.ChainSelector, reason string) {
+	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("reason", reason))
+	p.bhMerkleRootObservationErrs.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+func (p *PromReporter) TrackFChainReadError() {
+	p.bhFChainReadErrors.Add(context.Background(), 1, metric.WithAttributes(
+		attribute.String("chainFamily", p.chainFamily),
+		attribute.String("chainID", p.chainID),
+	))
+}
+
+func (p *PromReporter) TrackConsensusObservationFailed() {
+	p.bhConsensusObservationFailed.Add(context.Background(), 1, metric.WithAttributes(
+		attribute.String("chain_family", p.chainFamily),
+		attribute.String("chain_id", p.chainID),
+	))
+}
+
+func (p *PromReporter) TrackReportTransmissionGaveUp(sourceChain cciptypes.ChainSelector) {
+	p.bhReportTransmissionGaveUp.Add(context.Background(), 1,
+		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackReportTransmissionAttempts(attempts uint, success bool) {
+	p.bhReportTransmissionAttempts.Record(context.Background(), int64(attempts), metric.WithAttributes(
+		attribute.String("chainFamily", p.chainFamily),
+		attribute.String("chainID", p.chainID),
+		attribute.Bool("success", success),
+	))
+}
+
+func (p *PromReporter) TrackRangeTruncated(sourceChain cciptypes.ChainSelector) {
+	p.bhRangeTruncated.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelector, status string, active bool) {
+	var value int64
+	if active {
+		value = 1
+	}
+	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("status", status))
+	p.bhOffRampLaneStatus.Record(context.Background(), value, metric.WithAttributes(attrs...))
+}
+
+func (p *PromReporter) TrackSeqNumInvariantViolation(sourceChain cciptypes.ChainSelector, violationType string) {
+	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("type", violationType))
+	p.bhSeqNumInvariantViolation.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+func (p *PromReporter) TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector) {
+	p.bhOffRampConsensusInsuff.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
 }
