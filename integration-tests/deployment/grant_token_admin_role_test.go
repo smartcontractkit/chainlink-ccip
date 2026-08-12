@@ -257,6 +257,7 @@ func TestGrantTokenAdminRoleDeployer(t *testing.T) {
 	require.NotEmpty(t, chain.Users)
 	customer := chain.Users[0].From
 
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deployapi.DeployContracts(deployapi.GetRegistry()).Apply(*env,
 		deployapi.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
