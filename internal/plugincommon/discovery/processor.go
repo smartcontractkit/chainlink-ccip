@@ -295,6 +295,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 
 	// fChain consensus - uses the role DON F value because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
+	// TODO: report metrics (discovery equivalent of ccip_commit_consensus_dropped).
 	fChain, _ := consensus.GetConsensusMap(lggr, "fChain", agg.fChain, donThresh)
 	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
 
@@ -304,6 +305,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	} else {
 		destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fChain[cdp.dest]))
 
+		// TODO: report metrics (discovery equivalent of ccip_commit_consensus_dropped).
 		onrampConsensus, _ := consensus.GetConsensusMap(
 			lggr,
 			"onramp",
@@ -324,6 +326,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		contracts[consts.ContractNameOnRamp] = onrampConsensus
 	}
 
+	// TODO: report metrics (discovery equivalent of ccip_commit_consensus_dropped).
 	nonceManagerConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"nonceManager",
@@ -341,6 +344,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
 	// RMNRemote address consensus
+	// TODO: report metrics (discovery equivalent of ccip_commit_consensus_dropped).
 	rmnRemoteConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"rmnRemote",
@@ -360,6 +364,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 	contracts[consts.ContractNameRMNRemote] = rmnRemoteConsensus
 
+	// TODO: report metrics (discovery equivalent of ccip_commit_consensus_dropped).
 	feeQuoterConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"fee quoter",
@@ -380,6 +385,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
 
 	// Router address consensus
+	// TODO: report metrics (discovery equivalent of ccip_commit_consensus_dropped).
 	routerConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"router",

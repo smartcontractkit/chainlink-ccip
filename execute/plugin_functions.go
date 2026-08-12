@@ -920,6 +920,7 @@ func getConsensusFChain(
 
 	// consensus on the fChain map uses the role DON F value (all nodes can observe the home chain)
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(f))
+	// TODO: report metrics (execute equivalent of ccip_commit_consensus_dropped).
 	fChain, _ := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
 
 	return fChain

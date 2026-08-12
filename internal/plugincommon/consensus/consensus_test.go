@@ -437,10 +437,10 @@ func Test_GetConsensusMap_DropReasons(t *testing.T) {
 	threshold := MakeMultiThreshold(fChain, F)
 
 	input := map[cciptypes.ChainSelector][]int{
-		cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},       // consensus reached
-		cciptypes.ChainSelector(2): {5, 5},                 // insufficient agreement
-		cciptypes.ChainSelector(3): {5, 3, 5, 3, 5, 3},       // split vote
-		cciptypes.ChainSelector(4): {5, 5, 5},              // threshold not defined
+		cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},    // consensus reached
+		cciptypes.ChainSelector(2): {5, 5},             // insufficient agreement
+		cciptypes.ChainSelector(3): {5, 3, 5, 3, 5, 3}, // split vote
+		cciptypes.ChainSelector(4): {5, 5, 5},          // threshold not defined
 	}
 
 	result, drops := GetConsensusMap(lggr, "test", input, threshold)
@@ -500,7 +500,7 @@ func Test_GetConsensusMapAggregator_DropReasons(t *testing.T) {
 
 	input := map[int][]int{
 		1: {5, 5, 5, 5, 5}, // consensus reached
-		2: {5, 5},           // insufficient agreement
+		2: {5, 5},          // insufficient agreement
 		4: {5, 5, 5},       // threshold not defined
 	}
 
