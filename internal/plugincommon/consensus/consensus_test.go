@@ -52,7 +52,7 @@ func Test_fChainConsensus(t *testing.T) {
 	for _, scenario := range testCases {
 		t.Run(scenario.name, func(t *testing.T) {
 			minObs := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(scenario.f))
-			result := GetConsensusMap(lggr, "fChain", scenario.inputMap, minObs)
+			result, _ := GetConsensusMap(lggr, "fChain", scenario.inputMap, minObs)
 			assert.Equal(t, scenario.expectedOutput, result)
 		})
 	}
@@ -132,7 +132,7 @@ func Test_SeqNumConsensus(t *testing.T) {
 
 	for _, scenario := range testCases {
 		t.Run(scenario.name, func(t *testing.T) {
-			result := GetOrderedConsensus(lggr, "fChain", scenario.inputMap, scenario.thresholds)
+			result, _ := GetOrderedConsensus(lggr, "fChain", scenario.inputMap, scenario.thresholds)
 			require.Equal(t, scenario.expectedOutput, result)
 		})
 	}
@@ -154,7 +154,7 @@ func Test_GetConsensusMapMedianTimestamp(t *testing.T) {
 	}
 
 	threshold := MakeConstantThreshold[int](Threshold(f))
-	timeFinal := GetConsensusMapAggregator(lggr, "time", timeValues, threshold, func(vals []time.Time) time.Time {
+	timeFinal, _ := GetConsensusMapAggregator(lggr, "time", timeValues, threshold, func(vals []time.Time) time.Time {
 		return Median(vals, TimestampComparator)
 	})
 
@@ -180,7 +180,7 @@ func Test_GetConsensusMapMedianInt(t *testing.T) {
 	}
 
 	threshold := MakeConstantThreshold[int](Threshold(f))
-	intFinal := GetConsensusMapAggregator(lggr, "int", intValues, threshold, func(vals []int) int {
+	intFinal, _ := GetConsensusMapAggregator(lggr, "int", intValues, threshold, func(vals []int) int {
 		return Median(vals, func(a, b int) bool {
 			return a < b
 		})
@@ -416,7 +416,7 @@ func Test_GetConsensusMapAggregator(t *testing.T) {
 			threshold := MakeMultiThreshold(tc.thresholdMap, func(i int) Threshold {
 				return Threshold(tc.thresholdMap[i])
 			})
-			result := GetConsensusMapAggregator(lggr, "test", tc.inputMap, threshold, func(vals []int) int {
+			result, _ := GetConsensusMapAggregator(lggr, "test", tc.inputMap, threshold, func(vals []int) int {
 				return Median(vals, func(a, b int) bool {
 					return a < b
 				})
@@ -424,4 +424,96 @@ func Test_GetConsensusMapAggregator(t *testing.T) {
 			assert.Equal(t, tc.expectedOutput, result)
 		})
 	}
+}
+
+func Test_GetConsensusMap_DropReasons(t *testing.T) {
+	lggr := logger.Test(t)
+
+	fChain := map[cciptypes.ChainSelector]int{
+		cciptypes.ChainSelector(1): 3,
+		cciptypes.ChainSelector(2): 3,
+		cciptypes.ChainSelector(3): 3,
+	}
+	threshold := MakeMultiThreshold(fChain, F)
+
+	input := map[cciptypes.ChainSelector][]int{
+		cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},       // consensus reached
+		cciptypes.ChainSelector(2): {5, 5},                 // insufficient agreement
+		cciptypes.ChainSelector(3): {5, 3, 5, 3, 5, 3},       // split vote
+		cciptypes.ChainSelector(4): {5, 5, 5},              // threshold not defined
+	}
+
+	result, drops := GetConsensusMap(lggr, "test", input, threshold)
+
+	assert.Equal(t, map[cciptypes.ChainSelector]int{
+		cciptypes.ChainSelector(1): 5,
+	}, result)
+
+	assert.Equal(t, map[cciptypes.ChainSelector]ConsensusDropReason{
+		cciptypes.ChainSelector(2): DropReasonInsufficientAgreement,
+		cciptypes.ChainSelector(3): DropReasonSplit,
+		cciptypes.ChainSelector(4): DropReasonThresholdNotDefined,
+	}, drops)
+}
+
+func Test_GetOrderedConsensus_DropReasons(t *testing.T) {
+	lggr := logger.Test(t)
+
+	fChain := map[cciptypes.ChainSelector]int{
+		cciptypes.ChainSelector(1): 3,
+		cciptypes.ChainSelector(2): 3,
+		cciptypes.ChainSelector(4): 0,
+	}
+	threshold := MakeMultiThreshold(fChain, F)
+
+	input := map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+		cciptypes.ChainSelector(1): {1, 2, 3, 4, 5, 6, 7}, // consensus at f=3
+		cciptypes.ChainSelector(2): {1, 2, 3},             // insufficient agreement
+		cciptypes.ChainSelector(4): {1, 2, 3, 4, 5, 6, 7}, // invalid threshold
+		cciptypes.ChainSelector(5): {1, 2, 3, 4, 5, 6, 7}, // threshold not defined
+	}
+
+	result, drops := GetOrderedConsensus(lggr, "test", input, threshold)
+
+	assert.Equal(t, map[cciptypes.ChainSelector]cciptypes.SeqNum{
+		cciptypes.ChainSelector(1): 4,
+	}, result)
+
+	assert.Equal(t, map[cciptypes.ChainSelector]ConsensusDropReason{
+		cciptypes.ChainSelector(2): DropReasonInsufficientAgreement,
+		cciptypes.ChainSelector(4): DropReasonInvalidThreshold,
+		cciptypes.ChainSelector(5): DropReasonThresholdNotDefined,
+	}, drops)
+}
+
+func Test_GetConsensusMapAggregator_DropReasons(t *testing.T) {
+	lggr := logger.Test(t)
+
+	thresholdMap := map[int]int{
+		1: 3,
+		2: 3,
+		3: 3,
+	}
+	threshold := MakeMultiThreshold(thresholdMap, func(i int) Threshold {
+		return Threshold(thresholdMap[i])
+	})
+
+	input := map[int][]int{
+		1: {5, 5, 5, 5, 5}, // consensus reached
+		2: {5, 5},           // insufficient agreement
+		4: {5, 5, 5},       // threshold not defined
+	}
+
+	result, drops := GetConsensusMapAggregator(lggr, "test", input, threshold, func(vals []int) int {
+		return Median(vals, func(a, b int) bool { return a < b })
+	})
+
+	assert.Equal(t, map[int]int{
+		1: 5,
+	}, result)
+
+	assert.Equal(t, map[int]ConsensusDropReason{
+		2: DropReasonInsufficientAgreement,
+		4: DropReasonThresholdNotDefined,
+	}, drops)
 }

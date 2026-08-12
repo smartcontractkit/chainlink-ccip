@@ -62,9 +62,8 @@ This doc is meant to be walked mechanically, not just read. Two things make that
    what a human should look at, don't try to fetch it yourself unless you have another tool for
    it.
 
-If a query's metric doesn't exist on your datasource (e.g. `ccip_commit_consensus_dropped`,
-see [Known gaps](#known-gaps)), treat the result as unknown, not as `0`/flat — say so explicitly
-rather than silently treating "no such metric" as "no signal."
+If a query's metric doesn't exist on your datasource, treat the result as unknown, not as
+`0`/flat — say so explicitly rather than silently treating "no such metric" as "no signal."
 
 ### A note on counter naming
 
@@ -187,14 +186,14 @@ steps:
       full_don:          {action: "CONTINUE:scenario3c", reason: "oracle count isn't the explanation; proceed to H1/H2"}
     if_false: {action: "CONTINUE:scenario3c", reason: "fRoleDON wasn't supplied — report the raw count as context (see note) and proceed to H1/H2 regardless; a human/agent should sanity-check the count against what they know the DON size to be before trusting H1/H2's conclusion"}
     automatable: true
-    note: "csa_public_key uniquely identifies each node in every commit metric series (confirmed empirically, not just in the source) -- this is a direct headcount, not a proxy. Deliberately uses timestamp()-vs-time(), not rate()>0: confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops (rate() extrapolates across its whole window using the oldest/newest samples it finds), which silently under-counts a fresh outage. timestamp() answers 'did this series get a sample in the last 60s' directly, no extrapolation lag. Distinguishes 'not enough oracles are online' (a category H1/H2 cannot detect at all, since fchain_read_errors only reports a *surviving* oracle's own read failures and has no way to see oracles that never started) from the H1/H2 failure modes below. This is exactly the gap docs/metrics/commit-metrics.md's unimplemented ccip_commit_consensus_dropped{reason=\"insufficient_agreement\"} would otherwise close at the source instead of needing to be inferred from heartbeat cardinality."
+    note: "csa_public_key uniquely identifies each node in every commit metric series (confirmed empirically, not just in the source) -- this is a direct headcount, not a proxy. Deliberately uses timestamp()-vs-time(), not rate()>0: confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops (rate() extrapolates across its whole window using the oldest/newest samples it finds), which silently under-counts a fresh outage. timestamp() answers 'did this series get a sample in the last 60s' directly, no extrapolation lag. Distinguishes 'not enough oracles are online' (a category H1/H2 cannot detect at all, since fchain_read_errors only reports a *surviving* oracle's own read failures and has no way to see oracles that never started) from the H1/H2 failure modes below. This is now closed at the source by ccip_commit_consensus_dropped{reason=\"insufficient_agreement\"}; the heartbeat headcount is still useful as cross-check."
 
   - id: scenario3c
     check: h1_vs_h2
     query: 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
     condition: "result spiking broadly across oracles"
     if_true:  {action: "REPORT:home-chain-infra-oncall", reason: "H1 — too few oracles could read FChain; home-chain RPC/read outage"}
-    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Needs ccip_commit_consensus_dropped{reason=\"split\"}, NOT IMPLEMENTED as of this writing — see Known gaps. Corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}'}
+    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Confirm with ccip_commit_consensus_dropped{objectName=\"fChain\", reason=\"split\"} and corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}'}
     automatable: true
 ```
 
@@ -353,7 +352,7 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))
   ```
   Spiking broadly across oracles → home-chain RPC/read outage.
-- **H2 — oracles disagree (split vote).** *(Needs `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}` — **not implemented**, reviewed design only, see [Known gaps](#known-gaps). This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all.")*
+- **H2 — oracles disagree (split vote).** Check `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}`. This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all."
   Corroborate with:
   ```promql
   ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}
@@ -391,7 +390,7 @@ everything else is Beholder-only.
 | `ccip_commit_processor_errors` | Counter | `chainFamily,chainID,processor,method` | dual |
 | `ccip_commit_processor_latency` | Histogram | `chainFamily,chainID,processor,method` | dual |
 | `ccip_commit_loopp_ccip_provider_supported` | Gauge | `chain_family` | dual |
-| `ccip_commit_consensus_dropped` | — | `objectName,key,reason` | **not implemented** (reviewed design only) |
+| `ccip_commit_consensus_dropped` | Counter | `chainFamily,chainID,objectName,key,reason` | beholder-only |
 
 Note the label-casing inconsistency in the source (`chainFamily`/`chainID` vs.
 `chain_family`/`chain_id`) — copy the exact casing from this table per metric, it's not
@@ -399,7 +398,5 @@ uniform across the file.
 
 ## Known gaps
 
-- `ccip_commit_consensus_dropped` (Scenario 3, H1/H2 split) is **not implemented** — reviewed
-  design only. Any query against it will return no data; that's expected, not a signal.
 - This runbook assumes `RMNEnabled` is hardcoded off (current production state). If that
   changes, the RMN-signature branches dropped from step4 need to be reinstated.

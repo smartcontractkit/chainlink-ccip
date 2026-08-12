@@ -295,7 +295,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 
 	// fChain consensus - uses the role DON F value because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
-	fChain := consensus.GetConsensusMap(lggr, "fChain", agg.fChain, donThresh)
+	fChain, _ := consensus.GetConsensusMap(lggr, "fChain", agg.fChain, donThresh)
 	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
 
 	// We read onramp addresses from destChain offramp configs
@@ -304,7 +304,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	} else {
 		destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fChain[cdp.dest]))
 
-		onrampConsensus := consensus.GetConsensusMap(
+		onrampConsensus, _ := consensus.GetConsensusMap(
 			lggr,
 			"onramp",
 			agg.onrampAddrs,
@@ -324,7 +324,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		contracts[consts.ContractNameOnRamp] = onrampConsensus
 	}
 
-	nonceManagerConsensus := consensus.GetConsensusMap(
+	nonceManagerConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"nonceManager",
 		agg.nonceManagerAddrs,
@@ -341,7 +341,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
 	// RMNRemote address consensus
-	rmnRemoteConsensus := consensus.GetConsensusMap(
+	rmnRemoteConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"rmnRemote",
 		agg.rmnRemoteAddrs,
@@ -360,7 +360,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 	contracts[consts.ContractNameRMNRemote] = rmnRemoteConsensus
 
-	feeQuoterConsensus := consensus.GetConsensusMap(
+	feeQuoterConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"fee quoter",
 		agg.feeQuoterAddrs,
@@ -380,7 +380,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
 
 	// Router address consensus
-	routerConsensus := consensus.GetConsensusMap(
+	routerConsensus, _ := consensus.GetConsensusMap(
 		lggr,
 		"router",
 		agg.routerAddrs,

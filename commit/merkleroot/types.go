@@ -303,6 +303,11 @@ type MetricsReporter interface {
 	// because fewer than 2*fDestChain+1 oracles agreed on its offRamp next sequence number. From outside,
 	// this looks identical to "no new messages on this lane".
 	TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector)
+
+	// TrackConsensusDropped reports a key that was dropped during shared consensus
+	// aggregation (e.g. fChain, Merkle Root, OnRamp Max Seq Nums). The reason
+	// distinguishes "threshold not defined", "insufficient agreement", and "split".
+	TrackConsensusDropped(objectName string, key string, reason string)
 }
 
 type NoopMetrics struct{}
@@ -340,3 +345,5 @@ func (n NoopMetrics) TrackOffRampLaneStatus(cciptypes.ChainSelector, string, boo
 func (n NoopMetrics) TrackSeqNumInvariantViolation(cciptypes.ChainSelector, string) {}
 
 func (n NoopMetrics) TrackOffRampConsensusInsufficient(cciptypes.ChainSelector) {}
+
+func (n NoopMetrics) TrackConsensusDropped(string, string, string) {}

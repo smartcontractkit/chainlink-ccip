@@ -143,6 +143,7 @@ type PromReporter struct {
 	bhOffRampLaneStatus          metric.Int64Gauge
 	bhSeqNumInvariantViolation   metric.Int64Counter
 	bhOffRampConsensusInsuff     metric.Int64Counter
+	bhConsensusDropped           metric.Int64Counter
 }
 
 //nolint:gocyclo
@@ -246,6 +247,10 @@ func NewPromReporter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_offramp_consensus_insufficient counter: %w", err)
 	}
+	consensusDropped, err := bhClient.Meter.Int64Counter("ccip_commit_consensus_dropped")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_commit_consensus_dropped counter: %w", err)
+	}
 
 	return &PromReporter{
 		lggr:        lggr,
@@ -289,6 +294,7 @@ func NewPromReporter(
 		bhOffRampLaneStatus:          offRampLaneStatus,
 		bhSeqNumInvariantViolation:   seqNumInvariantViolation,
 		bhOffRampConsensusInsuff:     offRampConsensusInsuff,
+		bhConsensusDropped:           consensusDropped,
 	}, nil
 }
 
@@ -597,4 +603,14 @@ func (p *PromReporter) TrackSeqNumInvariantViolation(sourceChain cciptypes.Chain
 
 func (p *PromReporter) TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector) {
 	p.bhOffRampConsensusInsuff.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+}
+
+func (p *PromReporter) TrackConsensusDropped(objectName string, key string, reason string) {
+	p.bhConsensusDropped.Add(context.Background(), 1, metric.WithAttributes(
+		attribute.String("chainFamily", p.chainFamily),
+		attribute.String("chainID", p.chainID),
+		attribute.String("objectName", objectName),
+		attribute.String("key", key),
+		attribute.String("reason", reason),
+	))
 }
