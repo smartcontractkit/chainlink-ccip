@@ -3,7 +3,6 @@ package tokens
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -43,16 +42,6 @@ type TokenTransferConfig struct {
 	// the zero value, then the finality config will remain unchanged on-chain. Pre-v2 pools will
 	// ignore this parameter as it is not supported on those versions.
 	AllowedFinalityConfig finality.Config `yaml:"allowedFinalityConfig" json:"allowedFinalityConfig"`
-	// LiquidityMigrationAmount, if set, specifies an exact token amount to migrate from the old pool (read from the
-	// TokenAdminRegistry) to the new pool's lockbox. Mutually exclusive with LiquidityMigrationBasisPoints.
-	// When either field is set, a liquidity migration is triggered via TokenExpansion after UpdateAuthorities
-	// transfers pool and lockbox ownership to the MCMS timelock. Migration requires the timelock to own the v2
-	// lockbox (and the legacy pool for rebalancer/withdraw ops). Use TokenExpansion for connect/upgrade flows;
-	// ConfigureTokensForTransfers rejects these fields. For standalone step-2 drains, use MigrateLockReleasePoolLiquidity.
-	LiquidityMigrationAmount *big.Int `yaml:"liquidityMigrationAmount" json:"liquidityMigrationAmount"`
-	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
-	// Mutually exclusive with LiquidityMigrationAmount. See LiquidityMigrationAmount for ownership and entry-point requirements.
-	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints" json:"liquidityMigrationBasisPoints"`
 	// AutoMigrateRemoteChains is only applicable when migrating a pre-V2 pool to V2. When true, the changeset
 	// fetches the currently active pool from TAR, queries its supported remote chains, and populates RemoteChains
 	// automatically with (token, pool, decimals, rate limits, and MigrationMetadata). Legacy lane fees are read
@@ -108,14 +97,6 @@ func ConfigureTokensForTransfers(tokenRegistry *TokenAdapterRegistry, mcmsRegist
 
 func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) error {
 	return func(_ cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
-		for _, token := range cfg.Tokens {
-			if token.LiquidityMigrationAmount != nil || token.LiquidityMigrationBasisPoints != nil {
-				return fmt.Errorf(
-					"liquidity migration on chain selector %d requires TokenExpansion, which runs migration after UpdateAuthorities transfers pool and lockbox ownership to the MCMS timelock",
-					token.ChainSelector,
-				)
-			}
-		}
 		return nil
 	}
 }
