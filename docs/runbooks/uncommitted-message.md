@@ -141,10 +141,19 @@ steps:
     query: 'sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain", phase="should_transmit"}[15m])) by (reason)'
     condition: "any reason count > 0"
     if_true:
-      config_digest_mismatch: {action: "REPORT:ccip-commit-oncall", reason: "config sync issue; cross-check ccip_commit_config_digest_mismatch"}
-      stale:                  {action: "STOP", reason: "often benign — a different overlapping report already landed; re-check step1, the gauge may have just moved"}
-      dest_not_supported:     {action: "REPORT:ccip-commit-oncall", reason: "transmission-schedule/config bug"}
-      cursed:                 {action: "CONTINUE:step4", reason: "converges with step4"}
+      config_digest_mismatch:  {action: "REPORT:ccip-commit-oncall", reason: "config sync issue; cross-check ccip_commit_config_digest_mismatch"}
+      config_digest_check_error: {action: "REPORT:chain-infra-oncall", reason: "error *reading* the offramp's config digest (RPC/read failure), distinct from an actual mismatch -- chain-B read/infra issue, not a config sync issue"}
+      stale:                   {action: "STOP", reason: "often benign — a different overlapping report already landed; re-check step1, the gauge may have just moved"}
+      dest_not_supported:      {action: "REPORT:ccip-commit-oncall", reason: "transmission-schedule/config bug"}
+      dest_support_check_error: {action: "REPORT:chain-infra-oncall", reason: "error *checking* dest-chain support (RPC/read failure), distinct from a real config gap"}
+      cursed:                  {action: "CONTINUE:step4", reason: "converges with step4"}
+      cursed_check_error:      {action: "REPORT:chain-infra-oncall", reason: "error *checking* the curse state (RPC/read failure), not an actual curse -- don't conflate with step4's cursed=1 case"}
+      empty_root:              {action: "REPORT:ccip-commit-oncall", reason: "report-builder produced an empty merkle root; likely a bug upstream in the merkleroot processor, not an infra issue"}
+      invalid_seqnum_range:    {action: "REPORT:ccip-commit-oncall", reason: "report-builder produced start>end seqnums; likely a bug upstream in the merkleroot processor"}
+      decode_report:           {action: "REPORT:ccip-commit-oncall", reason: "report codec failure; check for a report-codec/chainlink-common version skew across the DON"}
+      decode_report_info:      {action: "REPORT:ccip-commit-oncall", reason: "same as decode_report but for the report-info envelope"}
+      root_blessing_mismatch:  {action: "REPORT:ccip-commit-oncall", reason: "root blessing validation failed; check on-chain blessing state for the roots in this report. RMN signing itself is dead code (RMNEnabled hardcoded off) but this specific check still runs"}
+      default:                 {action: "REPORT:ccip-commit-oncall", reason: "reason string not in this list -- do NOT go source-diving to interpret it as one of the reasons above by guessing. Report the exact reason string, the rate, and say explicitly this runbook doesn't have a mapping for it yet. (This is exactly how a hardcoded test-only fault injection with reason=\"forced_test_failure\" surfaces if a stale binary is still deployed -- treat an unmapped reason as equally likely to be a real new rejection path OR leftover test/debug code, and say you can't tell which from metrics alone.)"}
     if_false: {action: "CONTINUE:scenario2b", reason: "never rejected locally — check on-chain / read-lag hypotheses"}
     automatable: true
 
@@ -277,10 +286,27 @@ sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain", pha
 ```
 - `config_digest_mismatch` climbing → cross-check `ccip_commit_config_digest_mismatch`; config
   sync issue.
+- `config_digest_check_error` → an RPC/read error *checking* the digest, not an actual mismatch —
+  chain-B infra issue, don't conflate with the reason above.
 - `stale` climbing → often benign — a different, overlapping report already landed; re-check
   step1, it may have just moved.
 - `dest_not_supported` → transmission-schedule/config bug.
+- `dest_support_check_error` → RPC/read error checking dest support, not a real config gap.
 - `cursed` → converges with step4.
+- `cursed_check_error` → RPC/read error checking curse state, not an actual curse — don't
+  conflate with step4's `cursed=1`.
+- `empty_root` / `invalid_seqnum_range` → the report-builder produced an invalid report; likely a
+  bug upstream in the merkleroot processor, not an infra issue.
+- `decode_report` / `decode_report_info` → report/report-info codec failure; check for a
+  report-codec or `chainlink-common` version skew across the DON.
+- `root_blessing_mismatch` → on-chain root blessing validation failed for this report. RMN
+  signing itself is dead code (`RMNEnabled` hardcoded off) but this specific check still runs.
+- **Any other reason string** → do not guess which of the above it's "close enough to." Report
+  the exact string and rate and say plainly this runbook has no mapping for it — confirmed by
+  live testing that an unmapped reason (`forced_test_failure`, deliberately not a real production
+  value) forces exactly this situation. An unmapped reason is equally likely to be a genuinely
+  new rejection path in the code or leftover test/debug instrumentation in a stale binary; metrics
+  alone can't tell you which, and the doc shouldn't pretend otherwise.
 - All flat → move to B.
 
 **B — transmitted, reverted/stuck on-chain.** *(`automatable: false` — outside commit-plugin
