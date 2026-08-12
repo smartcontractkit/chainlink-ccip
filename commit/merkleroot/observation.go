@@ -63,6 +63,27 @@ var allOffRampLaneStatuses = []string{
 	laneStatusLive, laneStatusSkippedNotALane, laneStatusSkippedDisabled, laneStatusRMNMisconfigured,
 }
 
+// Reasons passed to MetricsReporter.TrackObservationError. Named here, rather than left as inline
+// literals, because these are effectively a stable label-value contract for dashboards/runbooks/alerts
+// (see docs/runbooks/uncommitted-message.md's metric reference table) with no test asserting on the
+// literal spelling -- a typo at a call site would silently create an unmonitored label value instead of
+// failing to compile.
+const (
+	obsErrNoBindings         = "no_bindings"
+	obsErrTimeout            = "timeout"
+	obsErrRPCError           = "rpc_error"
+	obsErrMsgCountMismatch   = "msg_count_mismatch"
+	obsErrSeqNumMismatch     = "seq_num_mismatch"
+	obsErrHashError          = "hash_error"
+	obsErrAddressLookupError = "address_lookup_error"
+)
+
+// Curse-type labels used with MetricsReporter.TrackRmnCurseActive.
+const (
+	curseTypeGlobal      = "global"
+	curseTypeDestination = "destination"
+)
+
 // offRampLaneClassification buckets source chains by their offramp lane status.
 type offRampLaneClassification struct {
 	// live lanes are enabled, have an onRamp, and have RMN verification disabled (queryable).
@@ -597,8 +618,8 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 
 	// Report curse state unconditionally (including "not cursed") so the gauges reflect the current
 	// round rather than sticking at a stale "1" from a curse that has since cleared.
-	o.metricsReporter.TrackRmnCurseActive("global", curseInfo.GlobalCurse)
-	o.metricsReporter.TrackRmnCurseActive("destination", curseInfo.CursedDestination)
+	o.metricsReporter.TrackRmnCurseActive(curseTypeGlobal, curseInfo.GlobalCurse)
+	o.metricsReporter.TrackRmnCurseActive(curseTypeDestination, curseInfo.CursedDestination)
 	for _, sourceChain := range allSourceChains {
 		o.metricsReporter.TrackSourceChainCursed(sourceChain, curseInfo.CursedSourceChains[sourceChain])
 	}
@@ -714,13 +735,13 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
-					o.metricsReporter.TrackObservationError(sourceChain, "no_bindings")
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrNoBindings)
 				} else if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain)
-					o.metricsReporter.TrackObservationError(sourceChain, "timeout")
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrTimeout)
 				} else {
 					lggr.Errorw("failed to get latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain, "err", err)
-					o.metricsReporter.TrackObservationError(sourceChain, "rpc_error")
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrRPCError)
 				}
 				return
 			}
@@ -771,10 +792,10 @@ func (o observerImpl) ObserveMerkleRoots(
 							logutil.FieldSourceChain, chainRange.ChainSel,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
-						o.metricsReporter.TrackObservationError(chainRange.ChainSel, "timeout")
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrTimeout)
 					} else {
 						lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
-						o.metricsReporter.TrackObservationError(chainRange.ChainSel, "rpc_error")
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrRPCError)
 					}
 					return
 				}
@@ -786,7 +807,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
 						"actual", len(msgs),
 					)
-					o.metricsReporter.TrackObservationError(chainRange.ChainSel, "msg_count_mismatch")
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrMsgCountMismatch)
 					return
 				}
 
@@ -802,7 +823,7 @@ func (o observerImpl) ObserveMerkleRoots(
 							"msgSeqNum", msgSeqNum,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
-						o.metricsReporter.TrackObservationError(chainRange.ChainSel, "seq_num_mismatch")
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrSeqNumMismatch)
 						return
 					}
 					msgIdx++
@@ -811,7 +832,7 @@ func (o observerImpl) ObserveMerkleRoots(
 				root, err := o.computeMerkleRoot(ctx, lggr, msgs)
 				if err != nil {
 					lggr.Warnw("call to computeMerkleRoot failed", "err", err)
-					o.metricsReporter.TrackObservationError(chainRange.ChainSel, "hash_error")
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrHashError)
 					return
 				}
 
@@ -822,7 +843,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"err", err,
 						logutil.FieldSourceChain, chainRange.ChainSel,
 					)
-					o.metricsReporter.TrackObservationError(chainRange.ChainSel, "address_lookup_error")
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrAddressLookupError)
 					return
 				}
 

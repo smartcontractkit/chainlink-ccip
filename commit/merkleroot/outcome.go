@@ -52,6 +52,17 @@ const (
 	InsufficientOffRampConsensus = "not enough observations for OffRampNextSeqNums consensus on chain"
 )
 
+// Violation-type labels used with MetricsReporter.TrackSeqNumInvariantViolation. Named here, rather
+// than left as inline literals, because these are effectively a stable label-value contract for
+// dashboards/runbooks/alerts (see docs/runbooks/uncommitted-message.md's metric reference table) with
+// no test asserting on the literal spelling -- a typo at a call site would silently create an
+// unmonitored label value instead of failing to compile.
+const (
+	seqNumViolationOnRampMaxZero          = "onramp_max_zero"
+	seqNumViolationOffRampAheadOfOnRamp   = "offramp_ahead_of_onramp"
+	seqNumViolationOffRampSeqNumRegressed = "offramp_seqnum_regression"
+)
+
 // Outcome depending on the current state, either:
 // - chooses the seq num ranges for the next round
 // - builds a report
@@ -164,12 +175,12 @@ func reportRangesOutcome(
 				lggr.Infow(OnRampMaxSeqNumZero,
 					logutil.FieldChain, chainSel,
 					"note", "not necessarily an issue, but if it persists without progress investigate why oracles observe 0")
-				metricsReporter.TrackSeqNumInvariantViolation(chainSel, "onramp_max_zero")
+				metricsReporter.TrackSeqNumInvariantViolation(chainSel, seqNumViolationOnRampMaxZero)
 			} else {
 				lggr.Errorw(ImpossibleSeqNumsOnOffRamp,
 					"detail", "offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
 					logutil.FieldChain, chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
-				metricsReporter.TrackSeqNumInvariantViolation(chainSel, "offramp_ahead_of_onramp")
+				metricsReporter.TrackSeqNumInvariantViolation(chainSel, seqNumViolationOffRampAheadOfOnRamp)
 			}
 		}
 
@@ -443,7 +454,8 @@ func checkForReportTransmission(
 					logutil.FieldSeqNum, previousSeqNumChain.SeqNum,
 					"currentSeqNum", currentSeqNum,
 				)
-				metricsReporter.TrackSeqNumInvariantViolation(previousSeqNumChain.ChainSel, "offramp_seqnum_regression")
+				metricsReporter.TrackSeqNumInvariantViolation(
+					previousSeqNumChain.ChainSel, seqNumViolationOffRampSeqNumRegressed)
 			}
 		}
 	}
