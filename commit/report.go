@@ -406,6 +406,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
 
+	// TEMPORARY FAULT INJECTION FOR RUNBOOK TESTING -- REVERT BEFORE MERGE
+	lggr.Warnw("forced test failure: always rejecting should_transmit")
+	p.metricsReporter.TrackReportValidationRejected("should_transmit", "forced_test_failure")
+	return false, nil
+	// END TEMPORARY
+
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r, "should_transmit")
 	if errors.Is(err, plugincommon.ErrStaleReport) {
 		lggr.Infow("stale report, not accepting", "err", err)
