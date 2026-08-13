@@ -63,10 +63,11 @@ var offChainCfg = pluginconfig.CommitOffchainConfig{
 func TestGetConsensusObservation(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
-		lggr:        lggr,
-		destChain:   destChainSel,
-		offChainCfg: offChainCfg,
-		fRoleDON:    1,
+		lggr:            lggr,
+		destChain:       destChainSel,
+		offChainCfg:     offChainCfg,
+		fRoleDON:        1,
+		metricsReporter: NoopMetrics{},
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 and fail feedChain 2f+1
