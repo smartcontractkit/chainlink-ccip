@@ -13,14 +13,14 @@ contract VerifierTestHelper_config is VerifierTestHelperSetup {
     _configureRemoteChain(DEST_CHAIN_SELECTOR);
 
     (BaseVerifier.RemoteChainConfigArgs memory config,) = s_verifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
-    assertEq(address(config.router), s_testRouter);
+    assertEq(address(config.router), s_verifier.getTestRouter());
     assertTrue(config.allowlistEnabled);
   }
 
   function test_applyRemoteChainConfigUpdates_RevertWhen_AllowlistIsDisabled() public {
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = BaseVerifier.RemoteChainConfigArgs({
-      router: IRouter(s_testRouter),
+      router: IRouter(s_verifier.getTestRouter()),
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowlistEnabled: false,
       feeUSDCents: 1,

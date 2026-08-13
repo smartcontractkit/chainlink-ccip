@@ -49,7 +49,7 @@ contract VerifierTestHelperSetup is BaseTest {
   ) internal {
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = BaseVerifier.RemoteChainConfigArgs({
-      router: IRouter(s_testRouter),
+      router: IRouter(s_verifier.getTestRouter()),
       remoteChainSelector: remoteChainSelector,
       allowlistEnabled: true,
       feeUSDCents: 1,
