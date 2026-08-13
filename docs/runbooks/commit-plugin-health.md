@@ -307,9 +307,9 @@ checks:
     group: data_source
     always_emitted: true
     query: 'max by (chain, kind) (ccip_reader_config_cache_age_seconds)'
-    severity: {crit_if: 'kind="chain" and result > 60', ok_if: 'all kind="chain" result <= 60', info: 'kind="source" values (report, no verdict)'}
+    severity: {crit_if: 'kind="chain" and result > 90', ok_if: 'all kind="chain" result <= 90', info: 'kind="source" values (report, no verdict)'}
     owner: chain-infra-oncall
-    note: "how stale the config-poller cache is. Behind every cached read (GetRMNRemoteConfig, GetRmnCurseInfo, config digest, router address), so staleness here manufactures bad curse/mismatch/stale conclusions in the checks above. refresh_period is 30s; ~60s+ means the poll is failing"
+    note: "how stale the config-poller cache is. This is the SUSTAINED signal for config-refresh failure: because the code refuses to advance the refresh timestamp on an empty snapshot, the age only climbs across MULTIPLE consecutive empty/failed polls -- a single intermittent empty (flip-flop) is absorbed by the next good poll and keeps age low. CRIT at >90s (3x the 30s refresh period) means the poller genuinely cannot refresh, so every cached read (GetRMNRemoteConfig, GetRmnCurseInfo, config digest, router address) is running on hollow/stale data. Tie to config_cache_overwritten_empty / config_poll_failure to name why"
 
   - id: config_poller_liveness
     group: data_source
@@ -331,9 +331,9 @@ checks:
     group: data_source
     always_emitted: false
     query: 'sum by (kind) (rate(ccip_reader_config_cache_overwritten_empty_total[5m]))'
-    severity: {crit_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
-    owner: ccip-commit-oncall
-    note: "a refresh time-stamped an EMPTY chain-config snapshot as fresh and served it to every consumer (now guarded in code, but a prior occurrence means the cache was serving empty-as-healthy). This is a reader/config-poller bug, not an infra issue -- escalate to the reader owners"
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "accessor returned an EMPTY chain-config snapshot (no-bindings / empty-batch). Per-event this is NOT a page: a single occurrence is benign and the guard refuses to clobber a good cache for it. Only actionable when SUSTAINED -- which is captured by config_cache_stale (age > 90s), not by this counter alone. Use this to explain WHY the cache went stale (empty snapshot) and which chains. WARN + see config_cache_stale for severity"
 ```
 
 ## Groups
@@ -374,9 +374,13 @@ mismatch.
 ### Data source (reader + config poller)
 
 This group is **upstream of the whole checklist**: it tests whether the commit plugin is healthy
-*but being fed empty/partial/stale data*. The `config_cache_overwritten_empty` check is the one
-`CRIT` here that is a **reader/config-poller bug** (empty snapshot served as fresh), not infra;
-escalate it to the reader owners. `config_cache_stale` and `config_poller_liveness` are the two
+*but being fed empty/partial/stale data*. The `CRIT` here is **`config_cache_stale`** (sustained:
+cache age > 90s = the poller genuinely cannot refresh), which is the thing that makes every cached
+read (curse, RMN config, config digest, router address) run on hollow data. `config_cache_overwritten_empty`
+alone is only `WARN` — a single empty snapshot is benign (the guard refuses to clobber a good cache),
+and per-event empties only matter when they're *sustained*, which `config_cache_stale` already
+captures. Use the empty counter + `config_poll_failure` to explain *why* the cache went stale and
+which chain(s). `config_cache_stale` and `config_poller_liveness` are the two
 `always_emitted: true` checks in this group, so an empty result on them is `UNKNOWN` (pipeline
 broken), and they're the ones to check before trusting the *cached* inputs behind step4
 (cursing) and the config-digest mismatch check above.

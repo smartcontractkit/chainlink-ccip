@@ -127,7 +127,7 @@ steps:
       - 'sum by (query, chain) (rate(ccip_reader_read_empty_total{query=~"NextSeqNum|MsgsBetweenSeqNums|LatestMsgSeqNum"}[5m]))'
       - 'sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{query=~"NextSeqNum|GetChainsFeeComponents|GetChainFeePriceUpdate"}[5m]))'
       - 'max by (chain, kind) (ccip_reader_config_cache_age_seconds)'
-    condition: "any read_partial/read_empty/chain_gap series > 0, or any config_cache_age_seconds{kind=\"chain\"} > 60"
+    condition: "any read_partial/read_empty/chain_gap series > 0, or any config_cache_age_seconds{kind=\"chain\"} > 90 (3x refresh period = sustained refresh failure, not a single empty poll)"
     if_true:  {action: "REPORT:chain-infra-oncall", reason: "the plugin DATA SOURCE is degrading, which is upstream of -- and distinct from -- onramp-lag/consensus/transmission. Reads are returning empty/partial (chain not returned, or a subset returned) or the config-poller cache went stale. This is the root cause the onramp-gauge stall looks like, not a commit-plugin bug. For ccip_reader_chain_gap, the actionable state values per (query,chain) are not_found|disabled|misconfigured|error|invalid|missing|stale. Split node-local (one csa_public_key) from DON-wide (all series) before escalating.", followup_query: 'count by (csa_public_key) (ccip_reader_chain_gap_total{query="NextSeqNum"})'}
     if_false: {action: "CONTINUE:step3"}
     automatable: true
@@ -301,7 +301,8 @@ sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{query=~"NextSeqNu
 max by (chain, kind) (ccip_reader_config_cache_age_seconds)
 ```
 
-Any `> 0` (or any `config_cache_age_seconds{kind="chain"}` above ~60s) → the **data layer** feeding the
+Any `> 0` (or any `config_cache_age_seconds{kind="chain"}` above ~90s — sustained, 3x refresh; a
+single intermittent empty snap isn't enough) → the **data layer** feeding the
 commit plugin is degrading, so this is a `chain-infra`/reader problem, not a commit-plugin defect. Still
 split single-node (group by `csa_public_key`) vs DON-wide before escalating. All flat → continue.
 The `chain` label here is the **numeric chain selector** (not `source_network_name`); `query` names the
