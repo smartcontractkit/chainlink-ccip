@@ -11,9 +11,7 @@ import (
 
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/verifier_test_helper"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/test_verifier"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -55,31 +53,6 @@ func (a *EVMTestVerifierChainAdapter) PoolAddress(d datastore.DataStore, b cldf_
 	}, chainSelector, evmds.ToEVMAddressBytes)
 	if err != nil {
 		return nil, fmt.Errorf("resolve TESTVTR pool on chain %d: %w", chainSelector, err)
-	}
-	return ref, nil
-}
-
-// VerifierAddress returns the test verifier address on the given chain.
-func (a *EVMTestVerifierChainAdapter) VerifierAddress(d datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	ref, err := datastore_utils.FindAndFormatRef(d, datastore.AddressRef{
-		Type:    datastore.ContractType(verifier_test_helper.ContractType),
-		Version: verifier_test_helper.Version,
-	}, chainSelector, evmds.ToEVMAddressBytes)
-	if err != nil {
-		return nil, fmt.Errorf("resolve test verifier on chain %d: %w", chainSelector, err)
-	}
-	return ref, nil
-}
-
-// VerifierResolverAddress returns the test verifier resolver address on the given chain.
-func (a *EVMTestVerifierChainAdapter) VerifierResolverAddress(d datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	ref, err := datastore_utils.FindAndFormatRef(d, datastore.AddressRef{
-		Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
-		Version:   versioned_verifier_resolver.Version,
-		Qualifier: test_verifier.TestVerifierResolverQualifier,
-	}, chainSelector, evmds.ToEVMAddressBytes)
-	if err != nil {
-		return nil, fmt.Errorf("resolve test verifier resolver on chain %d: %w", chainSelector, err)
 	}
 	return ref, nil
 }

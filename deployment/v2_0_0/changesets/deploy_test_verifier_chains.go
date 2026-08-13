@@ -26,8 +26,6 @@ type TestVerifierChainConfig struct {
 	// StorageLocations are passed to the VerifierTestHelper constructor.
 	// The verifier's getFee delegates to RMN, which needs valid storage locations.
 	StorageLocations []string
-	// FeeAggregator is the fee aggregator address for the token pool.
-	FeeAggregator string
 	// RemoteChains is the set of remote chains to configure lanes for.
 	RemoteChains map[uint64]adapters.RemoteTestVerifierChainConfig
 }
