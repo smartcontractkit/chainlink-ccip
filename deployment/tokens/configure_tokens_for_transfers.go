@@ -173,6 +173,17 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 			}
 		}
 
+		type DiscoveredRemoteChain struct {
+			remoteSelector uint64
+			remotePoolAddr string
+			remoteAdapter  TokenAdapter
+		}
+
+		// When AutoMigrateRemoteChains = true, we read the legacy pool's remote chains and import them into
+		// the new pool. Example: if pools A, B, and C form a fully connected web and we migrate B to B_new,
+		// then the code below will discover that remote pools A and C need to be added to B_new to maintain
+		// connectivity from B_new to A and C. The reverse propagation is handled later in the code.
+		var discoveredRemotes []DiscoveredRemoteChain
 		if token.AutoMigrateRemoteChains {
 			registryMigrator, ok := adapter.(TokenPoolMigrator)
 			if !ok {
@@ -285,6 +296,11 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to resolve adapter for remote chain selector %d: %w", remoteSelector, err)
 				}
+				discoveredRemotes = append(discoveredRemotes, DiscoveredRemoteChain{
+					remoteSelector: remoteSelector,
+					remotePoolAddr: remotePoolAddr,
+					remoteAdapter:  remoteAdapter,
+				})
 				remoteTokenDecimals, err := remoteAdapter.DeriveTokenDecimals(e, remoteSelector, remotePoolRef, remoteTokenBytes)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to derive remote token decimals for remote chain selector %d: %w", remoteSelector, err)
@@ -392,6 +408,55 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				}
 				batchOps = append(batchOps, feeBatchOps...)
 				reports = append(reports, feeReports...)
+			}
+		}
+
+		// Reverse-propagate the new pool address to every counterpart discovered by autoMigrateRemoteChains.
+		// Example: if pools A, B, and C form a fully connected web and we migrate B to B_new, then this step
+		// tells A and C to add B_new as an additional remote pool, so that web remains fully connected after
+		// the migration is performed. Without this, the forward direction (B_new → A) works, but the reverse
+		// (A → B_new) would fail because A's pool still only knows about B_old.
+		//
+		// This loop doesn't need to import rate limits, fee configs, or any other per-chain configs onto the
+		// counterpart pools (A, C). If a counterpart is itself migrated later then `autoMigrateRemoteChains`
+		// on that upgrade will discover B_new as the active pool on chain B and handle those imports at that
+		// time through the normal forward flow.
+		if len(discoveredRemotes) > 0 {
+			migratedTokenBytes, err := adapter.AddressRefToBytes(fullTokenRef)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
+			}
+			migratedPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
+			}
+			for _, ru := range discoveredRemotes {
+				reverseInput := ConfigureTokenForTransfersInput{
+					ExistingDataStore: e.DataStore,
+					TokenPoolAddress:  ru.remotePoolAddr,
+					ChainSelector:     ru.remoteSelector,
+					TokenRef:          fullTokenRef,
+					RemoteChains: map[uint64]RemoteChainConfig[[]byte, string]{
+						selector: {
+							RemoteToken: migratedTokenBytes,
+							RemotePool:  migratedPoolBytes,
+						},
+					},
+				}
+				reverseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, ru.remoteAdapter.ConfigureTokenForTransfersSequence(), e.BlockChains, reverseInput)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf(
+						"failed to propagate new pool to counterpart chain selector %d for chain selector %d: %w",
+						ru.remoteSelector, selector, err,
+					)
+				}
+				batchOps = append(batchOps, reverseReport.Output.BatchOps...)
+				reports = append(reports, reverseReport.ExecutionReports...)
+				for _, r := range reverseReport.Output.Addresses {
+					if err := ds.Addresses().Add(r); err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add address %s to datastore: %w", r.Address, err)
+					}
+				}
 			}
 		}
 	}
