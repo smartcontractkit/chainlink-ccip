@@ -278,13 +278,21 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to normalize remote token address for remote chain selector %d: %w", remoteSelector, err)
 				}
-				remoteRegReader, ok := tokenRegistry.GetTokenAdminRegistryReader(remoteFamily)
-				if !ok {
-					return nil, nil, nil, fmt.Errorf("no admin registry reader for remote chain family %s", remoteFamily)
-				}
-				remotePoolBytes, err := remoteRegReader.GetActivePool(e, remoteSelector, datastore.AddressRef{Address: remoteTokenAddr})
-				if err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to get active pool for remote chain selector %d: %w", remoteSelector, err)
+				var remotePoolBytes []byte
+				if counterpartCfg, alsoMigrating := cfg[remoteSelector]; alsoMigrating {
+					remotePoolBytes, err = adapter.AddressRefToBytes(counterpartCfg.TokenPoolRef)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to convert counterpart pool ref to bytes for chain selector %d: %w", remoteSelector, err)
+					}
+				} else {
+					remoteRegReader, ok := tokenRegistry.GetTokenAdminRegistryReader(remoteFamily)
+					if !ok {
+						return nil, nil, nil, fmt.Errorf("no admin registry reader for remote chain family %s", remoteFamily)
+					}
+					remotePoolBytes, err = remoteRegReader.GetActivePool(e, remoteSelector, datastore.AddressRef{Address: remoteTokenAddr})
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to get active pool for remote chain selector %d: %w", remoteSelector, err)
+					}
 				}
 				remotePoolAddr, err := remoteNormalizer.BytesToString(remotePoolBytes)
 				if err != nil {
