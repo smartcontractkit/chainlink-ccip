@@ -239,6 +239,80 @@ func (_c *MockOnRampUpgrader_DestChainSelectors_Call) RunAndReturn(run func(e de
 	return _c
 }
 
+// EnsureOffRampOnTestRouter provides a mock function for the type MockOnRampUpgrader
+func (_mock *MockOnRampUpgrader) EnsureOffRampOnTestRouter(e deployment.Environment, destChainSelector uint64, sourceChainSelector uint64) ([]types.BatchOperation, error) {
+	ret := _mock.Called(e, destChainSelector, sourceChainSelector)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnsureOffRampOnTestRouter")
+	}
+
+	var r0 []types.BatchOperation
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, uint64) ([]types.BatchOperation, error)); ok {
+		return returnFunc(e, destChainSelector, sourceChainSelector)
+	}
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, uint64) []types.BatchOperation); ok {
+		r0 = returnFunc(e, destChainSelector, sourceChainSelector)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.BatchOperation)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(deployment.Environment, uint64, uint64) error); ok {
+		r1 = returnFunc(e, destChainSelector, sourceChainSelector)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureOffRampOnTestRouter'
+type MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call struct {
+	*mock.Call
+}
+
+// EnsureOffRampOnTestRouter is a helper method to define mock.On call
+//   - e deployment.Environment
+//   - destChainSelector uint64
+//   - sourceChainSelector uint64
+func (_e *MockOnRampUpgrader_Expecter) EnsureOffRampOnTestRouter(e any, destChainSelector any, sourceChainSelector any) *MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call {
+	return &MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call{Call: _e.mock.On("EnsureOffRampOnTestRouter", e, destChainSelector, sourceChainSelector)}
+}
+
+func (_c *MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call) Run(run func(e deployment.Environment, destChainSelector uint64, sourceChainSelector uint64)) *MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 deployment.Environment
+		if args[0] != nil {
+			arg0 = args[0].(deployment.Environment)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		var arg2 uint64
+		if args[2] != nil {
+			arg2 = args[2].(uint64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call) Return(batchOperations []types.BatchOperation, err error) *MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call {
+	_c.Call.Return(batchOperations, err)
+	return _c
+}
+
+func (_c *MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call) RunAndReturn(run func(e deployment.Environment, destChainSelector uint64, sourceChainSelector uint64) ([]types.BatchOperation, error)) *MockOnRampUpgrader_EnsureOffRampOnTestRouter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ExistingOnRampUpgrade provides a mock function for the type MockOnRampUpgrader
 func (_mock *MockOnRampUpgrader) ExistingOnRampUpgrade(e deployment.Environment, chainSelector uint64) (adapters.OnRampUpgradeResult, bool, error) {
 	ret := _mock.Called(e, chainSelector)

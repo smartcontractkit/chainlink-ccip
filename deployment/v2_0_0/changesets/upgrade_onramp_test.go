@@ -608,6 +608,9 @@ func TestUpgradeOnrampPhase2(t *testing.T) {
 			},
 		}
 		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().
+			EnsureOffRampOnTestRouter(mock.Anything, chainB, chainA).
+			Return(nil, nil)
 		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
 			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
 		expectTimelockOwnership(upgrader)
@@ -656,6 +659,9 @@ func TestUpgradeOnrampPhase2(t *testing.T) {
 	t.Run("StageError", func(t *testing.T) {
 		e := newTestEnv(t)
 		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().
+			EnsureOffRampOnTestRouter(mock.Anything, chainB, chainA).
+			Return(nil, nil)
 		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
 			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
 		expectTimelockOwnership(upgrader)

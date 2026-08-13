@@ -61,6 +61,7 @@ type OnRampUpgrader interface {
 	// routes destSelectors through the legacy OnRamp. Phase 3 uses it as a pre-flight check:
 	// anything else means Phase 3 already ran or an unexpected OnRamp is live for that dest.
 	VerifyLegacyOnRampOnProdRouter(e cldf.Environment, chainSelector uint64, destSelectors []uint64) error
+	EnsureOffRampOnTestRouter(e cldf.Environment, destChainSelector uint64, sourceChainSelector uint64) ([]mcms_types.BatchOperation, error)
 }
 
 // LaneClass partitions a chain's dest chains by which router currently fronts them.
