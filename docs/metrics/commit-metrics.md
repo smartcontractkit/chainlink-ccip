@@ -57,7 +57,7 @@ Every metric proposed in this doc, with a one/two-line "why" — the full ration
 
 | Metric | Status | Why |
 |---|---|---|
-| `ccip_commit_consensus_dropped{objectName,key,reason}` (needs an additive `GetConsensusMap` return value) | Reviewed design, not implemented | Splits "no threshold configured" (config bug) from "insufficient agreement" (routine) from "split vote" (integrity signal) — currently collapsed into one `TODO: metrics` log line. |
+| `ccip_commit_consensus_dropped{objectName,key,reason,source_network_name}` | ✅ Implemented | Splits "no threshold configured" (config bug) from "insufficient agreement" (routine) from "split vote" (integrity signal) — previously collapsed into one `TODO: metrics` log line. `source_network_name` is included for chain-keyed objectNames. |
 
 ### Merkle root processor — High
 
@@ -117,7 +117,7 @@ These aren't owned by any single processor — they're the outer round loop and 
 
 ### Shared: consensus aggregation (`internal/plugincommon/consensus/consensus.go`)
 
-Used by commit (`chainfee`, `merkleroot`, `plugin.go`, `report.go`), `execute/plugin_functions.go`, **and** `internal/plugincommon/discovery/processor.go` — this is genuinely shared infra, not commit-specific, which shapes the recommended fix below. Reviewed design, not yet implemented.
+Used by commit (`chainfee`, `merkleroot`, `plugin.go`, `report.go`), `execute/plugin_functions.go`, **and** `internal/plugincommon/discovery/processor.go` — this is genuinely shared infra, not commit-specific, which shapes the recommended fix below. ✅ Implemented.
 
 **High**
 - **`GetConsensusMap` collapses three distinguishable outcomes into one `Debugw`/`Warnw` line, both marked `// TODO: metrics`** (`consensus.go:34-56`). `NewMinObservation.GetValid()` (`min_observation.go:57-66`) buckets observations by identical value and returns every distinct value that independently cleared the threshold, which means there are three cases today, not two:

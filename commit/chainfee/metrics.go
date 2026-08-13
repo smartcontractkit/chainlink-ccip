@@ -1,0 +1,33 @@
+package chainfee
+
+import (
+	"time"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+)
+
+// MetricsReporter exposes the metrics methods used by the chainfee processor.
+// It embeds the generic processor metrics and adds chainfee-specific reporters so
+// future metrics can be added here without widening the shared plugincommon interface.
+type MetricsReporter interface {
+	plugincommon.MetricsReporter
+
+	// TrackConsensusDropped reports a key that was dropped during shared consensus
+	// aggregation (e.g. fChain, ChainFeeUpdates, FeeComponents). The reason
+	// distinguishes "threshold not defined", "insufficient agreement", and "split".
+	// sourceChain is the chain selector the key represents, if any, so the metric can
+	// carry a human-readable source_network_name label for chain-keyed objectNames.
+	TrackConsensusDropped(objectName string, key string, reason string, sourceChain cciptypes.ChainSelector)
+}
+
+// NoopMetrics is a no-op MetricsReporter for tests.
+type NoopMetrics struct{}
+
+func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration, error) {}
+
+func (n NoopMetrics) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}
+
+func (n NoopMetrics) TrackConsensusDropped(string, string, string, cciptypes.ChainSelector) {}
