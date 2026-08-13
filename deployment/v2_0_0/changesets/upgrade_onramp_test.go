@@ -228,13 +228,6 @@ func mockUpgraderRegistry(upgrader *mocks.MockOnRampUpgrader) *adapters.OnRampUp
 	return reg
 }
 
-// expectNoUpgradeInProgress programs the pre-flight legacy-ref lookup: no legacy
-// OnRamp exists yet.
-func expectNoUpgradeInProgress(upgrader *mocks.MockOnRampUpgrader) {
-	upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
-		Return(datastore.AddressRef{}, errors.New("not found")).Once()
-}
-
 // expectVerifyRequireUpgrade programs the pre-flight check that the canonical OnRamp is not yet upgraded to the new version.
 func expectVerifyRequireUpgrade(upgrader *mocks.MockOnRampUpgrader, requireUpgrade bool) {
 	var err error = nil
@@ -271,7 +264,6 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
 		expectVerifyRequireUpgrade(upgrader, true)
-		expectNoUpgradeInProgress(upgrader)
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
 		// chainB is TestRouter-class: Phase 1 must not deploy a test verifier for it.
@@ -350,7 +342,6 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
 		expectVerifyRequireUpgrade(upgrader, true)
-		expectNoUpgradeInProgress(upgrader)
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
 		// chainB is ProdRouter-class: Phase 1 must validate test verifier infra.
@@ -448,7 +439,6 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		seedOnRamp(t, &e, oldOnRampAddr)
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
-		expectNoUpgradeInProgress(upgrader)
 		expectVerifyRequireUpgrade(upgrader, true)
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
@@ -481,7 +471,6 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		seedOnRamp(t, &e, oldOnRampAddr)
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
-		expectNoUpgradeInProgress(upgrader)
 		expectVerifyRequireUpgrade(upgrader, true)
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
@@ -518,7 +507,6 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		seedOnRamp(t, &e, oldOnRampAddr)
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
-		expectNoUpgradeInProgress(upgrader)
 		expectVerifyRequireUpgrade(upgrader, true)
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
@@ -552,7 +540,6 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		seedOnRamp(t, &e, oldOnRampAddr)
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
-		expectNoUpgradeInProgress(upgrader)
 		expectVerifyRequireUpgrade(upgrader, true)
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
@@ -578,36 +565,11 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		require.ErrorContains(t, err, "does not whitelist expected onramp")
 	})
 
-	t.Run("UpgradeAlreadyInProgress", func(t *testing.T) {
-		e := newTestEnv(t)
-
-		upgrader := mocks.NewMockOnRampUpgrader(t)
-		// A legacy-qualified OnRamp exists: a previous upgrade is still in flight.
-		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
-			Return(legacyOnRampRef(), nil).Once()
-		// Nothing else must be called: the guard fails before any read or mutation.
-
-		familyReg, _ := newLaneMocks(t)
-		cs := changesets.UpgradeOnrampPhase1(
-			mockUpgraderRegistry(upgrader),
-			familyReg,
-			mockMCMSReaderRegistry(t),
-			nil,
-		)
-		_, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
-			ChainSelector:        chainA,
-			DestSelectorsInScope: []uint64{chainB},
-			MCMS:                 validMCMSInput(),
-		})
-		require.ErrorContains(t, err, "upgrade is already in progress")
-	})
-
 	t.Run("NoUpgradeRequired", func(t *testing.T) {
 		e := newTestEnv(t)
 		seedOnRamp(t, &e, oldOnRampAddr)
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
-		expectNoUpgradeInProgress(upgrader)
 		expectVerifyRequireUpgrade(upgrader, false)
 
 		familyReg, _ := newLaneMocks(t)

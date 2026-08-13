@@ -79,15 +79,7 @@ func UpgradeOnrampPhase1(
 			return cldf.ChangesetOutput{}, fmt.Errorf("no chain family adapter for family %q", family)
 		}
 
-		// A legacy-qualified OnRamp means an upgrade is already in progress on this chain;
-		// stacking a second one would orphan the first migration's state.
-		if _, err := upgrader.LegacyOnRampRef(e, cfg.ChainSelector); err == nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf(
-				"a legacy OnRamp already exists on chain %d: an upgrade is already in progress — run Phase 2/3/Cleanup or remove the legacy ref first",
-				cfg.ChainSelector)
-		}
-
-		// // Pre-flight: Ask the adapter if the Onramp is already upgraded to the new version. If it is, we should not run this changeset.
+		// Pre-flight: Ask the adapter if the Onramp is already upgraded to the new version. If it is, we should not run this changeset.
 		if err := upgrader.VerifyOnrampRequireUpgrade(e, cfg.ChainSelector); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("verify OnRamp require upgrade: %w", err)
 		}
@@ -445,7 +437,7 @@ func UpgradeOnrampCleanup(
 			return cldf.ChangesetOutput{}, fmt.Errorf("classify dest chains: %w", err)
 		}
 
-		scopedProdDestSelectors := scopeDestSelectors(destChainSelectors, cfg.DestSelectorsInScope)
+		scopedProdDestSelectors := scopeDestSelectors(laneClass.ProdRouterDests, cfg.DestSelectorsInScope)
 		scopedTestDestSelectors := scopeDestSelectors(laneClass.TestRouterDests, cfg.DestSelectorsInScope)
 
 		// Pre-flight: removing the legacy OnRamp from remote OffRamp whitelists is only
