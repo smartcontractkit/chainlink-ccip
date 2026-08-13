@@ -1228,7 +1228,8 @@ func Test_reportRangesOutcome(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			outcome := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit, destChain)
+			outcome := reportRangesOutcome(
+				Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit, destChain, NoopMetrics{})
 			require.Equal(t, tc.expectedOutcome, outcome)
 		})
 	}
@@ -1392,6 +1393,7 @@ func TestCheckForReportTransmission(t *testing.T) {
 				tt.multipleReports,
 				tt.previousOutcome,
 				tt.consensusObservation,
+				NoopMetrics{},
 			)
 			require.Equal(t, tt.expectedOutcome, outcome)
 		})
@@ -1462,7 +1464,7 @@ func Test_getOffRampNextSequenceNumbersConsensus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res := getOffRampNextSequenceNumbersConsensus(lggr, tc.fDestChain, tc.observationsPerChain)
+			res := getOffRampNextSequenceNumbersConsensus(lggr, tc.fDestChain, tc.observationsPerChain, NoopMetrics{})
 			require.Equal(t, tc.expRes, res)
 		})
 	}

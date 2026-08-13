@@ -64,6 +64,7 @@ type SetTokenPoolAdminsSequenceInput struct {
 // TokenAdminRoleAdapter is an optional interface for chain families that support token admin role management.
 type TokenAdminRoleAdapter interface {
 	RevokeTokenAdminRole() *cldf_ops.Sequence[RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GrantTokenAdminRole() *cldf_ops.Sequence[GrantTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // TokenRefResolver is an optional interface that can be implemented by TokenAdapters. It acts as a form of middleware that allows token
