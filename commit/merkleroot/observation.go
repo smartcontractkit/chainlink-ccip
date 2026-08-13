@@ -2,8 +2,10 @@ package merkleroot
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -366,8 +368,11 @@ func (p *Processor) getObservation(
 			lggr.Debugw("fetched RMN-enabled chains from rmnHome", "rmnEnabledChains", rmnEnabledChains)
 		}
 
+		merkleRoots := p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport)
+		applyTestConsensusSabotage(lggr, p.oracleID, merkleRoots)
+
 		return Observation{
-			MerkleRoots:      p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			MerkleRoots:      merkleRoots,
 			FChain:           p.observer.ObserveFChain(ctx),
 			RMNEnabledChains: rmnEnabledChains,
 		}, nextState, nil
@@ -380,6 +385,25 @@ func (p *Processor) getObservation(
 		return Observation{},
 			nextState,
 			fmt.Errorf("unexpected nextState=%d with prevOutcome=%d", nextState, previousOutcome.OutcomeType)
+	}
+}
+
+// TEST-ONLY fault injection: force a per-lane merkle-root consensus failure so the commit DON
+// agrees with nothing and keeps dropping the source chain(s) (DropReasonInsufficientAgreement),
+// which is what the uncommitted-message runbook's step2b detects. Must never merge to main.
+//
+// When CCIP_TEST_FORCE_MERKLEROOT_CONSENSUS_FAILURE is set, every oracle reports a distinct,
+// still-valid merkle root (keyed on its own oracleID), so no single root ever reaches the 2f+1
+// consensus threshold and the round degrades to ReportEmpty while the source lane stays uncommitted.
+func applyTestConsensusSabotage(lggr logger.Logger, oracleID commontypes.OracleID, roots []cciptypes.MerkleRootChain) {
+	if os.Getenv("CCIP_TEST_FORCE_MERKLEROOT_CONSENSUS_FAILURE") == "" {
+		return
+	}
+	for i := range roots {
+		h := sha256.Sum256(append([]byte{byte(oracleID)}, roots[i].MerkleRoot[:]...))
+		roots[i].MerkleRoot = h
+		lggr.Warnw("TEST ONLY: sabotaged merkle root to force a consensus failure",
+			"oracleID", oracleID, "chain", roots[i].ChainSel, "root", h)
 	}
 }
 
