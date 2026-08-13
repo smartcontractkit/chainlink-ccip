@@ -11,6 +11,7 @@ inputs:
 related:
   - docs/runbooks/uncommitted-message.md   # incident triage for one specific stuck message
   - docs/metrics/commit-metrics.md         # design rationale + full metric-by-metric findings
+  - docs/metrics/reader-metrics.md         # data-source (reader + config poller) metrics & gaps
   - devenv/dashboards/commit-plugin.json   # Grafana rendering of this runbook (Health section)
 status: living
 ---
@@ -58,6 +59,12 @@ label key from each check's own query; don't assume one spelling applies file-wi
 per-node identity present on *every* commit metric series (confirmed against a live devenv, not
 just inferred). `live_oracle_count` is the only check that groups by it; nothing else in this
 checklist needs to.
+
+The `data_source` group (reader + config poller) breaks both conventions above: those metrics are
+shared with **execute**, carry **no** dest `chainID` label, and key on `chain` = the **numeric chain
+selector** plus `query`/`kind`/`state`. Filter them by the metric's own labels, not by
+`source_network_name`/`chainID`. They still inherit `node_id` + `csa_public_key` from the beholder
+client (like every commit series), so per-node vs DON-wide grouping works the same way.
 
 ### Empty result sets: the rule that actually matters
 
@@ -264,6 +271,69 @@ checks:
     severity: {info: true}
     owner: ccip-commit-oncall
     note: "recorded once per transmission-check attempt; empty result means zero transmission cycles in the window, which is itself informational (report as INFO with value \"no data\"), not UNKNOWN. Rising attempts alongside report_transmission_gave_up firing is the actionable combination, not this alone"
+
+  # --- data source (reader + config poller) ---
+  # These are shared with execute and live in the reader/config-poller layers (see
+  # docs/metrics/reader-metrics.md). Unlike the commit metrics above, `chain` is the NUMERIC
+  # chain selector (not source_network_name) and there's no dest `chainID` label to filter on;
+  # every series carries `node_id` + `csa_public_key` inherited from the beholder client.
+  # They answer "is the plugin fine but being fed empty/partial/stale data?" -- upstream of,
+  # and a root cause for, several of the outcome checks above.
+  - id: reader_read_empty
+    group: data_source
+    always_emitted: false
+    query: 'sum by (query, chain) (rate(ccip_reader_read_empty_total[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "a read returned nothing with no error -- the false-idle primitive. Empty result here is OK (the event never happened). Correlate `chain` (numeric selector) to a lane and split node-local vs DON-wide by csa_public_key"
+
+  - id: reader_read_partial
+    group: data_source
+    always_emitted: false
+    query: 'sum by (query, chain) (rate(ccip_reader_read_partial_total[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "a read returned a non-empty subset of what was requested (some chains silently dropped)"
+
+  - id: reader_chain_gap
+    group: data_source
+    always_emitted: false
+    query: 'sum by (query, chain, state) (rate(ccip_reader_chain_gap_total[5m]))'
+    severity: {warn_if: 'any series with state!="returned" > 0', ok_if: 'all series with state="returned" or empty result'}
+    owner: chain-infra-oncall
+    note: "per-chain outcome of a multi-chain read. Actionable states: not_found|disabled|misconfigured|error|invalid|missing|stale|no_accessor|config_error|no_native_token"
+
+  - id: config_cache_stale
+    group: data_source
+    always_emitted: true
+    query: 'max by (chain, kind) (ccip_reader_config_cache_age_seconds)'
+    severity: {crit_if: 'kind="chain" and result > 60', ok_if: 'all kind="chain" result <= 60', info: 'kind="source" values (report, no verdict)'}
+    owner: chain-infra-oncall
+    note: "how stale the config-poller cache is. Behind every cached read (GetRMNRemoteConfig, GetRmnCurseInfo, config digest, router address), so staleness here manufactures bad curse/mismatch/stale conclusions in the checks above. refresh_period is 30s; ~60s+ means the poll is failing"
+
+  - id: config_poller_liveness
+    group: data_source
+    always_emitted: true
+    query: 'min by (chain) (ccip_reader_config_poller_last_success_timestamp)'
+    severity: {crit_if: "time() - result > 90", ok_if: "time() - result <= 90"}
+    owner: chain-infra-oncall
+    note: "last successful background config poll per chain; a wedged/missing poller goroutine makes every cache silently go stale. Uses last-success staleness, not rate(), for the same detection-lag reason as live_oracle_count"
+
+  - id: config_poll_failure
+    group: data_source
+    always_emitted: false
+    query: 'sum by (chain) (rate(ccip_reader_config_poll_failure_total[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "background config refresh failures -- exactly the per-chain accounting that a warn-only log used to hide (which chain, not just 'somewhere')"
+
+  - id: config_cache_overwritten_empty
+    group: data_source
+    always_emitted: false
+    query: 'sum by (kind) (rate(ccip_reader_config_cache_overwritten_empty_total[5m]))'
+    severity: {crit_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: ccip-commit-oncall
+    note: "a refresh time-stamped an EMPTY chain-config snapshot as fresh and served it to every consumer (now guarded in code, but a prior occurrence means the cache was serving empty-as-healthy). This is a reader/config-poller bug, not an infra issue -- escalate to the reader owners"
 ```
 
 ## Groups
@@ -301,6 +371,16 @@ points to H2 (oracles disagree), while `reason="insufficient_agreement"` on `obj
 points to H1 (too few oracles could even report). `reason="threshold_not_defined"` is a config/data
 mismatch.
 
+### Data source (reader + config poller)
+
+This group is **upstream of the whole checklist**: it tests whether the commit plugin is healthy
+*but being fed empty/partial/stale data*. The `config_cache_overwritten_empty` check is the one
+`CRIT` here that is a **reader/config-poller bug** (empty snapshot served as fresh), not infra;
+escalate it to the reader owners. `config_cache_stale` and `config_poller_liveness` are the two
+`always_emitted: true` checks in this group, so an empty result on them is `UNKNOWN` (pipeline
+broken), and they're the ones to check before trusting the *cached* inputs behind step4
+(cursing) and the config-digest mismatch check above.
+
 ### Report transmission
 
 `report_transmission_gave_up` is `CRIT`. `report_validation_rejected` is split by reason:
@@ -328,6 +408,12 @@ two explicit combination rules:
   `reason="split"` on `objectName="fChain"` is H2 (oracles disagree). `reason="insufficient_agreement"`
   on `objectName="fChain"` together with `fchain_read_errors` spiking is H1 (home-chain read outage).
   `reason="threshold_not_defined"` is a config/data mismatch independent of H1/H2.
+- **A `data_source` finding firing at the same time as an outcome check (`pending_messages`
+  climbing, `reader_read_*` alongside `consensus_dropped`, `config_cache_stale` alongside a curse
+  or digest-mismatch reading) is the SAME incident, and the data-source check is the **root
+  cause**.** Fold it in as the named cause with the outcome check as the symptom — do not report
+  them as two unrelated problems (a plugin fed empty/partial/stale data is not broken; the reader
+  layer feeding it is).
 
 `UNKNOWN` is never silently dropped to `OK` — but per the [empty-result rule](#empty-result-sets-the-rule-that-actually-matters),
 most checks should legitimately resolve `UNKNOWN` only when an `always_emitted: true` check comes

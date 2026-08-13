@@ -76,11 +76,13 @@ All plugin-generic, keyed by `{queryName}`. ✅ = implemented; everything else i
 
 | Metric | Status | Why |
 |---|---|---|
-| `ccip_reader_read_all_ok_total{query}` / `ccip_reader_read_empty_total{query}` / `ccip_reader_read_partial_total{query}` | Proposed | Splits "errored" from the two false-idle shapes — "returned nothing" and "returned a subset." The single highest-value signal this layer could emit. |
-| `ccip_reader_chain_gap_total{query,chain,state="requested\|returned\|dropped\|misconfigured"}` | Proposed | Count of source chains requested vs returned vs silently dropped in `NextSeqNum` / `GetChainsFeeComponents` / `GetWrappedNativeTokenPriceUSD`, so a subset is a visible gap rather than buried behind `Debugw`. |
-| `ccip_reader_query_last_success_timestamp{query}` gauge | Proposed | Per-member staleness for reads that feed caches (RMN remote config, curse, config digest, source chain config, router address via the configPoller). A stuck cache looks healthy indefinitely today. |
-| `ccip_reader_msg_dropped_total{query,reason}` | Proposed | Reads that *did* return data but dropped rows on validation/cast (onRamp-address-changed mid-query, type/count mismatch, event validation drop). Data present but trimmed. |
-| `ccip_reader_chain_fee_components` | Proposed | Port of the existing promauto gauge (chainFee `exec`/`da`) to beholder; it is the only value-level gauge in this layer and is NOP-invisible today. |
+| `ccip_reader_read_outcome{chainID,query,outcome="ok"\|"empty"\|"error"}` | ✅ Implemented | Per-query classification ok/empty/error — the false-idle primitive (empty-with-no-error). |
+| `ccip_reader_read_empty{query,chain}` / `ccip_reader_read_partial{query,chain}` | ✅ Implemented | Splits "errored" from the two false-idle shapes — "returned nothing" and "returned a subset." |
+| `ccip_reader_chain_gap{query,chain,state}` | ✅ Implemented | Count of source chains in each state (`returned` vs `not_found`/`disabled`/`misconfigured`/`error`/`invalid`/`missing`/`stale`/...), so a subset is a visible gap rather than buried behind `Debugw`. |
+| `ccip_reader_chain_fee_components{chainFamily,chainID,feeType}` | ✅ Implemented | Beholder port of the existing promauto gauge (chainFee `exec`/`da`) — now NOP-visible. |
+| `ccip_reader_read_all_ok{query}` | Proposed | Folded into `read_outcome{outcome="ok"}`; not a separate instrument. |
+| `ccip_reader_msg_dropped{query,reason}` | Instrument added; no call site yet | Reads that returned data but dropped rows on validation/cast. Registered but not yet recorded anywhere — wire when the accessor wrapper lands. |
+| `ccip_reader_query_last_success_timestamp{query}` | Proposed | Per-member staleness for cache-feeding reads; the config-poller last-success timestamp below covers the poller side only. |
 | `ccip_reader_txhash_blanked_total` | Proposed (Low) | A deliberate data wipe (`populateTxHashEnabled=false`) with no count today. |
 
 ## Proposed metrics at a glance — accessor / price layer
@@ -98,11 +100,12 @@ All plugin-generic, keyed by `{queryName}`. ✅ = implemented; everything else i
 
 | Metric | Status | Why |
 |---|---|---|
-| `ccip_reader_config_cache_age_seconds{chain,kind="chain\|source"}` gauge | Proposed | The poller's whole job is freshness, and for that exact number it computes `time.Since(chainConfigRefresh)` and **discards it into `Debugw`** (`config_poller_v2.go:232`). Expose it so every behind-the-cache read (`GetRMNRemoteConfig`, `GetRmnCurseInfo`, `GetOffRampConfigDigest`, `GetOffRampSourceChainConfigs`, router address) can be judged for staleness. |
-| `ccip_reader_config_poll_success_total{chain}` / `ccip_reader_config_poll_failure_total{chain}` / `ccip_reader_config_poll_duration{chain}` | Proposed | Per-chain refresh accounting. Today `refreshAllKnownChains` (388-409) collapses every chain's outcome into one `Warnw` + a single `consecutiveFailedPolls` counter with no chain label — you can't tell *which* chain is failing. |
-| `ccip_reader_config_cache_overwritten_empty_total{kind}` | Proposed | Flags when a refresh **time-stamps an empty snapshot as fresh** and serves it to every consumer — the single highest-value config-poller finding (see full findings). |
-| `ccip_reader_config_poller_last_success_timestamp{chain}` gauge | Proposed | The background polling goroutine has no liveness signal of its own; if it wedges, every cache silently goes stale forever. Last-success turns "wedge" from invisible into page-able. |
-| `ccip_reader_config_miss_refresh_duration{chain}` | Proposed | Synchronous batch refreshes triggered on read-path cache misses (`GetChainConfig:240`, `GetOfframpSourceChainConfigs:333`) can stall the caller; latency is unmetered. |
+| `ccip_reader_config_cache_age_seconds{chain,kind="chain"\|"source"}` gauge | ✅ Implemented | The poller's whole job is freshness, and for that exact number it computed `time.Since(chainConfigRefresh)` and **discarded it into `Debugw`** (`config_poller_v2.go`). Now exported so every behind-the-cache read (curse, RMN config, config digest, router address) can be judged for staleness. |
+| `ccip_reader_config_poll_success{chain}` / `ccip_reader_config_poll_failure{chain}` | ✅ Implemented | Per-chain refresh accounting, replacing the single chain-unlabeled `consecutiveFailedPolls` counter — now you can tell *which* chain is failing. |
+| `ccip_reader_config_cache_overwritten_empty{kind}` | ✅ Implemented (+ write guard) | Flags when a refresh **time-stamped an empty snapshot as fresh**; the code now also refuses to write/mark-fresh an empty snapshot (the bug fix in this branch). |
+| `ccip_reader_config_poller_last_success_timestamp{chain}` gauge | ✅ Implemented | The background polling goroutine's liveness via last-success staleness — a wedged poller is now page-able instead of invisible. |
+| `ccip_reader_config_poll_duration{chain}` / `ccip_reader_config_miss_refresh_duration{chain}` | Proposed | Per-poll and read-path miss-refresh latency; not implemented here. |
+| `ccip_reader_config_cache_overwritten_empty{kind="source"}` | Proposed (source-cache variant) | The guard/metric cover the chain snapshot; the source-channel configs partial-overwrite is untouched. |
 
 ## How this extends the runbooks (all additive)
 
