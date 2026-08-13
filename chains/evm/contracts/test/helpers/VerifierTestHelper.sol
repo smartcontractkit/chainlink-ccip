@@ -62,6 +62,14 @@ contract VerifierTestHelper is BaseVerifier, Ownable2StepMsgSender {
     i_testToken = testToken;
   }
 
+  function getTestRouter() public view returns (address) {
+    return i_testRouter;
+  }
+
+  function getTestToken() public view returns (address) {
+    return i_testToken;
+  }
+
   function forwardToVerifier(
     MessageV1Codec.MessageV1 calldata message,
     bytes32, // messageId
@@ -121,10 +129,6 @@ contract VerifierTestHelper is BaseVerifier, Ownable2StepMsgSender {
     if (message.tokenTransfer.length != 1) {
       revert MustUseTestToken(i_testToken);
     }
-  }
-
-  function getTestRouter() public view returns (address) {
-    return i_testRouter;
   }
 
   /// @notice Updates remote chains specific configs.
