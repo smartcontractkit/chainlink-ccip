@@ -175,7 +175,8 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 
 		type DiscoveredRemoteChain struct {
 			remoteSelector uint64
-			remotePoolAddr string
+			remoteTokenRef datastore.AddressRef
+			remotePoolRef  datastore.AddressRef
 			remoteAdapter  TokenAdapter
 		}
 
@@ -273,6 +274,10 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote token for remote chain selector %d: %w", remoteSelector, err)
 				}
+				remoteTokenAddr, err := remoteNormalizer.BytesToString(remoteTokenBytes)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to normalize remote token address for remote chain selector %d: %w", remoteSelector, err)
+				}
 				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
@@ -288,17 +293,14 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to normalize remote pool address for remote chain selector %d: %w", remoteSelector, err)
 				}
-				remotePoolRef, err := ResolveTokenPoolRef(e, tokenRegistry, remoteSelector, datastore.AddressRef{Address: remotePoolAddr})
+				remoteAdapter, _, remotePoolRef, remoteTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, remoteSelector, datastore.AddressRef{Address: remotePoolAddr}, datastore.AddressRef{Address: remoteTokenAddr})
 				if err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to resolve token pool ref for remote chain selector %d: %w", remoteSelector, err)
-				}
-				remoteAdapter, _, err := ResolveAdapter(tokenRegistry, remoteSelector, remotePoolRef.Version)
-				if err != nil {
-					return nil, nil, nil, fmt.Errorf("failed to resolve adapter for remote chain selector %d: %w", remoteSelector, err)
+					return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for remote chain selector %d: %w", remoteSelector, err)
 				}
 				discoveredRemotes = append(discoveredRemotes, DiscoveredRemoteChain{
 					remoteSelector: remoteSelector,
-					remotePoolAddr: remotePoolAddr,
+					remoteTokenRef: remoteTokenRef,
+					remotePoolRef:  remotePoolRef,
 					remoteAdapter:  remoteAdapter,
 				})
 				remoteTokenDecimals, err := remoteAdapter.DeriveTokenDecimals(e, remoteSelector, remotePoolRef, remoteTokenBytes)
@@ -433,9 +435,10 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 			for _, ru := range discoveredRemotes {
 				reverseInput := ConfigureTokenForTransfersInput{
 					ExistingDataStore: e.DataStore,
-					TokenPoolAddress:  ru.remotePoolAddr,
+					TokenPoolAddress:  ru.remotePoolRef.Address,
 					ChainSelector:     ru.remoteSelector,
-					TokenRef:          fullTokenRef,
+					TokenRef:          ru.remoteTokenRef,
+					PoolType:          ru.remotePoolRef.Type.String(),
 					RemoteChains: map[uint64]RemoteChainConfig[[]byte, string]{
 						selector: {
 							RemoteToken: migratedTokenBytes,
