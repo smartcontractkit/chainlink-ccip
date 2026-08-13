@@ -144,7 +144,6 @@ func NewCCIPReaderWithExtendedContractReaders(
 		destChain,
 		offrampAddress,
 		addrCodec,
-		false, // populateTxHashEnabled - default to false for deprecated test function
 	)
 	if err != nil {
 		// Panic here since right now this is only called from tests in core

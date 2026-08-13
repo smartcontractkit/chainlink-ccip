@@ -62,7 +62,6 @@ func newCCIPChainReaderInternal(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
-	populateTxHashEnabled bool,
 ) (*ccipChainReader, error) {
 	return newCCIPChainReaderWithConfigPollerInternal(
 		ctx,
@@ -74,7 +73,7 @@ func newCCIPChainReaderInternal(
 		offrampAddress,
 		addrCodec,
 		nil,
-		populateTxHashEnabled,
+		false, // test/deprecated-only helper; production passes the real value via NewCCIPChainReader
 		nil,
 	)
 }
