@@ -414,8 +414,8 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 		// Reverse-propagate the new pool address to every counterpart discovered by autoMigrateRemoteChains.
 		// Example: if pools A, B, and C form a fully connected web and we migrate B to B_new, then this step
 		// tells A and C to add B_new as an additional remote pool, so that web remains fully connected after
-		// the migration is performed. Without this, the forward direction (B_new → A) works, but the reverse
-		// (A → B_new) would fail because A's pool still only knows about B_old.
+		// the migration is performed. Without this, the forward direction (A → B_new) works, but the reverse
+		// (B_new → A) would fail because A's pool still only knows about B_old.
 		//
 		// This loop doesn't need to import rate limits, fee configs, or any other per-chain configs onto the
 		// counterpart pools (A, C). If a counterpart is itself migrated later then `autoMigrateRemoteChains`
