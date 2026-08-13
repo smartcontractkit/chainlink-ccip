@@ -304,23 +304,6 @@ func UpgradeOnrampPhase2(
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		operationsBundle := operations.NewBundle(func() context.Context { return context.Background() }, e.Logger, operations.NewMemoryReporter())
 		e.OperationsBundle = operationsBundle
-
-		for _, destSelector := range scopedDestSelectors {
-			destFamily, err := chainsel.GetSelectorFamily(destSelector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("get dest chain family: %w", err)
-			}
-			destUpgrader, ok := onrampUpgraderRegistry.Get(destFamily)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("no OnRampUpgrader registered for family %q", destFamily)
-			}
-			offRampOps, err := destUpgrader.EnsureOffRampOnTestRouter(e, destSelector, cfg.ChainSelector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("stage destination %d on TestRouter: %w", destSelector, err)
-			}
-			batchOps = append(batchOps, offRampOps...)
-		}
-
 		promoteOps, err := upgrader.PromoteOnrampToTestRouter(e, cfg.ChainSelector, scopedDestSelectors)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("stage on TestRouter: %w", err)
