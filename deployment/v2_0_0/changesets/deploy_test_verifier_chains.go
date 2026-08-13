@@ -19,12 +19,6 @@ import (
 
 // TestVerifierChainConfig specifies configuration for a chain to deploy test verifier infrastructure.
 type TestVerifierChainConfig struct {
-	// TokenName is the name of the drip token. Defaults to "TESTVTR".
-	TokenName string
-	// TokenSymbol is the symbol of the drip token. Defaults to "TESTVTR".
-	TokenSymbol string
-	// TokenDecimals is the number of decimals for the token. Defaults to 18.
-	TokenDecimals uint8
 	// PreMintAccounts maps addresses to initial mint amounts (as decimal strings in base units).
 	PreMintAccounts map[string]string
 	// AllowedSenders are addresses allowlisted on the test verifier.
@@ -47,9 +41,9 @@ type DeployTestVerifierChainsConfig struct {
 }
 
 const (
-	defaultTokenName     = "TESTVTR"
-	defaultTokenSymbol   = "TESTVTR"
-	defaultTokenDecimals = 18
+	DefaultTokenName     = "TESTVTR"
+	DefaultTokenSymbol   = "TESTVTR"
+	DefaultTokenDecimals = 18
 )
 
 // DeployTestVerifierChains returns a changeset that deploys test verifier infrastructure
@@ -126,33 +120,18 @@ func makeApplyDeployTestVerifierChains(
 		// Phase 1: Deploy test verifier infrastructure on each chain.
 		newDS := datastore.NewMemoryDataStore()
 		for chainSel, chainCfg := range cfg.Chains {
-			// Apply defaults.
-			tokenName := chainCfg.TokenName
-			if tokenName == "" {
-				tokenName = defaultTokenName
-			}
-			tokenSymbol := chainCfg.TokenSymbol
-			if tokenSymbol == "" {
-				tokenSymbol = defaultTokenSymbol
-			}
-			tokenDecimals := chainCfg.TokenDecimals
-			if tokenDecimals == 0 {
-				tokenDecimals = defaultTokenDecimals
-			}
-
 			dep := adapters.DeployTestVerifierChainDeps{
 				BlockChains: e.BlockChains,
 				DataStore:   e.DataStore,
 			}
 			in := adapters.DeployTestVerifierChainInput{
 				ChainSelector:    chainSel,
-				TokenName:        tokenName,
-				TokenSymbol:      tokenSymbol,
-				TokenDecimals:    tokenDecimals,
+				TokenName:        DefaultTokenName,
+				TokenSymbol:      DefaultTokenSymbol,
+				TokenDecimals:    DefaultTokenDecimals,
 				PreMintAccounts:  chainCfg.PreMintAccounts,
 				AllowedSenders:   chainCfg.AllowedSenders,
 				StorageLocations: chainCfg.StorageLocations,
-				FeeAggregator:    chainCfg.FeeAggregator,
 			}
 			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].DeployTestVerifierChain(), dep, in)
 			if err != nil {

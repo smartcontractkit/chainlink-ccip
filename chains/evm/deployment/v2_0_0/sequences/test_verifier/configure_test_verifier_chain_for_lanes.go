@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 )
 
 var ConfigureTestVerifierChainForLanes = cldf_ops.NewSequence(
@@ -60,7 +61,7 @@ var ConfigureTestVerifierChainForLanes = cldf_ops.NewSequence(
 		poolRef, err := findRef(dep.DataStore, datastore.AddressRef{
 			Type:      datastore.ContractType("BurnMintTokenPool"),
 			Version:   semver.MustParse("2.0.0"),
-			Qualifier: "TESTVTR",
+			Qualifier: changesets.DefaultTokenName,
 		}, input.ChainSelector)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("resolve TESTVTR pool on chain %d: %w", input.ChainSelector, err)

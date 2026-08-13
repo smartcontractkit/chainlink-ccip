@@ -30,8 +30,6 @@ type DeployTestVerifierChainInput struct {
 	// StorageLocations are passed to the VerifierTestHelper constructor. The verifier's
 	// getFee delegates to RMN, which needs valid storage locations to compute fees.
 	StorageLocations []string
-	// FeeAggregator is the fee aggregator for the token pool.
-	FeeAggregator string
 }
 
 // DeployTestVerifierChainDeps are the dependencies for the DeployTestVerifierChain sequence.
@@ -78,10 +76,6 @@ type RemoteTestVerifierChain interface {
 	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
 	// PoolAddress returns the TESTVTR pool address on the remote chain in bytes.
 	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
-	// VerifierAddress returns the test verifier address on the remote chain.
-	VerifierAddress(d datastore.DataStore, chainSelector uint64) ([]byte, error)
-	// VerifierResolverAddress returns the test verifier resolver address on the remote chain.
-	VerifierResolverAddress(d datastore.DataStore, chainSelector uint64) ([]byte, error)
 }
 
 // TestVerifierChainAdapter is the interface for chains that support test verifier deployment.
