@@ -61,6 +61,14 @@ type Reporter interface {
 	TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelector, status string, active bool)
 	TrackSeqNumInvariantViolation(sourceChain cciptypes.ChainSelector, violationType string)
 	TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector)
+
+	// TrackConsensusDropped reports a key that was dropped during shared consensus
+	// aggregation, with a reason that distinguishes config errors, insufficient
+	// agreement, and split votes. objectName is the logical name of the map being
+	// aggregated (e.g. "fChain", "Merkle Root"); key is the dropped map key.
+	// sourceChain is the chain selector the key represents, if any, so the metric can
+	// carry a human-readable source_network_name label for chain-keyed objectNames.
+	TrackConsensusDropped(objectName string, key string, reason string, sourceChain cciptypes.ChainSelector)
 }
 
 type CommitPluginReporter interface {
@@ -69,6 +77,10 @@ type CommitPluginReporter interface {
 	TrackConfigDigestMismatch(mismatch bool)
 	TrackPluginHeartbeat(phase string)
 	TrackReportValidationRejected(phase string, reason string)
+
+	// TrackConsensusDropped is documented on Reporter. It is exposed here because the
+	// commit plugin's top-level Outcome() also runs consensus on the main FChain map.
+	TrackConsensusDropped(objectName string, key string, reason string, sourceChain cciptypes.ChainSelector)
 }
 
 type Noop struct{}
@@ -118,6 +130,8 @@ func (n *Noop) TrackOffRampLaneStatus(cciptypes.ChainSelector, string, bool) {}
 func (n *Noop) TrackSeqNumInvariantViolation(cciptypes.ChainSelector, string) {}
 
 func (n *Noop) TrackOffRampConsensusInsufficient(cciptypes.ChainSelector) {}
+
+func (n *Noop) TrackConsensusDropped(string, string, string, cciptypes.ChainSelector) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}

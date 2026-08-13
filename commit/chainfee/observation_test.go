@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/asynclib"
-	plugincommon2 "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -133,7 +132,7 @@ func Test_processor_Observation(t *testing.T) {
 				ccipReader:      ccipReader,
 				oracleID:        oracleID,
 				homeChain:       homeChain,
-				metricsReporter: plugincommon2.NoopReporter{},
+				metricsReporter: NoopMetrics{},
 				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 				runner:          asynclib.NewRunner(),
 				// Non-zero so the async runner's per-round timeout doesn't fire before the (fast)
@@ -348,7 +347,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				ccipReader:      ccipReader,
 				oracleID:        oracleID,
 				homeChain:       homeChain,
-				metricsReporter: plugincommon2.NoopReporter{},
+				metricsReporter: NoopMetrics{},
 				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 				runner:          asynclib.NewRunner(),
 				// Non-zero so the async runner's per-round timeout doesn't fire before the (fast)

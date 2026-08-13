@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strconv"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -506,7 +507,8 @@ func getConsensusObservation(
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fRoleDON))
-	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	fChains, fChainDrops := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	reportChainSelectorDrops(metricsReporter, "fChain", fChainDrops)
 
 	_, exists := fChains[destChain]
 	if !exists {
@@ -528,21 +530,60 @@ func getConsensusObservation(
 		return consensusObservation{}, fmt.Errorf("no consensus value for fDestChain(%d): %v", fDestChain, fChain)
 	}
 
+	merkleRoots, merkleRootDrops := consensus.GetConsensusMap(
+		lggr,
+		"MerkleRoot",
+		aggObs.MerkleRoots,
+		twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "MerkleRoot", merkleRootDrops)
+
+	rmnEnabledChains, rmnEnabledDrops := consensus.GetConsensusMap(
+		lggr,
+		"RMNEnabledChains",
+		aggObs.RMNEnabledChains,
+		twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "RMNEnabledChains", rmnEnabledDrops)
+
+	onRampMaxSeqNums, onRampDrops := consensus.GetOrderedConsensus(
+		lggr,
+		"OnRampMaxSeqNums",
+		aggObs.OnRampMaxSeqNums,
+		fChain)
+	reportChainSelectorDrops(metricsReporter, "OnRampMaxSeqNums", onRampDrops)
+
+	rmnRemoteConfig, rmnRemoteDrops := consensus.GetConsensusMap(
+		lggr,
+		"RMNRemoteConfig",
+		rmnRemoteConfigs,
+		twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "RMNRemoteConfig", rmnRemoteDrops)
+
 	consensusObs := consensusObservation{
-		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
-		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
-		OnRampMaxSeqNums: consensus.GetOrderedConsensus(
-			lggr,
-			"OnRamp Max Seq Nums",
-			aggObs.OnRampMaxSeqNums,
-			fChain),
+		MerkleRoots:      merkleRoots,
+		RMNEnabledChains: rmnEnabledChains,
+		OnRampMaxSeqNums: onRampMaxSeqNums,
 		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(
 			lggr, uint(fDestChain), aggObs.OffRampNextSeqNums, metricsReporter),
-		RMNRemoteConfig: consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
+		RMNRemoteConfig: rmnRemoteConfig,
 		FChain:          fChains,
 	}
 
 	return consensusObs, nil
+}
+
+func reportChainSelectorDrops(
+	metricsReporter MetricsReporter,
+	objectName string,
+	drops map[cciptypes.ChainSelector]consensus.ConsensusDropReason,
+) {
+	for chain, reason := range drops {
+		metricsReporter.TrackConsensusDropped(
+			objectName,
+			strconv.FormatUint(uint64(chain), 10),
+			reason.String(),
+			chain,
+		)
+	}
 }
 
 // getOffRampNextSequenceNumbersConsensus accepts a list of offramp sequence number observations per chain
