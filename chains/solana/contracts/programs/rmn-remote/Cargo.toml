@@ -1,6 +1,6 @@
 [package]
 name = "rmn_remote"
-version = "1.6.3"
+version = "1.6.4"
 description = "Created with Anchor"
 edition = "2021"
 
