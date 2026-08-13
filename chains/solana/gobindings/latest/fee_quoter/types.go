@@ -172,6 +172,61 @@ func (obj *SVMExtraArgsV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
+type SuiExtraArgsV1 struct {
+	GasLimit                 ag_binary.Uint128
+	AllowOutOfOrderExecution bool
+	TokenReceiver            [32]uint8
+	ReceiverObjectIds        [][32]uint8
+}
+
+func (obj SuiExtraArgsV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `GasLimit` param:
+	err = encoder.Encode(obj.GasLimit)
+	if err != nil {
+		return err
+	}
+	// Serialize `AllowOutOfOrderExecution` param:
+	err = encoder.Encode(obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenReceiver` param:
+	err = encoder.Encode(obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `ReceiverObjectIds` param:
+	err = encoder.Encode(obj.ReceiverObjectIds)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SuiExtraArgsV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `GasLimit`:
+	err = decoder.Decode(&obj.GasLimit)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AllowOutOfOrderExecution`:
+	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ReceiverObjectIds`:
+	err = decoder.Decode(&obj.ReceiverObjectIds)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type SVM2AnyMessage struct {
 	Receiver     []byte
 	Data         []byte

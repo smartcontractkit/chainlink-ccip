@@ -10,17 +10,42 @@ use ccip_common::{
 };
 
 use crate::extra_args::{
-    GenericExtraArgsV2, SVMExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_MAX_ACCOUNTS,
-    SVM_EXTRA_ARGS_V1_TAG,
+    GenericExtraArgsV2, SVMExtraArgsV1, SuiExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG,
+    SUI_EXTRA_ARGS_V1_TAG, SVM_EXTRA_ARGS_MAX_ACCOUNTS, SVM_EXTRA_ARGS_V1_TAG,
 };
 use crate::messages::{ProcessedExtraArgs, SVM2AnyMessage};
 use crate::state::{BillingTokenConfig, DestChain, DestChainConfig};
 use crate::FeeQuoterError;
 
+/// The maximum number of receiver object ids that can be passed in SuiExtraArgs.
+pub const SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS: usize = 64;
+
+/// Number of overhead accounts needed for message execution on SUI.
+/// This is the message.receiver.
+pub const SUI_MESSAGING_ACCOUNTS_OVERHEAD: usize = 1;
+
+/// The size of each SUI account address in bytes.
+pub const SUI_ACCOUNT_BYTE_SIZE: usize = 32;
+
+/// The expected static payload size of a token transfer when BCS encoded and submitted to SUI.
+/// TokenPool extra data and offchain data sizes are dynamic, and should be accounted for separately.
+pub const SUI_TOKEN_TRANSFER_DATA_OVERHEAD: usize = (4 + 32) // source_pool, 4 bytes for length, 32 bytes for address
+    + 32 // dest_token_address
+    + 4 // dest_gas_amount
+    + 4 // extra_data length, the contents are calculated separately
+    + 32; // amount
+
+pub struct MessageInfo {
+    pub number_of_tokens: usize,
+    pub contains_receiver: bool,
+    pub data_len: usize,
+}
+
 pub fn validate_svm2any(
     msg: &SVM2AnyMessage,
     dest_chain: &DestChain,
     token_config: &BillingTokenConfig,
+    dest_bytes_overhead: &u32,
 ) -> Result<ProcessedExtraArgs> {
     require!(
         dest_chain.config.is_enabled,
@@ -44,7 +69,12 @@ pub fn validate_svm2any(
     let processed_extra_args = process_extra_args(
         &dest_chain.config,
         &msg.extra_args,
-        !msg.token_amounts.is_empty(),
+        &MessageInfo {
+            number_of_tokens: msg.token_amounts.len(),
+            contains_receiver: msg.receiver != [0; 32],
+            data_len: msg.data.len(),
+        },
+        dest_bytes_overhead,
     )?;
 
     require_gte!(
@@ -91,7 +121,8 @@ fn validate_dest_family_address(
 pub fn process_extra_args(
     dest_config: &DestChainConfig,
     extra_args: &[u8],
-    message_contains_tokens: bool,
+    message_info: &MessageInfo,
+    dest_bytes_overhead: &u32,
 ) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(dest_config.chain_family_selector) {
         CHAIN_FAMILY_SELECTOR_SVM => {
@@ -107,8 +138,31 @@ pub fn process_extra_args(
                 dest_config,
                 tag,
                 &mut data,
-                message_contains_tokens,
+                message_info.number_of_tokens != 0,
             )?)
+        }
+        CHAIN_FAMILY_SELECTOR_SUI => {
+            require!(
+                !extra_args.is_empty(),
+                FeeQuoterError::InvalidInputsMissingExtraArgs
+            );
+
+            require_gte!(
+                extra_args.len(),
+                4,
+                FeeQuoterError::InvalidInputsMissingExtraArgs
+            );
+
+            let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
+
+            let mut data = &extra_args[4..];
+            parse_and_validate_sui_extra_args(
+                dest_config,
+                tag,
+                &mut data,
+                message_info,
+                dest_bytes_overhead,
+            )
         }
         _ => {
             // Extra args are optional for non-SVM destinations. In case there
@@ -189,6 +243,71 @@ fn parse_and_validate_svm_extra_args(
     }
 }
 
+fn parse_and_validate_sui_extra_args(
+    cfg: &DestChainConfig,
+    tag: [u8; 4],
+    data: &mut &[u8],
+    message_info: &MessageInfo,
+    dest_bytes_overhead: &u32,
+) -> Result<ProcessedExtraArgs> {
+    match u32::from_be_bytes(tag) {
+        SUI_EXTRA_ARGS_V1_TAG => {
+            let args = SuiExtraArgsV1::deserialize(data)?;
+
+            let mut sui_expanded_data_len = message_info.data_len;
+
+            // token_receiver != 0 when tokens are present
+            let receiver_is_present = args.token_receiver != [0; 32];
+            let message_contains_tokens = message_info.number_of_tokens > 0;
+            require!(
+                !message_contains_tokens || receiver_is_present,
+                FeeQuoterError::InvalidTokenReceiver
+            );
+
+            let receiver_object_ids_len = args.receiver_object_ids.len();
+
+            if !message_info.contains_receiver {
+                require_eq!(
+                    receiver_object_ids_len,
+                    0,
+                    FeeQuoterError::InvalidSuiReceiverObjectIds,
+                );
+            } else {
+                let extra_data_len = (receiver_object_ids_len + SUI_MESSAGING_ACCOUNTS_OVERHEAD)
+                    * SUI_ACCOUNT_BYTE_SIZE;
+                sui_expanded_data_len += extra_data_len;
+            }
+
+            require_gte!(
+                SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS,
+                args.receiver_object_ids.len(),
+                FeeQuoterError::InvalidSuiReceiverObjectIds,
+            );
+
+            let token_transfer_data_overhead =
+                message_info.number_of_tokens * SUI_TOKEN_TRANSFER_DATA_OVERHEAD;
+            sui_expanded_data_len += token_transfer_data_overhead;
+
+            // The token destBytesOverhead can be very different per token so we have to take it into account as well.
+            sui_expanded_data_len += *dest_bytes_overhead as usize;
+
+            require_gte!(
+                cfg.max_data_bytes as usize,
+                sui_expanded_data_len,
+                FeeQuoterError::MessageTooLarge,
+            );
+
+            Ok(ProcessedExtraArgs {
+                bytes: args.serialize_with_tag(),
+                gas_limit: args.gas_limit,
+                allow_out_of_order_execution: args.allow_out_of_order_execution,
+                token_receiver: message_contains_tokens.then_some(args.token_receiver.to_vec()),
+            })
+        }
+        _ => Err(FeeQuoterError::InvalidExtraArgsTag.into()),
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -204,7 +323,7 @@ pub mod tests {
         chain.config.is_enabled = false;
 
         assert_eq!(
-            validate_svm2any(&sample_message(), &chain, &sample_billing_config()).unwrap_err(),
+            validate_svm2any(&sample_message(), &chain, &sample_billing_config(), &0).unwrap_err(),
             FeeQuoterError::DestinationChainDisabled.into()
         );
     }
@@ -215,7 +334,8 @@ pub mod tests {
         billing_config.enabled = false;
 
         assert_eq!(
-            validate_svm2any(&sample_message(), &sample_dest_chain(), &billing_config).unwrap_err(),
+            validate_svm2any(&sample_message(), &sample_dest_chain(), &billing_config, &0)
+                .unwrap_err(),
             FeeQuoterError::FeeTokenDisabled.into()
         );
     }
@@ -226,7 +346,8 @@ pub mod tests {
         let mut message = sample_message();
         message.data = vec![0; dest_chain.config.max_data_bytes as usize + 1];
         assert_eq!(
-            validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config()).unwrap_err(),
+            validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config(), &0)
+                .unwrap_err(),
             FeeQuoterError::MessageTooLarge.into()
         );
     }
@@ -249,7 +370,7 @@ pub mod tests {
         for address in invalid_addresses {
             message.receiver = address;
             assert_eq!(
-                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
+                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config(), &0)
                     .unwrap_err(),
                 CommonCcipError::InvalidEVMAddress.into()
             );
@@ -268,7 +389,8 @@ pub mod tests {
             dest_chain.config.max_number_of_tokens_per_msg as usize + 1
         ];
         assert_eq!(
-            validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config()).unwrap_err(),
+            validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config(), &0)
+                .unwrap_err(),
             FeeQuoterError::UnsupportedNumberOfTokens.into()
         );
     }
@@ -282,7 +404,8 @@ pub mod tests {
         }
         .serialize_with_tag();
         assert_eq!(
-            validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config()).unwrap_err(),
+            validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config(), &0)
+                .unwrap_err(),
             FeeQuoterError::MessageGasLimitTooHigh.into()
         );
     }
@@ -308,17 +431,25 @@ pub mod tests {
         .serialize_with_tag();
 
         // allowed cases
-        validate_svm2any(&message_ooo, &dest_chain_enforce, &sample_billing_config()).unwrap();
+        validate_svm2any(
+            &message_ooo,
+            &dest_chain_enforce,
+            &sample_billing_config(),
+            &0,
+        )
+        .unwrap();
         validate_svm2any(
             &message_ooo,
             &dest_chain_not_enforce,
             &sample_billing_config(),
+            &0,
         )
         .unwrap();
         validate_svm2any(
             &message_not_ooo,
             &dest_chain_not_enforce,
             &sample_billing_config(),
+            &0,
         )
         .unwrap();
 
@@ -327,7 +458,8 @@ pub mod tests {
             validate_svm2any(
                 &message_not_ooo,
                 &dest_chain_enforce,
-                &sample_billing_config()
+                &sample_billing_config(),
+                &0
             )
             .unwrap_err(),
             FeeQuoterError::ExtraArgOutOfOrderExecutionMustBeTrue.into()
@@ -381,12 +513,32 @@ pub mod tests {
 
         // tag but no data fails
         assert_eq!(
-            process_extra_args(&dest_chain.config, &generic_tag_bytes, false).unwrap_err(),
+            process_extra_args(
+                &dest_chain.config,
+                &generic_tag_bytes,
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: false,
+                    data_len: 0
+                },
+                &0,
+            )
+            .unwrap_err(),
             FeeQuoterError::InvalidInputsMissingDataAfterExtraArgs.into()
         );
 
         // default case: (no data or tag)
-        let extra_args = process_extra_args(&dest_chain.config, &[], false).unwrap();
+        let extra_args = process_extra_args(
+            &dest_chain.config,
+            &[],
+            &MessageInfo {
+                number_of_tokens: 0,
+                contains_receiver: false,
+                data_len: 0,
+            },
+            &0,
+        )
+        .unwrap();
         assert_eq!(
             extra_args.bytes[..4],
             GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes()
@@ -406,7 +558,12 @@ pub mod tests {
                 allow_out_of_order_execution: true,
             }
             .serialize_with_tag(),
-            false,
+            &MessageInfo {
+                number_of_tokens: 0,
+                contains_receiver: false,
+                data_len: 0,
+            },
+            &0,
         )
         .unwrap();
         assert_eq!(
@@ -419,7 +576,17 @@ pub mod tests {
 
         // fail to match an unrelated family's tag
         assert_eq!(
-            process_extra_args(&dest_chain.config, other_family_tag, false).unwrap_err(),
+            process_extra_args(
+                &dest_chain.config,
+                other_family_tag,
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
             FeeQuoterError::InvalidExtraArgsTag.into()
         );
     }
@@ -428,7 +595,17 @@ pub mod tests {
         let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
 
         // default case requires the SVM tag bytes
-        let extra_args = process_extra_args(&svm_dest_chain.config, &svm_tag_bytes, false).unwrap();
+        let extra_args = process_extra_args(
+            &svm_dest_chain.config,
+            &svm_tag_bytes,
+            &MessageInfo {
+                number_of_tokens: 0,
+                contains_receiver: false,
+                data_len: 0,
+            },
+            &0,
+        )
+        .unwrap();
         assert_eq!(extra_args.bytes[..4], SVM_EXTRA_ARGS_V1_TAG.to_be_bytes());
         assert_eq!(
             extra_args.gas_limit,
@@ -440,13 +617,33 @@ pub mod tests {
 
         // empty tag (no data) fails
         assert_eq!(
-            process_extra_args(&svm_dest_chain.config, &[], false).unwrap_err(),
+            process_extra_args(
+                &svm_dest_chain.config,
+                &[],
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
             FeeQuoterError::InvalidInputsMissingExtraArgs.into()
         );
 
         // contains tokens but no receiver address
         assert_eq!(
-            process_extra_args(&svm_dest_chain.config, &svm_tag_bytes, true).unwrap_err(),
+            process_extra_args(
+                &svm_dest_chain.config,
+                &svm_tag_bytes,
+                &MessageInfo {
+                    number_of_tokens: 1,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
             FeeQuoterError::InvalidTokenReceiver.into(),
         );
 
@@ -468,8 +665,17 @@ pub mod tests {
                     .to_bytes(),
             ],
         };
-        let extra_args =
-            process_extra_args(&svm_dest_chain.config, &args.serialize_with_tag(), true).unwrap();
+        let extra_args = process_extra_args(
+            &svm_dest_chain.config,
+            &args.serialize_with_tag(),
+            &MessageInfo {
+                number_of_tokens: 1,
+                contains_receiver: false,
+                data_len: 0,
+            },
+            &0,
+        )
+        .unwrap();
         assert_eq!(extra_args.bytes, args.serialize_with_tag());
         assert_eq!(extra_args.gas_limit, 100);
         assert_eq!(extra_args.token_receiver, Some(token_receiver.to_vec()));
@@ -477,7 +683,17 @@ pub mod tests {
 
         // fail to match generic tag
         assert_eq!(
-            process_extra_args(&svm_dest_chain.config, generic_tag_bytes, false).unwrap_err(),
+            process_extra_args(
+                &svm_dest_chain.config,
+                generic_tag_bytes,
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
             FeeQuoterError::InvalidExtraArgsTag.into()
         );
     }
@@ -558,5 +774,317 @@ pub mod tests {
                 chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),
             },
         }
+    }
+
+    /// SUI Tests
+
+    #[test]
+    fn process_extra_args_matches_family_sui() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        // Empty extra args are invalid.
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &[],
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
+            FeeQuoterError::InvalidInputsMissingExtraArgs.into()
+        );
+
+        // Wrong tag fails.
+        let generic_tag = GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes();
+
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &generic_tag,
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
+            FeeQuoterError::InvalidExtraArgsTag.into()
+        );
+    }
+
+    #[test]
+    fn sui_tokens_require_token_receiver() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            token_receiver: [0; 32],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &args.serialize_with_tag(),
+                &MessageInfo {
+                    number_of_tokens: 1,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
+            FeeQuoterError::InvalidTokenReceiver.into()
+        );
+    }
+
+    #[test]
+    fn sui_token_receiver_is_allowed_without_tokens() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            token_receiver: [1; 32],
+            ..Default::default()
+        };
+
+        let extra_args = process_extra_args(
+            &sui_dest_chain.config,
+            &args.serialize_with_tag(),
+            &MessageInfo {
+                number_of_tokens: 0,
+                contains_receiver: false,
+                data_len: 0,
+            },
+            &0,
+        )
+        .unwrap();
+
+        assert_eq!(extra_args.bytes, args.serialize_with_tag());
+        assert_eq!(extra_args.token_receiver, None);
+    }
+
+    #[test]
+    fn sui_receiver_object_ids_require_message_receiver() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            receiver_object_ids: vec![[1; 32]],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &args.serialize_with_tag(),
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: false,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
+            FeeQuoterError::InvalidSuiReceiverObjectIds.into()
+        );
+    }
+
+    #[test]
+    fn sui_max_receiver_object_ids_is_allowed() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            receiver_object_ids: vec![[1; 32]; SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS],
+            ..Default::default()
+        };
+
+        process_extra_args(
+            &sui_dest_chain.config,
+            &args.serialize_with_tag(),
+            &MessageInfo {
+                number_of_tokens: 0,
+                contains_receiver: true,
+                data_len: 0,
+            },
+            &0,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn sui_too_many_receiver_object_ids_fails() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            receiver_object_ids: vec![[1; 32]; SUI_EXTRA_ARGS_MAX_RECEIVER_OBJECT_IDS + 1],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &args.serialize_with_tag(),
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: true,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
+            FeeQuoterError::InvalidSuiReceiverObjectIds.into()
+        );
+    }
+
+    #[test]
+    fn sui_receiver_accounts_count_towards_max_data_bytes() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            receiver_object_ids: vec![[1; 32], [2; 32]],
+            ..Default::default()
+        };
+
+        let receiver_overhead = (args.receiver_object_ids.len() + SUI_MESSAGING_ACCOUNTS_OVERHEAD)
+            * SUI_ACCOUNT_BYTE_SIZE;
+
+        let data_len = sui_dest_chain.config.max_data_bytes as usize - receiver_overhead;
+
+        // Exactly max_data_bytes is allowed.
+        process_extra_args(
+            &sui_dest_chain.config,
+            &args.serialize_with_tag(),
+            &MessageInfo {
+                number_of_tokens: 0,
+                contains_receiver: true,
+                data_len,
+            },
+            &0,
+        )
+        .unwrap();
+
+        // One additional byte exceeds max_data_bytes.
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &args.serialize_with_tag(),
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: true,
+                    data_len: data_len + 1,
+                },
+                &0,
+            )
+            .unwrap_err(),
+            FeeQuoterError::MessageTooLarge.into()
+        );
+    }
+
+    #[test]
+    fn sui_token_transfer_overhead_counts_towards_max_data_bytes() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            token_receiver: [1; 32],
+            ..Default::default()
+        };
+
+        let dest_bytes_overhead = 100_u32;
+
+        let total_token_overhead = SUI_TOKEN_TRANSFER_DATA_OVERHEAD + dest_bytes_overhead as usize;
+
+        let data_len = sui_dest_chain.config.max_data_bytes as usize - total_token_overhead;
+
+        // Exactly max_data_bytes is allowed.
+        process_extra_args(
+            &sui_dest_chain.config,
+            &args.serialize_with_tag(),
+            &MessageInfo {
+                number_of_tokens: 1,
+                contains_receiver: false,
+                data_len,
+            },
+            &dest_bytes_overhead,
+        )
+        .unwrap();
+
+        // One additional byte exceeds max_data_bytes.
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &args.serialize_with_tag(),
+                &MessageInfo {
+                    number_of_tokens: 1,
+                    contains_receiver: false,
+                    data_len: data_len + 1,
+                },
+                &dest_bytes_overhead,
+            )
+            .unwrap_err(),
+            FeeQuoterError::MessageTooLarge.into()
+        );
+    }
+
+    #[test]
+    fn sui_combined_overheads_count_towards_max_data_bytes() {
+        let mut sui_dest_chain = sample_dest_chain();
+        sui_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let args = SuiExtraArgsV1 {
+            token_receiver: [1; 32],
+            receiver_object_ids: vec![[1; 32], [2; 32]],
+            ..Default::default()
+        };
+
+        let dest_bytes_overhead = 100_u32;
+
+        let receiver_overhead = (args.receiver_object_ids.len() + SUI_MESSAGING_ACCOUNTS_OVERHEAD)
+            * SUI_ACCOUNT_BYTE_SIZE;
+
+        let token_overhead = SUI_TOKEN_TRANSFER_DATA_OVERHEAD + dest_bytes_overhead as usize;
+
+        let total_overhead = receiver_overhead + token_overhead;
+
+        let data_len = sui_dest_chain.config.max_data_bytes as usize - total_overhead;
+
+        // All overheads combined result in exactly max_data_bytes.
+        process_extra_args(
+            &sui_dest_chain.config,
+            &args.serialize_with_tag(),
+            &MessageInfo {
+                number_of_tokens: 1,
+                contains_receiver: true,
+                data_len,
+            },
+            &dest_bytes_overhead,
+        )
+        .unwrap();
+
+        // One additional byte exceeds max_data_bytes.
+        assert_eq!(
+            process_extra_args(
+                &sui_dest_chain.config,
+                &args.serialize_with_tag(),
+                &MessageInfo {
+                    number_of_tokens: 1,
+                    contains_receiver: true,
+                    data_len: data_len + 1,
+                },
+                &dest_bytes_overhead,
+            )
+            .unwrap_err(),
+            FeeQuoterError::MessageTooLarge.into()
+        );
     }
 }
