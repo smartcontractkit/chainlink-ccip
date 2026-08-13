@@ -363,12 +363,8 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// This runs BEFORE processTokenConfigForChain / UpdateAuthorities so the
 				// new pool is not registered in TAR yet, and we can read the legacy pool
 				// address directly from TAR.
-				var registryRef datastore.AddressRef
-				if tc := cfg.TokenExpansionInputPerChain[selector].TokenTransferConfig; tc != nil {
-					registryRef = tc.RegistryRef
-				}
 				seedBatchOps, seedReports, err := buildSeedMigrationBatchOps(
-					e, tokenPoolRegistry, selector, *tokenPool, *tokenRef, registryRef,
+					e, tokenPoolRegistry, selector, *tokenPool, *tokenRef,
 					deployTokenPoolInput.TimelockAddress,
 					deployTokenPoolInput.LiquidityMigrationAmount,
 					deployTokenPoolInput.LiquidityMigrationBasisPoints,
@@ -636,7 +632,6 @@ func buildSeedMigrationBatchOps(
 	tokenPoolRegistry *TokenAdapterRegistry,
 	selector uint64,
 	tokenPool, tokenRef datastore.AddressRef,
-	registryRef datastore.AddressRef,
 	timelockAddr string,
 	amount *big.Int,
 	basisPoints *uint16,
@@ -655,15 +650,15 @@ func buildSeedMigrationBatchOps(
 		return nil, nil, fmt.Errorf("adapter for chain selector %d does not support liquidity migration", selector)
 	}
 
-	registryMigrator, ok := tokenPoolAdapter.(TokenPoolMigrator)
+	registryReader, ok := tokenPoolRegistry.GetTokenAdminRegistryReader(family)
 	if !ok {
 		return nil, nil, fmt.Errorf(
-			"adapter for chain selector %d does not support reading active pool from registry, which is required for liquidity migration",
-			selector,
+			"no token admin registry reader for chain family %s, which is required for liquidity migration",
+			family,
 		)
 	}
 
-	activePool, err := registryMigrator.GetActivePool(e, selector, registryRef, fullTokenRef)
+	activePool, err := registryReader.GetActivePool(e, selector, fullTokenRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get active pool for liquidity seed on chain selector %d: %w", selector, err)
 	}
