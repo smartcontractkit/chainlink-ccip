@@ -1241,6 +1241,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			internal.NewMockAddressCodecHex(t),
 			mockCache,
 			false,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -1290,6 +1291,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			internal.NewMockAddressCodecHex(t),
 			mockCache,
 			false,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -1333,6 +1335,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			internal.NewMockAddressCodecHex(t),
 			mockCache,
 			false,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -1398,6 +1401,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			internal.NewMockAddressCodecHex(t),
 			mockCache,
 			false,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -1766,6 +1770,7 @@ func Test_ccipChainReader_MsgsBetweenSeqNums_TxHash(t *testing.T) {
 				internal.NewMockAddressCodecHex(t),
 				mockCache,
 				tc.populateTxHashEnabled,
+				nil,
 			)
 			require.NoError(t, err)
 

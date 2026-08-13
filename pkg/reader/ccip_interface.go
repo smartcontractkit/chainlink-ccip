@@ -13,6 +13,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+
+	"go.opentelemetry.io/otel/metric"
 )
 
 var (
@@ -90,8 +92,14 @@ func NewCCIPChainReader(
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
 	populateTxHashEnabled bool,
+	meters ...metric.Meter,
 ) (CCIPReader, error) {
-	reader, err := newCCIPChainReaderInternal(
+	var meter metric.Meter
+	if len(meters) > 0 {
+		meter = meters[0]
+	}
+
+	reader, err := newCCIPChainReaderWithConfigPollerInternal(
 		ctx,
 		lggr,
 		chainAccessors,
@@ -100,7 +108,9 @@ func NewCCIPChainReader(
 		destChain,
 		offrampAddress,
 		addrCodec,
+		nil,
 		populateTxHashEnabled,
+		meter,
 	)
 	if err != nil {
 		return nil, err
@@ -109,7 +119,8 @@ func NewCCIPChainReader(
 		reader,
 		lggr,
 		destChain,
-	), nil
+		meter,
+	)
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended

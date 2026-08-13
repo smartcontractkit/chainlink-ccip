@@ -27,6 +27,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/addressbook"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader/rcmetrics"
+
+	"go.opentelemetry.io/otel/metric"
 )
 
 // Default refresh period for cache if not specified
@@ -46,6 +49,8 @@ type ccipChainReader struct {
 	addrCodec             cciptypes.AddressCodec
 	donAddressBook        *addressbook.Book
 	populateTxHashEnabled bool
+
+	rcMetrc rcmetrics.ReaderMetrics
 }
 
 func newCCIPChainReaderInternal(
@@ -70,6 +75,7 @@ func newCCIPChainReaderInternal(
 		addrCodec,
 		nil,
 		populateTxHashEnabled,
+		nil,
 	)
 }
 
@@ -84,6 +90,7 @@ func newCCIPChainReaderWithConfigPollerInternal(
 	addrCodec cciptypes.AddressCodec,
 	configPoller ConfigPoller,
 	populateTxHashEnabled bool,
+	meter metric.Meter,
 ) (*ccipChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
@@ -96,6 +103,15 @@ func newCCIPChainReaderWithConfigPollerInternal(
 		panic(fmt.Sprintf("failed to convert offramp address to string: %v", err))
 	}
 
+	rcMetrc, err := rcmetrics.NewReaderMetrics(meter)
+	if err != nil {
+		return nil, fmt.Errorf("init reader metrics: %w", err)
+	}
+	configPollerMetrics, err := rcmetrics.NewConfigPollerMetrics(meter)
+	if err != nil {
+		return nil, fmt.Errorf("init config poller metrics: %w", err)
+	}
+
 	reader := &ccipChainReader{
 		lggr:                  lggr,
 		contractReaders:       crs,
@@ -106,13 +122,14 @@ func newCCIPChainReaderWithConfigPollerInternal(
 		addrCodec:             addrCodec,
 		donAddressBook:        addressbook.NewBook(),
 		populateTxHashEnabled: populateTxHashEnabled,
+		rcMetrc:               rcMetrc,
 	}
 
 	// Initialize cache with readers
 	if configPoller != nil {
 		reader.configPoller = configPoller
 	} else {
-		reader.configPoller = newConfigPollerV2(lggr, chainAccessors, destChain, defaultRefreshPeriod)
+		reader.configPoller = newConfigPollerV2(lggr, chainAccessors, destChain, defaultRefreshPeriod, configPollerMetrics)
 	}
 
 	contracts := cciptypes.ContractAddresses{
@@ -363,33 +380,41 @@ func (r *ccipChainReader) NextSeqNum(
 		minSeqNrMissing []cciptypes.ChainSelector
 	)
 	for _, chain := range chains {
+		chainLabel := rcmetrics.ChainLabel(chain)
+
 		cfg, exists := cfgs[chain]
 		if !exists {
 			configNotFound = append(configNotFound, chain)
+			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "not_found")
 			continue
 		}
 
 		if !cfg.IsEnabled {
 			disabledChains = append(disabledChains, chain)
+			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "disabled")
 			continue
 		}
 
 		if len(cfg.OnRamp) == 0 {
 			onRampMissing = append(onRampMissing, chain)
+			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "misconfigured")
 			continue
 		}
 
 		if len(cfg.Router) == 0 {
 			routerMissing = append(routerMissing, chain)
+			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "misconfigured")
 			continue
 		}
 
 		if cfg.MinSeqNr == 0 {
 			minSeqNrMissing = append(minSeqNrMissing, chain)
+			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "misconfigured")
 			continue
 		}
 
 		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
+		r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "returned")
 	}
 
 	logutil.LogWhenExceedFrequency(&nextSeqNumLastLog, readerLogFrequency, func() {
@@ -446,8 +471,10 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 
 	for _, chain := range chains {
 		func(chain cciptypes.ChainSelector) {
+			chainLabel := rcmetrics.ChainLabel(chain)
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "no_accessor")
 				logutil.LogWhenExceedFrequency(&getChainsFeeComponentsAccessorLastLog, readerLogFrequency, func() {
 					lggr.Debugw("failed to get chain accessor", logutil.FieldChain, chain, "err", err)
 				})
@@ -458,6 +485,7 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			defer chainCancel()
 			feeComponent, err := chainAccessor.GetChainFeeComponents(chainCtx)
 			if err != nil {
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "error")
 				if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting chain fee components", logutil.FieldChain, chain)
 				} else {
@@ -468,10 +496,12 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 
 			if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
 				lggr.Errorw("execution fee is nil or non positive", logutil.FieldChain, chain)
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "invalid")
 				return
 			}
 			if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
 				lggr.Errorw("data availability fee is nil or negative", logutil.FieldChain, chain)
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "invalid")
 				return
 			}
 
@@ -479,6 +509,7 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 				ExecutionFee:        feeComponent.ExecutionFee,
 				DataAvailabilityFee: feeComponent.DataAvailabilityFee,
 			}
+			r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "returned")
 		}(chain)
 	}
 	return feeComponents
@@ -516,6 +547,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "no_accessor")
 				logutil.LogWhenExceedFrequency(&wrappedNativeTokenPriceAccessorLastLog, readerLogFrequency, func() {
 					lggr.Debugw("chain accessor not found, chain native price skipped", logutil.FieldChain, chain, "err", err)
 				})
@@ -524,6 +556,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			config, err := r.configPoller.GetChainConfig(chainCtx, chain)
 			if err != nil {
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "config_error")
 				if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting chain config for native token address", logutil.FieldChain, chain)
 				} else {
@@ -536,6 +569,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			nativeTokenAddress := config.Router.WrappedNativeAddress
 
 			if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "no_native_token")
 				lggr.Debug("Native token address is zero or empty. Ignore for disabled chains otherwise "+
 					"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
 				return
@@ -543,6 +577,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			price, err := chainAccessor.GetTokenPriceUSD(chainCtx, cciptypes.UnknownAddress(nativeTokenAddress))
 			if err != nil {
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "error")
 				if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw(MsgTimedOutGettingNativeTokenPrice, logutil.FieldChain, chain, "address", nativeTokenAddress.String())
 				} else {
@@ -553,10 +588,12 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			}
 
 			if price.Timestamp == 0 {
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "stale")
 				lggr.Warnw(MsgNoNativeTokenPriceAvailable, logutil.FieldChain, chain)
 				return
 			}
 			if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "invalid")
 				lggr.Errorw(MsgNativeTokenPriceNilOrNonPositive, logutil.FieldChain, chain)
 				return
 			}
@@ -564,6 +601,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			mu.Lock()
 			prices[chain] = cciptypes.NewBigInt(price.Value)
 			mu.Unlock()
+			r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "returned")
 		})
 	}
 
@@ -598,6 +636,20 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	var result = make(map[cciptypes.ChainSelector]cciptypes.TimestampedBig, len(updates))
 	for chain, update := range updates {
 		result[chain] = cciptypes.TimeStampedBigFromUnix(update)
+	}
+
+	// Reconcile requested vs returned: a chain missing from the result is a silent
+	// gap (the accessor does not log which chains it failed to include).
+	for _, chain := range selectors {
+		chainLabel := rcmetrics.ChainLabel(chain)
+		if _, ok := result[chain]; ok {
+			r.rcMetrc.RecordChainGap("GetChainFeePriceUpdate", chainLabel, "returned")
+		} else {
+			r.rcMetrc.RecordChainGap("GetChainFeePriceUpdate", chainLabel, "missing")
+		}
+	}
+	if len(result) == 0 {
+		r.rcMetrc.RecordReadEmpty("GetChainFeePriceUpdate", rcmetrics.ChainLabel(r.destChain))
 	}
 
 	return result
