@@ -185,7 +185,21 @@ fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         FeeQuoterError::InvalidInputsMissingTokenConfig
     );
-    let processed_extra_args = validate_svm2any(message, dest_chain, fee_token_config)?;
+    let dest_bytes_overhead = additional_token_configs_for_dest_chain
+        .iter()
+        .map(|config| match config {
+            Some(config)
+                if config.token_transfer_config.is_enabled
+                    && config.token_transfer_config.dest_bytes_overhead > 0 =>
+            {
+                config.token_transfer_config.dest_bytes_overhead
+            }
+            _ => CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        })
+        .sum::<u32>();
+
+    let processed_extra_args =
+        validate_svm2any(message, dest_chain, fee_token_config, &dest_bytes_overhead)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
