@@ -13,3 +13,27 @@ packages:
       filename: mock_offchain_client.go
     interfaces:
       Client:
+  github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters:
+    config:
+      dir: ./v2_0_0/mocks
+      pkgname: mocks
+      filename: "mock_{{.InterfaceName | snakecase}}.go"
+    interfaces:
+      OnRampUpgrader:
+      ChainFamily:
+      OffRampSourceOnRampSetter:
+      OffRampSourceOnRampReader:
+  github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets:
+    config:
+      dir: ./v2_0_0/mocks
+      pkgname: mocks
+      filename: mock_mcms_reader.go
+    interfaces:
+      MCMSReader:
+  github.com/smartcontractkit/chainlink-ccip/deployment/deploy:
+    config:
+      dir: ./v2_0_0/mocks
+      pkgname: mocks
+      filename: mock_transfer_ownership_adapter.go
+    interfaces:
+      TransferOwnershipAdapter:

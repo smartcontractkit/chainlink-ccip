@@ -92,6 +92,44 @@ func findRef(ds datastore.DataStore, ref datastore.AddressRef) (datastore.Addres
 	return refs[0], 1, nil
 }
 
+// FindAndFormatCanonicalRef is like FindAndFormatRef but always includes
+// AddressRefByQualifier in the filter list, even when ref.Qualifier is empty.
+// This ensures no-qualifier lookups only match refs with an empty qualifier
+// (canonical refs), not refs with non-empty qualifiers like "legacy".
+func FindAndFormatCanonicalRef[T any](ds datastore.DataStore, ref datastore.AddressRef, chainSelector uint64, format FormatFn[T]) (T, error) {
+	var empty T
+	ref.ChainSelector = chainSelector
+
+	filters := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{}
+	if ref.Address != "" {
+		filters = append(filters, datastore.AddressRefByAddress(ref.Address))
+	}
+	if ref.ChainSelector != 0 {
+		filters = append(filters, datastore.AddressRefByChainSelector(ref.ChainSelector))
+	}
+	// Always add qualifier filter — even when empty — so that unqualified
+	// lookups do not match refs that carry a non-empty qualifier.
+	filters = append(filters, datastore.AddressRefByQualifier(ref.Qualifier))
+	if ref.Version != nil {
+		filters = append(filters, datastore.AddressRefByVersion(ref.Version))
+	}
+	if ref.Type != "" {
+		filters = append(filters, datastore.AddressRefByType(ref.Type))
+	}
+
+	refs := ds.Addresses().Filter(filters...)
+	if len(refs) != 1 {
+		return empty, fmt.Errorf("expected to find exactly 1 canonical ref with criteria %s, found %d", SprintRef(ref), len(refs))
+	}
+
+	formattedRef, err := format(refs[0])
+	if err != nil {
+		return empty, fmt.Errorf("failed to format canonical ref %s: %w", SprintRef(refs[0]), err)
+	}
+
+	return formattedRef, nil
+}
+
 // IsAddressRefFullyPopulated checks if an AddressRef has all fields populated (except Labels).
 func IsAddressRefFullyPopulated(ref datastore.AddressRef) bool {
 	return ref.Address != "" &&

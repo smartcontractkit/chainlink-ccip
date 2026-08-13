@@ -24,3 +24,12 @@ type OffRampSetSourceOnRampsEntry struct {
 type OffRampSourceOnRampSetter interface {
 	SetOffRampSourceOnRamps(e cldf.Environment, update OffRampSetSourceOnRampsEntry) (*mcms_types.BatchOperation, bool, error)
 }
+
+// OffRampSourceOnRampReader is implemented by chain family adapters that can read the
+// current source-chain onramp whitelist from a chain's OffRamp.
+type OffRampSourceOnRampReader interface {
+	// GetOffRampSourceOnRamps returns the onramps currently whitelisted for
+	// sourceChainSelector on the local chain's OffRamp, as 0x-prefixed hex strings
+	// in the same wire format as OffRampSetSourceOnRampsEntry.OnRamps.
+	GetOffRampSourceOnRamps(e cldf.Environment, localChainSelector uint64, sourceChainSelector uint64) ([]string, error)
+}
