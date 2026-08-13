@@ -100,7 +100,7 @@ contract VerifierTestHelperSetup is BaseTest {
     address destToken,
     address sender,
     address receiver
-  ) internal pure returns (MessageV1Codec.MessageV1 memory message) {
+  ) internal pure returns (MessageV1Codec.MessageV1 memory) {
     MessageV1Codec.TokenTransferV1[] memory tokenTransfers = new MessageV1Codec.TokenTransferV1[](1);
     tokenTransfers[0] = MessageV1Codec.TokenTransferV1({
       amount: 1,
@@ -111,7 +111,7 @@ contract VerifierTestHelperSetup is BaseTest {
       extraData: ""
     });
 
-    message = MessageV1Codec.MessageV1({
+    return MessageV1Codec.MessageV1({
       sourceChainSelector: sourceChainSelector,
       destChainSelector: destChainSelector,
       messageNumber: 1,
