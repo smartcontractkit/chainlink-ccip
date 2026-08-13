@@ -44,11 +44,11 @@ type OnRampUpgrader interface {
 	// the new OnRamp. Used for ProdRouter lanes after they have been staged and smoke
 	// tested behind the TestRouter.
 	PromoteOnrampToProdRouter(e cldf.Environment, chainSelector uint64, destSelectors []uint64) ([]mcms_types.BatchOperation, error)
-	// VerifyPromotedToProdRouter returns an error unless the production Router routes
+	// VerifyPromotedToRouters returns an error unless the production Router routes
 	// destSelectors of the canonical OnRamp through it (i.e. Phase 3 has executed for them).
 	// Cleanup uses it as a pre-flight check before removing the legacy OnRamp from remote
 	// OffRamp whitelists.
-	VerifyPromotedToProdRouter(e cldf.Environment, chainSelector uint64, destSelectors []uint64) error
+	VerifyPromotedToRouters(e cldf.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64) error
 	// VerifyLegacyOnRampOnProdRouter returns an error unless the production Router still
 	// routes destSelectors through the legacy OnRamp. Phase 3 uses it as a pre-flight check:
 	// anything else means Phase 3 already ran or an unexpected OnRamp is live for that dest.

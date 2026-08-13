@@ -248,7 +248,7 @@ func expectVerifyRequireUpgrade(upgrader *mocks.MockOnRampUpgrader, requireUpgra
 
 // expectPromotedToProdRouter programs the cleanup pre-flight promotion check.
 func expectPromotedToProdRouter(upgrader *mocks.MockOnRampUpgrader) {
-	upgrader.EXPECT().VerifyPromotedToProdRouter(mock.Anything, chainA, mock.Anything).
+	upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, mock.Anything, mock.Anything).
 		Return(nil).Once()
 }
 
@@ -879,7 +879,7 @@ func TestUpgradeOnrampCleanup(t *testing.T) {
 		// chainB is prod-router class, so cleanup also un-wires the TestRouter for it.
 		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
 			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
-		upgrader.EXPECT().VerifyPromotedToProdRouter(mock.Anything, chainA, []uint64{chainB}).
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
 			Return(nil).Once()
 		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
 			Return(legacyOnRampRef(), nil).Once()
@@ -1028,7 +1028,7 @@ func TestUpgradeOnrampCleanup(t *testing.T) {
 			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
 		// The prod Router still routes through the old OnRamp: Phase 3 hasn't
 		// executed, so removing the old OnRamp from whitelists would drop traffic.
-		upgrader.EXPECT().VerifyPromotedToProdRouter(mock.Anything, chainA, []uint64{chainB}).
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
 			Return(errors.New("boom")).Once()
 		// LegacyOnRampRef and the OffRamp setter must NOT be called.
 

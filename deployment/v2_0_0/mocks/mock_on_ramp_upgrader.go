@@ -636,37 +636,38 @@ func (_c *MockOnRampUpgrader_VerifyOnrampRequireUpgrade_Call) RunAndReturn(run f
 	return _c
 }
 
-// VerifyPromotedToProdRouter provides a mock function for the type MockOnRampUpgrader
-func (_mock *MockOnRampUpgrader) VerifyPromotedToProdRouter(e deployment.Environment, chainSelector uint64, destSelectors []uint64) error {
-	ret := _mock.Called(e, chainSelector, destSelectors)
+// VerifyPromotedToRouters provides a mock function for the type MockOnRampUpgrader
+func (_mock *MockOnRampUpgrader) VerifyPromotedToRouters(e deployment.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64) error {
+	ret := _mock.Called(e, chainSelector, prodDestSelectors, testDestSelectors)
 
 	if len(ret) == 0 {
-		panic("no return value specified for VerifyPromotedToProdRouter")
+		panic("no return value specified for VerifyPromotedToRouters")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, []uint64) error); ok {
-		r0 = returnFunc(e, chainSelector, destSelectors)
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, []uint64, []uint64) error); ok {
+		r0 = returnFunc(e, chainSelector, prodDestSelectors, testDestSelectors)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// MockOnRampUpgrader_VerifyPromotedToProdRouter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyPromotedToProdRouter'
-type MockOnRampUpgrader_VerifyPromotedToProdRouter_Call struct {
+// MockOnRampUpgrader_VerifyPromotedToRouters_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyPromotedToRouters'
+type MockOnRampUpgrader_VerifyPromotedToRouters_Call struct {
 	*mock.Call
 }
 
-// VerifyPromotedToProdRouter is a helper method to define mock.On call
+// VerifyPromotedToRouters is a helper method to define mock.On call
 //   - e deployment.Environment
 //   - chainSelector uint64
-//   - destSelectors []uint64
-func (_e *MockOnRampUpgrader_Expecter) VerifyPromotedToProdRouter(e any, chainSelector any, destSelectors any) *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call {
-	return &MockOnRampUpgrader_VerifyPromotedToProdRouter_Call{Call: _e.mock.On("VerifyPromotedToProdRouter", e, chainSelector, destSelectors)}
+//   - prodDestSelectors []uint64
+//   - testDestSelectors []uint64
+func (_e *MockOnRampUpgrader_Expecter) VerifyPromotedToRouters(e any, chainSelector any, prodDestSelectors any, testDestSelectors any) *MockOnRampUpgrader_VerifyPromotedToRouters_Call {
+	return &MockOnRampUpgrader_VerifyPromotedToRouters_Call{Call: _e.mock.On("VerifyPromotedToRouters", e, chainSelector, prodDestSelectors, testDestSelectors)}
 }
 
-func (_c *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call) Run(run func(e deployment.Environment, chainSelector uint64, destSelectors []uint64)) *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call {
+func (_c *MockOnRampUpgrader_VerifyPromotedToRouters_Call) Run(run func(e deployment.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64)) *MockOnRampUpgrader_VerifyPromotedToRouters_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 deployment.Environment
 		if args[0] != nil {
@@ -680,21 +681,26 @@ func (_c *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call) Run(run func(e dep
 		if args[2] != nil {
 			arg2 = args[2].([]uint64)
 		}
+		var arg3 []uint64
+		if args[3] != nil {
+			arg3 = args[3].([]uint64)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
 }
 
-func (_c *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call) Return(err error) *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call {
+func (_c *MockOnRampUpgrader_VerifyPromotedToRouters_Call) Return(err error) *MockOnRampUpgrader_VerifyPromotedToRouters_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call) RunAndReturn(run func(e deployment.Environment, chainSelector uint64, destSelectors []uint64) error) *MockOnRampUpgrader_VerifyPromotedToProdRouter_Call {
+func (_c *MockOnRampUpgrader_VerifyPromotedToRouters_Call) RunAndReturn(run func(e deployment.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64) error) *MockOnRampUpgrader_VerifyPromotedToRouters_Call {
 	_c.Call.Return(run)
 	return _c
 }

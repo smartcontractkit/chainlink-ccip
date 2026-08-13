@@ -445,10 +445,13 @@ func UpgradeOnrampCleanup(
 			return cldf.ChangesetOutput{}, fmt.Errorf("classify dest chains: %w", err)
 		}
 
+		scopedProdDestSelectors := scopeDestSelectors(destChainSelectors, cfg.DestSelectorsInScope)
+		scopedTestDestSelectors := scopeDestSelectors(laneClass.TestRouterDests, cfg.DestSelectorsInScope)
+
 		// Pre-flight: removing the legacy OnRamp from remote OffRamp whitelists is only
 		// safe once every dest chain has been promoted to its final router (prod Router for
 		// the ProdRouter class, TestRouter for the TestRouter class).
-		if err := upgrader.VerifyPromotedToProdRouter(e, cfg.ChainSelector, laneClass.ProdRouterDests); err != nil {
+		if err := upgrader.VerifyPromotedToRouters(e, cfg.ChainSelector, scopedProdDestSelectors, scopedTestDestSelectors); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight promotion check: %w", err)
 		}
 
