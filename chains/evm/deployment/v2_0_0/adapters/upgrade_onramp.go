@@ -16,6 +16,7 @@ import (
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -70,6 +71,64 @@ func (a *EVMOnRampUpgrader) VerifyOnrampRequireUpgrade(e cldf.Environment, chain
 			"OnRamp %s already uses RMNProxy %s as RmnRemote; nothing to upgrade", oldAddr.Hex(), rmnProxyAddr.Hex())
 	}
 	return nil
+}
+
+// EnsureOffRampOnTestRouter implements [ccvadapters.OnRampUpgrader].
+func (a *EVMOnRampUpgrader) EnsureOffRampOnTestRouter(e cldf.Environment, destChainSelector uint64, sourceChainSelector uint64) ([]mcms_types.BatchOperation, error) {
+	chain, ok := e.BlockChains.EVMChains()[destChainSelector]
+	if !ok {
+		return nil, fmt.Errorf("no EVM chain found for selector %d", destChainSelector)
+	}
+
+	testRouterAddr, err := resolveTestRouter(e.DataStore, destChainSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	offRampAddr, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+		Type:    datastore.ContractType(offramp.ContractType),
+		Version: offramp.Version,
+	}, destChainSelector, evmds.ToEVMAddress)
+	if err != nil {
+		return nil, fmt.Errorf("resolve OffRamp on chain %d: %w", destChainSelector, err)
+	}
+
+	currentReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, router.GetOffRamps, chain, contract.FunctionInput[any]{
+		ChainSelector: destChainSelector,
+		Address:       testRouterAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get OffRamps from TestRouter on chain %d: %w", destChainSelector, err)
+	}
+
+	for _, current := range currentReport.Output {
+		if current.SourceChainSelector == sourceChainSelector && current.OffRamp == offRampAddr {
+			return nil, nil
+		}
+	}
+
+	report, err := cldf_ops.ExecuteOperation(e.OperationsBundle, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+		ChainSelector: destChainSelector,
+		Address:       testRouterAddr,
+		Args: router.ApplyRampsUpdatesArgs{
+			OffRampAdds: []router.OffRamp{{
+				SourceChainSelector: sourceChainSelector,
+				OffRamp:             offRampAddr,
+			}},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("add OffRamp to TestRouter on chain %d: %w", destChainSelector, err)
+	}
+
+	batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+	if err != nil {
+		return nil, fmt.Errorf("build batch op: %w", err)
+	}
+	if len(batchOp.Transactions) > 0 {
+		return []mcms_types.BatchOperation{batchOp}, nil
+	}
+	return nil, nil
 }
 
 // ExistingOnRampUpgrade implements [ccvadapters.OnRampUpgrader].
