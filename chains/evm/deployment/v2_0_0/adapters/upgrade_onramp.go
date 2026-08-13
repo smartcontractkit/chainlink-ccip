@@ -72,8 +72,117 @@ func (a *EVMOnRampUpgrader) VerifyOnrampRequireUpgrade(e cldf.Environment, chain
 	return nil
 }
 
+// ExistingOnRampUpgrade implements [ccvadapters.OnRampUpgrader].
+//
+// Phase 1 is considered already started when a legacy-qualified OnRamp ref
+// exists. In that state the canonical OnRamp must be the replacement OnRamp
+// and must already use RMNProxy as its RmnRemote.
+//
+// This method does not mutate any state. It is used by Phase 1 to distinguish
+// a first execution from a retry or a later destination-lane batch.
+func (a *EVMOnRampUpgrader) ExistingOnRampUpgrade(
+	e cldf.Environment,
+	chainSelector uint64,
+) (ccvadapters.OnRampUpgradeResult, bool, error) {
+	legacyRefs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(onramp.ContractType)),
+		datastore.AddressRefByVersion(onramp.Version),
+		datastore.AddressRefByQualifier(legacyQualifier),
+	)
+
+	if len(legacyRefs) == 0 {
+		return ccvadapters.OnRampUpgradeResult{}, false, nil
+	}
+
+	if len(legacyRefs) != 1 {
+		return ccvadapters.OnRampUpgradeResult{}, false, fmt.Errorf(
+			"expected exactly one legacy OnRamp on chain %d, found %d",
+			chainSelector,
+			len(legacyRefs),
+		)
+	}
+
+	legacyRef := legacyRefs[0]
+
+	newRef, err := canonicalOnRampRef(e.DataStore, chainSelector)
+	if err != nil {
+		return ccvadapters.OnRampUpgradeResult{}, false, fmt.Errorf(
+			"Phase 1 upgrade state is inconsistent on chain %d: legacy OnRamp %s exists but canonical OnRamp cannot be resolved: %w",
+			chainSelector,
+			legacyRef.Address,
+			err,
+		)
+	}
+
+	if common.HexToAddress(newRef.Address) == common.HexToAddress(legacyRef.Address) {
+		return ccvadapters.OnRampUpgradeResult{}, false, fmt.Errorf(
+			"Phase 1 upgrade state is inconsistent on chain %d: canonical and legacy OnRamp both resolve to %s",
+			chainSelector,
+			newRef.Address,
+		)
+	}
+
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return ccvadapters.OnRampUpgradeResult{}, false, fmt.Errorf(
+			"no EVM chain found for selector %d",
+			chainSelector,
+		)
+	}
+
+	rmnProxyAddr, err := resolveRMNProxy(e.DataStore, chainSelector)
+	if err != nil {
+		return ccvadapters.OnRampUpgradeResult{}, false, err
+	}
+
+	newStaticConfig, err := readStaticConfig(
+		e.OperationsBundle,
+		chain,
+		chainSelector,
+		common.HexToAddress(newRef.Address),
+	)
+	if err != nil {
+		return ccvadapters.OnRampUpgradeResult{}, false, fmt.Errorf(
+			"read canonical OnRamp while recovering Phase 1: %w",
+			err,
+		)
+	}
+
+	if newStaticConfig.RmnRemote != rmnProxyAddr {
+		return ccvadapters.OnRampUpgradeResult{}, false, fmt.Errorf(
+			"Phase 1 upgrade state is inconsistent on chain %d: legacy OnRamp %s exists but canonical OnRamp %s has RmnRemote %s, expected RMNProxy %s",
+			chainSelector,
+			legacyRef.Address,
+			newRef.Address,
+			newStaticConfig.RmnRemote.Hex(),
+			rmnProxyAddr.Hex(),
+		)
+	}
+
+	return ccvadapters.OnRampUpgradeResult{
+		NewOnRampRef:    newRef,
+		LegacyOnRampRef: legacyRef,
+		BatchOps:        nil,
+		Reused:          true,
+	}, true, nil
+}
+
 // DeployNewOnRamp implements [ccvadapters.OnRampUpgrader].
-func (a *EVMOnRampUpgrader) DeployNewOnRamp(e cldf.Environment, chainSelector uint64) (ccvadapters.OnRampUpgradeResult, error) {
+func (a *EVMOnRampUpgrader) DeployNewOnRamp(
+	e cldf.Environment,
+	chainSelector uint64,
+) (ccvadapters.OnRampUpgradeResult, error) {
+	// A retry of Phase 1, or a later destination-lane batch for the same source
+	// chain, must reuse the already-deployed canonical/legacy pair.
+	existing, found, err := a.ExistingOnRampUpgrade(e, chainSelector)
+	if err != nil {
+		return ccvadapters.OnRampUpgradeResult{}, err
+	}
+	if found {
+		return existing, nil
+	}
+
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return ccvadapters.OnRampUpgradeResult{}, fmt.Errorf("no EVM chain found for selector %d", chainSelector)
@@ -87,11 +196,6 @@ func (a *EVMOnRampUpgrader) DeployNewOnRamp(e cldf.Environment, chainSelector ui
 
 	legacyRef := oldRef
 	legacyRef.Qualifier = legacyQualifier
-
-	existingLegacy, err := a.LegacyOnRampRef(e, chainSelector)
-	if err == nil && existingLegacy.Address != "" {
-		legacyRef = existingLegacy
-	}
 
 	cfg, err := a.readOldOnRampConfigs(e.OperationsBundle, chain, chainSelector, oldAddr)
 	if err != nil {
@@ -108,10 +212,8 @@ func (a *EVMOnRampUpgrader) DeployNewOnRamp(e cldf.Environment, chainSelector ui
 	}
 	newAddr := common.HexToAddress(newRef.Address)
 
-	// Copy each dest chain config verbatim, including its current Router (already populated
-	// in cfg.DestChainConfigArgs by readAllDestChainConfigs). Neither router is repointed at
-	// the new OnRamp here — that only happens once the verifier jobs observe both OnRamps
-	// (Phase 1.5), so this write can never affect live traffic.
+	// Copy each dest chain config verbatim, including DefaultCCVs,
+	// LaneMandatedCCVs and its current Router.
 	applyReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, onramp.ApplyDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
 		ChainSelector: chainSelector,
 		Address:       newAddr,
@@ -135,10 +237,16 @@ func (a *EVMOnRampUpgrader) DeployNewOnRamp(e cldf.Environment, chainSelector ui
 		return ccvadapters.OnRampUpgradeResult{}, fmt.Errorf("build batch op from writes: %w", err)
 	}
 
+	batchOps := make([]mcms_types.BatchOperation, 0, 1)
+	if len(batchOp.Transactions) > 0 {
+		batchOps = append(batchOps, batchOp)
+	}
+
 	return ccvadapters.OnRampUpgradeResult{
 		NewOnRampRef:    newRef,
 		LegacyOnRampRef: legacyRef,
-		BatchOps:        []mcms_types.BatchOperation{batchOp},
+		BatchOps:        batchOps,
+		Reused:          false,
 	}, nil
 }
 

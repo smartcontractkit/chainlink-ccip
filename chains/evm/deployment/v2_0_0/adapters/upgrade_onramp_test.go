@@ -358,13 +358,16 @@ func TestDeployNewOnRampIdempotent(t *testing.T) {
 	require.NoError(t, ds.Merge(e.DataStore))
 	require.NoError(t, ds.Merge(mergeDS.Seal()))
 	e.DataStore = ds.Seal()
-
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// Re-deploying should return the same canonical OnRamp ref and no writes.
 	result2, err := adapter.DeployNewOnRamp(*e, upgradeTestChains[0])
 	require.NoError(t, err)
 	assert.Equal(t, result.NewOnRampRef.Address, result2.NewOnRampRef.Address, "New OnRamp ref should be canonical and unchanged on re-deploy")
 	assert.Equal(t, result.LegacyOnRampRef.Address, result2.LegacyOnRampRef.Address, "Legacy OnRamp ref should be unchanged on re-deploy")
-	assert.Len(t, result2.BatchOps, 1, "BatchOps still contains DestChainConfig writes")
+	require.True(t, result2.Reused)
+	assert.Equal(t, result.NewOnRampRef.Address, result2.NewOnRampRef.Address)
+	assert.Equal(t, result.LegacyOnRampRef.Address, result2.LegacyOnRampRef.Address)
+	assert.Empty(t, result2.BatchOps, "reusing an existing Phase 1 upgrade must not emit deployment/config writes")
 }
 
 func TestGetOffRampSourceOnRamps(t *testing.T) {
