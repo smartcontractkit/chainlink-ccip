@@ -443,14 +443,14 @@ func TestVerifyPromotedToProdRouter(t *testing.T) {
 
 	// Not yet promoted: the prod Router still routes through the old OnRamp.
 	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	err = adapter.VerifyPromotedToProdRouter(*e, upgradeTestChains[0], upgradeTestChains[1:])
+	err = adapter.VerifyPromotedToRouters(*e, upgradeTestChains[0], upgradeTestChains[1:], []uint64{})
 	require.ErrorContains(t, err, "Phase 3 must execute first")
 
 	_, err = adapter.PromoteOnrampToProdRouter(*e, upgradeTestChains[0], upgradeTestChains[1:])
 	require.NoError(t, err)
 
 	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	require.NoError(t, adapter.VerifyPromotedToProdRouter(*e, upgradeTestChains[0], upgradeTestChains[1:]))
+	require.NoError(t, adapter.VerifyPromotedToRouters(*e, upgradeTestChains[0], upgradeTestChains[1:], []uint64{}))
 }
 
 func TestVerifyLegacyOnRampOnProdRouter(t *testing.T) {

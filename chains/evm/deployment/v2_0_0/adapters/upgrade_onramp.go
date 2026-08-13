@@ -230,14 +230,27 @@ func (a *EVMOnRampUpgrader) LegacyOnRampRef(e cldf.Environment, chainSelector ui
 }
 
 // VerifyPromotedToProdRouter implements [ccvadapters.OnRampUpgrader].
-func (a *EVMOnRampUpgrader) VerifyPromotedToProdRouter(e cldf.Environment, chainSelector uint64, destSelectors []uint64) error {
+func (a *EVMOnRampUpgrader) VerifyPromotedToRouters(e cldf.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64) error {
 	newRef, err := canonicalOnRampRef(e.DataStore, chainSelector)
 	if err != nil {
 		return fmt.Errorf("find new OnRamp: %w", err)
 	}
-	if err := a.verifyProdRouterRoutesThrough(e, chainSelector, destSelectors, common.HexToAddress(newRef.Address)); err != nil {
+	routerAddr, err := resolveProdRouter(e.DataStore, chainSelector)
+	if err != nil {
+		return err
+	}
+	if err := a.verifyRouterRoutesThrough(e, chainSelector, prodDestSelectors, common.HexToAddress(newRef.Address), routerAddr); err != nil {
 		return fmt.Errorf("%w (Phase 3 must execute first)", err)
 	}
+
+	routerAddr, err = resolveTestRouter(e.DataStore, chainSelector)
+	if err != nil {
+		return err
+	}
+	if err := a.verifyRouterRoutesThrough(e, chainSelector, testDestSelectors, common.HexToAddress(newRef.Address), routerAddr); err != nil {
+		return fmt.Errorf("%w (Phase 3 must execute first)", err)
+	}
+
 	return nil
 }
 
@@ -247,7 +260,11 @@ func (a *EVMOnRampUpgrader) VerifyLegacyOnRampOnProdRouter(e cldf.Environment, c
 	if err != nil {
 		return err
 	}
-	if err := a.verifyProdRouterRoutesThrough(e, chainSelector, destSelectors, common.HexToAddress(legacyRef.Address)); err != nil {
+	routerAddr, err := resolveProdRouter(e.DataStore, chainSelector)
+	if err != nil {
+		return err
+	}
+	if err := a.verifyRouterRoutesThrough(e, chainSelector, destSelectors, common.HexToAddress(legacyRef.Address), routerAddr); err != nil {
 		return fmt.Errorf("%w (the prod Router must still route through the legacy OnRamp before promotion)", err)
 	}
 	return nil
@@ -279,22 +296,17 @@ func filterBySelectors(selectors []uint64, configs []onramp.DestChainConfigArgs,
 
 // verifyProdRouterRoutesThrough returns an error unless the prod Router routes every
 // selector in destSelectors through wantOnRamp.
-func (a *EVMOnRampUpgrader) verifyProdRouterRoutesThrough(e cldf.Environment, chainSelector uint64, destSelectors []uint64, wantOnRamp common.Address) error {
+func (a *EVMOnRampUpgrader) verifyRouterRoutesThrough(e cldf.Environment, chainSelector uint64, destSelectors []uint64, wantOnRamp common.Address, routerAddr common.Address) error {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return fmt.Errorf("no EVM chain found for selector %d", chainSelector)
-	}
-
-	prodRouterAddr, err := resolveProdRouter(e.DataStore, chainSelector)
-	if err != nil {
-		return err
 	}
 
 	var mismatched []uint64
 	for _, destSel := range destSelectors {
 		report, err := cldf_ops.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
 			ChainSelector: chainSelector,
-			Address:       prodRouterAddr,
+			Address:       routerAddr,
 			Args:          destSel,
 		})
 		if err != nil {
