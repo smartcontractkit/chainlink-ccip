@@ -235,13 +235,13 @@ func UpgradeOnrampPhase1(
 	return cldf.CreateChangeSet(apply, validate)
 }
 
-// UpgradeOnrampPhase2 stages the ProdRouter lane class behind the TestRouter so it can be
-// smoke tested before going live: it points the new OnRamp's DefaultCCVs at the test verifier
-// resolver for those dest chains, then promotes them to the TestRouter. It is a no-op for a
-// chain with no ProdRouter dests (e.g. purely TestRouter chains skip this phase
-// entirely and go straight to Phase 3) — in that case the ownership pre-flight below is also
-// skipped, since there is nothing to write. TestRouter dests are untouched here — their
-// only promotion happens in Phase 3, once the verifier jobs observe both OnRamps.
+// UpgradeOnrampPhase2 stages ProdRouter lanes behind the TestRouter so the
+// replacement OnRamp can be smoke tested before going live. The OnRamp's
+// DefaultCCVs remain unchanged (CommitteeVerifier); TESTVTR requires the
+// test verifier through its AdvancedPoolHooks configuration.
+//
+// TestRouter-class lanes are untouched here because TestRouter is already
+// their production path.
 func UpgradeOnrampPhase2(
 	onrampUpgraderRegistry *adapters.OnRampUpgraderRegistry,
 	mcmsReaderRegistry *changesetscore.MCMSReaderRegistry,
