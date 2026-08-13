@@ -27,10 +27,6 @@ const (
 	upgradeQualifier = "redeploy"
 )
 
-// testVerifierResolverQualifier is the fixed CREATE2 salt for the resolver wrapping the test
-// verifier. It must match the qualifier used by the DeployTestVerifierChain sequence.
-const testVerifierResolverQualifier = "redeploy-test-verifier-resolver"
-
 var _ ccvadapters.OnRampUpgrader = (*EVMOnRampUpgrader)(nil)
 
 type oldOnRampConfig struct {
@@ -55,8 +51,10 @@ func (a *EVMOnRampUpgrader) VerifyOnrampRequireUpgrade(e cldf.Environment, chain
 	}
 	oldAddr := common.HexToAddress(oldRef.Address)
 
-	legacyRef := oldRef
-	legacyRef.Qualifier = legacyQualifier
+	existingLegacy, err := a.LegacyOnRampRef(e, chainSelector)
+	if err == nil && existingLegacy.Address != "" {
+		oldAddr = common.HexToAddress(existingLegacy.Address)
+	}
 
 	cfg, err := a.readOldOnRampConfigs(e.OperationsBundle, chain, chainSelector, oldAddr)
 	if err != nil {
