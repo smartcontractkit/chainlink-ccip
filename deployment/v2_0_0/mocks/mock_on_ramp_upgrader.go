@@ -239,6 +239,78 @@ func (_c *MockOnRampUpgrader_DestChainSelectors_Call) RunAndReturn(run func(e de
 	return _c
 }
 
+// ExistingOnRampUpgrade provides a mock function for the type MockOnRampUpgrader
+func (_mock *MockOnRampUpgrader) ExistingOnRampUpgrade(e deployment.Environment, chainSelector uint64) (adapters.OnRampUpgradeResult, bool, error) {
+	ret := _mock.Called(e, chainSelector)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExistingOnRampUpgrade")
+	}
+
+	var r0 adapters.OnRampUpgradeResult
+	var r1 bool
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64) (adapters.OnRampUpgradeResult, bool, error)); ok {
+		return returnFunc(e, chainSelector)
+	}
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64) adapters.OnRampUpgradeResult); ok {
+		r0 = returnFunc(e, chainSelector)
+	} else {
+		r0 = ret.Get(0).(adapters.OnRampUpgradeResult)
+	}
+	if returnFunc, ok := ret.Get(1).(func(deployment.Environment, uint64) bool); ok {
+		r1 = returnFunc(e, chainSelector)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	if returnFunc, ok := ret.Get(2).(func(deployment.Environment, uint64) error); ok {
+		r2 = returnFunc(e, chainSelector)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockOnRampUpgrader_ExistingOnRampUpgrade_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExistingOnRampUpgrade'
+type MockOnRampUpgrader_ExistingOnRampUpgrade_Call struct {
+	*mock.Call
+}
+
+// ExistingOnRampUpgrade is a helper method to define mock.On call
+//   - e deployment.Environment
+//   - chainSelector uint64
+func (_e *MockOnRampUpgrader_Expecter) ExistingOnRampUpgrade(e any, chainSelector any) *MockOnRampUpgrader_ExistingOnRampUpgrade_Call {
+	return &MockOnRampUpgrader_ExistingOnRampUpgrade_Call{Call: _e.mock.On("ExistingOnRampUpgrade", e, chainSelector)}
+}
+
+func (_c *MockOnRampUpgrader_ExistingOnRampUpgrade_Call) Run(run func(e deployment.Environment, chainSelector uint64)) *MockOnRampUpgrader_ExistingOnRampUpgrade_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 deployment.Environment
+		if args[0] != nil {
+			arg0 = args[0].(deployment.Environment)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockOnRampUpgrader_ExistingOnRampUpgrade_Call) Return(onRampUpgradeResult adapters.OnRampUpgradeResult, b bool, err error) *MockOnRampUpgrader_ExistingOnRampUpgrade_Call {
+	_c.Call.Return(onRampUpgradeResult, b, err)
+	return _c
+}
+
+func (_c *MockOnRampUpgrader_ExistingOnRampUpgrade_Call) RunAndReturn(run func(e deployment.Environment, chainSelector uint64) (adapters.OnRampUpgradeResult, bool, error)) *MockOnRampUpgrader_ExistingOnRampUpgrade_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LegacyOnRampRef provides a mock function for the type MockOnRampUpgrader
 func (_mock *MockOnRampUpgrader) LegacyOnRampRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
 	ret := _mock.Called(e, chainSelector)

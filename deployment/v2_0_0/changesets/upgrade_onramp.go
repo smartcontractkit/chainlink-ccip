@@ -70,32 +70,59 @@ func UpgradeOnrampPhase1(
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("get chain family: %w", err)
 		}
+
 		upgrader, ok := upgradeOnrampRegistry.Get(family)
 		if !ok {
 			return cldf.ChangesetOutput{}, fmt.Errorf("no OnRampUpgrader registered for family %q", family)
 		}
+
 		localAdapter, ok := chainFamilyRegistry.GetChainFamily(family)
 		if !ok {
 			return cldf.ChangesetOutput{}, fmt.Errorf("no chain family adapter for family %q", family)
 		}
 
-		// Pre-flight: Ask the adapter if the Onramp is already upgraded to the new version. If it is, we should not run this changeset.
-		if err := upgrader.VerifyOnrampRequireUpgrade(e, cfg.ChainSelector); err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("verify OnRamp require upgrade: %w", err)
-		}
-
-		// The old OnRamp is still canonical in the environment datastore (the merge of the
-		// new refs only happens after this changeset returns). GetOnRampAddress returns the
-		// source chain's wire format — for EVM, abi.encode(address), 32 bytes left-padded.
-		oldOnRampBytes, err := localAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
+		// Determine whether Phase 1 has already deployed the replacement OnRamp.
+		//
+		// If it has, this is either:
+		//   - a retry of Phase 1, or
+		//   - a later destination-lane batch for the same source chain.
+		//
+		// In either case we must reuse the existing canonical/legacy pair.
+		existingUpgrade, upgradeExists, err := upgrader.ExistingOnRampUpgrade(e, cfg.ChainSelector)
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("encode old OnRamp: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("inspect existing OnRamp upgrade: %w", err)
 		}
-		oldOnRampHex := "0x" + hex.EncodeToString(oldOnRampBytes)
 
-		// Pre-flight: the whitelist update below replaces each remote OffRamp's onramp
-		// list, so verify it currently holds exactly the old OnRamp. Anything else would
-		// be dropped silently — fail before any mutation instead.
+		var oldOnRampHex string
+		var existingNewOnRampHex string
+
+		if upgradeExists {
+			oldOnRampHex, err = wireEncodeOnRampRef(localAdapter, existingUpgrade.LegacyOnRampRef, cfg.ChainSelector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("encode legacy OnRamp: %w", err)
+			}
+
+			existingNewOnRampHex, err = wireEncodeOnRampRef(localAdapter, existingUpgrade.NewOnRampRef, cfg.ChainSelector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("encode existing new OnRamp: %w", err)
+			}
+		} else {
+			// First Phase 1 execution. The canonical OnRamp is still the old one.
+			if err := upgrader.VerifyOnrampRequireUpgrade(e, cfg.ChainSelector); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("verify OnRamp requires upgrade: %w", err)
+			}
+
+			oldOnRampBytes, err := localAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("encode old OnRamp: %w", err)
+			}
+
+			oldOnRampHex = "0x" + hex.EncodeToString(oldOnRampBytes)
+		}
+
+		// Resolve the source OnRamp's configured destinations before making any
+		// mutations. Before the first Phase 1 run this reads the legacy/canonical
+		// OnRamp. On a retry it reads the already-deployed canonical new OnRamp.
 		destChainSelectors, err := upgrader.DestChainSelectors(e, cfg.ChainSelector)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("resolve dest chain selectors: %w", err)
@@ -103,13 +130,36 @@ func UpgradeOnrampPhase1(
 
 		scopedDestSelectors := scopeDestSelectors(destChainSelectors, cfg.DestSelectorsInScope)
 
+		// Pre-flight the remote OffRamp state before deployment/reconciliation.
+		//
+		// First execution:
+		//   current must contain legacy and may contain only legacy.
+		//
+		// Retry / later lane batch:
+		//   current must contain legacy, and may contain either:
+		//     [legacy]
+		//   or
+		//     [legacy, new]
+		//
+		// This means a lane whose Phase 1 update already executed is accepted,
+		// while a new lane batch that still only knows legacy is also accepted.
 		for _, remoteSel := range scopedDestSelectors {
-			if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector,
-				[]string{oldOnRampHex}, nil, []string{oldOnRampHex}); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight OffRamp whitelist check for upgrade: %w", err)
+			allowedCurrent := []string{oldOnRampHex}
+			if upgradeExists {
+				allowedCurrent = append(allowedCurrent, existingNewOnRampHex)
+			}
+
+			if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector, allowedCurrent, nil, []string{oldOnRampHex}); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf(
+					"pre-flight OffRamp whitelist check for upgrade: %w",
+					err,
+				)
 			}
 		}
 
+		// DeployNewOnRamp is now a reconcile operation:
+		//   - first execution deploys;
+		//   - retry/later lane batch returns the existing canonical/legacy pair.
 		result, err := upgrader.DeployNewOnRamp(e, cfg.ChainSelector)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("upgrade OnRamp: %w", err)
@@ -119,15 +169,22 @@ func UpgradeOnrampPhase1(
 
 		ds := datastore.NewMemoryDataStore()
 
-		// DS merge at the end of the changeset is expected to upsert the new onramp ref and replace the legacy onramp
-		if addErr := ds.Addresses().Add(result.NewOnRampRef); addErr != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("add new OnRamp ref to datastore: %w", addErr)
-		}
-		if addErr := ds.Addresses().Add(result.LegacyOnRampRef); addErr != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("add legacy OnRamp ref to datastore: %w", addErr)
+		// Always return both refs. On a retry these are the existing refs and the
+		// datastore merge is an idempotent upsert.
+		if err := ds.Addresses().Add(result.NewOnRampRef); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("add new OnRamp ref to datastore: %w", err)
 		}
 
-		if !cfg.DisableTransferAndVerifierOwnership {
+		if err := ds.Addresses().Add(result.LegacyOnRampRef); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("add legacy OnRamp ref to datastore: %w", err)
+		}
+
+		// Ownership transfer is only part of the initial deployment.
+		//
+		// A Phase 1 retry must not try to transfer ownership again, because the
+		// first Phase 1 MCMS operation may already have transferred ownership to
+		// the timelock.
+		if !result.Reused && !cfg.DisableTransferAndVerifierOwnership {
 			ownershipBatchOps, _, errOwnership := deploy.TransferToTimelock(
 				cfg.ChainSelector, e, cfg.MCMS, []datastore.AddressRef{result.NewOnRampRef},
 				mcmsReaderRegistry, transferOwnershipReg,
@@ -138,14 +195,17 @@ func UpgradeOnrampPhase1(
 			batchOps = append(batchOps, ownershipBatchOps...)
 		}
 
-		// The new OnRamp is only in our output datastore — wire-encode it in isolation.
 		newOnRampHex, err := wireEncodeOnRampRef(localAdapter, result.NewOnRampRef, cfg.ChainSelector)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("encode new OnRamp: %w", err)
 		}
 
-		// Allow the new OnRamp on every remote OffRamp, regardless of lane class — the OffRamp
-		// natively supports multiple onramps per source chain, so this never affects live traffic.
+		// Reconcile every scoped destination to the Phase 1 desired state:
+		//
+		//   remote OffRamp source whitelist == [legacy, new]
+		//
+		// SetOffRampSourceOnRamps is expected to skip when this exact state is
+		// already present.
 		for _, remoteSel := range scopedDestSelectors {
 			setter, err := offrampSourceOnRampSetter(chainFamilyRegistry, remoteSel)
 			if err != nil {
@@ -160,6 +220,7 @@ func UpgradeOnrampPhase1(
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("allow new OnRamp on OffRamp for remote %d: %w", remoteSel, err)
 			}
+
 			if !skipped && batchOp != nil {
 				batchOps = append(batchOps, *batchOp)
 			}
@@ -258,7 +319,7 @@ func UpgradeOnrampPhase2(
 }
 
 // UpgradeOnrampPhase3 promotes the new OnRamp to production for both lane classes:
-//   - ProdRouter dests are restored to the real committee CCVs and promoted from the
+//   - ProdRouter dests promoted from the
 //     TestRouter (where Phase 2 staged them) to the prod Router.
 //   - TestRoutee dests are promoted directly to the TestRouter — this is their only
 //     promotion, since their production path is the TestRouter itself and they never stage.
@@ -494,7 +555,7 @@ func UpgradeOnrampCleanup(
 			}
 		}
 
-		e.Logger.Infow("OnRamp upgrade cleanup complete. Operators must manually: (1) remove the legacy OnRamp (qualifier=\"legacy\") from the datastore, (2) tell NOPs to remove temp verifier jobs",
+		e.Logger.Infow("OnRamp upgrade cleanup complete. If and only if no other lanes are left for that chain operators must manually: (1) remove the legacy OnRamp (qualifier=\"legacy\") from the datastore, (2) tell NOPs to remove temp verifier jobs",
 			"chain", cfg.ChainSelector)
 
 		if len(batchOps) == 0 {

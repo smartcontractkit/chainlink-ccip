@@ -18,6 +18,14 @@ import (
 type OnRampUpgrader interface {
 	// VerifyOnrampRequireUpgrade returns no error if the canonical OnRamp is not yet upgraded to the new version, and an error otherwise
 	VerifyOnrampRequireUpgrade(e cldf.Environment, chainSelector uint64) error
+
+	// ExistingOnRampUpgrade returns the existing canonical new OnRamp and legacy
+	// OnRamp pair when Phase 1 has already deployed the replacement OnRamp.
+	//
+	// The bool is false when no Phase 1 upgrade state exists yet. Implementations
+	// must return an error when upgrade state exists but is inconsistent.
+	ExistingOnRampUpgrade(e cldf.Environment, chainSelector uint64) (OnRampUpgradeResult, bool, error)
+
 	DeployNewOnRamp(e cldf.Environment, chainSelector uint64) (OnRampUpgradeResult, error)
 	// ClassifyDestChains partitions the legacy OnRamp's dest chains by which router
 	// currently fronts them (prod Router vs TestRouter). A dest chain routed through
@@ -69,6 +77,10 @@ type OnRampUpgradeResult struct {
 	NewOnRampRef    datastore.AddressRef
 	LegacyOnRampRef datastore.AddressRef
 	BatchOps        []mcms_types.BatchOperation
+
+	// Reused is true when Phase 1 had already deployed the replacement OnRamp
+	// and this result represents the existing canonical/legacy pair.
+	Reused bool
 }
 
 // OnRampUpgraderRegistry maps chain families to OnRampUpgrader implementations.

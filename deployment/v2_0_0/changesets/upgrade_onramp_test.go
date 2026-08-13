@@ -269,6 +269,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		// chainB is TestRouter-class: Phase 1 must not deploy a test verifier for it.
 		upgrader.EXPECT().DeployNewOnRamp(mock.Anything, chainA).
 			Return(upgradeResult(chainB), nil).Once()
+		upgrader.EXPECT().ExistingOnRampUpgrade(mock.Anything, chainA).Return(adapters.OnRampUpgradeResult{}, false, nil).Once()
 
 		familyReg, lane := newLaneMocks(t)
 		// Called twice: old OnRamp from the env datastore, new OnRamp from the
@@ -342,6 +343,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
 		expectVerifyRequireUpgrade(upgrader, true)
+		upgrader.EXPECT().ExistingOnRampUpgrade(mock.Anything, chainA).Return(adapters.OnRampUpgradeResult{}, false, nil).Once()
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
 		// chainB is ProdRouter-class: Phase 1 must validate test verifier infra.
@@ -440,6 +442,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
 		expectVerifyRequireUpgrade(upgrader, true)
+		upgrader.EXPECT().ExistingOnRampUpgrade(mock.Anything, chainA).Return(adapters.OnRampUpgradeResult{}, false, nil).Once()
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
 		upgrader.EXPECT().DeployNewOnRamp(mock.Anything, chainA).
@@ -471,6 +474,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		seedOnRamp(t, &e, oldOnRampAddr)
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ExistingOnRampUpgrade(mock.Anything, chainA).Return(adapters.OnRampUpgradeResult{}, false, nil).Once()
 		expectVerifyRequireUpgrade(upgrader, true)
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
@@ -508,6 +512,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
 		expectVerifyRequireUpgrade(upgrader, true)
+		upgrader.EXPECT().ExistingOnRampUpgrade(mock.Anything, chainA).Return(adapters.OnRampUpgradeResult{}, false, nil).Once()
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
 		// DeployNewOnRamp must NOT be called: the pre-flight check fails first.
@@ -541,6 +546,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
 		expectVerifyRequireUpgrade(upgrader, true)
+		upgrader.EXPECT().ExistingOnRampUpgrade(mock.Anything, chainA).Return(adapters.OnRampUpgradeResult{}, false, nil).Once()
 		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
 			Return([]uint64{chainB}, nil).Once()
 
@@ -570,6 +576,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		seedOnRamp(t, &e, oldOnRampAddr)
 
 		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ExistingOnRampUpgrade(mock.Anything, chainA).Return(adapters.OnRampUpgradeResult{}, false, nil).Once()
 		expectVerifyRequireUpgrade(upgrader, false)
 
 		familyReg, _ := newLaneMocks(t)
