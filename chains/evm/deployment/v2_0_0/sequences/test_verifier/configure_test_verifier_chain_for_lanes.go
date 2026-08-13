@@ -43,7 +43,7 @@ var ConfigureTestVerifierChainForLanes = cldf_ops.NewSequence(
 		verifierAddr := common.HexToAddress(verifierRef.Address)
 
 		resolverRef, err := findRef(dep.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+			Type:      datastore.ContractType(versioned_verifier_resolver.TestVerifierResolverType),
 			Version:   versioned_verifier_resolver.Version,
 			Qualifier: TestVerifierResolverQualifier,
 		}, input.ChainSelector)

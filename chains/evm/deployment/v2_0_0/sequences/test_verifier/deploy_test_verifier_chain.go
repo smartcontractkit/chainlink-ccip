@@ -241,7 +241,7 @@ var DeployTestVerifierChain = cldf_ops.NewSequence(
 		// the datastore first.
 		resolverRefs := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
-			datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType)),
+			datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.TestVerifierResolverType)),
 			datastore.AddressRefByVersion(versioned_verifier_resolver.Version),
 			datastore.AddressRefByQualifier(TestVerifierResolverQualifier),
 		)
@@ -260,7 +260,7 @@ var DeployTestVerifierChain = cldf_ops.NewSequence(
 				CREATE2Factory: create2FactoryAddr,
 				ChainSelector:  input.ChainSelector,
 				Qualifier:      TestVerifierResolverQualifier,
-				Type:           datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+				Type:           datastore.ContractType(versioned_verifier_resolver.TestVerifierResolverType),
 				Version:        versioned_verifier_resolver.Version,
 			})
 			if err != nil {
