@@ -33,7 +33,11 @@ import (
 )
 
 // v2MajorVersion is the major version of a lane already on CCIP 2.0 (no migration needed).
-const v2MajorVersion = 2
+const (
+	v2MajorVersion    = 2
+	testTokenSymbol   = "TESTTR" // Note: a TEST token already exists on some chains behind the PROD Router
+	testTokenDecimals = 18
+)
 
 // tokenSymbolLookup resolves the ERC20 symbol of a token deployed on the given chain.
 type tokenSymbolLookup func(chainSel uint64, token common.Address) (string, error)
@@ -194,9 +198,6 @@ func MigrateChainLanesToV2(
 
 	return deployment.CreateChangeSet(apply, validate)
 }
-
-const testTokenSymbol = "TESTTR" // Note: a TEST token already exists on some chains behind the PROD Router
-const testTokenDecimals = 18
 
 func mergeTestTokenOutput(e deployment.Environment, laneOut, tokenOut deployment.ChangesetOutput) (deployment.ChangesetOutput, error) {
 	merged := laneOut
