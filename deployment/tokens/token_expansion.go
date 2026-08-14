@@ -363,8 +363,12 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				// This runs BEFORE processTokenConfigForChain / UpdateAuthorities so the
 				// new pool is not registered in TAR yet, and we can read the legacy pool
 				// address directly from TAR.
+				var seedRegistryRef datastore.AddressRef
+				if tc := input.TokenTransferConfig; tc != nil {
+					seedRegistryRef = tc.RegistryRef
+				}
 				seedBatchOps, seedReports, err := buildSeedMigrationBatchOps(
-					e, tokenPoolRegistry, selector, *tokenPool, *tokenRef,
+					e, tokenPoolRegistry, selector, *tokenPool, *tokenRef, seedRegistryRef,
 					deployTokenPoolInput.TimelockAddress,
 					deployTokenPoolInput.LiquidityMigrationAmount,
 					deployTokenPoolInput.LiquidityMigrationBasisPoints,
@@ -632,6 +636,7 @@ func buildSeedMigrationBatchOps(
 	tokenPoolRegistry *TokenAdapterRegistry,
 	selector uint64,
 	tokenPool, tokenRef datastore.AddressRef,
+	registryRef datastore.AddressRef,
 	timelockAddr string,
 	amount *big.Int,
 	basisPoints *uint16,
@@ -658,7 +663,7 @@ func buildSeedMigrationBatchOps(
 		)
 	}
 
-	activePool, err := registryReader.GetActivePool(e, selector, fullTokenRef)
+	activePool, err := registryReader.GetActivePool(e, selector, fullTokenRef, registryRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get active pool for liquidity seed on chain selector %d: %w", selector, err)
 	}

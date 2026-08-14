@@ -190,7 +190,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 			if !ok {
 				return nil, nil, nil, fmt.Errorf("no token admin registry reader for chain family %s", family)
 			}
-			activePool, err := tarReader.GetActivePool(e, selector, fullTokenRef)
+			activePool, err := tarReader.GetActivePool(e, selector, fullTokenRef, token.RegistryRef)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to get active pool for token pool on chain selector %d: %w", selector, err)
 			}

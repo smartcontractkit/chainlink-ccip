@@ -107,7 +107,9 @@ type RateLimitReaderAdapter interface {
 type TokenAdminRegistryReader interface {
 	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
 	// as raw address bytes. Returns empty bytes (no error) when no pool is registered.
-	GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef) ([]byte, error)
+	// Overrides are optional registry refs to use instead of the datastore default;
+	// the first one that resolves from the datastore is used.
+	GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error)
 	// GetTokenAdminRegistryRef resolves the TokenAdminRegistry ref for the given chain from the datastore.
 	GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error)
 }

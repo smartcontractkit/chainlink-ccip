@@ -354,10 +354,11 @@ func (a *EVMTokenBase) GetTokenAdminRegistryAddress(ds datastore.DataStore, sele
 }
 
 // GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry as raw
-// address bytes, or empty bytes when none is registered. The registry is resolved from the datastore
-// via GetTokenAdminRegistryRef. The read uses WithForceExecute because it reflects mutable on-chain
-// state that may have been read (and cached) earlier in this bundle.
-func (a *EVMTokenBase) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef) ([]byte, error) {
+// address bytes, or empty bytes when none is registered. Overrides are optional registry refs — the
+// first one that resolves from the datastore is used; when none are provided or none resolve, the
+// default TAR from the datastore is used. The read uses WithForceExecute because it reflects mutable
+// on-chain state that may have been read (and cached) earlier in this bundle.
+func (a *EVMTokenBase) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -368,9 +369,20 @@ func (a *EVMTokenBase) GetActivePool(e deployment.Environment, chainSelector uin
 		return nil, fmt.Errorf("failed to parse token address from ref %v on chain %d: %w", tokenRef, chainSelector, err)
 	}
 
-	registryAddr, err := a.GetTokenAdminRegistryAddress(e.DataStore, chainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve TokenAdminRegistry on chain %d: %w", chainSelector, err)
+	var registryAddr common.Address
+	for _, override := range overrides {
+		if !datastore_utils.IsAddressRefEmpty(override) {
+			if addr, err := datastore_utils.FindAndFormatRef(e.DataStore, override, chainSelector, datastore_utils_evm.ToNonZeroEVMAddress); err == nil {
+				registryAddr = addr
+				break
+			}
+		}
+	}
+	if registryAddr == (common.Address{}) {
+		registryAddr, err = a.GetTokenAdminRegistryAddress(e.DataStore, chainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve TokenAdminRegistry on chain %d: %w", chainSelector, err)
+		}
 	}
 
 	report, err := cldf_ops.ExecuteOperation(

@@ -21,7 +21,7 @@ var _ tokensapi.TokenAdminRegistryReader = (*SolanaAdminRegistryReader)(nil)
 
 type SolanaAdminRegistryReader struct{}
 
-func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef) ([]byte, error) {
+func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error) {
 	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -41,12 +41,24 @@ func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chai
 		return nil, fmt.Errorf("invalid token mint address %q: %w", tokenAddress, err)
 	}
 
-	routerRef, err := a.GetTokenAdminRegistryRef(e, chainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve Router on chain %d: %w", chainSelector, err)
+	var router solana.PublicKey
+	for _, override := range overrides {
+		if !datastore_utils.IsAddressRefEmpty(override) {
+			if ref, err := datastore_utils.FindAndFormatRef(e.DataStore, override, chainSelector, datastore_utils.FullRef); err == nil && ref.Address != "" {
+				router = solana.MustPublicKeyFromBase58(ref.Address)
+				break
+			}
+		}
+	}
+	if router.IsZero() {
+		if routerRef, err := a.GetTokenAdminRegistryRef(e, chainSelector); err != nil {
+			return nil, fmt.Errorf("failed to resolve Router on chain %d: %w", chainSelector, err)
+		} else {
+			router = solana.MustPublicKeyFromBase58(routerRef.Address)
+		}
 	}
 
-	tarPDA, _, err := state.FindTokenAdminRegistryPDA(mint, solana.MustPublicKeyFromBase58(routerRef.Address))
+	tarPDA, _, err := state.FindTokenAdminRegistryPDA(mint, router)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive TAR PDA: %w", err)
 	}
