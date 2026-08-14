@@ -280,7 +280,11 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				}
 				var remotePoolBytes []byte
 				if counterpartCfg, alsoMigrating := cfg[remoteSelector]; alsoMigrating {
-					remotePoolBytes, err = adapter.AddressRefToBytes(counterpartCfg.TokenPoolRef)
+					fullRemotePoolRef, err := ResolveTokenPoolRef(e, tokenRegistry, remoteSelector, counterpartCfg.TokenPoolRef)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to resolve counterpart pool ref for remote chain selector %d: %w", remoteSelector, err)
+					}
+					remotePoolBytes, err = remoteNormalizer.StringToBytes(fullRemotePoolRef.Address)
 					if err != nil {
 						return nil, nil, nil, fmt.Errorf("failed to convert counterpart pool ref to bytes for chain selector %d: %w", remoteSelector, err)
 					}
