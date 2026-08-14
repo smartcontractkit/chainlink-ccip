@@ -29,7 +29,7 @@ func (a *ChainFamilyAdapter) GetOffRampSourceOnRamps(
 	e cldf.Environment,
 	localChainSelector uint64,
 	sourceChainSelector uint64,
-) ([]string, error) {
+) ([][]byte, error) {
 	chain, ok := e.BlockChains.EVMChains()[localChainSelector]
 	if !ok {
 		return nil, fmt.Errorf("EVM chain %d not found in environment", localChainSelector)
@@ -51,9 +51,9 @@ func (a *ChainFamilyAdapter) GetOffRampSourceOnRamps(
 			sourceChainSelector, offRampAddr, err)
 	}
 
-	onRamps := make([]string, 0, len(report.Output.OnRamps))
+	onRamps := make([][]byte, 0, len(report.Output.OnRamps))
 	for _, onRamp := range report.Output.OnRamps {
-		onRamps = append(onRamps, hexutil.Encode(onRamp))
+		onRamps = append(onRamps, onRamp)
 	}
 	return onRamps, nil
 }
