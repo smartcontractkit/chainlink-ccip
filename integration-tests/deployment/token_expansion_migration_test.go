@@ -548,6 +548,17 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	cfgAfter, err := tarA.GetTokenConfig(&bind.CallOpts{Context: t.Context()}, s.tokAddrA)
 	require.NoError(t, err)
 	require.Equal(t, newPoolAddrA, cfgAfter.TokenPool, "TAR should be switched to the new v2.0 pool")
+
+	// Reverse propagation: the legacy pool on the remote chain (B_old) should now have the new pool (A_new)
+	// in its remote pool list for chain A. This is the counterpart direction of autoMigrateRemoteChains —
+	// handled by autoMigrateRemoteChains reverse propagation in processTokenConfigForChain.
+	chainB := e.BlockChains.EVMChains()[selB]
+	oldPoolB, err := tokenpoolV2_0_0.NewTokenPool(s.oldPoolAddrB, chainB.Client)
+	require.NoError(t, err)
+	gotRemotePoolsB, err := oldPoolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, selA)
+	require.NoError(t, err)
+	require.Contains(t, gotRemotePoolsB, common.LeftPadBytes(newPoolAddrA.Bytes(), 32),
+		"reverse propagation: legacy pool B should have new pool A in remote pools for chain A")
 }
 
 // TestTokenExpansionMigration_DeployWithSeed verifies that deploying a LockRelease pool with
