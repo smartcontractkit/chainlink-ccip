@@ -19,7 +19,44 @@ import (
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
-var _ ccvadapters.OffRampSourceOnRampSetter = (*ChainFamilyAdapter)(nil)
+var (
+	_ ccvadapters.OffRampSourceOnRampSetter = (*ChainFamilyAdapter)(nil)
+	_ ccvadapters.OffRampSourceOnRampReader = (*ChainFamilyAdapter)(nil)
+)
+
+// GetOffRampSourceOnRamps implements [ccvadapters.OffRampSourceOnRampReader].
+func (a *ChainFamilyAdapter) GetOffRampSourceOnRamps(
+	e cldf.Environment,
+	localChainSelector uint64,
+	sourceChainSelector uint64,
+) ([][]byte, error) {
+	chain, ok := e.BlockChains.EVMChains()[localChainSelector]
+	if !ok {
+		return nil, fmt.Errorf("EVM chain %d not found in environment", localChainSelector)
+	}
+
+	offRampBytes, err := a.GetOffRampAddress(e.DataStore, localChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("resolve OffRamp on chain %d: %w", localChainSelector, err)
+	}
+	offRampAddr := common.BytesToAddress(offRampBytes)
+
+	report, err := cldf_ops.ExecuteOperation(e.OperationsBundle, offramp.GetSourceChainConfig, chain, contract.FunctionInput[uint64]{
+		ChainSelector: chain.Selector,
+		Address:       offRampAddr,
+		Args:          sourceChainSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get source chain config for %d on OffRamp %s: %w",
+			sourceChainSelector, offRampAddr, err)
+	}
+
+	onRamps := make([][]byte, 0, len(report.Output.OnRamps))
+	for _, onRamp := range report.Output.OnRamps {
+		onRamps = append(onRamps, onRamp)
+	}
+	return onRamps, nil
+}
 
 // SetOffRampSourceOnRamps updates the OffRamp source-chain onramp whitelist on an EVM chain.
 func (a *ChainFamilyAdapter) SetOffRampSourceOnRamps(
