@@ -5,7 +5,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -381,11 +380,11 @@ func TestGetOffRampSourceOnRamps(t *testing.T) {
 	// The lane setup whitelists chain0's canonical OnRamp on chain1's OffRamp,
 	// in wire format (32-byte left-padded).
 	onRampRef := initialStateAssertions(t, *e)
-	expected := hexutil.Encode(common.LeftPadBytes(common.HexToAddress(onRampRef.Address).Bytes(), 32))
+	expected := common.LeftPadBytes(common.HexToAddress(onRampRef.Address).Bytes(), 32)
 
 	got, err := adapter.GetOffRampSourceOnRamps(*e, upgradeTestChains[1], upgradeTestChains[0])
 	require.NoError(t, err)
-	require.Equal(t, []string{expected}, got)
+	require.Equal(t, [][]byte{expected}, got)
 }
 
 func TestLegacyOnRampRef(t *testing.T) {
