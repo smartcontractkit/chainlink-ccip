@@ -45,8 +45,12 @@ func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chai
 	for _, override := range overrides {
 		if !datastore_utils.IsAddressRefEmpty(override) {
 			if ref, err := datastore_utils.FindAndFormatRef(e.DataStore, override, chainSelector, datastore_utils.FullRef); err == nil && ref.Address != "" {
-				router = solana.MustPublicKeyFromBase58(ref.Address)
-				break
+				if parsedRouter, parseErr := solana.PublicKeyFromBase58(ref.Address); parseErr != nil {
+					return nil, fmt.Errorf("invalid router address %q: %w", ref.Address, parseErr)
+				} else {
+					router = parsedRouter
+					break
+				}
 			}
 		}
 	}
