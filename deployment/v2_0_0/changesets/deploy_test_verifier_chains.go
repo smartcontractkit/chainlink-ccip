@@ -23,9 +23,6 @@ type TestVerifierChainConfig struct {
 	PreMintAccounts map[string]string
 	// AllowedSenders are addresses allowlisted on the test verifier.
 	AllowedSenders []string
-	// StorageLocations are passed to the VerifierTestHelper constructor.
-	// The verifier's getFee delegates to RMN, which needs valid storage locations.
-	StorageLocations []string
 	// RemoteChains is the set of remote chains to configure lanes for.
 	RemoteChains map[uint64]adapters.RemoteTestVerifierChainConfig
 }
@@ -68,6 +65,11 @@ func makeVerifyDeployTestVerifierChains() func(cldf.Environment, DeployTestVerif
 			if _, err := chain_selectors.GetSelectorFamily(chainSel); err != nil {
 				return fmt.Errorf("invalid chain selector %d: %w", chainSel, err)
 			}
+
+			if len(chainCfg.AllowedSenders) == 0 {
+				return fmt.Errorf("chain %d must have at least one allowed sender", chainSel)
+			}
+
 			for _, addr := range chainCfg.AllowedSenders {
 				if !common.IsHexAddress(addr) {
 					return fmt.Errorf("invalid allowed sender address %q for chain %d", addr, chainSel)
@@ -123,13 +125,12 @@ func makeApplyDeployTestVerifierChains(
 				DataStore:   e.DataStore,
 			}
 			in := adapters.DeployTestVerifierChainInput{
-				ChainSelector:    chainSel,
-				TokenName:        DefaultTokenName,
-				TokenSymbol:      DefaultTokenSymbol,
-				TokenDecimals:    DefaultTokenDecimals,
-				PreMintAccounts:  chainCfg.PreMintAccounts,
-				AllowedSenders:   chainCfg.AllowedSenders,
-				StorageLocations: chainCfg.StorageLocations,
+				ChainSelector:   chainSel,
+				TokenName:       DefaultTokenName,
+				TokenSymbol:     DefaultTokenSymbol,
+				TokenDecimals:   DefaultTokenDecimals,
+				PreMintAccounts: chainCfg.PreMintAccounts,
+				AllowedSenders:  chainCfg.AllowedSenders,
 			}
 			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].DeployTestVerifierChain(), dep, in)
 			if err != nil {

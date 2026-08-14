@@ -224,11 +224,10 @@ var DeployTestVerifierChain = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: deployment.NewTypeAndVersion(verifier_test_helper.ContractType, *verifier_test_helper.Version),
 			Args: verifier_test_helper.ConstructorArgs{
-				TestRouter:       testRouterAddr,
-				Rmn:              rmnProxyAddr,
-				StorageLocations: input.StorageLocations,
-				VersionTag:       TestVerifierVersionTag,
-				TestToken:        tokenAddr,
+				TestRouter: testRouterAddr,
+				Rmn:        rmnProxyAddr,
+				VersionTag: TestVerifierVersionTag,
+				TestToken:  tokenAddr,
 			},
 		}, existingAddresses)
 		if err != nil {

@@ -49,9 +49,6 @@ func TestDeployTestVerifierChain(t *testing.T) {
 		AllowedSenders: []string{
 			preMintAccount.Hex(),
 		},
-		StorageLocations: []string{
-			"https://test.chain.link.fake",
-		},
 	}
 
 	report, err := operations.ExecuteSequence(

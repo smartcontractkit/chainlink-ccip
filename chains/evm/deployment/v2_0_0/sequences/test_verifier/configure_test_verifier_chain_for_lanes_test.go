@@ -144,6 +144,7 @@ func TestConfigureTestVerifierChainForLanes(t *testing.T) {
 	baseDS := mergeTestVerifierDataStores(t, baseA, baseB)
 
 	allowedSender := e.BlockChains.EVMChains()[chainA].DeployerKey.From
+	differentSender := common.HexToAddress("0x1234567890123456789012345678901234567890")
 
 	deploy := func(chainSelector uint64) []datastore.AddressRef {
 		report, err := operations.ExecuteSequence(
@@ -160,9 +161,6 @@ func TestConfigureTestVerifierChainForLanes(t *testing.T) {
 				TokenDecimals: 18,
 				AllowedSenders: []string{
 					allowedSender.Hex(),
-				},
-				StorageLocations: []string{
-					"https://test.chain.link.fake",
 				},
 			},
 		)
@@ -353,6 +351,84 @@ func TestConfigureTestVerifierChainForLanes(t *testing.T) {
 			t,
 			configReport.Output.AllowedSendersList,
 			allowedSender,
+		)
+	})
+
+	t.Run("configure allowlist can remove senders", func(t *testing.T) {
+		// Remove the allowed sender from the allowlist.
+		input := adapters.ConfigureTestVerifierForLanesInput{
+			ChainSelector:  chainA,
+			AllowedSenders: []string{
+				// No allowed senders.
+			},
+			RemoteChains: map[uint64]adapters.RemoteTestVerifierChainConfig{
+				chainB: cfg,
+			},
+		}
+
+		_, err := operations.ExecuteSequence(
+			testsetup.BundleWithFreshReporter(e.OperationsBundle),
+			ConfigureTestVerifierChainForLanes,
+			deps,
+			input,
+		)
+		require.NoError(t, err)
+
+		configReport, err := operations.ExecuteOperation(
+			testsetup.BundleWithFreshReporter(e.OperationsBundle),
+			verifier_test_helper.GetRemoteChainConfig,
+			chain,
+			contract_utils.FunctionInput[uint64]{
+				ChainSelector: chainA,
+				Address:       verifierAddr,
+				Args:          chainB,
+			},
+		)
+		require.NoError(t, err)
+
+		require.Empty(
+			t,
+			configReport.Output.AllowedSendersList,
+			"allowlist should be empty after removing all senders",
+		)
+	})
+
+	t.Run("configure allowlist can add senders", func(t *testing.T) {
+		// Add the allowed sender back to the allowlist.
+		input := adapters.ConfigureTestVerifierForLanesInput{
+			ChainSelector: chainA,
+			AllowedSenders: []string{
+				differentSender.Hex(),
+			},
+			RemoteChains: map[uint64]adapters.RemoteTestVerifierChainConfig{
+				chainB: cfg,
+			},
+		}
+
+		_, err := operations.ExecuteSequence(
+			testsetup.BundleWithFreshReporter(e.OperationsBundle),
+			ConfigureTestVerifierChainForLanes,
+			deps,
+			input,
+		)
+		require.NoError(t, err)
+
+		configReport, err := operations.ExecuteOperation(
+			testsetup.BundleWithFreshReporter(e.OperationsBundle),
+			verifier_test_helper.GetRemoteChainConfig,
+			chain,
+			contract_utils.FunctionInput[uint64]{
+				ChainSelector: chainA,
+				Address:       verifierAddr,
+				Args:          chainB,
+			},
+		)
+		require.NoError(t, err)
+
+		require.Contains(
+			t,
+			configReport.Output.AllowedSendersList,
+			differentSender,
 		)
 	})
 

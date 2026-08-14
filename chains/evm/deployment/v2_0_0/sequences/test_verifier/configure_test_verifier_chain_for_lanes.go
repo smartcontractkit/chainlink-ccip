@@ -3,6 +3,7 @@ package test_verifier
 import (
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -118,20 +119,47 @@ var ConfigureTestVerifierChainForLanes = cldf_ops.NewSequence(
 			}
 			writes = append(writes, remoteChainConfigReport.Output)
 
-			// 2. Configure test verifier allowlist.
-			allowlistReport, err := cldf_ops.ExecuteOperation(b, verifier_test_helper.ApplyAllowlistUpdates, chain, contract_utils.FunctionInput[[]verifier_test_helper.AllowlistConfigArgs]{
+			// 2. Configure test verifier allowlist for remote chain.
+			getRemoteConfigReports, err := cldf_ops.ExecuteOperation(b, verifier_test_helper.GetRemoteChainConfig, chain, contract_utils.FunctionInput[uint64]{
 				ChainSelector: input.ChainSelector,
 				Address:       verifierAddr,
-				Args: []verifier_test_helper.AllowlistConfigArgs{{
-					DestChainSelector:       remoteChainSelector,
-					AllowlistEnabled:        true,
-					AddedAllowlistedSenders: senders,
-				}},
+				Args:          remoteChainSelector,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure test verifier allowlist for chain %d remote %d: %w", input.ChainSelector, remoteChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get test verifier remote chain config for chain %d remote %d: %w", input.ChainSelector, remoteChainSelector, err)
 			}
-			writes = append(writes, allowlistReport.Output)
+			currentAllowlist := getRemoteConfigReports.Output.AllowedSendersList
+			addedSenders := make([]common.Address, 0)
+			removedSenders := make([]common.Address, 0)
+			for _, s := range senders {
+				found := slices.ContainsFunc(currentAllowlist, func(a common.Address) bool { return a == s })
+				if !found {
+					addedSenders = append(addedSenders, s)
+				}
+			}
+			for _, s := range currentAllowlist {
+				found := slices.ContainsFunc(senders, func(a common.Address) bool { return a == s })
+				if !found {
+					removedSenders = append(removedSenders, s)
+				}
+			}
+
+			if len(addedSenders) > 0 || len(removedSenders) > 0 {
+				allowlistUpdateReport, err := cldf_ops.ExecuteOperation(b, verifier_test_helper.ApplyAllowlistUpdates, chain, contract_utils.FunctionInput[[]verifier_test_helper.AllowlistConfigArgs]{
+					ChainSelector: input.ChainSelector,
+					Address:       verifierAddr,
+					Args: []verifier_test_helper.AllowlistConfigArgs{{
+						DestChainSelector:         remoteChainSelector,
+						AllowlistEnabled:          true,
+						AddedAllowlistedSenders:   addedSenders,
+						RemovedAllowlistedSenders: removedSenders,
+					}},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to update test verifier allowlist for chain %d remote %d: %w", input.ChainSelector, remoteChainSelector, err)
+				}
+				writes = append(writes, allowlistUpdateReport.Output)
+			}
 
 			// 3. Wire outbound implementation on resolver.
 			outboundReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.ApplyOutboundImplementationUpdates, chain, contract_utils.FunctionInput[[]versioned_verifier_resolver.OutboundImplementationArgs]{

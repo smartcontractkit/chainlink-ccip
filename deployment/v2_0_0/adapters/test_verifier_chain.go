@@ -27,9 +27,6 @@ type DeployTestVerifierChainInput struct {
 	PreMintAccounts map[string]string
 	// AllowedSenders are addresses allowlisted on the test verifier.
 	AllowedSenders []string
-	// StorageLocations are passed to the VerifierTestHelper constructor. The verifier's
-	// getFee delegates to RMN, which needs valid storage locations to compute fees.
-	StorageLocations []string
 }
 
 // DeployTestVerifierChainDeps are the dependencies for the DeployTestVerifierChain sequence.
