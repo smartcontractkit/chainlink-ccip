@@ -29,7 +29,6 @@ type OffRampSourceOnRampSetter interface {
 // current source-chain onramp whitelist from a chain's OffRamp.
 type OffRampSourceOnRampReader interface {
 	// GetOffRampSourceOnRamps returns the onramps currently whitelisted for
-	// sourceChainSelector on the local chain's OffRamp, as 0x-prefixed hex strings
-	// in the same wire format as OffRampSetSourceOnRampsEntry.OnRamps.
-	GetOffRampSourceOnRamps(e cldf.Environment, localChainSelector uint64, sourceChainSelector uint64) ([]string, error)
+	// sourceChainSelector on the local chain's OffRamp, as the source chain writes them into its messages. For an EVM source that is abi.encode(address) — 32 bytes, left zero-padded — not the 20-byte contract address.
+	GetOffRampSourceOnRamps(e cldf.Environment, localChainSelector uint64, sourceChainSelector uint64) ([][]byte, error)
 }

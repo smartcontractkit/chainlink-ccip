@@ -37,23 +37,23 @@ func (_m *MockOffRampSourceOnRampReader) EXPECT() *MockOffRampSourceOnRampReader
 }
 
 // GetOffRampSourceOnRamps provides a mock function for the type MockOffRampSourceOnRampReader
-func (_mock *MockOffRampSourceOnRampReader) GetOffRampSourceOnRamps(e deployment.Environment, localChainSelector uint64, sourceChainSelector uint64) ([]string, error) {
+func (_mock *MockOffRampSourceOnRampReader) GetOffRampSourceOnRamps(e deployment.Environment, localChainSelector uint64, sourceChainSelector uint64) ([][]byte, error) {
 	ret := _mock.Called(e, localChainSelector, sourceChainSelector)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOffRampSourceOnRamps")
 	}
 
-	var r0 []string
+	var r0 [][]byte
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, uint64) ([]string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, uint64) ([][]byte, error)); ok {
 		return returnFunc(e, localChainSelector, sourceChainSelector)
 	}
-	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, uint64) []string); ok {
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, uint64) [][]byte); ok {
 		r0 = returnFunc(e, localChainSelector, sourceChainSelector)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
+			r0 = ret.Get(0).([][]byte)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(deployment.Environment, uint64, uint64) error); ok {
@@ -100,12 +100,12 @@ func (_c *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call) Run(run fu
 	return _c
 }
 
-func (_c *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call) Return(strings []string, err error) *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call {
-	_c.Call.Return(strings, err)
+func (_c *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call) Return(bytess [][]byte, err error) *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call {
+	_c.Call.Return(bytess, err)
 	return _c
 }
 
-func (_c *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call) RunAndReturn(run func(e deployment.Environment, localChainSelector uint64, sourceChainSelector uint64) ([]string, error)) *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call {
+func (_c *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call) RunAndReturn(run func(e deployment.Environment, localChainSelector uint64, sourceChainSelector uint64) ([][]byte, error)) *MockOffRampSourceOnRampReader_GetOffRampSourceOnRamps_Call {
 	_c.Call.Return(run)
 	return _c
 }

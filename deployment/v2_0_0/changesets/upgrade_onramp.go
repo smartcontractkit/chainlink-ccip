@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -26,6 +25,40 @@ type UpgradeOnrampConfig struct {
 	MCMS                                mcms.Input
 }
 
+func encodeAddressToHex(addr []byte) string {
+	return "0x" + hex.EncodeToString(addr)
+}
+
+func validateUpgradeOnrampConfig(cfg UpgradeOnrampConfig) error {
+	if cfg.ChainSelector == 0 {
+		return fmt.Errorf("chain selector is required")
+	}
+	if len(cfg.DestSelectorsInScope) == 0 {
+		return fmt.Errorf("at least one dest selector must be in scope")
+	}
+	return nil
+}
+
+func initUpgradeOnrampChangesets(upgradeOnrampRegistry *adapters.OnRampUpgraderRegistry, cfg UpgradeOnrampConfig) (string, adapters.OnRampUpgrader, error) {
+	if err := cfg.MCMS.PopulateDefaults(); err != nil {
+		return "", nil, err
+	}
+
+	if err := cfg.MCMS.Validate(); err != nil {
+		return "", nil, err
+	}
+
+	family, err := chainsel.GetSelectorFamily(cfg.ChainSelector)
+	if err != nil {
+		return "", nil, fmt.Errorf("get chain family: %w", err)
+	}
+	upgrader, ok := upgradeOnrampRegistry.Get(family)
+	if !ok {
+		return "", nil, fmt.Errorf("no OnRampUpgrader registered for family %q", family)
+	}
+	return family, upgrader, nil
+}
+
 // UpgradeOnrampPhase1 upgrades the OnRamp with RMNProxy address, copies dest
 // chain configs verbatim (including each dest's current Router), allows the new OnRamp on
 // all remote OffRamps alongside the legacy one, and transfers ownership of the new OnRamp to
@@ -45,34 +78,17 @@ func UpgradeOnrampPhase1(
 	transferOwnershipReg *deploy.TransferOwnershipAdapterRegistry,
 ) cldf.ChangeSetV2[UpgradeOnrampConfig] {
 	validate := func(e cldf.Environment, cfg UpgradeOnrampConfig) error {
-		if cfg.ChainSelector == 0 {
-			return fmt.Errorf("chain selector is required")
-		}
-
-		if len(cfg.DestSelectorsInScope) == 0 {
-			return fmt.Errorf("at least one dest selector must be in scope")
+		if err := validateUpgradeOnrampConfig(cfg); err != nil {
+			return fmt.Errorf("invalid UpgradeOnrampConfig: %w", err)
 		}
 
 		return nil
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		if err := cfg.MCMS.PopulateDefaults(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-
-		if err := cfg.MCMS.Validate(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-
-		family, err := chainsel.GetSelectorFamily(cfg.ChainSelector)
+		family, upgrader, err := initUpgradeOnrampChangesets(upgradeOnrampRegistry, cfg)
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("get chain family: %w", err)
-		}
-
-		upgrader, ok := upgradeOnrampRegistry.Get(family)
-		if !ok {
-			return cldf.ChangesetOutput{}, fmt.Errorf("no OnRampUpgrader registered for family %q", family)
+			return cldf.ChangesetOutput{}, err
 		}
 
 		localAdapter, ok := chainFamilyRegistry.GetChainFamily(family)
@@ -92,16 +108,16 @@ func UpgradeOnrampPhase1(
 			return cldf.ChangesetOutput{}, fmt.Errorf("inspect existing OnRamp upgrade: %w", err)
 		}
 
-		var oldOnRampHex string
-		var existingNewOnRampHex string
+		var oldOnRampBytes []byte
+		var existingNewOnRampBytes []byte
 
 		if upgradeExists {
-			oldOnRampHex, err = wireEncodeOnRampRef(localAdapter, existingUpgrade.LegacyOnRampRef, cfg.ChainSelector)
+			oldOnRampBytes, err = wireEncodeOnRampRef(localAdapter, existingUpgrade.LegacyOnRampRef, cfg.ChainSelector)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("encode legacy OnRamp: %w", err)
 			}
 
-			existingNewOnRampHex, err = wireEncodeOnRampRef(localAdapter, existingUpgrade.NewOnRampRef, cfg.ChainSelector)
+			existingNewOnRampBytes, err = wireEncodeOnRampRef(localAdapter, existingUpgrade.NewOnRampRef, cfg.ChainSelector)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("encode existing new OnRamp: %w", err)
 			}
@@ -111,12 +127,12 @@ func UpgradeOnrampPhase1(
 				return cldf.ChangesetOutput{}, fmt.Errorf("verify OnRamp requires upgrade: %w", err)
 			}
 
-			oldOnRampBytes, err := localAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
+			result, err := localAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("encode old OnRamp: %w", err)
 			}
 
-			oldOnRampHex = "0x" + hex.EncodeToString(oldOnRampBytes)
+			oldOnRampBytes = result
 		}
 
 		// Resolve the source OnRamp's configured destinations before making any
@@ -143,12 +159,12 @@ func UpgradeOnrampPhase1(
 		// This means a lane whose Phase 1 update already executed is accepted,
 		// while a new lane batch that still only knows legacy is also accepted.
 		for _, remoteSel := range scopedDestSelectors {
-			allowedCurrent := []string{oldOnRampHex}
+			allowedCurrent := [][]byte{oldOnRampBytes}
 			if upgradeExists {
-				allowedCurrent = append(allowedCurrent, existingNewOnRampHex)
+				allowedCurrent = append(allowedCurrent, existingNewOnRampBytes)
 			}
 
-			if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector, allowedCurrent, nil, []string{oldOnRampHex}); err != nil {
+			if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector, allowedCurrent, nil, [][]byte{oldOnRampBytes}); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf(
 					"pre-flight OffRamp whitelist check for upgrade: %w",
 					err,
@@ -214,7 +230,7 @@ func UpgradeOnrampPhase1(
 			batchOp, skipped, err := setter.SetOffRampSourceOnRamps(e, adapters.OffRampSetSourceOnRampsEntry{
 				LocalChainSelector:  remoteSel,
 				SourceChainSelector: cfg.ChainSelector,
-				OnRamps:             []string{oldOnRampHex, newOnRampHex},
+				OnRamps:             []string{encodeAddressToHex(oldOnRampBytes), encodeAddressToHex(newOnRampHex)},
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("allow new OnRamp on OffRamp for remote %d: %w", remoteSel, err)
@@ -246,31 +262,16 @@ func UpgradeOnrampPhase2(
 	mcmsReaderRegistry *changesetscore.MCMSReaderRegistry,
 ) cldf.ChangeSetV2[UpgradeOnrampConfig] {
 	validate := func(e cldf.Environment, cfg UpgradeOnrampConfig) error {
-		if cfg.ChainSelector == 0 {
-			return fmt.Errorf("chain selector is required")
-		}
-
-		if len(cfg.DestSelectorsInScope) == 0 {
-			return fmt.Errorf("at least one dest selector must be in scope")
+		if err := validateUpgradeOnrampConfig(cfg); err != nil {
+			return fmt.Errorf("invalid UpgradeOnrampConfig: %w", err)
 		}
 		return nil
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		if err := cfg.MCMS.PopulateDefaults(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-		if err := cfg.MCMS.Validate(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-
-		family, err := chainsel.GetSelectorFamily(cfg.ChainSelector)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, cfg)
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("get chain family: %w", err)
-		}
-		upgrader, ok := onrampUpgraderRegistry.Get(family)
-		if !ok {
-			return cldf.ChangesetOutput{}, fmt.Errorf("no OnRampUpgrader registered for family %q", family)
+			return cldf.ChangesetOutput{}, err
 		}
 
 		laneClass, err := upgrader.ClassifyDestChains(e, cfg.ChainSelector)
@@ -301,8 +302,7 @@ func UpgradeOnrampPhase2(
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0)
-		operationsBundle := operations.NewBundle(func() context.Context { return context.Background() }, e.Logger, operations.NewMemoryReporter())
-		e.OperationsBundle = operationsBundle
+		e.OperationsBundle = operations.NewBundle(func() context.Context { return context.Background() }, e.Logger, operations.NewMemoryReporter())
 		promoteOps, err := upgrader.PromoteOnrampToTestRouter(e, cfg.ChainSelector, scopedDestSelectors)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("stage on TestRouter: %w", err)
@@ -327,35 +327,25 @@ func UpgradeOnrampPhase2(
 // this phase never causes downtime on either lane class.
 func UpgradeOnrampPhase3(
 	onrampUpgrader *adapters.OnRampUpgraderRegistry,
+	chainFamilyRegistry *adapters.ChainFamilyRegistry,
 	mcmsReaderRegistry *changesetscore.MCMSReaderRegistry,
 ) cldf.ChangeSetV2[UpgradeOnrampConfig] {
 	validate := func(e cldf.Environment, cfg UpgradeOnrampConfig) error {
-		if cfg.ChainSelector == 0 {
-			return fmt.Errorf("chain selector is required")
-		}
-
-		if len(cfg.DestSelectorsInScope) == 0 {
-			return fmt.Errorf("at least one dest selector must be in scope")
+		if err := validateUpgradeOnrampConfig(cfg); err != nil {
+			return fmt.Errorf("invalid UpgradeOnrampConfig: %w", err)
 		}
 
 		return nil
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		if err := cfg.MCMS.PopulateDefaults(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-		if err := cfg.MCMS.Validate(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-
-		family, err := chainsel.GetSelectorFamily(cfg.ChainSelector)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgrader, cfg)
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("get chain family: %w", err)
+			return cldf.ChangesetOutput{}, err
 		}
-		upgrader, ok := onrampUpgrader.Get(family)
+		localAdapter, ok := chainFamilyRegistry.GetChainFamily(family)
 		if !ok {
-			return cldf.ChangesetOutput{}, fmt.Errorf("no OnRampUpgrader registered for family %q", family)
+			return cldf.ChangesetOutput{}, fmt.Errorf("no chain family adapter for family %q", family)
 		}
 
 		if !cfg.DisableTransferAndVerifierOwnership {
@@ -375,6 +365,11 @@ func UpgradeOnrampPhase3(
 			}
 		}
 
+		newOnramp, err := localAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("get current OnRamp address: %w", err)
+		}
+
 		laneClass, err := upgrader.ClassifyDestChains(e, cfg.ChainSelector)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("classify dest chains: %w", err)
@@ -388,7 +383,27 @@ func UpgradeOnrampPhase3(
 		operationsBundle := operations.NewBundle(func() context.Context { return context.Background() }, e.Logger, operations.NewMemoryReporter())
 		e.OperationsBundle = operationsBundle
 
+		if len(scopedTestDestSelectors) > 0 {
+			// Pre-flight: Verify that the offramp source whitelist the new onramp, maybe allowlist the legacy onramp but not needed for this state
+			err = ensureNewOnrampIsAllowlistedAndMaybeLegacy(e, upgrader, localAdapter, chainFamilyRegistry, scopedTestDestSelectors, cfg, newOnramp)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight OffRamp whitelist check: %w", err)
+			}
+
+			promoteOps, err := upgrader.PromoteOnrampToTestRouter(e, cfg.ChainSelector, scopedTestDestSelectors)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("promote to TestRouter: %w", err)
+			}
+			batchOps = append(batchOps, promoteOps...)
+		}
+
 		if len(scopedProdDestSelectors) > 0 {
+			// Pre-flight: Verify that the offramp source whitelist the new onramp, maybe allowlist the legacy onramp but not needed for this state
+			err = ensureNewOnrampIsAllowlistedAndMaybeLegacy(e, upgrader, localAdapter, chainFamilyRegistry, scopedProdDestSelectors, cfg, newOnramp)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight OffRamp whitelist check: %w", err)
+			}
+
 			// Pre-flight: the prod Router must still route through the legacy OnRamp for these
 			// dest chains; anything else means Phase 3 already ran or an unexpected OnRamp is live.
 			if err := upgrader.VerifyLegacyOnRampOnProdRouter(e, cfg.ChainSelector, scopedProdDestSelectors); err != nil {
@@ -401,14 +416,6 @@ func UpgradeOnrampPhase3(
 			promoteOps, err := upgrader.PromoteOnrampToProdRouter(e, cfg.ChainSelector, scopedProdDestSelectors)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("promote to prod Router: %w", err)
-			}
-			batchOps = append(batchOps, promoteOps...)
-		}
-
-		if len(scopedTestDestSelectors) > 0 {
-			promoteOps, err := upgrader.PromoteOnrampToTestRouter(e, cfg.ChainSelector, scopedTestDestSelectors)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("promote to TestRouter: %w", err)
 			}
 			batchOps = append(batchOps, promoteOps...)
 		}
@@ -461,31 +468,19 @@ func UpgradeOnrampCleanup(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		if err := cfg.MCMS.PopulateDefaults(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-		if err := cfg.MCMS.Validate(); err != nil {
-			return cldf.ChangesetOutput{}, err
-		}
-
-		family, err := chainsel.GetSelectorFamily(cfg.ChainSelector)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, cfg)
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("get chain family: %w", err)
+			return cldf.ChangesetOutput{}, err
 		}
 		chainAdapter, ok := chainFamilyRegistry.GetChainFamily(family)
 		if !ok {
 			return cldf.ChangesetOutput{}, fmt.Errorf("no adapter for family %q", family)
-		}
-		upgrader, ok := onrampUpgraderRegistry.Get(family)
-		if !ok {
-			return cldf.ChangesetOutput{}, fmt.Errorf("no OnRampUpgrader registered for family %q", family)
 		}
 
 		newOnRampAddr, err := chainAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("resolve new OnRamp: %w", err)
 		}
-		newOnRampHex := "0x" + hex.EncodeToString(newOnRampAddr)
 
 		destChainSelectors, err := upgrader.DestChainSelectors(e, cfg.ChainSelector)
 		if err != nil {
@@ -506,31 +501,10 @@ func UpgradeOnrampCleanup(
 		if err := upgrader.VerifyPromotedToRouters(e, cfg.ChainSelector, scopedProdDestSelectors, scopedTestDestSelectors); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight promotion check: %w", err)
 		}
-
-		// The whitelist update below replaces each remote OffRamp's onramp list with
-		// [new]; the only onramp it may remove is the legacy one.
-		var expectedRemovals []string
-		legacyRef, err := upgrader.LegacyOnRampRef(e, cfg.ChainSelector)
-		if err != nil {
-			e.Logger.Infow("No legacy OnRamp ref found; only the new OnRamp is expected on remote OffRamps",
-				"chain", cfg.ChainSelector, "err", err)
-		} else {
-			legacyOnRampHex, err := wireEncodeOnRampRef(chainAdapter, legacyRef, cfg.ChainSelector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("encode legacy OnRamp: %w", err)
-			}
-			expectedRemovals = []string{legacyOnRampHex}
-		}
-
 		scopedDestSelectors := scopeDestSelectors(destChainSelectors, cfg.DestSelectorsInScope)
-
-		// Pre-flight: verify no remote OffRamp whitelists an unknown onramp that the
-		// update below would silently drop.
-		for _, remoteSel := range scopedDestSelectors {
-			if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector,
-				[]string{newOnRampHex}, expectedRemovals, nil); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight OffRamp whitelist check: %w", err)
-			}
+		// Pre-flight: verify that the new OnRamp is already allowlisted on all remote OffRamps, and that the legacy OnRamp is either allowlisted or not.
+		if err := ensureNewOnrampIsAllowlistedAndMaybeLegacy(e, upgrader, chainAdapter, chainFamilyRegistry, scopedDestSelectors, cfg, newOnRampAddr); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight OffRamp whitelist check: %w", err)
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -544,7 +518,7 @@ func UpgradeOnrampCleanup(
 			batchOp, skipped, err := setter.SetOffRampSourceOnRamps(e, adapters.OffRampSetSourceOnRampsEntry{
 				LocalChainSelector:  remoteSel,
 				SourceChainSelector: cfg.ChainSelector,
-				OnRamps:             []string{newOnRampHex},
+				OnRamps:             []string{encodeAddressToHex(newOnRampAddr)},
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("disallow old OnRamp on OffRamp for remote %d: %w", remoteSel, err)
@@ -567,6 +541,33 @@ func UpgradeOnrampCleanup(
 	}
 
 	return cldf.CreateChangeSet(apply, validate)
+}
+
+// ensureNewOnrampIsAllowlistedAndMaybeLegacy verifies that the new OnRamp is allowlisted on all remote OffRamps, and that the legacy OnRamp is either allowlisted or not. This guards against silently dropping an onramp that still serves traffic.
+func ensureNewOnrampIsAllowlistedAndMaybeLegacy(e cldf.Environment, upgrader adapters.OnRampUpgrader, chainAdapter adapters.ChainFamily, chainFamilyRegistry *adapters.ChainFamilyRegistry, scopedDestSelectors []uint64, cfg UpgradeOnrampConfig, newOnRampAddr []byte) error {
+	var expectedRemovals [][]byte
+	legacyRef, err := upgrader.LegacyOnRampRef(e, cfg.ChainSelector)
+	if err != nil {
+		e.Logger.Infow("No legacy OnRamp ref found; only the new OnRamp is expected on remote OffRamps",
+			"chain", cfg.ChainSelector, "err", err)
+	} else {
+		legacyOnRampHex, err := wireEncodeOnRampRef(chainAdapter, legacyRef, cfg.ChainSelector)
+		if err != nil {
+			return fmt.Errorf("encode legacy OnRamp: %w", err)
+		}
+		expectedRemovals = [][]byte{legacyOnRampHex}
+	}
+
+	// Pre-flight: verify no remote OffRamp whitelists an unknown onramp that the
+	// update below would silently drop, and that the new OnRamp is actually
+	// whitelisted before we promote traffic to it.
+	for _, remoteSel := range scopedDestSelectors {
+		if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector,
+			[][]byte{newOnRampAddr}, expectedRemovals, [][]byte{newOnRampAddr}); err != nil {
+			return fmt.Errorf("pre-flight OffRamp whitelist check: %w", err)
+		}
+	}
+	return nil
 }
 
 // remoteChainFamilyAdapter resolves the chain family adapter for a remote chain.
@@ -596,19 +597,19 @@ func offrampSourceOnRampSetter(reg *adapters.ChainFamilyRegistry, remoteSel uint
 	return setter, nil
 }
 
-// wireEncodeOnRampRef returns the 0x-prefixed wire-format hex of an OnRamp ref, using a
+// wireEncodeOnRampRef returns the wire-encoded OnRamp ref, using a
 // temp datastore so the family adapter resolves it as the canonical OnRamp.
-func wireEncodeOnRampRef(adapter adapters.ChainFamily, ref datastore.AddressRef, chainSelector uint64) (string, error) {
+func wireEncodeOnRampRef(adapter adapters.ChainFamily, ref datastore.AddressRef, chainSelector uint64) ([]byte, error) {
 	ref.Qualifier = ""
 	tmp := datastore.NewMemoryDataStore()
 	if err := tmp.Addresses().Add(ref); err != nil {
-		return "", fmt.Errorf("add OnRamp ref to temp datastore: %w", err)
+		return nil, fmt.Errorf("add OnRamp ref to temp datastore: %w", err)
 	}
 	onRampBytes, err := adapter.GetOnRampAddress(tmp.Seal(), chainSelector)
 	if err != nil {
-		return "", fmt.Errorf("encode OnRamp %s: %w", ref.Address, err)
+		return nil, fmt.Errorf("encode OnRamp %s: %w", ref.Address, err)
 	}
-	return "0x" + hex.EncodeToString(onRampBytes), nil
+	return onRampBytes, nil
 }
 
 // verifyOffRampSourceOnRamps reads the current onramp whitelist for sourceChainSelector
@@ -620,9 +621,9 @@ func verifyOffRampSourceOnRamps(
 	reg *adapters.ChainFamilyRegistry,
 	remoteSel uint64,
 	sourceSel uint64,
-	desired []string,
-	expectedRemovals []string,
-	mustContain []string,
+	desired [][]byte,
+	expectedRemovals [][]byte,
+	mustContain [][]byte,
 ) error {
 	remoteAdapter, remoteFamily, err := remoteChainFamilyAdapter(reg, remoteSel)
 	if err != nil {
@@ -640,19 +641,19 @@ func verifyOffRampSourceOnRamps(
 
 	allowed := make(map[string]struct{}, len(desired)+len(expectedRemovals))
 	for _, addr := range desired {
-		allowed[strings.ToLower(addr)] = struct{}{}
+		allowed[hex.EncodeToString(addr)] = struct{}{}
 	}
 	for _, addr := range expectedRemovals {
-		allowed[strings.ToLower(addr)] = struct{}{}
+		allowed[hex.EncodeToString(addr)] = struct{}{}
 	}
 
 	currentSet := make(map[string]struct{}, len(current))
 	var unexpected []string
 	for _, addr := range current {
-		key := strings.ToLower(addr)
+		key := hex.EncodeToString(addr)
 		currentSet[key] = struct{}{}
 		if _, ok := allowed[key]; !ok {
-			unexpected = append(unexpected, addr)
+			unexpected = append(unexpected, key)
 		}
 	}
 	if len(unexpected) > 0 {
@@ -661,9 +662,10 @@ func verifyOffRampSourceOnRamps(
 			remoteSel, unexpected, sourceSel)
 	}
 	for _, addr := range mustContain {
-		if _, ok := currentSet[strings.ToLower(addr)]; !ok {
+		key := hex.EncodeToString(addr)
+		if _, ok := currentSet[key]; !ok {
 			return fmt.Errorf("OffRamp on chain %d does not whitelist expected onramp %s for source chain %d (current: %v)",
-				remoteSel, addr, sourceSel, current)
+				remoteSel, key, sourceSel, current)
 		}
 	}
 	return nil
