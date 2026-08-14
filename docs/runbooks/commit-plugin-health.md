@@ -227,9 +227,9 @@ checks:
     group: cursing_consensus
     always_emitted: false
     query: 'sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain"}[5m])) by (objectName, reason)'
-    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    severity: {warn_if: 'result > 0 and not (objectName="RMNRemoteConfig" and reason="insufficient_agreement")', info_if: 'result > 0 and objectName="RMNRemoteConfig" and reason="insufficient_agreement"', ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
-    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries source_network_name, so you can drill down to the affected lane. Empty result is OK, not UNKNOWN"
+    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries source_network_name, so you can drill down to the affected lane. EXCEPTION: objectName='RMNRemoteConfig', reason='insufficient_agreement' is EXPECTED benign noise when RMN is disabled (the RMN remote config is empty, so the DON can never agree on a meaningful value) -- report as INFO, do NOT let it drive the WARN/overall verdict. Empty result is OK, not UNKNOWN"
 
   - id: live_oracle_count
     group: cursing_consensus
@@ -325,7 +325,7 @@ checks:
     query: 'sum by (kind) (rate(ccip_reader_config_cache_overwritten_empty_total[5m]))'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: chain-infra-oncall
-    note: "accessor returned an EMPTY chain-config snapshot (no-bindings / empty-batch). Per-event this is NOT a page: a single occurrence is benign and the guard refuses to clobber a good cache for it. Only actionable when SUSTAINED -- which is captured by config_cache_stale (age > 90s), not by this counter alone. Use this to explain WHY the cache went stale (empty snapshot) and which chains. WARN + see config_cache_stale for severity"
+    note: "accessor returned an EMPTY chain-config snapshot (no-bindings / empty-batch). Per-event this is NOT a page: a single occurrence is benign and the guard refuses to clobber a good cache for it. Only actionable when SUSTAINED -- which is captured by config_cache_stale (age > 90s), not by this counter alone. Use this to explain WHY the cache went stale (empty snapshot) and which chains. In dev/no-binding environments this can fire chronically as expected noise (unbound RMN/optional contracts); treat it as a signal only when accompanied by config_cache_stale climbing. WARN + see config_cache_stale for severity"
 ```
 
 ## Groups
@@ -361,7 +361,10 @@ a low oracle count is a root cause `fchain_read_errors` is structurally unable t
 own. `consensus_dropped` then names the *kind* of failure: `reason="split"` on `objectName="fChain"`
 points to H2 (oracles disagree), while `reason="insufficient_agreement"` on `objectName="fChain"`
 points to H1 (too few oracles could even report). `reason="threshold_not_defined"` is a config/data
-mismatch.
+mismatch. One chronic exception to treat as INFO, not a finding: on an **RMN-disabled** deployment,
+`objectName="RMNRemoteConfig", reason="insufficient_agreement"` fires constantly because the RMN
+remote config is empty and the DON can never agree on a meaningful value — ignore it here (it's a
+real signal only if RMN is actually enabled).
 
 ### Data source (reader + config poller)
 
@@ -404,6 +407,9 @@ two explicit combination rules:
   `reason="split"` on `objectName="fChain"` is H2 (oracles disagree). `reason="insufficient_agreement"`
   on `objectName="fChain"` together with `fchain_read_errors` spiking is H1 (home-chain read outage).
   `reason="threshold_not_defined"` is a config/data mismatch independent of H1/H2.
+  Do NOT fold `objectName="RMNRemoteConfig", reason="insufficient_agreement"` into `concerns` at all
+  when RMN is disabled — it is expected chronic noise, and its only relevance is as a hint that the
+  config-poller was serving an empty RMN remote config (cross-check `config_cache_overwritten_empty`).
 - **A `data_source` finding firing at the same time as an outcome check (`pending_messages`
   climbing, `reader_read_*` alongside `consensus_dropped`, `config_cache_stale` alongside a curse
   or digest-mismatch reading) is the SAME incident, and the data-source check is the **root
