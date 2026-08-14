@@ -23,8 +23,9 @@ status: living
    * [Steps](#steps)
       + [step0 — is the plugin alive at all?](#step0-is-the-plugin-alive-at-all)
       + [step1 — is this even a commit-plugin problem?](#step1-is-this-even-a-commit-plugin-problem)
-      + [step2 — has the plugin observed it on-chain yet?](#step2-has-the-plugin-observed-it-on-chain-yet)
-      + [step3 — is the round producing outcomes at all?](#step3-is-the-round-producing-outcomes-at-all)
+       + [step2 — has the plugin observed it on-chain yet?](#step2-has-the-plugin-observed-it-on-chain-yet)
+       + [step2b — can the DON agree on this chain's per-chain values?](#step2b-can-the-don-agree-on-this-chains-per-chain-values)
+       + [step3 — is the round producing outcomes at all?](#step3-is-the-round-producing-outcomes-at-all)
       + [step4 — is chain A or B cursed?](#step4-is-chain-a-or-b-cursed)
       + [step5 — is a report being built but never landing?](#step5-is-a-report-being-built-but-never-landing)
    * [Deep dives](#deep-dives)
@@ -62,9 +63,8 @@ This doc is meant to be walked mechanically, not just read. Two things make that
    what a human should look at, don't try to fetch it yourself unless you have another tool for
    it.
 
-If a query's metric doesn't exist on your datasource (e.g. `ccip_commit_consensus_dropped`,
-see [Known gaps](#known-gaps)), treat the result as unknown, not as `0`/flat — say so explicitly
-rather than silently treating "no such metric" as "no signal."
+If a query's metric doesn't exist on your datasource, treat the result as unknown, not as
+`0`/flat — say so explicitly rather than silently treating "no such metric" as "no signal."
 
 ### A note on counter naming
 
@@ -106,6 +106,16 @@ steps:
     query: 'max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain"})'
     condition: "result < $seqNum"
     if_true:  {action: "REPORT:chain-infra-oncall", reason: "onramp read is lagging; check ccip_commit_merkleroot_observation_errors_total by reason (no_bindings/timeout/rpc_error) for the source-chain read/infra issue", followup_query: 'sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain"}[5m])) by (reason)'}
+    if_false: {action: "CONTINUE:step2b"}
+    automatable: true
+
+  - id: step2b
+    check: per_chain_consensus_dropped
+    queries:
+      - 'sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)'
+      - 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain"}[5m]))'
+    condition: "any result > 0"
+    if_true:  {action: "REPORT:ccip-commit-oncall", reason: "DON could not reach consensus on a per-chain value for this lane. For ccip_commit_consensus_dropped: reason='split' means disagreeing oracles, reason='insufficient_agreement' means too few oracles observed the key, reason='threshold_not_defined' is a config/data mismatch. ccip_commit_offramp_consensus_insufficient means the DON could not agree on OffRampNextSeqNums for this lane. The message cannot advance until the disagreement resolves."}
     if_false: {action: "CONTINUE:step3"}
     automatable: true
 
@@ -187,14 +197,14 @@ steps:
       full_don:          {action: "CONTINUE:scenario3c", reason: "oracle count isn't the explanation; proceed to H1/H2"}
     if_false: {action: "CONTINUE:scenario3c", reason: "fRoleDON wasn't supplied — report the raw count as context (see note) and proceed to H1/H2 regardless; a human/agent should sanity-check the count against what they know the DON size to be before trusting H1/H2's conclusion"}
     automatable: true
-    note: "csa_public_key uniquely identifies each node in every commit metric series (confirmed empirically, not just in the source) -- this is a direct headcount, not a proxy. Deliberately uses timestamp()-vs-time(), not rate()>0: confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops (rate() extrapolates across its whole window using the oldest/newest samples it finds), which silently under-counts a fresh outage. timestamp() answers 'did this series get a sample in the last 60s' directly, no extrapolation lag. Distinguishes 'not enough oracles are online' (a category H1/H2 cannot detect at all, since fchain_read_errors only reports a *surviving* oracle's own read failures and has no way to see oracles that never started) from the H1/H2 failure modes below. This is exactly the gap docs/metrics/commit-metrics.md's unimplemented ccip_commit_consensus_dropped{reason=\"insufficient_agreement\"} would otherwise close at the source instead of needing to be inferred from heartbeat cardinality."
+    note: "csa_public_key uniquely identifies each node in every commit metric series (confirmed empirically, not just in the source) -- this is a direct headcount, not a proxy. Deliberately uses timestamp()-vs-time(), not rate()>0: confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops (rate() extrapolates across its whole window using the oldest/newest samples it finds), which silently under-counts a fresh outage. timestamp() answers 'did this series get a sample in the last 60s' directly, no extrapolation lag. Distinguishes 'not enough oracles are online' (a category H1/H2 cannot detect at all, since fchain_read_errors only reports a *surviving* oracle's own read failures and has no way to see oracles that never started) from the H1/H2 failure modes below. This is now closed at the source by ccip_commit_consensus_dropped{reason=\"insufficient_agreement\"}; the heartbeat headcount is still useful as cross-check."
 
   - id: scenario3c
     check: h1_vs_h2
     query: 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
     condition: "result spiking broadly across oracles"
     if_true:  {action: "REPORT:home-chain-infra-oncall", reason: "H1 — too few oracles could read FChain; home-chain RPC/read outage"}
-    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Needs ccip_commit_consensus_dropped{reason=\"split\"}, NOT IMPLEMENTED as of this writing — see Known gaps. Corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}'}
+    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Confirm with ccip_commit_consensus_dropped{objectName=\"fChain\", reason=\"split\"} and corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}'}
     automatable: true
 ```
 
@@ -239,6 +249,31 @@ sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$
 (`no_bindings` / `timeout` / `rpc_error` / `msg_count_mismatch` / `hash_error` /
 `address_lookup_error`). This is a source-chain read/infra issue, not commit logic — report and
 stop. `>= $seqNum` → plugin has seen it; continue.
+
+### step2b — can the DON agree on this chain's per-chain values?
+
+The onramp has been observed, but the DON still has to agree on the source-chain values that go
+into the merkle root (onramp max seq nums and merkle roots themselves). If consensus on these
+fails for this lane, the message will not advance even though the onramp read is healthy.
+
+Per-chain consensus failures:
+```promql
+sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)
+```
+
+`ccip_commit_consensus_dropped` `reason` values:
+- `split` — two or more distinct values each cleared the threshold (oracles disagree)
+- `insufficient_agreement` — no single value reached the threshold (too few oracles observed the key)
+- `threshold_not_defined` — the consensus code had no threshold configured for this key (config/data mismatch)
+
+OffRampNextSeqNums consensus failures use a dedicated counter (same path conceptually, but a
+custom consensus helper):
+```promql
+sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain"}[5m]))
+```
+
+Any of these `> 0` for the lane → the message cannot advance until the disagreement resolves.
+Report and stop. All flat (including empty) → continue.
 
 ### step3 — is the round producing outcomes at all?
 
@@ -353,12 +388,14 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))
   ```
   Spiking broadly across oracles → home-chain RPC/read outage.
-- **H2 — oracles disagree (split vote).** *(Needs `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}` — **not implemented**, reviewed design only, see [Known gaps](#known-gaps). This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all.")*
-  Corroborate with:
+- **H2 — oracles disagree (split vote).** Check `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}`:
+  ```promql
+  sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain", objectName="fChain", reason="split"}[5m])) by (key)
+  ```
+  This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all." Corroborate with `ccip_commit_config_digest_mismatch` flipping for a subset of oracles around the same time:
   ```promql
   ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}
   ```
-  flipping for a subset of oracles around the same time.
 
 ## Metric reference
 
@@ -391,7 +428,7 @@ everything else is Beholder-only.
 | `ccip_commit_processor_errors` | Counter | `chainFamily,chainID,processor,method` | dual |
 | `ccip_commit_processor_latency` | Histogram | `chainFamily,chainID,processor,method` | dual |
 | `ccip_commit_loopp_ccip_provider_supported` | Gauge | `chain_family` | dual |
-| `ccip_commit_consensus_dropped` | — | `objectName,key,reason` | **not implemented** (reviewed design only) |
+| `ccip_commit_consensus_dropped` | Counter | `chainFamily,chainID,objectName,key,reason,source_network_name` | beholder-only |
 
 Note the label-casing inconsistency in the source (`chainFamily`/`chainID` vs.
 `chain_family`/`chain_id`) — copy the exact casing from this table per metric, it's not
@@ -399,7 +436,5 @@ uniform across the file.
 
 ## Known gaps
 
-- `ccip_commit_consensus_dropped` (Scenario 3, H1/H2 split) is **not implemented** — reviewed
-  design only. Any query against it will return no data; that's expected, not a signal.
 - This runbook assumes `RMNEnabled` is hardcoded off (current production state). If that
   changes, the RMN-signature branches dropped from step4 need to be reinstated.

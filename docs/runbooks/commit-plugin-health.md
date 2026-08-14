@@ -216,6 +216,14 @@ checks:
     owner: ccip-commit-oncall
     note: "the only way a whole round fails: DON can't reach 2*fRoleDON+1 agreement on FChain for the dest chain. Destination-chain-wide by construction, not lane-specific"
 
+  - id: consensus_dropped
+    group: cursing_consensus
+    always_emitted: false
+    query: 'sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain"}[5m])) by (objectName, reason)'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: ccip-commit-oncall
+    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries source_network_name, so you can drill down to the affected lane. Empty result is OK, not UNKNOWN"
+
   - id: live_oracle_count
     group: cursing_consensus
     always_emitted: true
@@ -288,7 +296,10 @@ absence is the expected/healthy state, not a gap in coverage. If it does fire, c
 `live_oracle_count` before `fchain_read_errors`: an oracle that never started can't emit
 `fchain_read_errors` at all (only a *surviving* oracle's own read failures are counted there), so
 a low oracle count is a root cause `fchain_read_errors` is structurally unable to surface on its
-own.
+own. `consensus_dropped` then names the *kind* of failure: `reason="split"` on `objectName="fChain"`
+points to H2 (oracles disagree), while `reason="insufficient_agreement"` on `objectName="fChain"`
+points to H1 (too few oracles could even report). `reason="threshold_not_defined"` is a config/data
+mismatch.
 
 ### Report transmission
 
@@ -312,6 +323,11 @@ two explicit combination rules:
   in that situation is expected (dead oracles can't emit it), not evidence that points elsewhere.
   Don't report "H1 ruled out, likely a split vote" if `live_oracle_count` already found the real
   cause — that conclusion would be actively wrong, not just unconfirmed.
+- **`consensus_dropped` (`WARN`) firing at the same time as `consensus_observation_failed`
+  (`CRIT`) should be folded into the same `concerns` entry and used to name the failure mode.**
+  `reason="split"` on `objectName="fChain"` is H2 (oracles disagree). `reason="insufficient_agreement"`
+  on `objectName="fChain"` together with `fchain_read_errors` spiking is H1 (home-chain read outage).
+  `reason="threshold_not_defined"` is a config/data mismatch independent of H1/H2.
 
 `UNKNOWN` is never silently dropped to `OK` — but per the [empty-result rule](#empty-result-sets-the-rule-that-actually-matters),
 most checks should legitimately resolve `UNKNOWN` only when an `always_emitted: true` check comes
