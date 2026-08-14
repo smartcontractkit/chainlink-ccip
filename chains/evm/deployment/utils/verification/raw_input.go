@@ -6,7 +6,7 @@ import (
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/hybrid_with_external_minter_token_pool"
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
 
-	mcmsbindings "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
+	mcmsbindings "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/link_token"

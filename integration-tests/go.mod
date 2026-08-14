@@ -35,10 +35,10 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260529212215-bfcc2ee071c8
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260608180601-efa81bfdfda9
-	github.com/smartcontractkit/chainlink-deployments-framework v0.117.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.119.0
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260710181111-6417709a55ee
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260710181111-6417709a55ee
-	github.com/smartcontractkit/mcms v0.52.0
+	github.com/smartcontractkit/mcms v0.52.1
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -251,7 +251,7 @@ require (
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
-	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
+	github.com/smartcontractkit/ccip-owner-contracts v0.2.1 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc // indirect
 	github.com/smartcontractkit/chainlink-canton v0.0.0-20260615233851-4e78e7c23a58 // indirect
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260518100439-9564f35fd264 // indirect

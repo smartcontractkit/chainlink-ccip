@@ -13,9 +13,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chain-selectors v1.0.107
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
-	github.com/smartcontractkit/chainlink-deployments-framework v0.116.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.119.0
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0
-	github.com/smartcontractkit/mcms v0.52.0
+	github.com/smartcontractkit/mcms v0.52.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.22.0
 	google.golang.org/grpc v1.82.1
