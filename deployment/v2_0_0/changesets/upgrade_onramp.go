@@ -22,7 +22,6 @@ import (
 type UpgradeOnrampConfig struct {
 	ChainSelector                       uint64
 	DisableTransferAndVerifierOwnership bool
-	TestVerifierAllowedSenders          []string
 	DestSelectorsInScope                []uint64
 	MCMS                                mcms.Input
 }
