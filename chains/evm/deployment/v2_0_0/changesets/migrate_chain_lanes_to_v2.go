@@ -307,7 +307,7 @@ func newTestTokenPerChainConfig(e deployment.Environment, sel uint64, remotes ma
 			},
 			AllowedFinalityConfig: finality.Config{
 				WaitForFinality: false,
-				WaitForSafe:     false,
+				WaitForSafe:     true,
 				BlockDepth:      1,
 			},
 			RemoteChains: remoteChains,
