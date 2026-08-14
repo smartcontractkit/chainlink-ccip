@@ -66,6 +66,12 @@ selector** plus `query`/`kind`/`state`. Filter them by the metric's own labels, 
 `source_network_name`/`chainID`. They still inherit `node_id` + `csa_public_key` from the beholder
 client (like every commit series), so per-node vs DON-wide grouping works the same way.
 
+**One exception inside the group itself:** `ccip_reader_read_outcome` is recorded at the
+`observedCCIPReader` wrapper level (every reader call, not just the per-source-chain ones), so it
+carries `chainID` matching the **destination** chain — the same convention as the commit metrics
+above, not the `chain`-numeric-selector convention the rest of `data_source` uses. Filter it with
+`chainID=~"$destChain"`, not `chain`.
+
 ### Empty result sets: the rule that actually matters
 
 An empty Prometheus/PromQL result (zero series returned) is **not** the same as "all series are
@@ -279,6 +285,14 @@ checks:
   # every series carries `node_id` + `csa_public_key` inherited from the beholder client.
   # They answer "is the plugin fine but being fed empty/partial/stale data?" -- upstream of,
   # and a root cause for, several of the outcome checks above.
+  - id: reader_read_outcome_error
+    group: data_source
+    always_emitted: false
+    query: 'sum by (query) (rate(ccip_reader_read_outcome_total{chainID=~"$destChain", outcome="error"}[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "the consolidated ok/empty/error classification recorded at the observedCCIPReader wrapper for every reader call. This is the ERROR leg specifically -- a query that returned a hard error, not just an empty/partial result (that's reader_read_empty/reader_chain_gap below). Empty result here is OK (never happened). Filters by chainID=~\"$destChain\" (destination chain), NOT by `chain` numeric selector -- see the label key cheat sheet exception above. Split node-local vs DON-wide by csa_public_key before escalating"
+
   - id: reader_read_empty
     group: data_source
     always_emitted: false
@@ -369,7 +383,10 @@ real signal only if RMN is actually enabled).
 ### Data source (reader + config poller)
 
 This group is **upstream of the whole checklist**: it tests whether the commit plugin is healthy
-*but being fed empty/partial/stale data*. The `CRIT` here is **`config_cache_stale`** (sustained:
+*but being fed empty/partial/stale data*. `reader_read_outcome_error` is the consolidated
+error-leg signal (a query failed outright) and is complementary to `reader_read_empty`/
+`reader_chain_gap` below it (which cover the empty/partial leg) — a query can show up in one
+without the other, check both. The `CRIT` here is **`config_cache_stale`** (sustained:
 cache age > 90s = the poller genuinely cannot refresh), which is the thing that makes every cached
 read (curse, RMN config, config digest, router address) run on hollow data. `config_cache_overwritten_empty`
 alone is only `WARN` — a single empty snapshot is benign (the guard refuses to clobber a good cache),

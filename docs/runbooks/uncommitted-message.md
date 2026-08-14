@@ -171,8 +171,8 @@ steps:
       dest_support_check_error: {action: "REPORT:chain-infra-oncall", reason: "error *checking* dest-chain support (RPC/read failure), distinct from a real config gap"}
       cursed:                  {action: "CONTINUE:step4", reason: "converges with step4"}
       cursed_check_error:      {action: "REPORT:chain-infra-oncall", reason: "error *checking* the curse state (RPC/read failure), not an actual curse -- don't conflate with step4's cursed=1 case"}
-      empty_root:              {action: "REPORT:ccip-commit-oncall", reason: "report-builder produced an empty merkle root; likely a bug upstream in the merkleroot processor, not an infra issue"}
-      invalid_seqnum_range:    {action: "REPORT:ccip-commit-oncall", reason: "report-builder produced start>end seqnums; likely a bug upstream in the merkleroot processor"}
+      empty_root:              {action: "REPORT:ccip-commit-oncall", reason: "report-builder produced an empty merkle root. Before treating this as a merkleroot-processor bug, check whether the reader supplied incomplete data for this lane: ccip_reader_read_empty_total{query=\"MsgsBetweenSeqNums\"} or ccip_reader_chain_gap_total{query=\"MsgsBetweenSeqNums\", state!=\"returned\"} firing for this chain around the same time means the reader handed the processor a subset (or nothing) to build from -- a reader-layer/chain-infra issue, not a processor bug. Both flat → likely genuinely a bug upstream in the merkleroot processor.", followup_query: 'sum by (chain, state) (rate(ccip_reader_chain_gap_total{query=\"MsgsBetweenSeqNums\", state!=\"returned\"}[15m]))'}
+      invalid_seqnum_range:    {action: "REPORT:ccip-commit-oncall", reason: "report-builder produced start>end seqnums. Same reader-layer check as empty_root above: ccip_reader_chain_gap_total{query=\"MsgsBetweenSeqNums\", state=\"count_mismatch\"} in particular means the reader returned a message count that didn't match its requested range -- a partial read manufacturing an invalid range, not a processor bug. Rule that out before reporting this as a merkleroot-processor defect.", followup_query: 'sum by (chain) (rate(ccip_reader_chain_gap_total{query=\"MsgsBetweenSeqNums\", state=\"count_mismatch\"}[15m]))'}
       decode_report:           {action: "REPORT:ccip-commit-oncall", reason: "report codec failure; check for a report-codec/chainlink-common version skew across the DON"}
       decode_report_info:      {action: "REPORT:ccip-commit-oncall", reason: "same as decode_report but for the report-info envelope"}
       root_blessing_mismatch:  {action: "REPORT:ccip-commit-oncall", reason: "root blessing validation failed; check on-chain blessing state for the roots in this report. RMN signing itself is dead code (RMNEnabled hardcoded off) but this specific check still runs"}
@@ -214,11 +214,15 @@ steps:
 
   - id: scenario3c
     check: h1_vs_h2
-    query: 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
-    condition: "result spiking broadly across oracles"
-    if_true:  {action: "REPORT:home-chain-infra-oncall", reason: "H1 — too few oracles could read FChain; home-chain RPC/read outage"}
-    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Confirm with ccip_commit_consensus_dropped{objectName=\"fChain\", reason=\"split\"} and corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}'}
+    queries:
+      - 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
+      - 'sum by (query, chain, csa_public_key) (rate(ccip_reader_read_empty_total[5m]))'
+      - 'sum by (query, chain, state, csa_public_key) (rate(ccip_reader_chain_gap_total{state!="returned"}[5m]))'
+    condition: "fchain_read_errors spiking broadly across oracles, OR reader read_empty/non-returned chain_gap firing across most/all csa_public_key values for the same query"
+    if_true:  {action: "REPORT:home-chain-infra-oncall", reason: "H1 — too few oracles could read FChain; home-chain RPC/read outage. The reader-layer series (grouped by csa_public_key) give the direct data-level observation behind this: if read_empty/chain_gap fire for the SAME query across (nearly) every csa_public_key, that's DON-wide data-source failure, not one node's RPC -- report it as such rather than as a bare fchain_read_errors count. If only one or two csa_public_key values show up, that's a single bad node, not a DON-wide outage; say so explicitly, it changes the remediation."}
+    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Confirm with ccip_commit_consensus_dropped{objectName=\"fChain\", reason=\"split\"} and corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If the reader-layer series above are flat (no read_empty/chain_gap), that corroborates H2 -- oracles are reading fine, they're just disagreeing on the value. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}'}
     automatable: true
+    note: "the reader-layer queries are shared with execute and keyed by `chain` (numeric selector, not source_network_name/chainID) -- see docs/metrics/reader-metrics.md and the data-layer note on step2c. Grouping by csa_public_key here is what turns 'H1 or H2' from a guess into a query: a bad read on every node's series is DON-wide; a bad read on one node's series is that node's RPC, regardless of what fchain_read_errors alone says."
 ```
 
 ## Steps
@@ -365,8 +369,18 @@ sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain", pha
 - `cursed` → converges with step4.
 - `cursed_check_error` → RPC/read error checking curse state, not an actual curse — don't
   conflate with step4's `cursed=1`.
-- `empty_root` / `invalid_seqnum_range` → the report-builder produced an invalid report; likely a
-  bug upstream in the merkleroot processor, not an infra issue.
+- `empty_root` / `invalid_seqnum_range` → the report-builder produced an invalid report. Before
+  attributing this to the merkleroot processor, rule out a reader-supplied partial read for this
+  lane:
+  ```promql
+  sum by (chain, state) (rate(ccip_reader_chain_gap_total{query="MsgsBetweenSeqNums", state!="returned"}[15m]))
+  sum by (chain) (rate(ccip_reader_read_empty_total{query="MsgsBetweenSeqNums"}[15m]))
+  ```
+  `chain_gap{state="count_mismatch"}` in particular means the reader returned a message count
+  that didn't match its requested range — that alone can manufacture `invalid_seqnum_range`
+  without any bug in the processor. Any of these firing for the lane around the same time → this
+  is a reader-layer/chain-infra issue, not a processor bug. All flat → likely a genuine bug
+  upstream in the merkleroot processor.
 - `decode_report` / `decode_report_info` → report/report-info codec failure; check for a
   report-codec or `chainlink-common` version skew across the DON.
 - `root_blessing_mismatch` → on-chain root blessing validation failed for this report. RMN
@@ -422,7 +436,16 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   ```promql
   sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))
   ```
-  Spiking broadly across oracles → home-chain RPC/read outage.
+  Spiking broadly across oracles → home-chain RPC/read outage. Corroborate with the reader layer,
+  grouped by node so "DON-wide" vs "one bad RPC" is a query, not a guess:
+  ```promql
+  sum by (query, chain, csa_public_key) (rate(ccip_reader_read_empty_total[5m]))
+  sum by (query, chain, state, csa_public_key) (rate(ccip_reader_chain_gap_total{state!="returned"}[5m]))
+  ```
+  Firing across (nearly) every `csa_public_key` for the same query → DON-wide data-source failure,
+  not a split vote. Firing for one or two `csa_public_key` values only → that node's RPC, not a
+  DON-wide condition — say so explicitly, it changes who fixes it. Both flat → corroborates H2
+  below (oracles are reading fine, they're just disagreeing).
 - **H2 — oracles disagree (split vote).** Check `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}`:
   ```promql
   sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain", objectName="fChain", reason="split"}[5m])) by (key)
@@ -479,7 +502,7 @@ and `query` names the specific read. Design + gap rationale: `docs/metrics/reade
 
 | metric | otel_type | key labels | registration |
 |---|---|---|---|
-| `ccip_reader_read_outcome` | Counter | `chainID,query,outcome="ok"\|"empty"\|"error"` | beholder-only |
+| `ccip_reader_read_outcome` | Counter | `chainID,query,outcome="ok"\|"empty"\|"error"` | beholder-only |¹
 | `ccip_reader_read_empty` | Counter | `query,chain` | beholder-only |
 | `ccip_reader_chain_gap` | Counter | `query,chain,state` | beholder-only |
 | `ccip_reader_msg_dropped` | Counter | `query,reason` | beholder-only |
@@ -489,6 +512,11 @@ and `query` names the specific read. Design + gap rationale: `docs/metrics/reade
 | `ccip_reader_config_poll_failure` | Counter | `chain` | beholder-only |
 | `ccip_reader_config_cache_overwritten_empty` | Counter | `kind` | beholder-only |
 | `ccip_reader_config_poller_last_success_timestamp` | Gauge | `chain` | beholder-only |
+
+¹ `ccip_reader_read_outcome` is the one exception to the "`chain` = numeric selector" convention
+above: it's recorded at the `observedCCIPReader` wrapper level for every reader call, so `chainID`
+is the **destination** chain, matching the commit-metric convention, not the numeric-selector one.
+Filter it with `chainID=~"$destChain"`.
 
 ## Known gaps
 
