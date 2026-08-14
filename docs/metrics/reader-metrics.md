@@ -77,8 +77,8 @@ All plugin-generic, keyed by `{queryName}`. ✅ = implemented; everything else i
 | Metric | Status | Why |
 |---|---|---|
 | `ccip_reader_read_outcome{chainID,query,outcome="ok"\|"empty"\|"error"}` | ✅ Implemented | Per-query classification ok/empty/error — the false-idle primitive (empty-with-no-error). |
-| `ccip_reader_read_empty{query,chain}` / `ccip_reader_read_partial{query,chain}` | ✅ Implemented | Splits "errored" from the two false-idle shapes — "returned nothing" and "returned a subset." |
-| `ccip_reader_chain_gap{query,chain,state}` | ✅ Implemented | Count of source chains in each state (`returned` vs `not_found`/`disabled`/`misconfigured`/`error`/`invalid`/`missing`/`stale`/...), so a subset is a visible gap rather than buried behind `Debugw`. |
+| `ccip_reader_read_empty{query,chain}` | ✅ Implemented | "Returned nothing with no error" — the single-chain false-idle primitive, wired at the concrete reads (`MsgsBetweenSeqNums`, `LatestMsgSeqNum`, `GetChainFeePriceUpdate`) where the source chain is known. |
+| `ccip_reader_chain_gap{query,chain,state}` | ✅ Implemented | Count of source chains in each state (`returned` vs `not_found`/`disabled`/`misconfigured`/`error`/`invalid`/`missing`/`stale`/`count_mismatch`/...). `count_mismatch` = a message read whose count doesn't match its requested range (partial/incomplete). This is the per-lane subset signal AND its reason. (Consolidated: the originally-proposed `ccip_reader_read_partial` counter was folded into `chain_gap{state!="returned"}` to avoid duplicate instrumentation.) |
 | `ccip_reader_chain_fee_components{chainFamily,chainID,feeType}` | ✅ Implemented | Beholder port of the existing promauto gauge (chainFee `exec`/`da`) — now NOP-visible. |
 | `ccip_reader_read_all_ok{query}` | Proposed | Folded into `read_outcome{outcome="ok"}`; not a separate instrument. |
 | `ccip_reader_msg_dropped{query,reason}` | Instrument added; no call site yet | Reads that returned data but dropped rows on validation/cast. Registered but not yet recorded anywhere — wire when the accessor wrapper lands. |
@@ -123,14 +123,14 @@ is reading is empty or garbage.** When `onramp_max_seq_num` is flat, the runbook
 distinguish "no new messages (true idle)" from "every oracle's onramp read is returning empty
 (false idle)." The reader's own counters can:
 
-`read_empty`/`read_partial`/`chain_gap`/`value_staleness` firing on the same query across oracles →
+`read_empty`/`chain_gap`/`value_staleness` firing on the same query across oracles →
 the onramp is stalled **because the read returns nothing**, and the outcome-level tree is moot.
 This is effectively a **second heartbeat — data-source liveness** — orthogonal to process liveness,
 and genuinely new: nothing in the current runbooks can answer "commit plugin healthy but fed
 garbage" vs "commit plugin itself broken."
 
 The runbook should therefore gain a *data-layer gate* step (run before the processor step tree, or
-as the top of step2): if any reader `read_empty`/`read_partial`/`chain_gap`/`value_staleness` series
+as the top of step2): if any reader `read_empty`/`chain_gap`/`value_staleness` series
 for the lane (or dest chain) is non-zero, branch straight to `REPORT: chain-infra-oncall`, before
 consensus or transmission logic is implicated.
 
@@ -140,12 +140,12 @@ consensus or transmission logic is implicated.
   which only fires for a handful of typed reasons. `chain_gap{NextSeqNum,state="misconfigured"}`,
   `read_empty` and `msg_dropped{MsgsBetweenSeqNums}` catch the *untyped* silent degradations
   (no-bindings, empty event index, cast/validation drops) that observation-errors never sees.
-- **step2b — consensus dropped.** `read_partial`/`read_empty` are the *per-oracle substrate* feeding
+- **step2b — consensus dropped.** `read_empty` / non-"returned" `chain_gap` are the *per-oracle substrate* feeding
   `consensus_dropped{reason=insufficient_agreement|split}`. They let the runbook answer whether the
   disagreement was "because N oracles literally couldn't read the lane" vs "oracles read fine but
   observed different things" — before or in parallel with the consensus signal.
 - **step3 / Scenario 3 (H1 vs H2).** Currently H1/H2 are inferred from silhouettes
-  (`fchain_read_errors`, `config_digest_mismatch`). `read_partial`/`read_empty` on the underlying
+  (`fchain_read_errors`, `config_digest_mismatch`). `read_empty` / non-"returned" `chain_gap` on the underlying
   source-chain queries give the **direct data-level observation** behind a consensus failure, for
   **all lanes at once**, rather than the single fChain the round needs. With the `node_id`/`csa_public_key`
   labels (see [known boundaries](#known-boundaries-and-deferred-work) below) this cleanly splits
@@ -160,7 +160,7 @@ consensus or transmission logic is implicated.
   a stale or empty digest cache *manufactures* `config_digest_mismatch` pages across the DON. Poller
   freshness turns that branch from "mismatch = config sync issue" into "mismatch **and** the digest
   read is stale → reader issue, not config issue."
-- **Scenario 2 — report-content rejections.** `read_partial`/`msg_dropped` on `MsgsBetweenSeqNums`
+- **Scenario 2 — report-content rejections.** `read_empty`/`msg_dropped` on `MsgsBetweenSeqNums`
   explain *why* a built report is missing messages → spurious
   `empty_root`/`invalid_seqnum_range`/`stale` rejections. Splits "report-builder bug" (processor)
   from "reader-supplied partial data" (data layer).
@@ -175,7 +175,7 @@ consensus or transmission logic is implicated.
   "fee/price pipeline healthy?" branch that does not exist today — including the
   `config_cache_overwritten_empty` class where a value is time-stamped fresh around empty data.
 - **Temporal root-cause arrow.** Because data-layer failures are upstream of their consequences, a
-  "did `read_partial`/`read_empty` appear *before* `pending_messages`/`consensus_dropped` climbed?"
+  "did `read_empty`/non-"returned" `chain_gap` appear *before* `pending_messages`/`consensus_dropped` climbed?"
   ordering comparison gives a **causation direction**: "the read broke first, the pipeline
   consequence followed" vs "reads are fine, the breakdown is inside the pipeline." Purely from
   timestamp ordering — no extra instrumentation.
@@ -185,7 +185,7 @@ consensus or transmission logic is implicated.
 ### 4. The proactive payoff (`commit-plugin-health.md`)
 
 The triage runbook is reactive — it needs a *missed* message to fire. Monitor-by-freshness metrics
-(`chain_gap`, `value_staleness`, `read_partial`, `config_cache_age`) let the health runbook find a
+(`chain_gap`, `value_staleness`, `read_empty`, `config_cache_age`) let the health runbook find a
 silently-degraded lane **before a message is missed** — the incident in the making. Outcome-level
 metrics cannot do this, because they legitimately don't move while nothing has been dropped yet.
 
@@ -209,7 +209,7 @@ metrics cannot do this, because they legitimately don't move while nothing has b
   EVM log poller that pulls over HTTP vs websockets. Those lower-level components should export
   their own health metrics and are to be reviewed in a later session; this docs does not solve for
   them.
-- Keep `read_empty`/`read_partial`/`chain_gap` sovereign from the *correctness* of the batch — a
+- Keep `read_empty`/`chain_gap` sovereign from the *correctness* of the batch — a
   partial read is not yet "wrong data," and a full read is not yet "correct data." Combined with the
   metric-reference note that "no such metric" must be treated as *unknown*, not `0`, the reference
   table below should be folded into the runbooks' reference tables as the metrics are implemented.
@@ -417,7 +417,8 @@ per-oracle-vs-DON-wide distinction queryable (see [known boundaries](#known-boun
 
 | metric | otel_type | key labels | proposed registration |
 |---|---|---|---|
-| `ccip_reader_read_all_ok` / `ccip_reader_read_empty` / `ccip_reader_read_partial` | Counter | `query` | beholder |
+| `ccip_reader_read_outcome` | Counter | `chainID,query,outcome` | beholder |
+| `ccip_reader_read_empty` | Counter | `query,chain` | beholder |
 | `ccip_reader_chain_gap` | Counter | `query,chain,state` | beholder |
 | `ccip_reader_query_last_success_timestamp` | Gauge | `query` | beholder |
 | `ccip_reader_msg_dropped` | Counter | `query,reason` | beholder |

@@ -9,7 +9,6 @@ type NoopReaderMetrics struct{}
 
 func (NoopReaderMetrics) RecordChainGap(string, string, string) {}
 func (NoopReaderMetrics) RecordReadEmpty(string, string)        {}
-func (NoopReaderMetrics) RecordReadPartial(string, string)      {}
 func (NoopReaderMetrics) RecordMsgDropped(string, string)       {}
 
 // NoopObservedReaderMetrics is a no-op ObservedReaderMetrics.

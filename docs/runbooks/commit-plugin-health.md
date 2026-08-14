@@ -287,21 +287,13 @@ checks:
     owner: chain-infra-oncall
     note: "a read returned nothing with no error -- the false-idle primitive. Empty result here is OK (the event never happened). Correlate `chain` (numeric selector) to a lane and split node-local vs DON-wide by csa_public_key"
 
-  - id: reader_read_partial
-    group: data_source
-    always_emitted: false
-    query: 'sum by (query, chain) (rate(ccip_reader_read_partial_total[5m]))'
-    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
-    owner: chain-infra-oncall
-    note: "a read returned a non-empty subset of what was requested (some chains silently dropped)"
-
   - id: reader_chain_gap
     group: data_source
     always_emitted: false
     query: 'sum by (query, chain, state) (rate(ccip_reader_chain_gap_total[5m]))'
     severity: {warn_if: 'any series with state!="returned" > 0', ok_if: 'all series with state="returned" or empty result'}
     owner: chain-infra-oncall
-    note: "per-chain outcome of a multi-chain read. Actionable states: not_found|disabled|misconfigured|error|invalid|missing|stale|no_accessor|config_error|no_native_token"
+    note: "per-chain outcome of a chain read -- serves as BOTH the subset flag and its reason. Actionable (non-returned) states: not_found|disabled|misconfigured|error|invalid|missing|stale|no_accessor|config_error|no_native_token|count_mismatch. count_mismatch = a message read came back with a count that doesn't match the requested range (partial/incomplete data). A read returning a subset = any requested chain in a non-returned state. (Consolidated: the separate ccip_reader_read_partial counter was removed; subset detection is chain_gap{state!=\"returned\"}.)"
 
   - id: config_cache_stale
     group: data_source

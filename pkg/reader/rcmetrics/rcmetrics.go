@@ -31,18 +31,15 @@ type ReaderMetrics interface {
 	RecordChainGap(query, chain, state string)
 	// RecordReadEmpty records a query that returned nothing with no error.
 	RecordReadEmpty(query, chain string)
-	// RecordReadPartial records a query that returned a subset of the requested set.
-	RecordReadPartial(query, chain string)
 	// RecordMsgDropped records a read record dropped on validation/cast.
 	RecordMsgDropped(query, reason string)
 }
 
 // readerMetrics implements ReaderMetrics against a beholder meter.
 type readerMetrics struct {
-	chainGap    metric.Int64Counter
-	readEmpty   metric.Int64Counter
-	readPartial metric.Int64Counter
-	msgDropped  metric.Int64Counter
+	chainGap   metric.Int64Counter
+	readEmpty  metric.Int64Counter
+	msgDropped metric.Int64Counter
 }
 
 // NewReaderMetrics registers the reader instruments against m. Returns a NoOp
@@ -58,9 +55,6 @@ func NewReaderMetrics(m metric.Meter) (ReaderMetrics, error) {
 	}
 	if rm.readEmpty, err = m.Int64Counter("ccip_reader_read_empty"); err != nil {
 		return nil, fmt.Errorf("register ccip_reader_read_empty: %w", err)
-	}
-	if rm.readPartial, err = m.Int64Counter("ccip_reader_read_partial"); err != nil {
-		return nil, fmt.Errorf("register ccip_reader_read_partial: %w", err)
 	}
 	if rm.msgDropped, err = m.Int64Counter("ccip_reader_msg_dropped"); err != nil {
 		return nil, fmt.Errorf("register ccip_reader_msg_dropped: %w", err)
@@ -78,13 +72,6 @@ func (r *readerMetrics) RecordChainGap(query, chain, state string) {
 
 func (r *readerMetrics) RecordReadEmpty(query, chain string) {
 	r.readEmpty.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("query", query),
-		attribute.String("chain", chain),
-	))
-}
-
-func (r *readerMetrics) RecordReadPartial(query, chain string) {
-	r.readPartial.Add(context.Background(), 1, metric.WithAttributes(
 		attribute.String("query", query),
 		attribute.String("chain", chain),
 	))

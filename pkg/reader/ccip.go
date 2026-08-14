@@ -297,6 +297,26 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		}
 	}
 
+	// An empty message read with no error is the false-idle primitive: "no messages
+	// to this dest in this range" is indistinguishable on its own from "the on-ramp
+	// event index returned nothing". Surface it so the data-source gate can tell the
+	// reader failing to deliver data apart from a genuinely quiet lane.
+	if len(messages) == 0 {
+		r.rcMetrc.RecordReadEmpty("MsgsBetweenSeqNums", rcmetrics.ChainLabel(sourceChainSelector))
+	}
+
+	// A message read whose count doesn't match the requested range means the read
+	// came back partial/incomplete (messages missing from an indexed range). This
+	// mirrors the commit merkleroot observer's msg-count check (observation.go) at
+	// the data-source layer, so the (plugin-generic) chain_gap signal names it before
+	// it reaches a consensus/root stage. Aligned to the same expression so the two
+	// never disagree.
+	if uint64(len(messages)) != uint64(seqNumRange.End()-seqNumRange.Start()+1) {
+		r.rcMetrc.RecordChainGap("MsgsBetweenSeqNums", rcmetrics.ChainLabel(sourceChainSelector), "count_mismatch")
+	} else {
+		r.rcMetrc.RecordChainGap("MsgsBetweenSeqNums", rcmetrics.ChainLabel(sourceChainSelector), "returned")
+	}
+
 	return messages, nil
 }
 
@@ -317,6 +337,14 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 
 	lggr.Debugw("chain reader returning latest onramp sequence number",
 		logutil.FieldSeqNum, seqNum, logutil.FieldSourceChain, chain)
+
+	// seq 0 with no error = the on-ramp event index returned nothing for "latest
+	// message to dest" -> indistinguishable from "no message ever sent" upstream.
+	// Surface it so the data-source gate can see a possibly-empty read.
+	if seqNum == 0 {
+		r.rcMetrc.RecordReadEmpty("LatestMsgSeqNum", rcmetrics.ChainLabel(chain))
+	}
+
 	return seqNum, nil
 }
 

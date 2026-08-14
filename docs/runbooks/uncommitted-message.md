@@ -123,12 +123,11 @@ steps:
   - id: step2c
     check: reader_data_source
     queries:
-      - 'sum by (query, chain) (rate(ccip_reader_read_partial_total{query=~"NextSeqNum|MsgsBetweenSeqNums|GetChainsFeeComponents|GetChainFeePriceUpdate"}[5m]))'
       - 'sum by (query, chain) (rate(ccip_reader_read_empty_total{query=~"NextSeqNum|MsgsBetweenSeqNums|LatestMsgSeqNum"}[5m]))'
-      - 'sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{query=~"NextSeqNum|GetChainsFeeComponents|GetChainFeePriceUpdate"}[5m]))'
+      - 'sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{query=~"NextSeqNum|MsgsBetweenSeqNums|GetChainsFeeComponents|GetChainFeePriceUpdate", state!="returned"}[5m]))'
       - 'max by (chain, kind) (ccip_reader_config_cache_age_seconds)'
-    condition: "any read_partial/read_empty/chain_gap series > 0, or any config_cache_age_seconds{kind=\"chain\"} > 90 (3x refresh period = sustained refresh failure, not a single empty poll)"
-    if_true:  {action: "REPORT:chain-infra-oncall", reason: "the plugin DATA SOURCE is degrading, which is upstream of -- and distinct from -- onramp-lag/consensus/transmission. Reads are returning empty/partial (chain not returned, or a subset returned) or the config-poller cache went stale. This is the root cause the onramp-gauge stall looks like, not a commit-plugin bug. For ccip_reader_chain_gap, the actionable state values per (query,chain) are not_found|disabled|misconfigured|error|invalid|missing|stale. Split node-local (one csa_public_key) from DON-wide (all series) before escalating.", followup_query: 'count by (csa_public_key) (ccip_reader_chain_gap_total{query="NextSeqNum"})'}
+    condition: "any read_empty series > 0, any chain_gap series with state!=\"returned\" > 0, or any config_cache_age_seconds{kind=\"chain\"} > 90 (3x refresh period = sustained refresh failure, not a single empty poll)"
+    if_true:  {action: "REPORT:chain-infra-oncall", reason: "the plugin DATA SOURCE is degrading, which is upstream of -- and distinct from -- onramp-lag/consensus/transmission. Reads are returning empty (nothing) or partial (chains not returned, or a message read whose count doesn't match its range) or the config-poller cache went stale. This is the root cause the onramp-gauge stall looks like, not a commit-plugin bug. For ccip_reader_chain_gap, the actionable state values per (query,chain) are not_found|disabled|misconfigured|error|invalid|missing|stale|count_mismatch. Split node-local (one csa_public_key) from DON-wide (all series) before escalating.", followup_query: 'count by (csa_public_key) (ccip_reader_chain_gap_total{query="NextSeqNum"})'}
     if_false: {action: "CONTINUE:step3"}
     automatable: true
     note: "ccip_reader_* / config-poller metrics are shared with execute and keyed by `chain` = the NUMERIC chain selector (NOT source_network_name) and by `query`; correlate `chain` to the incident lane via its selector. Every series carries node_id + csa_public_key inherited from the beholder client, so group by them to distinguish a single bad node from a DON-wide data/index/RPC failure. See docs/metrics/reader-metrics.md."
@@ -295,13 +294,12 @@ The on/offramp gauges and consensus signals are *outcomes* — they can't tell "
 "plugin is fine but being fed empty/partial data." This step checks the data source directly:
 
 ```promql
-sum by (query, chain) (rate(ccip_reader_read_partial_total{query=~"NextSeqNum|MsgsBetweenSeqNums|GetChainsFeeComponents|GetChainFeePriceUpdate"}[5m]))
 sum by (query, chain) (rate(ccip_reader_read_empty_total{query=~"NextSeqNum|MsgsBetweenSeqNums|LatestMsgSeqNum"}[5m]))
-sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{query=~"NextSeqNum|GetChainsFeeComponents|GetChainFeePriceUpdate"}[5m]))
+sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{query=~"NextSeqNum|MsgsBetweenSeqNums|GetChainsFeeComponents|GetChainFeePriceUpdate", state!="returned"}[5m]))
 max by (chain, kind) (ccip_reader_config_cache_age_seconds)
 ```
 
-Any `> 0` (or any `config_cache_age_seconds{kind="chain"}` above ~90s — sustained, 3x refresh; a
+Any `read_empty` or non-`returned` `chain_gap` `> 0` (or any `config_cache_age_seconds{kind="chain"}` above ~90s — sustained, 3x refresh; a
 single intermittent empty snap isn't enough) → the **data layer** feeding the
 commit plugin is degrading, so this is a `chain-infra`/reader problem, not a commit-plugin defect. Still
 split single-node (group by `csa_public_key`) vs DON-wide before escalating. All flat → continue.
@@ -483,7 +481,6 @@ and `query` names the specific read. Design + gap rationale: `docs/metrics/reade
 |---|---|---|---|
 | `ccip_reader_read_outcome` | Counter | `chainID,query,outcome="ok"\|"empty"\|"error"` | beholder-only |
 | `ccip_reader_read_empty` | Counter | `query,chain` | beholder-only |
-| `ccip_reader_read_partial` | Counter | `query,chain` | beholder-only |
 | `ccip_reader_chain_gap` | Counter | `query,chain,state` | beholder-only |
 | `ccip_reader_msg_dropped` | Counter | `query,reason` | beholder-only |
 | `ccip_reader_chain_fee_components` | Gauge | `chainFamily,chainID,feeType` | beholder-only (also promauto) |
