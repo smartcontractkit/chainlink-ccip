@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -278,6 +279,16 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	messages, err := sourceChainAccessor.MsgsBetweenSeqNums(ctx, r.destChain, seqNumRange)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call MsgsBetweenSeqNums on sourceChainAccessor: %w", err)
+	}
+
+	// TEST-ONLY fault injection: simulate a data-source miss by replacing the result with
+	// empty (no error), so a sent message is observed on the onramp but never built into a
+	// commit root. Placed AFTER the accessor call so the read_empty / chain_gap{count_mismatch}
+	// instrumentation below still records it (an early return would skip it). Must NEVER merge.
+	if os.Getenv("CCIP_TEST_FORCE_EMPTY_MSGS") != "" {
+		r.lggr.Warnw("TEST ONLY: forcing empty MsgsBetweenSeqNums to simulate a data-source miss",
+			"chain", sourceChainSelector, "range", seqNumRange)
+		messages = nil
 	}
 
 	onRampAddressAfterQuery, err := sourceChainAccessor.GetContractAddress(consts.ContractNameOnRamp)
