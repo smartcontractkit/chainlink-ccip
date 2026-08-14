@@ -1,0 +1,200 @@
+name: commit-plugin-health
+description: Point-in-time health check for a commit plugin instance and its merkle root processor. No incident or specific message required.
+type: checklist
+owner: ccip-commit-oncall
+inputs:
+  - {name: destChain, type: string, required: true, description: "chainID/chain_id label value of the node's destination chain"}
+  - {name: sourceChains, type: string, default: ".*", description: "source_network_name regex filter; defaults to all lanes into destChain"}
+  - {name: fRoleDON, type: integer, description: "optional. expected live oracle count is 3*fRoleDON+1, consensus threshold 2*fRoleDON+1. If omitted, live_oracle_count reports the raw count with no verdict."}
+checks:
+  # --- liveness ---
+  - id: heartbeat_observation
+    group: liveness
+    always_emitted: true
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}[1m]))'
+    severity:
+      - {status: CRIT, condition: "result == 0"}
+      - {status: OK, condition: "result > 0"}
+    note: "unconditional per-round liveness signal for Observation(); 0 or empty means every other metric may be stale, not bad. Window deliberately 1m."
+
+  - id: heartbeat_outcome
+    group: liveness
+    always_emitted: true
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="outcome"}[1m]))'
+    severity:
+      - {status: CRIT, condition: "result == 0"}
+      - {status: OK, condition: "result > 0"}
+    note: "same signal for Outcome(); flat while observation is healthy means OCR is failing to schedule/deliver to outcome."
+
+  - id: config_digest_mismatch
+    group: liveness
+    always_emitted: true
+    owner: ccip-commit-oncall
+    query: 'max(ccip_commit_config_digest_mismatch{chain_id=~"$destChain"})'
+    severity:
+      - {status: CRIT, condition: "result == 1"}
+      - {status: OK, condition: "result == 0"}
+    note: "home-chain config digest differs from the offramp's; root cause for a wide range of downstream rejections."
+
+  - id: processor_errors
+    group: liveness
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_processor_errors_total{chainID=~"$destChain"}[15m])) by (processor, method)'
+    severity:
+      - {status: WARN, condition: "any series > 0"}
+      - {status: OK, condition: "all series == 0"}
+    note: "generic TrackedProcessor error counter; empty means zero errors, not unknown. Does not include swallowed per-goroutine failures."
+
+  - id: processor_latency_p95
+    group: liveness
+    always_emitted: true
+    owner: ccip-commit-oncall
+    info: true
+    query: 'histogram_quantile(0.95, sum(rate(ccip_commit_processor_latency_bucket{chainID=~"$destChain"}[15m])) by (le, processor, method))'
+    note: "report raw value only; single point-in-time sample with nothing to trend against. If pinned at the max bucket, say so explicitly."
+
+  # --- lane throughput & backlog (per source chain) ---
+  - id: pending_messages
+    group: lane_throughput
+    always_emitted: true
+    owner: ccip-commit-oncall
+    info: true
+    query: 'max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChains"})'
+    note: "onRampMaxSeqNum - offRampNextSeqNum; no universal healthy value, watch for sustained growth not a single sample. Empty result is UNKNOWN-contributing (always emitted per active lane)."
+
+  - id: range_truncated
+    group: lane_throughput
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_range_truncated_total{source_network_name=~"$sourceChains"}[15m])) by (source_network_name)'
+    severity:
+      - {status: WARN, condition: "any series > 0"}
+      - {status: OK, condition: "all series == 0"}
+    note: "chain-throughput ceiling (MaxMerkleTreeSize) being hit."
+
+  - id: seqnum_invariant_violation
+    group: lane_throughput
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_seqnum_invariant_violation_total{source_network_name=~"$sourceChains"}[15m])) by (source_network_name, type)'
+    severity:
+      - {status: CRIT, condition: "any series > 0"}
+      - {status: OK, condition: "all series == 0"}
+    note: "offramp_ahead_of_onramp / onramp_max_zero / offramp_seqnum_regression -- documented in-code as stall signals, not routine noise."
+
+  - id: offramp_consensus_insufficient
+    group: lane_throughput
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChains"}[15m])) by (source_network_name)'
+    severity:
+      - {status: WARN, condition: "any series > 0"}
+      - {status: OK, condition: "all series == 0"}
+    note: "DON couldn't agree on OffRampNextSeqNum for this chain; identical to 'no new messages' without this."
+
+  - id: offramp_lane_status
+    group: lane_throughput
+    always_emitted: true
+    owner: ccip-commit-oncall
+    query: 'max by (source_network_name, status) (ccip_commit_offramp_lane_status{source_network_name=~"$sourceChains"})'
+    severity:
+      - {status: CRIT, condition: 'any series with status="rmn_misconfigured" == 1'}
+      - {status: INFO, condition: 'any series with status=~"skipped_.*" == 1'}
+      - {status: OK, condition: 'any series with status="live" == 1'}
+    note: "rmn_misconfigured flags real config drift; skipped_* are expected states. Reported for all four statuses every round, so empty result is UNKNOWN."
+
+  # --- cursing & consensus ---
+  - id: rmn_curse_active
+    group: cursing_consensus
+    always_emitted: true
+    owner: curse-owner
+    query: 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type=~"global|destination"}) by (curse_type)'
+    severity:
+      - {status: WARN, condition: "any series == 1"}
+      - {status: OK, condition: "all series == 0"}
+    note: "halts ALL reporting while active; often intentional/incident-flagged. WARN not CRIT because an active curse is frequently expected."
+
+  - id: source_chain_cursed
+    group: cursing_consensus
+    always_emitted: true
+    owner: curse-owner
+    query: 'max by (source_network_name) (ccip_commit_source_chain_cursed{source_network_name=~"$sourceChains"})'
+    severity:
+      - {status: WARN, condition: "any series == 1"}
+      - {status: OK, condition: "all series == 0"}
+    note: "per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active."
+
+  - id: consensus_observation_failed
+    group: cursing_consensus
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~"$destChain"}[5m]))'
+    severity:
+      - {status: CRIT, condition: "result > 0"}
+      - {status: OK, condition: "result == 0"}
+    note: "the only way a whole round fails: DON can't reach 2*fRoleDON+1 agreement on FChain for the dest chain. Destination-chain-wide by construction."
+
+  - id: consensus_dropped
+    group: cursing_consensus
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain"}[5m])) by (objectName, reason)'
+    severity:
+      - {status: WARN, condition: "any series > 0"}
+      - {status: OK, condition: "all series == 0"}
+    note: "per-key consensus drop breakdown. split on fChain is H2; insufficient_agreement on fChain with fchain_read_errors spiking is H1; threshold_not_defined is config/data mismatch. Chain-keyed objectNames carry source_network_name for lane drill-down."
+
+  - id: live_oracle_count
+    group: cursing_consensus
+    always_emitted: true
+    owner: ccip-commit-oncall
+    query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))'
+    severity:
+      - {status: CRIT, condition: "known fRoleDON and result < 2*fRoleDON+1"}
+      - {status: WARN, condition: "known fRoleDON and 2*fRoleDON+1 <= result < 3*fRoleDON+1"}
+      - {status: OK, condition: "known fRoleDON and result >= 3*fRoleDON+1"}
+      - {status: INFO, condition: "not known fRoleDON"}
+    note: "csa_public_key uniquely ids each node. Uses timestamp()-vs-time(), not rate()>0 (rate extrapolates across its window, under-counting a fresh outage). The ONLY check that can detect 'not enough oracles are even running'."
+
+  - id: fchain_read_errors
+    group: cursing_consensus
+    always_emitted: false
+    owner: home-chain-infra-oncall
+    query: 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
+    severity:
+      - {status: WARN, condition: "result > 0"}
+      - {status: OK, condition: "result == 0"}
+    note: "if this AND consensus_observation_failed are both firing, treat as one CRIT finding (H1, home-chain RPC/read outage), not two."
+
+  # --- report transmission ---
+  - id: report_validation_rejected
+    group: report_transmission
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain"}[15m])) by (phase, reason)'
+    severity:
+      - {status: WARN, condition: 'any series with reason!="stale" > 0'}
+      - {status: INFO, condition: 'any series > 0 and no series with reason!="stale" > 0'}
+      - {status: OK, condition: "all series == 0"}
+    note: 'reason="stale" is usually benign (an overlapping report already landed); other reasons are worth a look.'
+
+  - id: report_transmission_gave_up
+    group: report_transmission
+    always_emitted: false
+    owner: ccip-commit-oncall
+    query: 'sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChains"}[15m])) by (source_network_name)'
+    severity:
+      - {status: CRIT, condition: "any series > 0"}
+      - {status: OK, condition: "all series == 0"}
+    note: "one of the most common on-call pages historically. If CRIT, uncommitted-message.md Scenario 2 may name a different owner (chain-b-txm-oncall) once root-caused."
+
+  - id: report_transmission_attempts_p95
+    group: report_transmission
+    always_emitted: false
+    owner: ccip-commit-oncall
+    info: true
+    query: 'histogram_quantile(0.95, sum(rate(ccip_commit_report_transmission_attempts_bucket{chainID=~"$destChain"}[15m])) by (le, success))'
+    note: 'empty result means zero transmission cycles in window (report as INFO, not UNKNOWN). Rising attempts alongside gave_up firing is the actionable combination.'

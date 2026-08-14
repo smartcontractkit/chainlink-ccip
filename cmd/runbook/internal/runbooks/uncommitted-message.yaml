@@ -1,0 +1,131 @@
+name: uncommitted-message
+description: Triage a message that has not landed on the destination offramp within the expected time window.
+type: graph
+owner: ccip-commit-oncall
+root: step0
+inputs:
+  - {name: destChain, type: string, required: true, description: "chainID/chain_id label value of the destination chain"}
+  - {name: sourceChain, type: string, required: true, description: "source_network_name label value of the source chain"}
+  - {name: seqNum, type: integer, required: true, description: "onramp sequence number of the message under investigation (X)"}
+  - {name: msgID, type: string, description: "message ID, hex, for cross-referencing logs/explorers"}
+  - {name: fRoleDON, type: integer, description: "optional. expected live oracle count 3*fRoleDON+1, consensus threshold 2*fRoleDON+1. Omit if uncertain."}
+steps:
+  - id: step0
+    label: is the plugin alive at all?
+    queries:
+      - 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain"}[1m]))'
+    condition: "result == 0"
+    outcomes:
+      true: {action: "REPORT:ccip-commit-oncall", reason: "plugin process is not running rounds at all; every other metric below may simply be stale, not bad. Report the live oracle headcount alongside (see step0 note) -- a bare 'not running' is real but blunt."}
+      false: {action: "CONTINUE:step1"}
+    note: "window deliberately 1m, not 5m -- rate() extrapolates across its whole window, so a plugin that died N minutes ago still reads alive for up to [window] more."
+
+  - id: step1
+    label: is this even a commit-plugin problem?
+    queries:
+      - 'max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~"$sourceChain"})'
+    condition: "result > $seqNum"
+    outcomes:
+      true: {action: "STOP", reason: "a root covering X already landed on the offramp; commit plugin's job is done, hand off to exec on-call for delivery status."}
+      false: {action: "CONTINUE:step2"}
+
+  - id: step2
+    label: has the plugin observed it on-chain yet?
+    queries:
+      - 'max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain"})'
+    condition: "result < $seqNum"
+    outcomes:
+      true: {action: "REPORT:chain-infra-oncall", reason: "onramp read is lagging; check ccip_commit_merkleroot_observation_errors_total by reason (no_bindings/timeout/rpc_error) for the source-chain read/infra issue."}
+      false: {action: "CONTINUE:step2b"}
+
+  - id: step2b
+    label: can the DON agree on this chain's per-chain values?
+    queries:
+      - 'sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)'
+      - 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain"}[5m]))'
+    condition: "any series > 0"
+    outcomes:
+      true: {action: "REPORT:ccip-commit-oncall", reason: "DON could not reach consensus on a per-chain value for this lane. reason='split' = disagreeing oracles, 'insufficient_agreement' = too few observed, 'threshold_not_defined' = config/data mismatch. The message cannot advance until the disagreement resolves."}
+      false: {action: "CONTINUE:step3"}
+
+  - id: step3
+    label: is the round producing outcomes at all?
+    queries:
+      - 'sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~"$destChain"}[5m]))'
+    condition: "result > 0"
+    outcomes:
+      true: {action: "CONTINUE:scenario3", reason: "destination-chain-wide consensus failure -- see deep dive."}
+      false: {action: "CONTINUE:step4"}
+
+  - id: step4
+    label: is chain A or B cursed?
+    queries:
+      - 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="global"})'
+      - 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="destination"})'
+      - 'max(ccip_commit_source_chain_cursed{source_network_name=~"$sourceChain"})'
+    condition: "any series == 1"
+    outcomes:
+      true: {action: "REPORT:curse-owner", reason: "chain A or B is cursed; likely intentional/incident-flagged, hand off to whoever owns the curse."}
+      false: {action: "CONTINUE:step5"}
+
+  - id: step5
+    label: is a report being built but never landing?
+    queries:
+      - 'sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChain"}[5m]))'
+    condition: "result > 0"
+    outcomes:
+      true: {action: "CONTINUE:scenario2", reason: "report is being built but never landing -- see deep dive."}
+      false: {action: "REPORT:ccip-commit-oncall", reason: "no failure signal found; likely just backlog size. Report ccip_commit_pending_messages and an ETA estimate from round cadence (see note)."}
+
+  - id: scenario2
+    label: never transmitted (rejected pre-send)?
+    queries:
+      - 'sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain", phase="should_transmit"}[15m])) by (reason)'
+    reason_outcomes:
+      - {reason: config_digest_mismatch, action: "REPORT:ccip-commit-oncall", reason_text: "config sync issue; cross-check ccip_commit_config_digest_mismatch."}
+      - {reason: config_digest_check_error, action: "REPORT:chain-infra-oncall", reason_text: "error *reading* the offramp's config digest (RPC/read failure) -- chain-B infra, not a config sync issue."}
+      - {reason: stale, action: "STOP", reason_text: "often benign -- a different overlapping report already landed; re-check step1, the gauge may have just moved."}
+      - {reason: dest_not_supported, action: "REPORT:ccip-commit-oncall", reason_text: "transmission-schedule/config bug."}
+      - {reason: dest_support_check_error, action: "REPORT:chain-infra-oncall", reason_text: "error *checking* dest-chain support (RPC/read failure), not a real config gap."}
+      - {reason: cursed, action: "CONTINUE:step4", reason_text: "converges with step4."}
+      - {reason: cursed_check_error, action: "REPORT:chain-infra-oncall", reason_text: "error *checking* curse state (RPC/read failure), not an actual curse."}
+      - {reason: empty_root, action: "REPORT:ccip-commit-oncall", reason_text: "report-builder produced an empty merkle root; likely a bug upstream in the merkleroot processor."}
+      - {reason: invalid_seqnum_range, action: "REPORT:ccip-commit-oncall", reason_text: "report-builder produced start>end seqnums; likely a bug upstream in the merkleroot processor."}
+      - {reason: decode_report, action: "REPORT:ccip-commit-oncall", reason_text: "report codec failure; check for a report-codec/chainlink-common version skew across the DON."}
+      - {reason: decode_report_info, action: "REPORT:ccip-commit-oncall", reason_text: "same as decode_report but for the report-info envelope."}
+      - {reason: root_blessing_mismatch, action: "REPORT:ccip-commit-oncall", reason_text: "root blessing validation failed; check on-chain blessing state. RMN signing itself is dead code but this check still runs."}
+      - {reason: default, action: "AGENT:",
+         reason_text: "unmapped reason string -- report the EXACT string and rate and say this runbook has no mapping. Equally likely a real new rejection path OR leftover test/debug instrumentation; metrics alone can't tell which."}
+    none_outcome: {action: "CONTINUE:scenario2b", reason: "never rejected locally -- check on-chain / read-lag hypotheses."}
+
+  - id: scenario2b
+    label: transmitted but stuck on-chain, or read lagging?
+    not_automatable: true
+    note: "outside commit-plugin metrics. Check chain B's TXM/tx-sender dashboard (nonce gap, underpriced gas, wallet balance, revert reason) OR cross-check ccip_commit_offramp_next_seq_num source by checking chain B's block explorer / chain-reader health. Two hypotheses, no query here."
+
+  - id: scenario3
+    label: destination-wide vs lane-specific
+    queries:
+      - 'max by (source_network_name) (ccip_commit_pending_messages{dest_network_name=~".*"})'
+    judgment: true
+    condition: "only $sourceChain's series is climbing, others into the same destChain are flat"
+    note: "requires trend judgment over multiple lanes from one snapshot; the engine hands the raw pending_messages results to an agent/human to decide between CONTINUE:step4 (lane-specific) and scenario3b (destination-wide)."
+
+  - id: scenario3b
+    label: H0 -- enough oracles even running?
+    queries:
+      - 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))'
+    decisions:
+      - {condition: "known fRoleDON and result < 2*fRoleDON+1", action: "REPORT:ccip-commit-oncall", reason: "H0 -- below consensus threshold: too few oracles running to reach consensus, full stop. This is the answer; don't proceed to H1/H2 (different failure mode)."}
+      - {condition: "known fRoleDON and 2*fRoleDON+1 <= result < 3*fRoleDON+1", action: "CONTINUE:scenario3c", reason: "some oracles down but still >= threshold; if consensus still fails, H1/H2 are the right next check."}
+      - {condition: "known fRoleDON and result >= 3*fRoleDON+1", action: "CONTINUE:scenario3c", reason: "oracle count isn't the explanation; proceed to H1/H2."}
+    none_outcome: {action: "CONTINUE:scenario3c", reason: "fRoleDON not supplied -- report the raw count (see evidence) as context and proceed; treat H1/H2 conclusion as low-confidence."}
+    note: "csa_public_key uniquely ids each node. Uses timestamp()-vs-time(), not rate()>0: rate extrapolates across its window and under-counts a fresh outage."
+
+  - id: scenario3c
+    label: H1 vs H2 -- read errors or split vote?
+    queries:
+      - 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
+    judgment: true
+    condition: "result spiking broadly across oracles"
+    note: "requires trend/breadth judgment over one snapshot. The engine hands raw fchain_read_errors plus (if queried) consensus_dropped to an agent/human: spiking broadly = H1 (home-chain RPC/read outage, REPORT:home-chain-infra-oncall); flat = H2 (oracles disagree, REPORT:ccip-commit-oncall, confirm with consensus_dropped{objectName=fChain,reason=split})."
