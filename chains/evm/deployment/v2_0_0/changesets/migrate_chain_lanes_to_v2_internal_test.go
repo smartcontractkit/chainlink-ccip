@@ -121,7 +121,7 @@ func TestDiscoverLanesToMigrate_SkipsAlreadyV2Lanes(t *testing.T) {
 		},
 	}
 
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestDiscoverLanesToMigrate_SkipsUnsupportedVersionLane(t *testing.T) {
 		},
 	}
 
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestDiscoverLanesToMigrate_ExcludesBlocklistedRemotes(t *testing.T) {
 		},
 	}
 
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
 			ChainSelectors:       []uint64{chainA},
 			ExcludedRemoteChains: []uint64{remoteDrop},
@@ -196,7 +196,7 @@ func TestDiscoverLanesToMigrate_DedupsAcrossMultipleChains(t *testing.T) {
 		},
 	}
 
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA, chainB, chainC}},
 	})
 	require.NoError(t, err)
@@ -246,7 +246,7 @@ func TestDiscoverLanesToMigrate_DedupsBidirectionalLane(t *testing.T) {
 		},
 	}
 
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA, chainB}},
 	})
 	require.NoError(t, err)
@@ -265,7 +265,7 @@ func TestDiscoverLanesToMigrate_SkipsUnknownVersionLane(t *testing.T) {
 		},
 	}
 
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.NoError(t, err)
@@ -285,7 +285,7 @@ func TestDiscoverLanesToMigrate_SkipsAllWithoutFQRegistry(t *testing.T) {
 
 	// Without a fee-quoter/ramp updater registry we cannot confirm a version is supported, so nothing
 	// is migrated. (The hard requirement is enforced by the changeset's VerifyPreconditions.)
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), nil, nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), nil, nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.NoError(t, err)
@@ -296,7 +296,7 @@ func TestDiscoverLanesToMigrate_ErrorsWhenResolverMissing(t *testing.T) {
 	chainA := chainsel.TEST_90000001.Selector
 
 	// Empty registry: no resolver registered for any family.
-	_, err := discoverLanesToMigrate(cldf.Environment{}, adapters.NewDeployChainContractsRegistry(), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	_, err := discoverLanesToMigrate(cldf.Environment{}, adapters.NewDeployChainContractsRegistry(), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.Error(t, err)
@@ -311,7 +311,7 @@ func TestDiscoverLanesToMigrate_PropagatesResolverError(t *testing.T) {
 		err:       errors.New("rpc unavailable"),
 	}
 
-	_, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	_, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.Error(t, err)
@@ -325,7 +325,7 @@ func TestDiscoverLanesToMigrate_ErrorsWhenChainUnsupported(t *testing.T) {
 		supported: map[uint64]bool{chainA: false},
 	}
 
-	_, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	_, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.Error(t, err)
@@ -354,7 +354,7 @@ func TestDiscoverLanesToMigrate_ExcludesNonEVMRemotes(t *testing.T) {
 		},
 	}
 
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 	})
 	require.NoError(t, err)
@@ -369,7 +369,7 @@ func TestDiscoverLanesToMigrate_SkipsNonEVMLocalChain(t *testing.T) {
 	solana := chainsel.SOLANA_DEVNET.Selector
 
 	// No resolver needed: non-EVM local chains are skipped before any resolver lookup.
-	lanes, err := discoverLanesToMigrate(cldf.Environment{}, adapters.NewDeployChainContractsRegistry(), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, adapters.NewDeployChainContractsRegistry(), supportedFQRegistry(t), nil, nil, MigrateChainLanesToV2Config{
 		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{solana}},
 	})
 	require.NoError(t, err)
@@ -418,11 +418,132 @@ func TestDiscoverLanesToMigrate_SkipsLanesWithExcludedTokenSymbol(t *testing.T) 
 		registryWithResolver(t, resolver),
 		fqRegistryWithImporter(t, version, importer),
 		symbolOf,
+		nil,
 		MigrateChainLanesToV2Config{
 			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
 				ChainSelectors: []uint64{chainA},
 				// Lowercase to confirm case-insensitive matching against on-chain "USDC".
 				ExcludeLanesWithTokenSymbols: []string{"usdc"},
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, lanes, 1)
+	assert.Equal(t, remotePlain, lanes[0].ChainB)
+}
+
+// mechanismLookupFrom builds a fake tokenPoolMechanismLookup from a token-address -> mechanism map.
+// Tokens not present in the map report an error, simulating a pool that doesn't implement
+// USDCTokenPoolProxy (e.g. an LBTC/BTC.b pool).
+func mechanismLookupFrom(mechanisms map[common.Address]uint8) tokenPoolMechanismLookup {
+	return func(_ uint64, token common.Address, _ uint64) (uint8, error) {
+		mechanism, ok := mechanisms[token]
+		if !ok {
+			return 0, errors.New("not a USDCTokenPoolProxy pool")
+		}
+		return mechanism, nil
+	}
+}
+
+func TestDiscoverLanesToMigrate_DoesNotExcludeLockReleaseUSDCLikeToken(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	remoteWithUSDC := chainsel.TEST_90000002.Selector
+	remotePlain := chainsel.TEST_90000003.Selector
+
+	version := semver.MustParse("1.6.0")
+	usdc := common.HexToAddress("0x000000000000000000000000000000000000abcd")
+	other := common.HexToAddress("0x0000000000000000000000000000000000001234")
+
+	resolver := &fakeLaneVersionResolver{
+		supported: map[uint64]bool{chainA: true, remoteWithUSDC: true, remotePlain: true},
+		lanes: map[uint64]map[uint64]*semver.Version{
+			chainA: {
+				remoteWithUSDC: version,
+				remotePlain:    version,
+			},
+			remoteWithUSDC: {chainA: version},
+			remotePlain:    {chainA: version},
+		},
+	}
+	importer := &fakeConfigImporter{
+		tokensPerRemote: map[uint64][]common.Address{
+			remoteWithUSDC: {other, usdc},
+			remotePlain:    {other},
+		},
+	}
+	symbolOf := symbolLookupFrom(map[common.Address]string{
+		usdc:  "USDC",
+		other: "WETH",
+	})
+	// The pool backing "usdc" reports LOCK_RELEASE for this remote, so it is not genuinely
+	// CCTP-backed and must NOT cause the lane to be excluded despite the symbol match.
+	mechanismOf := mechanismLookupFrom(map[common.Address]uint8{
+		usdc: lockOrBurnMechanismLockRelease,
+	})
+
+	lanes, err := discoverLanesToMigrate(
+		cldf.Environment{},
+		registryWithResolver(t, resolver),
+		fqRegistryWithImporter(t, version, importer),
+		symbolOf,
+		mechanismOf,
+		MigrateChainLanesToV2Config{
+			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+				ChainSelectors:               []uint64{chainA},
+				ExcludeLanesWithTokenSymbols: []string{"USDC"},
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, lanes, 2, "LOCK_RELEASE mechanism means this is not real USDC, so neither lane should be excluded")
+	gotRemotes := map[uint64]struct{}{lanes[0].ChainB: {}, lanes[1].ChainB: {}}
+	assert.Contains(t, gotRemotes, remoteWithUSDC)
+	assert.Contains(t, gotRemotes, remotePlain)
+}
+
+func TestDiscoverLanesToMigrate_ExcludesWhenMechanismLookupFailsFallsBackToSymbol(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	remoteWithUSDC := chainsel.TEST_90000002.Selector
+	remotePlain := chainsel.TEST_90000003.Selector
+
+	version := semver.MustParse("1.6.0")
+	usdc := common.HexToAddress("0x000000000000000000000000000000000000abcd")
+	other := common.HexToAddress("0x0000000000000000000000000000000000001234")
+
+	resolver := &fakeLaneVersionResolver{
+		supported: map[uint64]bool{chainA: true, remotePlain: true},
+		lanes: map[uint64]map[uint64]*semver.Version{
+			chainA: {
+				remoteWithUSDC: version,
+				remotePlain:    version,
+			},
+			remotePlain: {chainA: version},
+		},
+	}
+	importer := &fakeConfigImporter{
+		tokensPerRemote: map[uint64][]common.Address{
+			remoteWithUSDC: {other, usdc},
+			remotePlain:    {other},
+		},
+	}
+	symbolOf := symbolLookupFrom(map[common.Address]string{
+		usdc:  "USDC",
+		other: "WETH",
+	})
+	// mechanismLookupFrom(nil) errors for every token (not a USDCTokenPoolProxy pool), so the plain
+	// symbol match must still exclude the lane.
+	mechanismOf := mechanismLookupFrom(nil)
+
+	lanes, err := discoverLanesToMigrate(
+		cldf.Environment{},
+		registryWithResolver(t, resolver),
+		fqRegistryWithImporter(t, version, importer),
+		symbolOf,
+		mechanismOf,
+		MigrateChainLanesToV2Config{
+			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+				ChainSelectors:               []uint64{chainA},
+				ExcludeLanesWithTokenSymbols: []string{"USDC"},
 			},
 		},
 	)
@@ -457,6 +578,7 @@ func TestDiscoverLanesToMigrate_SkipsLaneWithExcludedTokenOnlyInReverseDirection
 		registryWithResolver(t, resolver),
 		fqRegistryWithImporter(t, version, importer),
 		symbolLookupFrom(map[common.Address]string{usdc: "USDC", other: "WETH"}),
+		nil,
 		MigrateChainLanesToV2Config{
 			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
 				ChainSelectors:               []uint64{chainA},
@@ -484,6 +606,7 @@ func TestDiscoverLanesToMigrate_SkipsVersionWithoutConfigImporter(t *testing.T) 
 		registryWithResolver(t, resolver),
 		fqRegistryWithImporter(t, semver.MustParse("1.5.0"), &fakeConfigImporter{}),
 		symbolLookupFrom(nil),
+		nil,
 		MigrateChainLanesToV2Config{
 			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
 		},

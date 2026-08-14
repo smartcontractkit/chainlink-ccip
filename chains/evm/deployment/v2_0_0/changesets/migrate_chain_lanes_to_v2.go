@@ -14,10 +14,16 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
+	tokenadminregistry "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/token_admin_registry"
+
+	tarref "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	usdctokenpoolproxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	v2changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
@@ -27,8 +33,22 @@ import (
 // v2MajorVersion is the major version of a lane already on CCIP 2.0 (no migration needed).
 const v2MajorVersion = 2
 
+// lockOrBurnMechanismLockRelease is USDCTokenPoolProxy.LockOrBurnMechanism.LOCK_RELEASE (see the
+// Solidity enum backing getLockOrBurnMechanism/updateLockOrBurnMechanisms). A pool reporting this
+// mechanism for a given remote chain is not genuinely CCTP-backed for that lane, so a token whose
+// symbol matches an excluded name (e.g. "USDC") should NOT cause the lane to be excluded when its
+// pool reports LOCK_RELEASE for that remote.
+const lockOrBurnMechanismLockRelease uint8 = 3
+
 // tokenSymbolLookup resolves the ERC20 symbol of a token deployed on the given chain.
 type tokenSymbolLookup func(chainSel uint64, token common.Address) (string, error)
+
+// tokenPoolMechanismLookup resolves the on-chain lock/burn mechanism (USDCTokenPoolProxy enum,
+// e.g. CCTP_V1/CCTP_V2/LOCK_RELEASE/CCTP_V2_WITH_CCV) configured for token's pool on chainSel, for
+// the given remote chain selector. Returns an error if token's pool cannot be resolved or does not
+// implement USDCTokenPoolProxy (e.g. an LBTC/BTC.b pool) — callers should treat that as "unknown,
+// fall back to symbol-only matching" rather than a hard failure.
+type tokenPoolMechanismLookup func(chainSel uint64, token common.Address, remoteSel uint64) (uint8, error)
 
 // MigrateChainLanesToV2Input is the durable-pipeline payload for migrate_chain_lanes_to_v2.
 //
@@ -127,7 +147,7 @@ func MigrateChainLanesToV2(
 	}
 
 	apply := func(e deployment.Environment, cfg MigrateChainLanesToV2Config) (deployment.ChangesetOutput, error) {
-		lanes, err := discoverLanesToMigrate(e, deployChainContractsRegistry, fqRegistry, makeEVMSymbolLookup(e), cfg)
+		lanes, err := discoverLanesToMigrate(e, deployChainContractsRegistry, fqRegistry, makeEVMSymbolLookup(e), makeEVMMechanismLookup(e), cfg)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -171,6 +191,7 @@ type laneDiscoverer struct {
 	resolvers       *adapters.DeployChainContractsRegistry
 	fqRegistry      *deploy.FQAndRampUpdaterRegistry
 	symbolOf        tokenSymbolLookup
+	mechanismOf     tokenPoolMechanismLookup
 	excludedRemotes map[uint64]struct{}
 	excludedSymbols map[string]struct{}
 }
@@ -183,6 +204,7 @@ func discoverLanesToMigrate(
 	resolvers *adapters.DeployChainContractsRegistry,
 	fqRegistry *deploy.FQAndRampUpdaterRegistry,
 	symbolOf tokenSymbolLookup,
+	mechanismOf tokenPoolMechanismLookup,
 	cfg MigrateChainLanesToV2Config,
 ) ([]v2changesets.CrossFamilyLanePair, error) {
 	d := &laneDiscoverer{
@@ -190,6 +212,7 @@ func discoverLanesToMigrate(
 		resolvers:       resolvers,
 		fqRegistry:      fqRegistry,
 		symbolOf:        symbolOf,
+		mechanismOf:     mechanismOf,
 		excludedRemotes: newUint64Set(cfg.ExcludedRemoteChains),
 		excludedSymbols: canonicalSymbolSet(cfg.ExcludeLanesWithTokenSymbols),
 	}
@@ -368,10 +391,24 @@ func (d *laneDiscoverer) tokenExcludedRemotes(chainSel uint64, laneVersions map[
 			if err != nil {
 				return nil, fmt.Errorf("failed to read symbol for token %s on chain %d: %w", token.Hex(), chainSel, err)
 			}
-			if _, bad := d.excludedSymbols[strings.ToUpper(symbol)]; bad {
-				excluded[remote] = struct{}{}
-				break
+			if _, bad := d.excludedSymbols[strings.ToUpper(symbol)]; !bad {
+				continue
 			}
+
+			// The symbol matched an excluded name (e.g. "USDC"). Confirm via the pool's on-chain
+			// lock/burn mechanism before excluding: LOCK_RELEASE means this is not a genuine
+			// CCTP-backed token for this remote, so the lane should NOT be excluded on account of
+			// it. If the pool doesn't implement USDCTokenPoolProxy at all (mechErr != nil — e.g. an
+			// LBTC/BTC.b pool), fall back to the plain symbol match and exclude as before.
+			if d.mechanismOf != nil {
+				mechanism, mechErr := d.mechanismOf(chainSel, token, remote)
+				if mechErr == nil && mechanism == lockOrBurnMechanismLockRelease {
+					continue
+				}
+			}
+
+			excluded[remote] = struct{}{}
+			break
 		}
 	}
 	return excluded, nil
@@ -461,6 +498,70 @@ func readERC20Symbol(ctx context.Context, backend bind.ContractBackend, token co
 		return "", fmt.Errorf("failed to bind ERC20 at %s: %w", token.Hex(), err)
 	}
 	return erc20C.Symbol(&bind.CallOpts{Context: ctx})
+}
+
+// mechanismCacheKey identifies a (token, remote chain) pair on a specific local chain for
+// lock/burn-mechanism lookup caching.
+type mechanismCacheKey struct {
+	chainSel uint64
+	token    common.Address
+	remote   uint64
+}
+
+// makeEVMMechanismLookup returns a tokenPoolMechanismLookup that resolves token's pool address on
+// chainSel via TokenAdminRegistry.GetPool, then reads USDCTokenPoolProxy.GetLockOrBurnMechanism for
+// remoteSel on that pool. Errors (no TokenAdminRegistry ref, no pool, or the pool doesn't implement
+// USDCTokenPoolProxy) are returned to the caller, which treats them as "not a USDC proxy pool" and
+// falls back to symbol-only matching. Results are cached, and the returned closure is safe for
+// concurrent use (chains are discovered in parallel).
+func makeEVMMechanismLookup(e deployment.Environment) tokenPoolMechanismLookup {
+	var mu sync.Mutex
+	cache := make(map[mechanismCacheKey]uint8)
+	return func(chainSel uint64, token common.Address, remoteSel uint64) (uint8, error) {
+		key := mechanismCacheKey{chainSel: chainSel, token: token, remote: remoteSel}
+
+		mu.Lock()
+		mechanism, ok := cache[key]
+		mu.Unlock()
+		if ok {
+			return mechanism, nil
+		}
+
+		chain, ok := e.BlockChains.EVMChains()[chainSel]
+		if !ok {
+			return 0, fmt.Errorf("lock/burn mechanism lookup is only supported for EVM chains; chain %d is not an EVM chain", chainSel)
+		}
+
+		tarRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			Type:    datastore.ContractType(tarref.ContractType),
+			Version: tarref.Version,
+		}, chainSel, datastore_utils.FullRef)
+		if err != nil {
+			return 0, fmt.Errorf("failed to find TokenAdminRegistry ref on chain %d: %w", chainSel, err)
+		}
+		tar, err := tokenadminregistry.NewTokenAdminRegistry(common.HexToAddress(tarRef.Address), chain.Client)
+		if err != nil {
+			return 0, fmt.Errorf("failed to bind TokenAdminRegistry at %s on chain %d: %w", tarRef.Address, chainSel, err)
+		}
+		poolAddr, err := tar.GetPool(&bind.CallOpts{Context: e.GetContext()}, token)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get pool for token %s on chain %d: %w", token.Hex(), chainSel, err)
+		}
+
+		proxy, err := usdctokenpoolproxy.NewUSDCTokenPoolProxyContract(poolAddr, chain.Client)
+		if err != nil {
+			return 0, fmt.Errorf("failed to bind USDCTokenPoolProxy at %s on chain %d: %w", poolAddr.Hex(), chainSel, err)
+		}
+		mechanism, err = proxy.GetLockOrBurnMechanism(&bind.CallOpts{Context: e.GetContext()}, remoteSel)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get lock/burn mechanism for token %s remote %d on chain %d: %w", token.Hex(), remoteSel, chainSel, err)
+		}
+
+		mu.Lock()
+		cache[key] = mechanism
+		mu.Unlock()
+		return mechanism, nil
+	}
 }
 
 // newUint64Set returns a set of the given selectors, or nil when empty.
