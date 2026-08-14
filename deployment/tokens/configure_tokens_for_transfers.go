@@ -437,6 +437,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
+
 			migratedPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
@@ -450,8 +451,12 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 					PoolType:          ru.remotePoolRef.Type.String(),
 					RemoteChains: map[uint64]RemoteChainConfig[[]byte, string]{
 						selector: {
-							RemoteToken: migratedTokenBytes,
-							RemotePool:  migratedPoolBytes,
+							// Pad to match on-chain storage format (32-byte left-padded for EVM).
+							// The token comparison in ConfigureTokenPoolForRemoteChain (line 234)
+							// compares against on-chain bytes without padding, so a 20-byte input
+							// would mismatch and trigger a remove+re-add instead of addRemotePool
+							RemoteToken: common.LeftPadBytes(migratedTokenBytes, 32),
+							RemotePool:  common.LeftPadBytes(migratedPoolBytes, 32),
 						},
 					},
 				}
