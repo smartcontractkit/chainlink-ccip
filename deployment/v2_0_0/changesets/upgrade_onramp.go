@@ -301,16 +301,14 @@ func UpgradeOnrampPhase2(
 			}
 		}
 
-		batchOps := make([]mcms_types.BatchOperation, 0)
 		e.OperationsBundle = operations.NewBundle(func() context.Context { return context.Background() }, e.Logger, operations.NewMemoryReporter())
 		promoteOps, err := upgrader.PromoteOnrampToTestRouter(e, cfg.ChainSelector, scopedDestSelectors)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("stage on TestRouter: %w", err)
 		}
-		batchOps = append(batchOps, promoteOps...)
 
 		return changesetscore.NewOutputBuilder(e, mcmsReaderRegistry).
-			WithBatchOps(batchOps).
+			WithBatchOps(promoteOps).
 			Build(cfg.MCMS)
 	}
 
