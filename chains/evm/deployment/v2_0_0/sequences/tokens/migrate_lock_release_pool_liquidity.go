@@ -18,6 +18,7 @@ import (
 	tar_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	lrtp_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	siloed_ops_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
+	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
 	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
@@ -164,18 +165,10 @@ func migrateUnsiloedPool(
 		return sequences.OnChainOutput{}, err
 	}
 
-	transferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
-		ChainSelector: chainSel,
-		Address:       tokenAddr,
-		Args: erc20_ops.TransferArgs{
-			Receiver: lockboxAddr,
-			Amount:   amount,
-		},
-	})
+	ops, err = appendFundingOps(b, evmChain, chainSel, lockboxAddr, tokenAddr, timelockAddr, amount, 0, input.UsePlainTransfer, ops)
 	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer tokens to lockbox %s: %w", lockboxAddr, err)
+		return sequences.OnChainOutput{}, err
 	}
-	ops = append(ops, transferReport.Output)
 
 	restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
 		ChainSelector: chainSel,
@@ -378,18 +371,10 @@ func migrateSiloedPool(
 		}
 		ops = append(ops, withdrawReport.Output)
 
-		siloTransferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
-			ChainSelector: chainSel,
-			Address:       tokenAddr,
-			Args: erc20_ops.TransferArgs{
-				Receiver: lockbox,
-				Amount:   siloAmount,
-			},
-		})
+		ops, err = appendFundingOps(b, evmChain, chainSel, lockbox, tokenAddr, timelockAddr, siloAmount, info.chainSelector, input.UsePlainTransfer, ops)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer siloed liquidity to lockbox for chain %d: %w", info.chainSelector, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build funding ops for siloed chain %d: %w", info.chainSelector, err)
 		}
-		ops = append(ops, siloTransferReport.Output)
 	}
 
 	unsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetUnsiloedLiquidity, evmChain, evm_contract.FunctionInput[struct{}]{
@@ -424,18 +409,10 @@ func migrateSiloedPool(
 		}
 		ops = append(ops, withdrawUnsiloedReport.Output)
 
-		unsiloedTransferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
-			ChainSelector: chainSel,
-			Address:       tokenAddr,
-			Args: erc20_ops.TransferArgs{
-				Receiver: depositLockbox,
-				Amount:   unsiloedAmount,
-			},
-		})
+		ops, err = appendFundingOps(b, evmChain, chainSel, depositLockbox, tokenAddr, timelockAddr, unsiloedAmount, 0, input.UsePlainTransfer, ops)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer unsiloed liquidity to lockbox: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build funding ops for unsiloed liquidity: %w", err)
 		}
-		ops = append(ops, unsiloedTransferReport.Output)
 	}
 
 	for _, info := range siloInfos {
@@ -509,6 +486,83 @@ func appendSetRebalancerAndWithdraw(
 		return nil, fmt.Errorf("failed to withdraw liquidity from old pool %s: %w", oldPoolAddr, err)
 	}
 	ops = append(ops, withdrawReport.Output)
+
+	return ops, nil
+}
+
+// appendFundingOps appends the operations that fund the new pool's lockbox with migrated
+// liquidity. By default it uses the lockbox's deposit() path (emitting the Deposit event). Use
+// usePlainTransfer=true as a break-glass option to transfer the tokens directly, bypassing the
+// Deposit event.
+func appendFundingOps(
+	b cldf_ops.Bundle,
+	evmChain evm.Chain,
+	chainSel uint64,
+	lockboxAddr, tokenAddr, timelockAddr common.Address,
+	amount *big.Int,
+	remoteChainSelector uint64,
+	usePlainTransfer bool,
+	ops []evm_contract.WriteOutput,
+) ([]evm_contract.WriteOutput, error) {
+	if usePlainTransfer {
+		transferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
+			ChainSelector: chainSel,
+			Address:       tokenAddr,
+			Args: erc20_ops.TransferArgs{
+				Receiver: lockboxAddr,
+				Amount:   amount,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to transfer tokens to lockbox %s: %w", lockboxAddr, err)
+		}
+		return append(ops, transferReport.Output), nil
+	}
+
+	// Deposit path: make the timelock an authorized caller so it can deposit, approve the lockbox,
+	// then deposit via the lockbox's deposit() function (emits the Deposit event). The framework
+	// routes the authorize step automatically based on lockbox ownership: EOA when deployer-owned
+	// or MCMS-batched when timelock-owned. The timelock remains an authorized caller afterward;
+	// this is harmless since the timelock is governance and typically owns the lockbox.
+	addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
+		ChainSelector: chainSel,
+		Address:       lockboxAddr,
+		Args: lockbox_ops.AuthorizedCallerArgs{
+			AddedCallers:   []common.Address{timelockAddr},
+			RemovedCallers: []common.Address{},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
+	}
+	ops = append(ops, addAuthReport.Output)
+
+	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.ApproveProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveArgs]{
+		ChainSelector: chainSel,
+		Address:       tokenAddr,
+		Args: erc20_ops.ApproveArgs{
+			Spender: lockboxAddr,
+			Value:   amount,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to approve lockbox %s to spend tokens: %w", lockboxAddr, err)
+	}
+	ops = append(ops, approveReport.Output)
+
+	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.DepositProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositArgs]{
+		ChainSelector: chainSel,
+		Address:       lockboxAddr,
+		Args: lockbox_ops.DepositArgs{
+			Token:               tokenAddr,
+			RemoteChainSelector: remoteChainSelector,
+			Amount:              amount,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to deposit into lockbox %s: %w", lockboxAddr, err)
+	}
+	ops = append(ops, depositReport.Output)
 
 	return ops, nil
 }

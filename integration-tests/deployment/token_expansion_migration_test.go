@@ -16,6 +16,7 @@ import (
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evmtokensseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	erc20LockBoxBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
 	lnrpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/lock_release_token_pool"
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
@@ -561,17 +562,20 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		"reverse propagation: legacy pool B should have new pool A in remote pools for chain A")
 }
 
-// TestTokenExpansionMigration_DeployWithSeed verifies that deploying a LockRelease pool with
-// LiquidityMigrationBasisPoints on DeployTokenPoolInput seeds liquidity from a legacy pool
-// into the new lockbox without configuring the new pool on TAR or transferring ownership.
-func TestTokenExpansionMigration_DeployWithSeed(t *testing.T) {
+// TestTokenExpansionMigration_FullProcess exercises the full token pool liquidity migration for a
+// LockRelease pool on a single chain: seed (partial liquidity from the legacy pool into the new
+// lockbox), activate (configure new pool + setPool on TAR + transfer pool/lockbox ownership to the
+// timelock, including autoMigrateRemoteChains) and cleanup (drain the orphaned legacy pool via the
+// standalone MigrateLockReleasePoolLiquidity changeset through real MCMS). The cleanup phase
+// exercises moving funds into a timelock-owned lockbox, where the add-auth step routes through MCMS.
+func TestTokenExpansionMigration_FullProcess(t *testing.T) {
 	const (
 		totalLiquidity = 1
 		oldPoolQual    = "MIG_LNR_A_V1"
 		dummyPoolQual  = "MIG_LNR_B_V1"
 		tokenSymbol    = "MIG_SEED_TOK"
 		newPoolQual    = "MIG_LNR_A_V2"
-		migrateAll     = uint16(10000)
+		migrateHalf    = uint16(5000) // seed 50%, leave the rest for cleanup
 	)
 
 	// Setup test environment
@@ -590,6 +594,32 @@ func TestTokenExpansionMigration_DeployWithSeed(t *testing.T) {
 	e.DataStore = cumulative.Seal()
 	DeployMCMS(t, e, selA, []string{cciputils.CLLQualifier})
 	DeployMCMS(t, e, selB, []string{cciputils.CLLQualifier})
+
+	// Wire CCIP lanes between the test chains. Required for the Activate step's autoMigrateRemoteChains
+	// to resolve the fee adapter and import legacy lane fees for the A → B lane (no OnRamp = fee import
+	// fail).
+	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
+	deployer := e.BlockChains.EVMChains()[selA].DeployerKey.From.Hex()
+	connectOut, err := v2changesets.ConfigureChainsForLanesFromTopology(
+		ccvadapters.GetCommitteeVerifierContractRegistry(),
+		ccvadapters.GetChainFamilyRegistry(),
+		changesets.GetRegistry(),
+	).Apply(*e, v2changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: NewLaneTopologyForV2(deployer, selA, selB),
+		BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
+			MCMS: mcms.Input{},
+			Lanes: []v2changesets.CrossFamilyLanePair{
+				{
+					ChainA:          selA,
+					ChainB:          selB,
+					ChainAOverrides: NewLaneOverridesForV2(selA),
+					ChainBOverrides: NewLaneOverridesForV2(selB),
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, e, connectOut.DataStore)
 
 	// Deploy legacy pools and tokens - RemoteChains naturally registers both pools on TAR
 	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
@@ -655,25 +685,36 @@ func TestTokenExpansionMigration_DeployWithSeed(t *testing.T) {
 	require.Len(t, tokenResults, 1)
 	tokenAddr := common.HexToAddress(tokenResults[0].Address)
 
-	oldPoolFilter := datastore.AddressRef{
+	oldPoolFilterA := datastore.AddressRef{
 		Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
 		Qualifier:     oldPoolQual,
 		ChainSelector: selA,
 		Version:       cciputils.Version_1_6_1,
 	}
-	oldPoolResults := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(oldPoolFilter)...)
-	require.Len(t, oldPoolResults, 1)
-	oldPoolAddr := common.HexToAddress(oldPoolResults[0].Address)
+	oldPoolResultsA := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(oldPoolFilterA)...)
+	require.Len(t, oldPoolResultsA, 1)
+	oldPoolAddrA := common.HexToAddress(oldPoolResultsA[0].Address)
+
+	// Resolve old pool B for the reverse-propagation assertion after activate
+	oldPoolFilterB := datastore.AddressRef{
+		Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
+		Qualifier:     dummyPoolQual,
+		ChainSelector: selB,
+		Version:       cciputils.Version_1_6_1,
+	}
+	oldPoolResultsB := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(oldPoolFilterB)...)
+	require.Len(t, oldPoolResultsB, 1)
+	oldPoolAddrB := common.HexToAddress(oldPoolResultsB[0].Address)
 
 	// Fund the old pool A with tokens
 	bnmERC20Drip, err := bnmERC20DripBindings.NewBurnMintERC20WithDrip(tokenAddr, chainA.Client)
 	require.NoError(t, err)
-	tx, err := bnmERC20Drip.Drip(chainA.DeployerKey, oldPoolAddr)
+	tx, err := bnmERC20Drip.Drip(chainA.DeployerKey, oldPoolAddrA)
 	require.NoError(t, err)
 	_, err = chainA.Confirm(tx)
 	require.NoError(t, err)
 
-	// Deploy v2 LockRelease pool with seed — no TokenTransferConfig
+	// ---- Phase 1: Deploy the new pool and seed 50% of the liquidity into the new lockbox (deployer-owned lockbox) ----
 	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
 	out2, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		ChainAdapterVersion: cciputils.Version_2_0_0,
@@ -686,7 +727,7 @@ func TestTokenExpansionMigration_DeployWithSeed(t *testing.T) {
 					TokenPoolQualifier:            newPoolQual,
 					PoolType:                      cciputils.LockReleaseTokenPool.String(),
 					TokenRef:                      &datastore.AddressRef{Address: tokenAddr.Hex()},
-					LiquidityMigrationBasisPoints: new(migrateAll),
+					LiquidityMigrationBasisPoints: new(migrateHalf),
 				},
 			},
 		},
@@ -695,45 +736,145 @@ func TestTokenExpansionMigration_DeployWithSeed(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *e, out2.MCMSTimelockProposals, false)
 	MergeAddresses(t, e, out2.DataStore)
 
-	// Resolve the new pool address
-	newPoolFilter := datastore.AddressRef{
+	// Resolve the deployed token and new pool A
+	newPoolFilterA := datastore.AddressRef{
 		Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
 		Qualifier:     newPoolQual,
 		ChainSelector: selA,
 		Version:       cciputils.Version_2_0_0,
 	}
-	newPoolResults := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(newPoolFilter)...)
-	require.Len(t, newPoolResults, 1)
-	newPoolAddr := common.HexToAddress(newPoolResults[0].Address)
+	newPoolResultsA := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(newPoolFilterA)...)
+	require.Len(t, newPoolResultsA, 1)
+	newPoolAddr := common.HexToAddress(newPoolResultsA[0].Address)
 
-	// Resolve TAR address from datastore
-	tarAddr, err := (&evmadpV1_0_0.EVMTokenBase{}).GetTokenAdminRegistryAddress(e.DataStore, selA)
-	require.NoError(t, err)
-
-	// 1. Lockbox holds the seed amount
+	// Get new pool A's lockbox
 	v2Pool, err := lnrpoolV2_0_0.NewLockReleaseTokenPool(newPoolAddr, chainA.Client)
 	require.NoError(t, err)
 	lockboxAddr, err := v2Pool.GetLockBox(&bind.CallOpts{})
 	require.NoError(t, err)
 	require.NotEqual(t, common.Address{}, lockboxAddr)
+
+	// Ensure the liquidity seed was correct: 50% of the total liquidity should have been transferred from the old pool to the new lockbox
+	halfLiquidity := new(big.Int).SetUint64(5e17)
 	lockboxBal, err := bnmERC20Drip.BalanceOf(&bind.CallOpts{Context: t.Context()}, lockboxAddr)
 	require.NoError(t, err)
-	require.Equal(t, new(big.Int).SetUint64(1e18), lockboxBal, "lockbox should hold the seed amount")
+	require.Equal(t, halfLiquidity, lockboxBal, "lockbox should hold the 50% seed amount")
 
-	// 2. Old pool drained
-	oldPoolBal, err := bnmERC20Drip.BalanceOf(&bind.CallOpts{Context: t.Context()}, oldPoolAddr)
+	// The deployer should still own the new pool after the seed step, since ownership transfer hasn't been applied yet
+	seedOwner, err := v2Pool.Owner(&bind.CallOpts{Context: t.Context()})
 	require.NoError(t, err)
-	require.Zero(t, oldPoolBal.Uint64(), "old pool should be fully drained")
+	require.Equal(t, chainA.DeployerKey.From, seedOwner, "new pool should be deployer-owned after seed")
 
-	// 3. TAR still points at old pool A (v2 pool's configure did not run)
+	// Ensure the old pool retained the other 50% of the liquidity
+	oldPoolBal, err := bnmERC20Drip.BalanceOf(&bind.CallOpts{Context: t.Context()}, oldPoolAddrA)
+	require.NoError(t, err)
+	require.Equal(t, halfLiquidity, oldPoolBal, "old pool should retain 50% after partial seed")
+
+	// The TokenAdminRegistry should still point at the old pool after the seed step, since ownership transfer was skipped
+	tarAddr, err := (&evmadpV1_0_0.EVMTokenBase{}).GetTokenAdminRegistryAddress(e.DataStore, selA)
+	require.NoError(t, err)
 	tar, err := tarbindings.NewTokenAdminRegistry(tarAddr, chainA.Client)
 	require.NoError(t, err)
 	tarPool, err := tar.GetPool(&bind.CallOpts{Context: t.Context()}, tokenAddr)
 	require.NoError(t, err)
-	require.Equal(t, oldPoolAddr, tarPool, "TAR should still point at old pool (configure did not run)")
+	require.Equal(t, oldPoolAddrA, tarPool, "TAR should still point at old pool after seed")
 
-	// 4. New pool is deployer-owned (UpdateAuthorities did not run)
-	owner, err := v2Pool.Owner(&bind.CallOpts{Context: t.Context()})
+	// ---- Phase 2: Activate - configure new pool, switch TAR, transfer ownership to timelock ----
+	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
+	out3, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
+		ChainAdapterVersion: cciputils.Version_2_0_0,
+		MCMS:                NewDefaultInputForMCMS("Activate v2 pool"),
+		TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+			selA: {
+				SkipOwnershipTransfer: false,
+				TokenPoolVersion:      cciputils.Version_2_0_0,
+				TokenTransferConfig: &tokensapi.TokenTransferConfig{
+					TokenPoolRef:            datastore.AddressRef{Address: newPoolAddr.Hex()},
+					TokenRef:                datastore.AddressRef{Address: tokenAddr.Hex()},
+					AutoMigrateRemoteChains: true,
+				},
+			},
+		},
+	})
 	require.NoError(t, err)
-	require.Equal(t, chainA.DeployerKey.From, owner, "new pool should be deployer-owned")
+	testhelpers.ProcessTimelockProposals(t, *e, out3.MCMSTimelockProposals, false)
+	MergeAddresses(t, e, out3.DataStore)
+
+	// TAR should now point at the new pool
+	tarPool, err = tar.GetPool(&bind.CallOpts{Context: t.Context()}, tokenAddr)
+	require.NoError(t, err)
+	require.Equal(t, newPoolAddr, tarPool, "TAR should point at new pool after activate")
+
+	// Resolve the CLL timelock address
+	mcmsReader, ok := changesets.GetRegistry().GetMCMSReader(chainsel.FamilyEVM)
+	require.True(t, ok)
+	timelockRef, err := mcmsReader.GetTimelockRef(*e, selA, mcms.Input{Qualifier: cciputils.CLLQualifier})
+	require.NoError(t, err)
+	timelockAddr := common.HexToAddress(timelockRef.Address)
+
+	// Confirm that the new pool is owned by timelock after the activate step
+	poolOwner, err := v2Pool.Owner(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, timelockAddr, poolOwner, "new pool should be timelock-owned after activate")
+
+	// Confirm that the lockbox is owned by timelock after the activate step
+	lockboxBindings, err := erc20LockBoxBindings.NewERC20LockBox(lockboxAddr, chainA.Client)
+	require.NoError(t, err)
+	lockboxOwner, err := lockboxBindings.Owner(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, timelockAddr, lockboxOwner, "lockbox should be timelock-owned after activate")
+
+	// Reverse propagation: autoMigrateRemoteChains must have told the legacy pool B about the new A pool
+	chainB, ok := e.BlockChains.EVMChains()[selB]
+	require.True(t, ok)
+	oldPoolB, err := tokenpoolV2_0_0.NewTokenPool(oldPoolAddrB, chainB.Client)
+	require.NoError(t, err)
+	gotRemotePoolsB, err := oldPoolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, selA)
+	require.NoError(t, err)
+	require.Contains(t, gotRemotePoolsB, common.LeftPadBytes(newPoolAddr.Bytes(), 32),
+		"reverse propagation: legacy pool B should have new pool A in remote pools for chain A")
+
+	// ---- Phase 3: Cleanup - drain the orphaned legacy pool via the standalone changeset (MCMS) ----
+	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
+	cleanupChangeset := tokensapi.MigrateLockReleasePoolLiquidity(tokensapi.GetTokenAdapterRegistry(), changesets.GetRegistry())
+	cleanupOut, err := cleanupChangeset.Apply(*e, tokensapi.MigrateLockReleasePoolLiquidityConfig{
+		MCMS: NewDefaultInputForMCMS("Drain orphaned legacy pool"),
+		Migrations: []tokensapi.LockReleasePoolMigration{
+			{
+				ChainSelector: selA,
+				OldPoolRef: datastore.AddressRef{
+					ChainSelector: selA,
+					Qualifier:     oldPoolQual,
+					Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
+					Version:       cciputils.Version_1_6_1,
+				},
+				NewPoolRef: datastore.AddressRef{
+					ChainSelector: selA,
+					Qualifier:     newPoolQual,
+					Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
+					Version:       cciputils.Version_2_0_0,
+				},
+				BasisPoints: new(uint16(10000)),
+			},
+		},
+	})
+	require.NoError(t, err)
+	testhelpers.ProcessTimelockProposals(t, *e, cleanupOut.MCMSTimelockProposals, false)
+	MergeAddresses(t, e, cleanupOut.DataStore)
+
+	// Old pool fully drained, lockbox holds all liquidity
+	oldPoolBal, err = bnmERC20Drip.BalanceOf(&bind.CallOpts{Context: t.Context()}, oldPoolAddrA)
+	require.NoError(t, err)
+	require.Zero(t, oldPoolBal.Uint64(), "old pool should be fully drained after cleanup")
+	lockboxBal, err = bnmERC20Drip.BalanceOf(&bind.CallOpts{Context: t.Context()}, lockboxAddr)
+	require.NoError(t, err)
+	require.Equal(t, new(big.Int).SetUint64(1e18), lockboxBal, "lockbox should hold all liquidity after cleanup")
+
+	// Lockbox remains timelock-owned and the timelock is now an authorized caller (deposit flow)
+	lockboxOwner, err = lockboxBindings.Owner(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, timelockAddr, lockboxOwner, "lockbox should remain timelock-owned after cleanup")
+	authCallers, err := lockboxBindings.GetAllAuthorizedCallers(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Contains(t, authCallers, timelockAddr, "timelock should be an authorized caller after deposit")
 }
