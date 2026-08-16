@@ -51,8 +51,15 @@ than duplicating the spec, so the control structure can't silently drift from th
 | `--bearer` / `--user` / `--pass` | | datasource auth |
 | `--suffix auto\|keep\|strip` | `auto` | metric-name suffix policy (see below) |
 | `--timeout` | `20s` | per-query timeout |
-| `--raw` | off | also emit raw query results for verification |
+| `--verbose, -v` | off | emit the full structured YAML report instead of the concise table |
+| `--raw` | off | attach raw per-query results to the `--verbose` YAML report |
 | `-D input=value` | | runbook inputs |
+
+By default a run prints a concise table — the health runbook shows a
+`concerns:` table (worst findings with owner), the triage runbook shows the
+walked trace and its `final` outcome. Pass `--verbose` for the complete
+structured YAML report, and `--raw` to additionally include every query's raw
+results so an agent (or human) can verify a verdict against ground truth.
 
 ## How the two runbook shapes map
 

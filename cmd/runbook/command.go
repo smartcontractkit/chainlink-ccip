@@ -26,6 +26,7 @@ type arguments struct {
 	pass       string
 	suffix     string
 	timeout    time.Duration
+	verbose    bool
 	raw        bool
 	defines    []string
 }
@@ -101,8 +102,14 @@ func runFlags(args *arguments) []cli.Flag {
 			Destination: &args.timeout,
 		},
 		&cli.BoolFlag{
+			Name:        "verbose",
+			Aliases:     []string{"v"},
+			Usage:       "Emit the full structured YAML report instead of the default concise concerns/trace table.",
+			Destination: &args.verbose,
+		},
+		&cli.BoolFlag{
 			Name:        "raw",
-			Usage:       "Emit raw query results alongside verdicts (for agent/human verification).",
+			Usage:       "Attach raw per-variable query results to the --verbose YAML report (for agent/human verification).",
 			Destination: &args.raw,
 		},
 		&cli.StringSliceFlag{
@@ -173,13 +180,19 @@ func run(ctx context.Context, name string, args *arguments) error {
 		if err != nil {
 			return err
 		}
-		return emitYAML(rep, args.raw)
+		if args.verbose || args.raw {
+			return emitYAML(rep, args.raw)
+		}
+		return emitConcerns(rep)
 	case "graph":
 		rep, err := internal.RunGraph(ctx, rb, ex, in, 30)
 		if err != nil {
 			return err
 		}
-		return emitYAML(rep, args.raw)
+		if args.verbose || args.raw {
+			return emitYAML(rep, args.raw)
+		}
+		return emitTrace(rep)
 	default:
 		return fmt.Errorf("unsupported runbook type %q", rb.Type)
 	}
