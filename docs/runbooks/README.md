@@ -2,9 +2,10 @@
 
 Operational docs for triaging and health-checking CCIP plugins, written to be followed
 mechanically by a human **or** an AI agent — not read once and internalized. Each doc pairs a
-structured, machine-checkable spec (a fenced YAML block: a decision graph or a checklist) with
-prose explaining the *why*, sharing the same step/check IDs so the two can't silently drift
-apart.
+structured, machine-checkable spec (a sibling `.yaml` file: a decision graph or a checklist) with
+prose explaining the *why*. The YAML lives **next to the markdown** and is the single source of
+truth that both the docs and the `cmd/runbook` tool execute — so the step/check IDs literally
+cannot silently drift apart.
 
 | doc | use when |
 |---|---|
@@ -21,7 +22,7 @@ mirrors `uncommitted-message.md`).
 
 1. Read the frontmatter first (`trigger`, `inputs`, `related`) — it tells you whether this is the
    right doc before you read anything else.
-2. Skip the YAML block unless you want the exact query for a step; the prose under
+2. Skip the sibling `.yaml` file unless you want the exact query for a step; the prose under
    `## Steps`/`## Groups` explains the reasoning in the same order.
 3. You need a Prometheus-compatible query endpoint with these metrics in it. Locally, that's the
    VictoriaMetrics stack started by `ccip obs up --victoria` (see `devenv/README.md`) — query it
@@ -38,9 +39,14 @@ mirrors `uncommitted-message.md`).
 
 ## Invoking an AI agent with a runbook
 
-Point the agent at the file and the query endpoint, give it the specific inputs, and ask for the
-doc's own output contract — don't ask it to "check if things look okay," the doc already defines
-what "okay" means and how to report it.
+The copy-paste-the-query, apply-the-rule, follow-the-branch work is deterministic and does not
+need an agent: [`cmd/runbook`](../../cmd/runbook) executes the sibling `.yaml` directly (`runbook
+list`, `runbook run <runbook> -D input=value`). Delegate that to the tool; only the residual
+judgment — the `AGENT` handoffs the tool emits for fuzzy conditions and out-of-band hypotheses —
+warrants an agent. Point the agent at the file and the query endpoint (or at the tool's
+`--raw` output), give it the specific inputs, and ask for the doc's own output contract — don't
+ask it to "check if things look okay," the doc already defines what "okay" means and how to report
+it.
 
 **Template:**
 
@@ -94,10 +100,11 @@ Keep new docs consistent with the two here:
 - A `## For agents` section defining the outcome vocabulary you're using and any non-obvious
   interpretation rules (empty results, label inconsistencies, anything an agent would otherwise
   have to guess).
-- A fenced YAML block that's the actual control structure (decision graph for
-  reactive/triage docs, checklist for proactive/health docs) — prose explains it, doesn't replace
-  it.
+- A **sibling `.yaml` file** (decision graph for reactive/triage docs, checklist for
+  proactive/health docs) that is the actual control structure — prose explains it, doesn't
+  replace it. The markdown links to it; it is not duplicated inline. Keep `note`/`reason` fields
+  in the YAML terse so the explanation lives in the prose.
 - A defined output contract, so "did the agent get the right answer" is checkable against a
   schema instead of read as prose.
-- `STOP` / `CONTINUE:<id>` / `REPORT:<owner>` as the only outcomes. No outcome that implies the
-  agent itself pages, escalates, or takes a remediation action.
+- `STOP` / `CONTINUE:<id>` / `REPORT:<owner>` / `AGENT` handoffs as the only outcomes. No outcome
+  that implies the agent itself pages, escalates, or takes a remediation action.

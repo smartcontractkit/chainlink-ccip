@@ -117,9 +117,11 @@ func (f *fakeQuerier) Query(_ context.Context, q string) ([]Series, error) {
 	return nil, nil
 }
 
+const testRunbookDir = "../../../docs/runbooks"
+
 func loadForTest(t *testing.T, name string) *Runbook {
 	t.Helper()
-	rb, err := LoadRunbook(name)
+	rb, err := LoadRunbook(testRunbookDir, name)
 	if err != nil {
 		t.Fatalf("LoadRunbook(%s): %v", name, err)
 	}

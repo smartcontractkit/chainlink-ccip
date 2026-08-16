@@ -13,17 +13,21 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/cmd/runbook/internal"
 )
 
-const defaultEndpoint = "http://localhost:8428"
+const (
+	defaultEndpoint   = "http://localhost:8428"
+	defaultRunbookDir = "docs/runbooks"
+)
 
 type arguments struct {
-	endpoint string
-	bearer   string
-	user     string
-	pass     string
-	suffix   string
-	timeout  time.Duration
-	raw      bool
-	defines  []string
+	runbookDir string
+	endpoint   string
+	bearer     string
+	user       string
+	pass       string
+	suffix     string
+	timeout    time.Duration
+	raw        bool
+	defines    []string
 }
 
 func makeCommand() *cli.Command {
@@ -34,8 +38,8 @@ func makeCommand() *cli.Command {
 		Commands: []*cli.Command{
 			{
 				Name:   "list",
-				Usage:  "List the runbooks bundled into this binary.",
-				Action: func(ctx context.Context, cmd *cli.Command) error { return listRunbooks() },
+				Usage:  "List the runbooks found in --runbook-dir.",
+				Action: func(ctx context.Context, cmd *cli.Command) error { return listRunbooks(&args) },
 			},
 			{
 				Name:      "run",
@@ -56,6 +60,12 @@ func makeCommand() *cli.Command {
 
 func runFlags(args *arguments) []cli.Flag {
 	return []cli.Flag{
+		&cli.StringFlag{
+			Name:        "runbook-dir",
+			Value:       defaultRunbookDir,
+			Usage:       "Directory containing the runbook YAML files (single source of truth shared with docs/).",
+			Destination: &args.runbookDir,
+		},
 		&cli.StringFlag{
 			Name:        "endpoint",
 			Value:       defaultEndpoint,
@@ -104,13 +114,13 @@ func runFlags(args *arguments) []cli.Flag {
 	}
 }
 
-func listRunbooks() error {
-	names, err := internal.EmbeddedRunbooks()
+func listRunbooks(args *arguments) error {
+	names, err := internal.ListRunbooks(args.runbookDir)
 	if err != nil {
 		return err
 	}
 	for _, n := range names {
-		rb, err := internal.LoadRunbook(strings.TrimSuffix(n, ".yaml"))
+		rb, err := internal.LoadRunbook(args.runbookDir, n)
 		if err != nil {
 			fmt.Printf("  %s\t— (unreadable: %v)\n", n, err)
 			continue
@@ -125,7 +135,7 @@ func listRunbooks() error {
 }
 
 func run(ctx context.Context, name string, args *arguments) error {
-	rb, err := internal.LoadRunbook(name)
+	rb, err := internal.LoadRunbook(args.runbookDir, name)
 	if err != nil {
 		return err
 	}

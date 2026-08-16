@@ -1,16 +1,14 @@
 package internal
 
 import (
-	"embed"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
-
-//go:embed runbooks/*.yaml
-var runbookFS embed.FS
 
 // Runbook is the machine-readable form of one docs/runbooks file. It is meant
 // to be a faithful, executable transcription of the fenced YAML block in the
@@ -203,43 +201,54 @@ type ReasonOutcome struct {
 	Text   string `yaml:"reason_text"`
 }
 
-// LoadRunbook reads and validates a runbook by its canonical name.
-func LoadRunbook(name string) (*Runbook, error) {
-	names, err := EmbeddedRunbooks()
-	if err != nil {
-		return nil, err
-	}
-	for _, n := range names {
-		if strings.TrimSuffix(n, ".yaml") == name || n == name {
-			data, err := runbookFS.ReadFile("runbooks/" + n)
-			if err != nil {
-				return nil, err
-			}
-			var rb Runbook
-			if err := yaml.Unmarshal(data, &rb); err != nil {
-				return nil, fmt.Errorf("parsing %s: %w", n, err)
-			}
-			if err := rb.Validate(); err != nil {
-				return nil, fmt.Errorf("validating %s: %w", n, err)
-			}
-			return &rb, nil
-		}
-	}
-	return nil, fmt.Errorf("unknown runbook %q (available: %s)", name, strings.Join(names, ", "))
-}
-
-// EmbeddedRunbooks returns the canonical names of the bundled runbooks.
-func EmbeddedRunbooks() ([]string, error) {
-	entries, err := runbookFS.ReadDir("runbooks")
+// ListRunbooks returns the canonical names (minus .yaml) of the runbooks in a
+// directory. The directory is the single source of truth that both the docs
+// and the tool read, so a name only has to exist once.
+func ListRunbooks(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	var names []string
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".yaml") {
-			names = append(names, e.Name())
+			names = append(names, strings.TrimSuffix(e.Name(), ".yaml"))
 		}
 	}
 	sort.Strings(names)
 	return names, nil
+}
+
+// LoadRunbook reads and validates a runbook by name from a directory. If name
+// is already a path to a .yaml file, it is loaded directly.
+func LoadRunbook(dir, name string) (*Runbook, error) {
+	path := name
+	if filepath.Ext(name) != ".yaml" {
+		path = filepath.Join(dir, name+".yaml")
+	}
+	rb, err := LoadRunbookFile(path)
+	if err != nil {
+		names, lerr := ListRunbooks(dir)
+		if lerr == nil {
+			return nil, fmt.Errorf("%w (available in %s: %s)", err, dir, strings.Join(names, ", "))
+		}
+		return nil, err
+	}
+	return rb, nil
+}
+
+// LoadRunbookFile parses and validates a single runbook YAML file.
+func LoadRunbookFile(path string) (*Runbook, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	var rb Runbook
+	if err := yaml.Unmarshal(data, &rb); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if err := rb.Validate(); err != nil {
+		return nil, fmt.Errorf("validating %s: %w", path, err)
+	}
+	return &rb, nil
 }

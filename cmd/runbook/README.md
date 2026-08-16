@@ -23,7 +23,7 @@ make checks
 ## Usage
 
 ```sh
-runbook list
+runbook list                             # reads --runbook-dir (default docs/runbooks)
 runbook run commit-plugin-health -D destChain=chain-b \
   -D sourceChains='.*' -D fRoleDON=2 \
   --endpoint http://localhost:8428 --raw
@@ -35,10 +35,18 @@ runbook run uncommitted-message \
 Runbook-specific inputs are passed with `-D name=value` (repeatable); which
 ones a runbook needs is in its `inputs:` block (see `runbook list`).
 
+## Single source of truth
+
+The runbook YAML files live in [`docs/runbooks/`](../../docs/runbooks) **next to the markdown
+docs** — that directory is the single source both the docs and this tool read (`--runbook-dir`,
+default `docs/runbooks`). Edit the YAML and the tool picks it up; the markdown links to it rather
+than duplicating the spec, so the control structure can't silently drift from the docs.
+
 ## CLI flags (run)
 
 | flag | default | purpose |
 |---|---|---|
+| `--runbook-dir` | `docs/runbooks` | directory holding the runbook `.yaml` files |
 | `--endpoint` | `http://localhost:8428` | datasource base URL |
 | `--bearer` / `--user` / `--pass` | | datasource auth |
 | `--suffix auto\|keep\|strip` | `auto` | metric-name suffix policy (see below) |
@@ -80,8 +88,9 @@ per-step one.
 
 ## Adding a runbook
 
-Add a `.yaml` under `internal/runbooks/` matching the `type: checklist`
+Add a `.yaml` to `docs/runbooks/` matching the `type: checklist`
 (checks + severity rules) or `type: graph` (root + steps) schema in
-`internal/schema.go`. `runbook list` validates it on load, so a malformed
-runbook fails fast rather than half-running. Keep it a faithful transcription
-of the markdown doc — the shared step IDs are what stop the two from drifting.
+`internal/schema.go`, and link it from the markdown instead of inlining a fenced
+block. `runbook list` validates it on load, so a malformed runbook fails fast
+rather than half-running. The YAML is the single source of truth — the markdown
+prose explains it, it never re-states the control structure.
