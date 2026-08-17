@@ -568,7 +568,7 @@ func appendFundingOps(
 	}
 	ops = append(ops, approveReport.Output)
 
-	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.DepositProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositArgs]{
+	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.Deposit, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositArgs]{
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
 		Args: lockbox_ops.DepositArgs{

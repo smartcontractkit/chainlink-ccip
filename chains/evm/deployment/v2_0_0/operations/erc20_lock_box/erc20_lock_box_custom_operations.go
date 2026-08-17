@@ -3,7 +3,6 @@ package erc20_lock_box
 import (
 	"fmt"
 	"math/big"
-	"slices"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -34,38 +33,9 @@ var Owner = contract.NewRead(contract.ReadParams[struct{}, common.Address, *ERC2
 })
 
 var Deposit = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
-	Name:         "erc20-lock-box:deposit",
-	Version:      Version,
-	Description:  "Deposits tokens into the ERC20LockBox",
-	ContractType: ContractType,
-	ContractABI:  ERC20LockBoxABI,
-	NewContract:  NewERC20LockBoxContract,
-	IsAllowedCaller: func(erc20LockBox *ERC20LockBoxContract, opts *bind.CallOpts, caller common.Address, args DepositArgs) (bool, error) {
-		callers, err := erc20LockBox.GetAllAuthorizedCallers(opts)
-		if err != nil {
-			return false, fmt.Errorf("failed to get authorized callers: %w", err)
-		}
-		return slices.Contains(callers, caller), nil
-	},
-	Validate: func(args DepositArgs) error {
-		if args.Amount == nil || args.Amount.Sign() <= 0 {
-			return fmt.Errorf("amount must be greater than zero")
-		}
-		if args.Token == (common.Address{}) {
-			return fmt.Errorf("token address must be set")
-		}
-		return nil
-	},
-	CallContract: func(erc20LockBox *ERC20LockBoxContract, opts *bind.TransactOpts, args DepositArgs) (*types.Transaction, error) {
-		return erc20LockBox.Deposit(opts, args.Token, args.RemoteChainSelector, args.Amount)
-	},
-})
-
-// DepositProposalOnly is identical to Deposit but forces the operation into an MCMS proposal.
-var DepositProposalOnly = contract.NewWrite(contract.WriteParams[DepositArgs, *ERC20LockBoxContract]{
-	Name:            "erc20-lock-box:deposit-proposal-only",
+	Name:            "erc20-lock-box:deposit",
 	Version:         Version,
-	Description:     "Calls deposit on the contract (proposal-only, never executed directly)",
+	Description:     "Deposits tokens into the ERC20LockBox",
 	ContractType:    ContractType,
 	ContractABI:     ERC20LockBoxABI,
 	NewContract:     NewERC20LockBoxContract,
