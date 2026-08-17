@@ -71,7 +71,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     address, // feeToken
     uint256, // feeTokenAmount
     bytes calldata // verifierArgs
-  ) external view returns (bytes memory verifierReturnData) {
+  ) external view virtual returns (bytes memory verifierReturnData) {
     _assertNotCursedByRMN(message.destChainSelector);
 
     // For EVM, sender is abi encoded.
@@ -86,7 +86,7 @@ contract CommitteeVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Sign
     MessageV1Codec.MessageV1 calldata message,
     bytes32 messageHash,
     bytes calldata verifierResults
-  ) external view {
+  ) external view virtual {
     _assertNotCursedByRMN(message.sourceChainSelector);
     if (verifierResults.length < VERIFIER_VERSION_BYTES + SIGNATURE_LENGTH_BYTES) {
       revert InvalidVerifierResults();
