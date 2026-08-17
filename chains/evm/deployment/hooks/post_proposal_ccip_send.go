@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -91,15 +92,58 @@ func (e *EVMPostProposalCCIPSend) AdapterVersionForLane(env cldf.Environment, sr
 	return nil, fmt.Errorf("no adapter version found for src %d -> dest %d", srcSel, destSel)
 }
 
+// laneVersions are cached per (env, source) since DeriveLaneVersionsForChain
+// issues live-RPC reads that would otherwise repeat per destination lane.
+type laneVersionsCacheKey struct {
+	envName string
+	srcSel  uint64
+}
+
+var laneVersionsCache sync.Map // map[laneVersionsCacheKey]cachedLaneVersions
+
+type cachedLaneVersions struct {
+	versions map[uint64]*semver.Version
+	err      error
+}
+
 // supportedRemoteChainsWithVersions resolves destination selectors and
 // their lane versions for a given source selector.
 func (e *EVMPostProposalCCIPSend) supportedRemoteChainsWithVersions(env cldf.Environment, srcSel uint64) (map[uint64]*semver.Version, error) {
+	key := laneVersionsCacheKey{envName: env.Name, srcSel: srcSel}
+	if cached, ok := laneVersionsCache.Load(key); ok {
+		c := cached.(cachedLaneVersions)
+		return c.versions, c.err
+	}
+
 	resolver := &adapters1_2.LaneVersionResolver{}
 	alldests, _, err := resolver.DeriveLaneVersionsForChain(env, srcSel)
 	if err != nil {
-		return nil, fmt.Errorf("derive all lane versions from source %d: %w", srcSel, err)
+		err = fmt.Errorf("derive all lane versions from source %d: %w", srcSel, err)
 	}
-	return alldests, nil
+	alldests = filterDeprecatedDests(env, srcSel, alldests)
+	laneVersionsCache.Store(key, cachedLaneVersions{versions: alldests, err: err})
+
+	return alldests, err
+}
+
+// filterDeprecatedDests drops chains marked deprecated in chain-selectors; they
+// no longer accept CCIP traffic and only yield spurious send failures.
+func filterDeprecatedDests(env cldf.Environment, srcSel uint64, alldests map[uint64]*semver.Version) map[uint64]*semver.Version {
+	filtered := make(map[uint64]*semver.Version, len(alldests))
+	for destSel, version := range alldests {
+		deprecated, derr := chain_selectors.IsDeprecated(destSel)
+		if derr != nil {
+			env.Logger.Warnf("verify-ccip-send: unable to check deprecation status for dest %d from src %d: %v", destSel, srcSel, derr)
+			filtered[destSel] = version
+			continue
+		}
+		if deprecated {
+			env.Logger.Infof("verify-ccip-send: skipping deprecated dest %d from src %d", destSel, srcSel)
+			continue
+		}
+		filtered[destSel] = version
+	}
+	return filtered
 }
 
 // SupportedFeeTokens discovers fee tokens configured on the source chain's
@@ -235,6 +279,11 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 			continue
 		}
 		env.Logger.Debugf("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
+		// No fork RPC client means no impersonation, so funding is impossible.
+		if ec == nil {
+			env.Logger.Warnf("Failed to fund fee token %s on chain %d: no direct fork RPC client available for impersonation, continuing without it", addr.Hex(), srcSel)
+			continue
+		}
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
 		tokenOwner, err := discoverFeeTokenFundingAccount(ctx, client, token, addr, fundingAmount)
 		if err != nil {
@@ -336,7 +385,7 @@ func findFundingSenderFromTokenEvents(
 ) (common.Address, error) {
 	const (
 		chunkSize   = uint64(20_000)
-		maxLookback = uint64(500_000)
+		maxLookback = uint64(100_000)
 	)
 	header, err := backend.HeaderByNumber(ctx, nil)
 	if err != nil {
