@@ -237,7 +237,7 @@ func runPostProposalCCIPSends(
 					}()
 
 					adapterVer, err := provider.AdapterVersionForLane(env, srcSel, destSel)
-					if err != nil {
+					if err != nil || adapterVer == nil {
 						destGroup.warnf("verify-ccip-send: failed to resolve adapter version src=%d dest=%d: %v", srcSel, destSel, err)
 						failuresMu.Lock()
 						addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, allFeeTokensSummaryLabel)
