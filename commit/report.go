@@ -24,6 +24,29 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+// Reasons passed to MetricsReporter.TrackReportValidationRejected from validateReport. Named
+// here, rather than left as inline literals, because these are effectively a stable label-value
+// contract for dashboards/runbooks/alerts (see docs/runbooks/uncommitted-message.md's metric
+// reference table) with no test asserting on the literal spelling -- a typo at a call site would
+// silently create an unmonitored label value instead of failing to compile.
+const (
+	rejectReasonDecodeReport         = "decode_report"
+	rejectReasonDecodeReportInfo     = "decode_report_info"
+	rejectReasonEmptyRoot            = "empty_root"
+	rejectReasonInvalidSeqNumRange   = "invalid_seqnum_range"
+	rejectReasonCursedCheckError     = "cursed_check_error"
+	rejectReasonCursed               = "cursed"
+	rejectReasonDestSupportCheckErr  = "dest_support_check_error"
+	rejectReasonDestNotSupported     = "dest_not_supported"
+	rejectReasonConfigDigestCheckErr = "config_digest_check_error"
+	rejectReasonConfigDigestMismatch = "config_digest_mismatch"
+	rejectReasonStale                = "stale"
+	rejectReasonRootBlessingMismatch = "root_blessing_mismatch"
+
+	validatePhaseShouldAccept   = "should_accept"
+	validatePhaseShouldTransmit = "should_transmit"
+)
+
 func encodeReports(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -128,6 +151,7 @@ func (p *Plugin) validateReport(
 	lggr logger.Logger,
 	seqNr uint64,
 	r ocr3types.ReportWithInfo[[]byte],
+	phase string,
 ) (cciptypes.CommitPluginReport, error) {
 	if r.Report == nil {
 		lggr.Warn("nil report")
@@ -136,12 +160,14 @@ func (p *Plugin) validateReport(
 
 	decodedReport, err := p.decodeReport(ctx, r.Report)
 	if err != nil {
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonDecodeReport)
 		return cciptypes.CommitPluginReport{},
 			plugincommon.NewErrValidatingReport(fmt.Errorf("decode report: %w, report: %x", err, r.Report))
 	}
 
 	var reportInfo cciptypes.CommitReportInfo
 	if reportInfo, err = cciptypes.DecodeCommitReportInfo(r.Info); err != nil {
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonDecodeReportInfo)
 		return cciptypes.CommitPluginReport{},
 			plugincommon.NewErrValidatingReport(fmt.Errorf("decode report info: %w", err))
 	}
@@ -149,11 +175,13 @@ func (p *Plugin) validateReport(
 	for _, root := range decodedReport.BlessedMerkleRoots {
 		if root.MerkleRoot == (cciptypes.Bytes32{}) {
 			lggr.Warnw("empty blessed merkle root", "root", root)
+			p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonEmptyRoot)
 			return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("empty blessed merkle root")
 
 		}
 		if root.SeqNumsRange.Start() > root.SeqNumsRange.End() {
 			lggr.Warnw("invalid seqNumsRange", "blessed root", root)
+			p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonInvalidSeqNumRange)
 			return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("invalid seqNumsRange")
 		}
 	}
@@ -161,14 +189,18 @@ func (p *Plugin) validateReport(
 	for _, root := range decodedReport.UnblessedMerkleRoots {
 		if root.MerkleRoot == (cciptypes.Bytes32{}) {
 			lggr.Warnw("empty unblessed merkle root", "root", root)
+			p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonEmptyRoot)
 			return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("empty unblessed merkle root")
 		}
 		if root.SeqNumsRange.Start() > root.SeqNumsRange.End() {
 			lggr.Warnw("invalid seqNumsRange", "unblessed root", root)
+			p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonInvalidSeqNumRange)
 			return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("invalid seqNumsRange")
 		}
 	}
 
+	// RMN blessing/signing is effectively dead code now that RMNEnabled is hardcoded off (see NewPlugin),
+	// so duplicate/insufficient RMN signature rejections aren't instrumented -- they shouldn't occur.
 	seen := make(map[cciptypes.RMNECDSASignature]struct{})
 	for _, sig := range decodedReport.RMNSignatures {
 
@@ -189,15 +221,18 @@ func (p *Plugin) validateReport(
 
 	if isCursed, err := p.checkReportCursed(ctx, lggr, decodedReport); err != nil || isCursed {
 		if err != nil {
+			p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonCursedCheckError)
 			return cciptypes.CommitPluginReport{},
 				plugincommon.NewErrValidatingReport(fmt.Errorf("check report cursed: %w", err))
 		}
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonCursed)
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("report cursed")
 	}
 
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonDestSupportCheckErr)
 		return cciptypes.CommitPluginReport{},
 			plugincommon.NewErrValidatingReport(fmt.Errorf("supports dest chain: %w", err))
 	}
@@ -207,6 +242,7 @@ func (p *Plugin) validateReport(
 			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
 			"assigned as readers of the destination chain, or if " +
 			"this oracle should support the destination chain but isn't!")
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonDestNotSupported)
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
@@ -214,6 +250,7 @@ func (p *Plugin) validateReport(
 		ctx, p.ccipReader, consts.PluginTypeCommit, p.reportingCfg.ConfigDigest,
 	)
 	if err != nil {
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonConfigDigestCheckErr)
 		return cciptypes.CommitPluginReport{},
 			plugincommon.NewErrValidatingReport(fmt.Errorf("check config digest: %w", err))
 	}
@@ -223,11 +260,13 @@ func (p *Plugin) validateReport(
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", plugincommon.FormatConfigDigest(offRampDigest),
 		)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonConfigDigestMismatch)
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport("config digest mismatch")
 	}
 
 	err = p.isStaleReport(ctx, seqNr, decodedReport)
 	if err != nil {
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonStale)
 		return cciptypes.CommitPluginReport{}, plugincommon.NewErrStaleReport(fmt.Sprintf("%v", err))
 	}
 
@@ -239,6 +278,7 @@ func (p *Plugin) validateReport(
 	)
 	if err != nil {
 		lggr.Errorw("report not accepted due to root blessings validation error", "err", err)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonRootBlessingMismatch)
 		err = plugincommon.NewErrInvalidReport(fmt.Sprintf("root blessings validation: %v", err))
 		return cciptypes.CommitPluginReport{}, err
 	}
@@ -251,7 +291,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
-	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
+	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r, validatePhaseShouldAccept)
 	if errors.Is(err, plugincommon.ErrStaleReport) {
 		lggr.Infow("stale report, not accepting", "err", err)
 		return false, nil
@@ -389,7 +429,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
 
-	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
+	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r, validatePhaseShouldTransmit)
 	if errors.Is(err, plugincommon.ErrStaleReport) {
 		lggr.Infow("stale report, not accepting", "err", err)
 		return false, nil

@@ -37,6 +37,7 @@ import (
 	feequoterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	cctpverifierops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
+
 	// Blank import so the RMN 2.1.0 fastcurse adapter registers itself for consumers that only
 	// import this package.
 	usdctokenpoolproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
@@ -84,6 +85,8 @@ func init() {
 	ccvadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyEVM, &EVMDeployChainContractsAdapter{})
 	ccvadapters.GetDeployChainContractsRegistry().RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &adapters1_6.ConfigImportAdapter{})
 	ccvadapters.GetDeployChainContractsRegistry().RegisterLaneVersionResolver(chainsel.FamilyEVM, &adapters1_2.LaneVersionResolver{})
+
+	ccvadapters.GetOnRampUpgraderRegistry().Register(chainsel.FamilyEVM, &EVMOnRampUpgrader{})
 
 	tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v, NewTokenAdapter())
 	feeAggReg := fees.GetFeeAggregatorRegistry()

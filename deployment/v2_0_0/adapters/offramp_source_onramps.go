@@ -24,3 +24,11 @@ type OffRampSetSourceOnRampsEntry struct {
 type OffRampSourceOnRampSetter interface {
 	SetOffRampSourceOnRamps(e cldf.Environment, update OffRampSetSourceOnRampsEntry) (*mcms_types.BatchOperation, bool, error)
 }
+
+// OffRampSourceOnRampReader is implemented by chain family adapters that can read the
+// current source-chain onramp whitelist from a chain's OffRamp.
+type OffRampSourceOnRampReader interface {
+	// GetOffRampSourceOnRamps returns the onramps currently whitelisted for
+	// sourceChainSelector on the local chain's OffRamp, as the source chain writes them into its messages. For an EVM source that is abi.encode(address) — 32 bytes, left zero-padded — not the 20-byte contract address.
+	GetOffRampSourceOnRamps(e cldf.Environment, localChainSelector uint64, sourceChainSelector uint64) ([][]byte, error)
+}
