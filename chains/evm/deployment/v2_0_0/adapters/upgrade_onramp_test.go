@@ -2,7 +2,9 @@ package adapters_test
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -149,7 +151,7 @@ func upgradeStateAssertions(t *testing.T, e deployment.Environment, result ccvad
 	})
 	require.NoError(t, err)
 
-	rmnProxyAddr, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+	rmnProxyAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    datastore.ContractType(rmnproxyops.ContractType),
 		Version: semver.MustParse("1.0.0"),
 	}, upgradeTestChains[0], evm_datastore_utils.ToEVMAddress)
@@ -159,7 +161,7 @@ func upgradeStateAssertions(t *testing.T, e deployment.Environment, result ccvad
 	// Phase 1 makes no router writes: TestRouter must not yet route to the new OnRamp for
 	// any dest chain, since that would cut prod-router-class lanes over before the verifier
 	// jobs observe both OnRamps.
-	testRouterAddr, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+	testRouterAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    datastore.ContractType(router.TestRouterContractType),
 		Version: router.Version,
 	}, upgradeTestChains[0], evm_datastore_utils.ToEVMAddress)
@@ -178,7 +180,7 @@ func upgradeStateAssertions(t *testing.T, e deployment.Environment, result ccvad
 
 	// New OnRamp dest chain configs should be copied verbatim from the legacy OnRamp,
 	// i.e. still use the prod Router (this test's lanes are all prod-router class).
-	prodRouterAddr, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+	prodRouterAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    datastore.ContractType(router.ContractType),
 		Version: router.Version,
 	}, upgradeTestChains[0], evm_datastore_utils.ToEVMAddress)
@@ -205,7 +207,7 @@ func stagedOnTestRouterAssertions(t *testing.T, e deployment.Environment, result
 
 	newOnRampAddr := common.HexToAddress(result.NewOnRampRef.Address)
 
-	testRouterAddr, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+	testRouterAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    datastore.ContractType(router.TestRouterContractType),
 		Version: router.Version,
 	}, upgradeTestChains[0], evm_datastore_utils.ToEVMAddress)
@@ -241,7 +243,7 @@ func promoteStateAssertions(t *testing.T, e deployment.Environment, result ccvad
 
 	newOnRampAddr := common.HexToAddress(result.NewOnRampRef.Address)
 
-	prodRouterAddr, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+	prodRouterAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    datastore.ContractType(router.ContractType),
 		Version: router.Version,
 	}, upgradeTestChains[0], evm_datastore_utils.ToEVMAddress)
@@ -270,6 +272,237 @@ func promoteStateAssertions(t *testing.T, e deployment.Environment, result ccvad
 		assert.Equal(t, prodRouterAddr, destCfg.Output.Router,
 			"new OnRamp dest config for %d should use prod Router", remoteSel)
 	}
+}
+
+// setRouterOnRamp points routerAddr's onRamp mapping for destSel at onRampAddr. Passing the zero
+// address disables the lane on that router. Unlike setDestChainRouter (which writes the OnRamp's
+// dest config), this writes the Router contract itself, so the two together build a fixture whose
+// OnRamp and Router agree about which router fronts a lane.
+func setRouterOnRamp(
+	t *testing.T,
+	e *deployment.Environment,
+	routerAddr common.Address,
+	destSel uint64,
+	onRampAddr common.Address,
+) {
+	t.Helper()
+	chain := e.BlockChains.EVMChains()[upgradeTestChains[0]]
+
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err := operations.ExecuteOperation(e.OperationsBundle, router.ApplyRampUpdates, chain, contract.FunctionInput[router.ApplyRampsUpdatesArgs]{
+		ChainSelector: chain.Selector,
+		Address:       routerAddr,
+		Args: router.ApplyRampsUpdatesArgs{
+			OnRampUpdates: []router.OnRamp{{DestChainSelector: destSel, OnRamp: onRampAddr}},
+		},
+	})
+	require.NoError(t, err)
+
+	// The reporter memoizes reads by (operation, chain, address, args), so a stale pre-write
+	// route would otherwise be served to the next caller.
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+}
+
+// assertOnRampDestRouter asserts that onRampAddr's dest chain config for destSel routes through
+// wantRouter. phase names the upgrade phase under test so failures identify themselves.
+func assertOnRampDestRouter(
+	t *testing.T,
+	e deployment.Environment,
+	onRampAddr common.Address,
+	destSel uint64,
+	wantRouter common.Address,
+	phase string,
+) {
+	t.Helper()
+	chain := e.BlockChains.EVMChains()[upgradeTestChains[0]]
+
+	destCfg, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
+		ChainSelector: chain.Selector,
+		Address:       onRampAddr,
+		Args:          destSel,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, wantRouter, destCfg.Output.Router,
+		"%s: OnRamp %s dest config for %d should route through %s",
+		phase, onRampAddr.Hex(), destSel, wantRouter.Hex())
+}
+
+// assertRouterRoutes asserts that routerAddr maps destSel to wantOnRamp. A zero wantOnRamp asserts
+// the router does not route that dest at all.
+func assertRouterRoutes(
+	t *testing.T,
+	e deployment.Environment,
+	routerAddr common.Address,
+	destSel uint64,
+	wantOnRamp common.Address,
+	phase string,
+) {
+	t.Helper()
+	chain := e.BlockChains.EVMChains()[upgradeTestChains[0]]
+
+	report, err := operations.ExecuteOperation(e.OperationsBundle, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
+		ChainSelector: chain.Selector,
+		Address:       routerAddr,
+		Args:          destSel,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, wantOnRamp, report.Output,
+		"%s: Router %s should map dest %d to OnRamp %s",
+		phase, routerAddr.Hex(), destSel, wantOnRamp.Hex())
+}
+
+// addRandomQualifiersToContracts adds timestamp-based qualifiers to test router, prod router, offramp, and RMN proxy
+// on all chains, simulating the real datastore where multiple instances of the same contract type coexist.
+// The onramp is left unqualified to remain canonical during the upgrade.
+func addRandomQualifiersToContracts(t *testing.T, e *deployment.Environment) {
+	t.Helper()
+
+	// Generate timestamp-based qualifiers for each contract type
+	timestamp := fmt.Sprintf("%d", time.Now().UnixMilli())
+
+	// Get all current refs from e.DataStore
+	allRefs := e.DataStore.Addresses().Filter()
+
+	// Process refs: modify qualifiers for specific contract types
+	for i := range allRefs {
+		ref := &allRefs[i]
+
+		if ref.Type != datastore.ContractType(onramp.ContractType) && ref.Qualifier == "" { // Leave onramp unqualified
+			ref.Qualifier = fmt.Sprintf("qualifier-%s", timestamp)
+		}
+	}
+
+	// Create a new datastore with the modified refs
+	newDS := datastore.NewMemoryDataStore()
+	for _, ref := range allRefs {
+		require.NoError(t, newDS.Addresses().Add(ref))
+	}
+
+	// Update environment datastore with the qualified versions
+	e.DataStore = newDS.Seal()
+}
+
+// TestUpgradeOnrampFullFlowForInitialOnrampBehindTestRouterAndProdRouterUsingRefWithQualifier drives
+// all three upgrade phases on a chain that serves both lane classes at once, against a datastore
+// whose non-OnRamp refs all carry qualifiers.
+//
+// The qualifier step reproduces the production datastore, where Router/TestRouter/ARMProxy are
+// stored under an "<address>-<Type>" qualifier with no canonical copy, while the 2.0.0 OnRamp is
+// canonical. Any lookup that insists on an empty qualifier for a non-OnRamp contract therefore
+// resolves nothing here, exactly as it would against prod.
+//
+// The lane fixture is mixed on purpose: one dest is fronted by the TestRouter (where the TestRouter
+// *is* that lane's production path and it never stages), the other by the prod Router (which stages
+// on the TestRouter in Phase 2 before cutting over in Phase 3). Phases are driven off
+// ClassifyDestChains the same way UpgradeOnrampPhase2/Phase3 drive them, so each class takes its
+// own workflow rather than both being promoted everywhere.
+func TestUpgradeOnrampFullFlowForInitialOnrampBehindTestRouterAndProdRouterUsingRefWithQualifier(t *testing.T) {
+	e := setupDeployNewOnRampTest(t)
+
+	// Step 1 — before any deploy or upgrade: qualify every non-OnRamp ref.
+	addRandomQualifiersToContracts(t, e)
+
+	legacyOnRamp := common.HexToAddress(initialStateAssertions(t, *e).Address)
+
+	// Both routers resolve from qualified refs.
+	testRouterAddr := resolveRouterAddrForTest(t, *e, datastore.ContractType(router.TestRouterContractType))
+	prodRouterAddr := resolveRouterAddrForTest(t, *e, datastore.ContractType(router.ContractType))
+
+	// Build the mixed fixture. testDest becomes a genuine TestRouter-class lane: its OnRamp dest
+	// config points at the TestRouter, the TestRouter routes it to the legacy OnRamp, and the prod
+	// Router does not route it at all. prodDest is left as the lane setup created it.
+	testDest, prodDest := upgradeTestChains[1], upgradeTestChains[2]
+	setDestChainRouter(t, e, legacyOnRamp, testDest, testRouterAddr)
+	setRouterOnRamp(t, e, testRouterAddr, testDest, legacyOnRamp)
+	setRouterOnRamp(t, e, prodRouterAddr, testDest, common.Address{})
+
+	adapter := adapters.EVMOnRampUpgrader{}
+
+	class, err := adapter.ClassifyDestChains(*e, upgradeTestChains[0])
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{prodDest}, class.ProdRouterDests)
+	require.ElementsMatch(t, []uint64{testDest}, class.TestRouterDests)
+
+	// ---- Phase 1: deploy the replacement OnRamp ----
+	result, err := adapter.DeployNewOnRamp(*e, upgradeTestChains[0])
+	require.NoError(t, err)
+	mergeUpgradeRefs(t, e, result)
+	newOnRamp := common.HexToAddress(result.NewOnRampRef.Address)
+
+	assert.Equal(t, legacyOnRamp, common.HexToAddress(result.LegacyOnRampRef.Address))
+	assert.Equal(t, "legacy", result.LegacyOnRampRef.Qualifier)
+	assert.Equal(t, "", result.NewOnRampRef.Qualifier)
+	assert.NotEqual(t, legacyOnRamp, newOnRamp)
+
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	// The replacement OnRamp must adopt the RMNProxy — resolved here from a qualified ref.
+	rmnProxyAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		Type:    datastore.ContractType(rmnproxyops.ContractType),
+		Version: semver.MustParse("1.0.0"),
+	}, upgradeTestChains[0], evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err)
+	staticReport, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetStaticConfig,
+		e.BlockChains.EVMChains()[upgradeTestChains[0]], contract.FunctionInput[struct{}]{
+			ChainSelector: upgradeTestChains[0],
+			Address:       newOnRamp,
+			Args:          struct{}{},
+		})
+	require.NoError(t, err)
+	assert.Equal(t, rmnProxyAddr, staticReport.Output.RmnRemote, "new OnRamp should use the RMNProxy")
+
+	// Phase 1 copies dest configs verbatim and makes no router writes: each class keeps its own
+	// router on the new OnRamp, and both routers still point at the legacy OnRamp.
+	assertOnRampDestRouter(t, *e, newOnRamp, prodDest, prodRouterAddr, "after Phase 1")
+	assertOnRampDestRouter(t, *e, newOnRamp, testDest, testRouterAddr, "after Phase 1")
+	assertRouterRoutes(t, *e, prodRouterAddr, prodDest, legacyOnRamp, "after Phase 1")
+	assertRouterRoutes(t, *e, testRouterAddr, testDest, legacyOnRamp, "after Phase 1")
+	assertRouterRoutes(t, *e, testRouterAddr, prodDest, common.Address{}, "after Phase 1")
+
+	// ---- Phase 2: stage the prod-class lane on the TestRouter ----
+	// Only ProdRouterDests stage. The TestRouter-class lane is untouched, since cutting it over
+	// here would put it into production before the verifier jobs observe both OnRamps.
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.PromoteOnrampToTestRouter(*e, upgradeTestChains[0], class.ProdRouterDests)
+	require.NoError(t, err)
+
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	assertRouterRoutes(t, *e, testRouterAddr, prodDest, newOnRamp, "after Phase 2")
+	assertOnRampDestRouter(t, *e, newOnRamp, prodDest, testRouterAddr, "after Phase 2")
+	// The prod-class lane's production path is untouched.
+	assertRouterRoutes(t, *e, prodRouterAddr, prodDest, legacyOnRamp, "after Phase 2")
+	require.NoError(t, adapter.VerifyLegacyOnRampOnProdRouter(*e, upgradeTestChains[0], class.ProdRouterDests))
+	// The test-class lane is untouched.
+	assertRouterRoutes(t, *e, testRouterAddr, testDest, legacyOnRamp, "after Phase 2")
+	assertOnRampDestRouter(t, *e, newOnRamp, testDest, testRouterAddr, "after Phase 2")
+
+	// Staging must not reclassify the prod-class lane. Classification reads the legacy OnRamp
+	// precisely so the Phase 2 write above cannot flip prodDest into the TestRouter bucket.
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	class, err = adapter.ClassifyDestChains(*e, upgradeTestChains[0])
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{prodDest}, class.ProdRouterDests)
+	require.ElementsMatch(t, []uint64{testDest}, class.TestRouterDests)
+
+	// ---- Phase 3: promote both classes to their production router ----
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.PromoteOnrampToTestRouter(*e, upgradeTestChains[0], class.TestRouterDests)
+	require.NoError(t, err)
+
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.PromoteOnrampToProdRouter(*e, upgradeTestChains[0], class.ProdRouterDests)
+	require.NoError(t, err)
+
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	assertRouterRoutes(t, *e, prodRouterAddr, prodDest, newOnRamp, "after Phase 3")
+	assertOnRampDestRouter(t, *e, newOnRamp, prodDest, prodRouterAddr, "after Phase 3")
+	assertRouterRoutes(t, *e, testRouterAddr, testDest, newOnRamp, "after Phase 3")
+	assertOnRampDestRouter(t, *e, newOnRamp, testDest, testRouterAddr, "after Phase 3")
+
+	// The adapter's own end-state check must agree, per class.
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	require.NoError(t, adapter.VerifyPromotedToRouters(
+		*e, upgradeTestChains[0], class.ProdRouterDests, class.TestRouterDests))
 }
 
 func TestUpgradeOnrampFullFlowForInitialOnrampBehindTestRouter(t *testing.T) {
@@ -663,7 +896,7 @@ func TestVerifyNewOnRampOwner(t *testing.T) {
 // upgrade target chain.
 func resolveRouterAddrForTest(t *testing.T, e deployment.Environment, contractType datastore.ContractType) common.Address {
 	t.Helper()
-	addr, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 		Type:    contractType,
 		Version: router.Version,
 	}, upgradeTestChains[0], evm_datastore_utils.ToEVMAddress)

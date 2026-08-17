@@ -3,7 +3,6 @@ package adapters
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"k8s.io/utils/ptr"
 
@@ -747,9 +746,9 @@ func readAllDestChainConfigs(b cldf_ops.Bundle, chain cldf_evm.Chain, chainSelec
 }
 
 func resolveRMNProxy(ds datastore.DataStore, chainSelector uint64) (common.Address, error) {
-	addr, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(rmnproxyops.ContractType),
-		Version: semver.MustParse("1.0.0"),
+		Version: rmnproxyops.Version,
 	}, chainSelector, evmds.ToEVMAddress)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("resolve RMNProxy on chain %d: %w", chainSelector, err)
@@ -758,7 +757,7 @@ func resolveRMNProxy(ds datastore.DataStore, chainSelector uint64) (common.Addre
 }
 
 func resolveTestRouter(ds datastore.DataStore, chainSelector uint64) (common.Address, error) {
-	bytes, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
+	bytes, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(router.TestRouterContractType),
 		Version: router.Version,
 	}, chainSelector, evmds.ToEVMAddressBytes)
@@ -838,7 +837,7 @@ func (a *EVMOnRampUpgrader) promoteOnrampToRouter(e cldf.Environment, chainSelec
 }
 
 func resolveProdRouter(ds datastore.DataStore, chainSelector uint64) (common.Address, error) {
-	bytes, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
+	bytes, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(router.ContractType),
 		Version: router.Version,
 	}, chainSelector, evmds.ToEVMAddressBytes)
