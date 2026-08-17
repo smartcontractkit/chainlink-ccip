@@ -519,23 +519,41 @@ func appendFundingOps(
 		return append(ops, transferReport.Output), nil
 	}
 
-	// Deposit path: make the timelock an authorized caller so it can deposit, approve the lockbox,
-	// then deposit via the lockbox's deposit() function (emits the Deposit event). The framework
-	// routes the authorize step automatically based on lockbox ownership: EOA when deployer-owned
-	// or MCMS-batched when timelock-owned. The timelock remains an authorized caller afterward;
-	// this is harmless since the timelock is governance and typically owns the lockbox.
-	addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
-		ChainSelector: chainSel,
-		Address:       lockboxAddr,
-		Args: lockbox_ops.AuthorizedCallerArgs{
-			AddedCallers:   []common.Address{timelockAddr},
-			RemovedCallers: []common.Address{},
+	// Liquidity migration is done in tranches, so the authorize step must be idempotent: only append
+	// the authorized-caller update if the timelock isn't already an authorized caller, avoiding a
+	// redundant MCMS batch op and a spurious AuthorizedCallerAdded event on every subsequent tranche.
+	authCallers, err := cldf_ops.ExecuteOperation(
+		b,
+		lockbox_ops.GetAllAuthorizedCallers,
+		evmChain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       lockboxAddr,
 		},
-	})
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
+		return nil, fmt.Errorf("failed to get authorized callers on lockbox %s: %w", lockboxAddr, err)
 	}
-	ops = append(ops, addAuthReport.Output)
+	if !slices.Contains(authCallers.Output, timelockAddr) {
+		// Deposit path: make the timelock an authorized caller so it can deposit, approve the lockbox,
+		// then deposit via the lockbox's deposit() function (emits the Deposit event). The framework
+		// routes the authorize step automatically based on lockbox ownership: EOA when deployer-owned
+		// or MCMS-batched when timelock-owned. The timelock remains an authorized caller afterward;
+		// this is harmless since the timelock is governance and typically owns the lockbox.
+		addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
+			ChainSelector: chainSel,
+			Address:       lockboxAddr,
+			Args: lockbox_ops.AuthorizedCallerArgs{
+				AddedCallers:   []common.Address{timelockAddr},
+				RemovedCallers: []common.Address{},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to add timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
+		}
+		ops = append(ops, addAuthReport.Output)
+	}
 
 	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.ApproveProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveArgs]{
 		ChainSelector: chainSel,
