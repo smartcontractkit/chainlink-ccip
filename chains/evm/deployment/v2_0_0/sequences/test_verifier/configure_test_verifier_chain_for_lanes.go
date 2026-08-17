@@ -192,7 +192,7 @@ var ConfigureTestVerifierChainForLanes = cldf_ops.NewSequence(
 			// ApplyChainUpdates reverts on an already-supported chain, so when the remote is
 			// already configured we only ensure the remote pool address is present.
 			if _, alreadySupported := supportedSet[remoteChainSelector]; alreadySupported {
-				paddedPool := common.LeftPadBytes(common.BytesToAddress(remotePoolBytes).Bytes(), 32)
+				paddedPool := common.LeftPadBytes(remotePoolBytes, 32)
 				remotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemotePools, chain, contract_utils.FunctionInput[uint64]{
 					ChainSelector: input.ChainSelector,
 					Address:       poolAddr,
