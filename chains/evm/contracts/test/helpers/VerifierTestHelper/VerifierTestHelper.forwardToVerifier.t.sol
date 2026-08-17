@@ -20,7 +20,7 @@ contract VerifierTestHelper_forwardToVerifier is VerifierTestHelperSetup {
     assertEq(returnData, abi.encodePacked(VERSION_TAG));
   }
 
-  function test_forwardToVerifier_RevertWhen_MessageHasSideEffects() public {
+  function test_forwardToVerifier_RevertWhen_MessageCannotHaveSideEffects() public {
     _configureRemoteChain(DEST_CHAIN_SELECTOR);
     _allowSender(DEST_CHAIN_SELECTOR, s_sender);
     MessageV1Codec.MessageV1 memory message = _createMessage(
@@ -33,7 +33,7 @@ contract VerifierTestHelper_forwardToVerifier is VerifierTestHelperSetup {
     s_verifier.forwardToVerifier(message, bytes32(0), address(0), 0, "");
   }
 
-  function test_forwardToVerifier_RevertWhen_SourceTokenIsNotTestToken() public {
+  function test_forwardToVerifier_RevertWhen_MustUseTestToken() public {
     _configureRemoteChain(DEST_CHAIN_SELECTOR);
     _allowSender(DEST_CHAIN_SELECTOR, s_sender);
     MessageV1Codec.MessageV1 memory message =
@@ -45,7 +45,7 @@ contract VerifierTestHelper_forwardToVerifier is VerifierTestHelperSetup {
     s_verifier.forwardToVerifier(message, bytes32(0), address(0), 0, "");
   }
 
-  function test_forwardToVerifier_RevertWhen_SenderIsNotAllowed() public {
+  function test_forwardToVerifier_RevertWhen_SenderNotAllowed() public {
     _configureRemoteChain(DEST_CHAIN_SELECTOR);
     _allowSender(DEST_CHAIN_SELECTOR, s_sender);
     address notAllowedSender = makeAddr("notAllowedSender");

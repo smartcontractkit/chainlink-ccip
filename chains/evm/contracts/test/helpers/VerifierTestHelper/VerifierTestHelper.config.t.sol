@@ -33,7 +33,7 @@ contract VerifierTestHelper_config is VerifierTestHelperSetup {
     s_verifier.applyRemoteChainConfigUpdates(configs);
   }
 
-  function test_applyRemoteChainConfigUpdates_RevertWhen_RouterIsNotTestRouter() public {
+  function test_applyRemoteChainConfigUpdates_RevertWhen_MustUseTestRouter() public {
     BaseVerifier.RemoteChainConfigArgs[] memory configs = new BaseVerifier.RemoteChainConfigArgs[](1);
     configs[0] = BaseVerifier.RemoteChainConfigArgs({
       router: IRouter(makeAddr("wrongRouter")),
@@ -49,7 +49,7 @@ contract VerifierTestHelper_config is VerifierTestHelperSetup {
     s_verifier.applyRemoteChainConfigUpdates(configs);
   }
 
-  function test_applyAllowlistUpdates_RevertWhen_AllowlistIsDisabled() public {
+  function test_applyAllowlistUpdates_RevertWhen_MustUseAllowlist() public {
     BaseVerifier.AllowlistConfigArgs[] memory configs = new BaseVerifier.AllowlistConfigArgs[](1);
     configs[0] = BaseVerifier.AllowlistConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
