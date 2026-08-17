@@ -1,6 +1,7 @@
 package adapters_test
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -339,6 +340,170 @@ func TestUpgradeOnrampFullFlowForInitialOnrampNotBehindProdRouter(t *testing.T) 
 	require.NoError(t, err)
 
 	promoteStateAssertions(t, *e, result)
+}
+
+func TestFullFlowWithRollback(t *testing.T) {
+	e := setupDeployNewOnRampTest(t)
+
+	legacyOnRamp := initialStateAssertions(t, *e)
+	adapter := adapters.EVMOnRampUpgrader{}
+
+	// Verify routers are originally on legacy OnRamp
+	chain := e.BlockChains.EVMChains()[upgradeTestChains[0]]
+	legacyOnRampAddr := common.HexToAddress(legacyOnRamp.Address)
+	prodRouterAddr := resolveRouterAddrForTest(t, *e, datastore.ContractType(router.ContractType))
+	b := testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	for _, remoteSel := range upgradeTestChains[1:] {
+		onRampReport, err := operations.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       prodRouterAddr,
+			Args:          remoteSel,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, legacyOnRampAddr, onRampReport.Output,
+			"prod Router should map dest %d back to legacy OnRamp after rollback", remoteSel)
+	}
+
+	// Phase 1: Deploy new OnRamp
+	result, err := adapter.DeployNewOnRamp(*e, upgradeTestChains[0])
+	require.NoError(t, err)
+	mergeUpgradeRefs(t, e, result)
+	upgradeStateAssertions(t, *e, result)
+
+	// Phase 2: Stage on TestRouter
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.PromoteOnrampToTestRouter(*e, upgradeTestChains[0], upgradeTestChains[1:])
+	require.NoError(t, err)
+	stagedOnTestRouterAssertions(t, *e, result)
+
+	// Phase 3: Promote to prod Router
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.PromoteOnrampToProdRouter(*e, upgradeTestChains[0], upgradeTestChains[1:])
+	require.NoError(t, err)
+	promoteStateAssertions(t, *e, result)
+
+	// Rollback: Return routers to legacy OnRamp
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.RollbackToLegacyRouters(*e, upgradeTestChains[0], upgradeTestChains[1:], []uint64{})
+	require.NoError(t, err)
+
+	// Verify routers are back on legacy OnRamp
+	b = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	for _, remoteSel := range upgradeTestChains[1:] {
+		onRampReport, err := operations.ExecuteOperation(b, router.GetOnRamp, chain, contract.FunctionInput[uint64]{
+			ChainSelector: chain.Selector,
+			Address:       prodRouterAddr,
+			Args:          remoteSel,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, legacyOnRampAddr, onRampReport.Output,
+			"prod Router should map dest %d back to legacy OnRamp after rollback", remoteSel)
+	}
+}
+
+func TestFullFlowWithCleanup(t *testing.T) {
+	e := setupDeployNewOnRampTest(t)
+
+	legacyOnRamp := initialStateAssertions(t, *e)
+	adapter := adapters.EVMOnRampUpgrader{}
+
+	// Phase 1: Deploy new OnRamp
+	result, err := adapter.DeployNewOnRamp(*e, upgradeTestChains[0])
+	require.NoError(t, err)
+	mergeUpgradeRefs(t, e, result)
+	upgradeStateAssertions(t, *e, result)
+
+	// Phase 1 (continued): Update remote OffRamps to allow both legacy and new OnRamps
+	// (in the real changeset, this is done via SetOffRampSourceOnRamps, but here we simulate it)
+	chainFamilyAdapter := &adapters.ChainFamilyAdapter{}
+	newOnRampAddr := common.HexToAddress(result.NewOnRampRef.Address)
+	legacyOnRampAddr := common.HexToAddress(legacyOnRamp.Address)
+
+	for _, remoteSel := range upgradeTestChains[1:] {
+		e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+		_, _, err := chainFamilyAdapter.SetOffRampSourceOnRamps(*e, ccvadapters.OffRampSetSourceOnRampsEntry{
+			LocalChainSelector:  remoteSel,
+			SourceChainSelector: upgradeTestChains[0],
+			OnRamps: []string{
+				"0x" + hex.EncodeToString(common.LeftPadBytes(legacyOnRampAddr.Bytes(), 32)),
+				"0x" + hex.EncodeToString(common.LeftPadBytes(newOnRampAddr.Bytes(), 32)),
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	// Phase 2: Stage on TestRouter
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.PromoteOnrampToTestRouter(*e, upgradeTestChains[0], upgradeTestChains[1:])
+	require.NoError(t, err)
+	stagedOnTestRouterAssertions(t, *e, result)
+
+	// Phase 3: Promote to prod Router
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	_, err = adapter.PromoteOnrampToProdRouter(*e, upgradeTestChains[0], upgradeTestChains[1:])
+	require.NoError(t, err)
+	promoteStateAssertions(t, *e, result)
+
+	// After Phase 3, verify OffRamps still contain both legacy and new OnRamps (cleanup removes legacy)
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	for _, remoteSel := range upgradeTestChains[1:] {
+		sourceOnRamps, err := chainFamilyAdapter.GetOffRampSourceOnRamps(*e, remoteSel, upgradeTestChains[0])
+		require.NoError(t, err)
+
+		expectedNewOnRamp := common.LeftPadBytes(newOnRampAddr.Bytes(), 32)
+		expectedLegacyOnRamp := common.LeftPadBytes(legacyOnRampAddr.Bytes(), 32)
+
+		require.Len(t, sourceOnRamps, 2, "OffRamp for remote chain %d should whitelist both legacy and new OnRamps before cleanup", remoteSel)
+
+		// Verify both are present
+		hasNewOnRamp := false
+		hasLegacyOnRamp := false
+		for _, onRamp := range sourceOnRamps {
+			if assert.ObjectsAreEqual(expectedNewOnRamp, onRamp) {
+				hasNewOnRamp = true
+			}
+			if assert.ObjectsAreEqual(expectedLegacyOnRamp, onRamp) {
+				hasLegacyOnRamp = true
+			}
+		}
+		assert.True(t, hasNewOnRamp, "OffRamp for remote chain %d should contain new OnRamp", remoteSel)
+		assert.True(t, hasLegacyOnRamp, "OffRamp for remote chain %d should contain legacy OnRamp before cleanup", remoteSel)
+	}
+
+	// Cleanup: Remove legacy OnRamp from remote OffRamp whitelists
+	for _, remoteSel := range upgradeTestChains[1:] {
+		e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+		_, _, err := chainFamilyAdapter.SetOffRampSourceOnRamps(*e, ccvadapters.OffRampSetSourceOnRampsEntry{
+			LocalChainSelector:  remoteSel,
+			SourceChainSelector: upgradeTestChains[0],
+			OnRamps: []string{
+				"0x" + hex.EncodeToString(common.LeftPadBytes(newOnRampAddr.Bytes(), 32)),
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	// After cleanup, verify OffRamps only contain the new OnRamp (legacy removed)
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	for _, remoteSel := range upgradeTestChains[1:] {
+		sourceOnRamps, err := chainFamilyAdapter.GetOffRampSourceOnRamps(*e, remoteSel, upgradeTestChains[0])
+		require.NoError(t, err)
+
+		expectedNewOnRamp := common.LeftPadBytes(newOnRampAddr.Bytes(), 32)
+		expectedLegacyOnRamp := common.LeftPadBytes(legacyOnRampAddr.Bytes(), 32)
+
+		require.Len(t, sourceOnRamps, 1, "OffRamp for remote chain %d should only whitelist the new OnRamp after cleanup", remoteSel)
+
+		// Verify only new OnRamp is present
+		assert.Equal(t, expectedNewOnRamp, sourceOnRamps[0],
+			"OffRamp for remote chain %d should only contain new OnRamp after cleanup", remoteSel)
+
+		// Ensure legacy is not in the list
+		for _, onRamp := range sourceOnRamps {
+			assert.NotEqual(t, expectedLegacyOnRamp, onRamp,
+				"OffRamp for remote chain %d should not contain legacy OnRamp after cleanup", remoteSel)
+		}
+	}
 }
 
 func TestDeployNewOnRampIdempotent(t *testing.T) {
