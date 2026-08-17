@@ -128,12 +128,17 @@ func (e *EVMPostProposalCCIPSend) supportedRemoteChainsWithVersions(env cldf.Env
 
 // filterDeprecatedDests drops chains marked deprecated in chain-selectors; they
 // no longer accept CCIP traffic and only yield spurious send failures.
-func filterDeprecatedDests(env cldf.Environment, srcSel uint64, alldests map[uint64]*semver.Version) map[uint64]*semver.Version {
+func filterDeprecatedDests(
+	env cldf.Environment, srcSel uint64, alldests map[uint64]*semver.Version,
+) map[uint64]*semver.Version {
 	filtered := make(map[uint64]*semver.Version, len(alldests))
 	for destSel, version := range alldests {
 		deprecated, derr := chain_selectors.IsDeprecated(destSel)
 		if derr != nil {
-			env.Logger.Warnf("verify-ccip-send: unable to check deprecation status for dest %d from src %d: %v", destSel, srcSel, derr)
+			env.Logger.Warnf(
+				"verify-ccip-send: unable to check deprecation status for dest %d from src %d: %v",
+				destSel, srcSel, derr,
+			)
 			filtered[destSel] = version
 			continue
 		}
@@ -175,10 +180,10 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	// context's RPC for anvil impersonation, and only when its chain ID matches.
 	client := chain.Client
 
-	var rpcUrl string
+	var rpcURL string
 	var ec *ethclient.Client
-	forkRpcUrl := evmForkContext.ChainConfig.HTTPRPCs[0].External
-	forkEc, dialErr := ethclient.Dial(forkRpcUrl)
+	forkRPCURL := evmForkContext.ChainConfig.HTTPRPCs[0].External
+	forkEc, dialErr := ethclient.Dial(forkRPCURL)
 	if dialErr == nil {
 		forkChainID, idErr := forkEc.ChainID(env.GetContext())
 		if idErr == nil {
@@ -186,7 +191,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 				expectedChainID := new(big.Int).SetUint64(chainMeta.EvmChainID)
 				if forkChainID.Cmp(expectedChainID) == 0 {
 					ec = forkEc
-					rpcUrl = forkRpcUrl
+					rpcURL = forkRPCURL
 				}
 			}
 		}
@@ -194,7 +199,7 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 			forkEc.Close()
 		}
 	} else {
-		env.Logger.Warnf("failed to connect to fork eth client at rpc %s: %v", forkRpcUrl, dialErr)
+		env.Logger.Warnf("failed to connect to fork eth client at rpc %s: %v", forkRPCURL, dialErr)
 	}
 	if ec != nil {
 		defer ec.Close()
@@ -253,13 +258,20 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 	// Best-effort on forked/anvil-backed chains: try to set native balance for the deployer key
 	// so impersonated token-owner transfers can pay gas. Environments without impersonation support
 	// should not fail the entire post-proposal verification flow here.
-	if rpcUrl != "" {
-		err = testhelpers.SetImpersonatedBalance(rpcUrl, chain.DeployerKey.From.Hex(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
+	if rpcURL != "" {
+		err = testhelpers.SetImpersonatedBalance(rpcURL, chain.DeployerKey.From.Hex(),
+			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
 		if err != nil {
-			env.Logger.Warnf("Failed to set impersonated balance for chain %d; continuing without fork balance setup: %v", srcSel, err)
+			env.Logger.Warnf(
+				"Failed to set impersonated balance for chain %d; continuing without fork balance setup: %v",
+				srcSel, err,
+			)
 		}
 	} else {
-		env.Logger.Warnf("Skipping impersonated balance setup for chain %d; fork context RPC does not match this chain", srcSel)
+		env.Logger.Warnf(
+			"Skipping impersonated balance setup for chain %d; fork context RPC does not match this chain",
+			srcSel,
+		)
 	}
 	var filteredFeeTokens []common.Address
 	// Best-effort funding: try to give the deployer fee token balances by impersonating each token owner
@@ -281,7 +293,10 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 		env.Logger.Debugf("Deployer balance for token %s on chain %d is %s, needs funding", addr.Hex(), srcSel, deployerBal.String())
 		// No fork RPC client means no impersonation, so funding is impossible.
 		if ec == nil {
-			env.Logger.Warnf("Failed to fund fee token %s on chain %d: no direct fork RPC client available for impersonation, continuing without it", addr.Hex(), srcSel)
+			env.Logger.Warnf(
+				"Failed to fund fee token %s on chain %d: no direct fork RPC client, continuing without it",
+				addr.Hex(), srcSel,
+			)
 			continue
 		}
 		// Prefer owner() when available; otherwise infer a likely funded account from token events.
@@ -299,10 +314,15 @@ func (e *EVMPostProposalCCIPSend) SupportedFeeTokens(env cldf.Environment, srcSe
 			continue
 		}
 		if ec == nil {
-			env.Logger.Warnf("Failed to fund fee token %s on chain %d: no direct fork RPC client available for impersonation, continuing without it", addr.Hex(), srcSel)
+			env.Logger.Warnf(
+				"Failed to fund fee token %s on chain %d: no direct fork RPC client, continuing without it",
+				addr.Hex(), srcSel,
+			)
 			continue
 		}
-		if err := testhelpers.SendImpersonatedTx(env.GetContext(), ec, rpcUrl, tokenOwner.Hex(), addr.Hex(), tx.Data()); err != nil {
+		if err := testhelpers.SendImpersonatedTx(
+			env.GetContext(), ec, rpcURL, tokenOwner.Hex(), addr.Hex(), tx.Data(),
+		); err != nil {
 			// in case of error continue
 			env.Logger.Warnf("Failed to send impersonated transfer transaction for fee token %s from token owner %s to deployer %s on chain %d, "+
 				"continuing without it: %v", addr.Hex(), tokenOwner.Hex(), chain.DeployerKey.From.Hex(), srcSel, err)

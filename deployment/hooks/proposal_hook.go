@@ -190,7 +190,6 @@ func runPostProposalCCIPSends(
 	srcGroup, _ := errgroup.WithContext(ctx)
 	srcGroup.SetLimit(4)
 	for _, srcSel := range srcSelectors {
-		srcSel := srcSel
 		srcGroup.Go(func() error {
 			err := provider.PreSendValidation(env, srcSel)
 			if err != nil {
@@ -230,7 +229,6 @@ func runPostProposalCCIPSends(
 			}
 
 			for _, destSel := range dests {
-				destSel := destSel
 				func() {
 					destGroup := newBufferedLogGroup("verify-ccip-send: src=%d dest=%d", srcSel, destSel)
 					destStatus := groupStatusSuccess
@@ -251,8 +249,11 @@ func runPostProposalCCIPSends(
 
 					factory, ok := testadapters.GetTestAdapterRegistry().GetForkCCIPSendTestAdapter(family, adapterVer)
 					if !ok {
-						destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing source test adapter for family %s version %s (src=%d dest=%d)",
-							family, adapterVer.String(), srcSel, destSel)
+						destGroup.warnf(
+							"verify-ccip-send: ⏭️ skipped lane verification, missing source test adapter "+
+								"for family %s version %s (src=%d dest=%d)",
+							family, adapterVer.String(), srcSel, destSel,
+						)
 						destStatus = groupStatusSkipped
 						return
 					}
@@ -286,10 +287,14 @@ func runPostProposalCCIPSends(
 							destAdapter = factory(&env, destSel)
 						} else {
 							// Cross-family: fall back to full adapters.
-							fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().GetForkCCIPSendTestAdapter(destFamily, adapterVer)
+							fullDestFactory, hasFullAdapter := testadapters.GetTestAdapterRegistry().
+								GetForkCCIPSendTestAdapter(destFamily, adapterVer)
 							if !hasFullAdapter {
-								destGroup.warnf("verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter for family %s version %s (src=%d dest=%d)",
-									destFamily, adapterVer.String(), srcSel, destSel)
+								destGroup.warnf(
+									"verify-ccip-send: ⏭️ skipped lane verification, missing destination test adapter "+
+										"for family %s version %s (src=%d dest=%d)",
+									destFamily, adapterVer.String(), srcSel, destSel,
+								)
 								destStatus = groupStatusSkipped
 								return
 							}
@@ -309,8 +314,10 @@ func runPostProposalCCIPSends(
 						destStatus = groupStatusFailed
 						return
 					}
-					destGroup.infof("verify-ccip-send: prepared message components for src=%d dest=%d (receiverLen=%d extraArgsLen=%d)",
-						srcSel, destSel, len(receiver), len(extraArgs))
+					destGroup.infof(
+						"verify-ccip-send: prepared message components for src=%d dest=%d (receiverLen=%d extraArgsLen=%d)",
+						srcSel, destSel, len(receiver), len(extraArgs),
+					)
 
 					for _, feeTok := range feeTokens {
 						feeTokenLabel := formatFeeTokenLogLabel(feeTok)
@@ -329,7 +336,10 @@ func runPostProposalCCIPSends(
 							ExtraArgs:         extraArgs,
 						})
 						if err != nil {
-							feeTokenGroup.warnf("verify-ccip-send: failed building message src=%d dest=%d fee=%q: %v", srcSel, destSel, feeTok, err)
+							feeTokenGroup.warnf(
+								"verify-ccip-send: failed building message src=%d dest=%d fee=%q: %v",
+								srcSel, destSel, feeTok, err,
+							)
 							failuresMu.Lock()
 							addLaneFailureSummary(failedLaneFeeTokens, srcSel, destSel, feeTok)
 							failuresMu.Unlock()

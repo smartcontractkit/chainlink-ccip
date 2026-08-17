@@ -109,7 +109,10 @@ func (r *LaneVersionResolver) DeriveLaneVersionsForChain(e cldf.Environment, cha
 				Context: grpCtx2,
 			}, remoteChain)
 			if err != nil {
-				return fmt.Errorf("failed to get onramp for remote chain %d from router at address %s for chain %d: %w", remoteChain, routerAddr.Hex(), chainSel, err)
+				return fmt.Errorf(
+					"failed to get onramp for remote chain %d from router at address %s for chain %d: %w",
+					remoteChain, routerAddr.Hex(), chainSel, err,
+				)
 			}
 			if onRamp == (common.Address{}) {
 				return nil
