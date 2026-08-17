@@ -29,6 +29,10 @@ type LockReleasePoolMigration struct {
 	// BasisPoints specifies a percentage (1-10000, where 10000 = 100%) of the old pool's balance to migrate.
 	// Mutually exclusive with Amount.
 	BasisPoints *uint16
+	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer instead of
+	// using the lockbox's deposit() function, bypassing the Deposit event emission. This is a break-glass
+	// option for the standalone changeset; the standard deposit() path is the default.
+	UsePlainTransfer bool
 	// RegistryRef, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
 	RegistryRef *datastore.AddressRef
 	// TokenRef, if provided along with RegistryRef, specifies the token address for the setPool call.
@@ -140,13 +144,14 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 			}
 
 			migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
-				ChainSelector:   migration.ChainSelector,
-				OldPoolAddress:  oldPoolRef.Address,
-				NewPoolAddress:  newPoolRef.Address,
-				TimelockAddress: timelockRef.Address,
-				Amount:          migration.Amount,
-				BasisPoints:     migration.BasisPoints,
-				SetPoolConfig:   setPoolConfig,
+				ChainSelector:    migration.ChainSelector,
+				OldPoolAddress:   oldPoolRef.Address,
+				NewPoolAddress:   newPoolRef.Address,
+				TimelockAddress:  timelockRef.Address,
+				Amount:           migration.Amount,
+				BasisPoints:      migration.BasisPoints,
+				UsePlainTransfer: migration.UsePlainTransfer,
+				SetPoolConfig:    setPoolConfig,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to execute liquidity migration: %w", i, err)
