@@ -86,6 +86,7 @@ func init() {
 	ccvadapters.GetDeployChainContractsRegistry().RegisterConfigImporter(chainsel.FamilyEVM, semver.MustParse("1.6.0"), &adapters1_6.ConfigImportAdapter{})
 	ccvadapters.GetDeployChainContractsRegistry().RegisterLaneVersionResolver(chainsel.FamilyEVM, &adapters1_2.LaneVersionResolver{})
 
+	ccvadapters.GetOnRampUpgraderRegistry().Register(chainsel.FamilyEVM, &EVMOnRampUpgrader{})
 	ccvadapters.GetTestVerifierChainRegistry().Register(chainsel.FamilyEVM, &EVMTestVerifierChainAdapter{})
 
 	tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v, NewTokenAdapter())

@@ -13,14 +13,14 @@ contract VerifierTestHelper_constructor is VerifierTestHelperSetup {
     assertEq(s_verifier.versionTag(), VERSION_TAG);
   }
 
-  function test_constructor_RevertWhen_TestRouterIsZero() public {
+  function test_constructor_RevertWhen_ZeroAddressNotAllowed_TestRouterIsZero() public {
     address testToken = s_verifier.getTestToken();
 
     vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);
     new VerifierTestHelper(address(0), testToken, s_storageLocations, address(s_mockRMNRemote), VERSION_TAG);
   }
 
-  function test_constructor_RevertWhen_TestTokenIsZero() public {
+  function test_constructor_RevertWhen_ZeroAddressNotAllowed_TestTokenIsZero() public {
     address testRouter = s_verifier.getTestRouter();
 
     vm.expectRevert(BaseVerifier.ZeroAddressNotAllowed.selector);

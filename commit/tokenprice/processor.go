@@ -27,7 +27,7 @@ type processor struct {
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
-	metricsReporter  plugincommon.MetricsReporter
+	metricsReporter  MetricsReporter
 	fRoleDON         int
 	obs              observer
 	runner           *asynclib.Runner
@@ -42,7 +42,7 @@ func NewProcessor(
 	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
-	metricsReporter plugincommon.MetricsReporter,
+	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	var obs observer
 	baseObs := newBaseObserver(

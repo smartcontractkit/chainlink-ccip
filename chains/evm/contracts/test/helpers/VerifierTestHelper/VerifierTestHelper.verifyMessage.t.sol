@@ -19,7 +19,7 @@ contract VerifierTestHelper_verifyMessage is VerifierTestHelperSetup {
     s_verifier.verifyMessage(message, bytes32(0), "");
   }
 
-  function test_verifyMessage_RevertWhen_DestTokenIsNotTestToken() public {
+  function test_verifyMessage_RevertWhen_MustUseTestToken() public {
     _configureRemoteChain(SOURCE_CHAIN_SELECTOR);
     _mockOffRampSourceChainConfig(SOURCE_CHAIN_SELECTOR, s_verifier.getTestRouter());
     MessageV1Codec.MessageV1 memory message =
@@ -31,7 +31,7 @@ contract VerifierTestHelper_verifyMessage is VerifierTestHelperSetup {
     s_verifier.verifyMessage(message, bytes32(0), "");
   }
 
-  function test_verifyMessage_RevertWhen_OffRampRouterIsNotTestRouter() public {
+  function test_verifyMessage_RevertWhen_MustUseTestRouter() public {
     _configureRemoteChain(SOURCE_CHAIN_SELECTOR);
     _mockOffRampSourceChainConfig(SOURCE_CHAIN_SELECTOR, makeAddr("wrongRouter"));
     MessageV1Codec.MessageV1 memory message = _createMessage(
@@ -43,7 +43,7 @@ contract VerifierTestHelper_verifyMessage is VerifierTestHelperSetup {
     s_verifier.verifyMessage(message, bytes32(0), "");
   }
 
-  function test_verifyMessage_RevertWhen_ReceiverIsNotAllowed() public {
+  function test_verifyMessage_RevertWhen_SenderNotAllowed() public {
     _configureRemoteChain(SOURCE_CHAIN_SELECTOR);
     _mockOffRampSourceChainConfig(SOURCE_CHAIN_SELECTOR, s_verifier.getTestRouter());
     address allowedReceiver = makeAddr("allowedReceiver");
