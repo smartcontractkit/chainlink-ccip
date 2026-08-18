@@ -174,6 +174,10 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	// BasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with Amount. For siloed pools, only BasisPoints is supported.
 	BasisPoints *uint16
+	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer
+	// instead of using the lockbox's deposit() function. This bypasses the Deposit event emission.
+	// Use only as a break-glass option when the standard deposit path is unavailable.
+	UsePlainTransfer bool
 	// SetPoolConfig, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
 	SetPoolConfig *MigrationSetPoolConfig
 }

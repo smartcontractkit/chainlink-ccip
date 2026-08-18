@@ -17,6 +17,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader/rcmetrics"
 
 	mock_ccipocr3 "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/ccipocr3"
 )
@@ -45,11 +46,15 @@ func setupConfigPollerV2(t *testing.T) (*configPollerV2, map[cciptypes.ChainSele
 		chainAccessors[chain] = accessor
 	}
 
+	pollerMetrics, err := rcmetrics.NewConfigPollerMetrics(nil)
+	require.NoError(t, err)
+
 	cPollerV2 := newConfigPollerV2(
 		logger.Test(t),
 		chainAccessors,
 		destChain,            // destination chain
 		100*time.Millisecond, // short refresh period for testing
+		pollerMetrics,
 	)
 
 	return cPollerV2, accessors

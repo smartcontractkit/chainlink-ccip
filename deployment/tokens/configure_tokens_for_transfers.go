@@ -3,6 +3,8 @@ package tokens
 import (
 	"bytes"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -126,8 +128,11 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 	reports := make([]cldf_ops.Report[any, any], 0)
 	ds := datastore.NewMemoryDataStore()
 
+	// Process chains in deterministic (sorted) selector order (Go map iteration is randomized)
 	var err error
-	for selector, token := range cfg {
+	for _, selector := range slices.Sorted(maps.Keys(cfg)) {
+		token := cfg[selector]
+
 		token.RegistryRef, err = deploy.TryNormalizeAddressRef(selector, token.RegistryRef)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to normalize registry ref address for chain selector %d: %w", selector, err)
@@ -447,12 +452,27 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
 			for _, ru := range discoveredRemotes {
+				// NOTE: we skip reverse-propagation into a counterpart being migrated in this same batch:
+				// running the full `ConfigureTokenForTransfers()` sequence on its not-yet-live pool would
+				// activate it `setPool()` prematurely so its own subsequent migration pass sees itself as
+				// "already the target pool", and skips auto-migration entirely (losing its legacy remotes
+				// and reverse-propagation). Wiring between same-batch peers is handled by each pool's own
+				// forward config; reverse-propagation only needs to reach every NON-migrating counterpart
+				// (already-active v2 or v1 pools) to keep them reachable.
+				if _, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
+					continue
+				}
 				reverseInput := ConfigureTokenForTransfersInput{
-					ExistingDataStore: e.DataStore,
-					TokenPoolAddress:  ru.remotePoolRef.Address,
-					ChainSelector:     ru.remoteSelector,
-					TokenRef:          ru.remoteTokenRef,
-					PoolType:          ru.remotePoolRef.Type.String(),
+					// Reverse propagation only *ADDS* this migration's new pool as an additional remote to an
+					// existing active pool including pools that may already be migrated and currently support
+					// many chains. The upgrade-safety check that requires remoteChains to cover all supported
+					// chains is therefore not applicable here — we are extending, not replacing the pool.
+					SkipActivePoolSupportedChainsCheck: true,
+					ExistingDataStore:                  e.DataStore,
+					TokenPoolAddress:                   ru.remotePoolRef.Address,
+					ChainSelector:                      ru.remoteSelector,
+					TokenRef:                           ru.remoteTokenRef,
+					PoolType:                           ru.remotePoolRef.Type.String(),
 					RemoteChains: map[uint64]RemoteChainConfig[[]byte, string]{
 						selector: {
 							// Pad to match on-chain storage format (32-byte left-padded for EVM).
