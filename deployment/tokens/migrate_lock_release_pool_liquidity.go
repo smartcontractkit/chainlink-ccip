@@ -34,6 +34,10 @@ type LockReleasePoolMigration struct {
 	// non-siloed pools. See MigrateLockReleasePoolLiquidityInput.UnsiloedLockBoxAddress for why
 	// this is specified rather than inferred.
 	UnsiloedLockBoxRef *datastore.AddressRef
+	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer instead of
+	// using the lockbox's deposit() function, bypassing the Deposit event emission. This is a break-glass
+	// option for the standalone changeset; the standard deposit() path is the default.
+	UsePlainTransfer bool
 	// RegistryRef, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
 	RegistryRef *datastore.AddressRef
 	// TokenRef, if provided along with RegistryRef, specifies the token address for the setPool call.
@@ -167,6 +171,7 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				Amount:                 migration.Amount,
 				BasisPoints:            migration.BasisPoints,
 				UnsiloedLockBoxAddress: unsiloedLockBoxAddress,
+				UsePlainTransfer:       migration.UsePlainTransfer,
 				SetPoolConfig:          setPoolConfig,
 			})
 			if err != nil {

@@ -308,6 +308,8 @@ contracts:
         access: public
       - name: getStaticConfig
         access: public
+      - name: getAllDestChainConfigs
+        access: public
 
   - contract_name: OffRamp
     version: "2.0.0"
@@ -632,6 +634,18 @@ contracts:
       - name: getFee
         access: public
       - name: versionTag
+        access: public
+
+  - contract_name: VerifierTestHelper
+    version: "2.0.0"
+    functions:
+      - name: getTestRouter
+        access: public
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: withdrawFeeTokens
         access: public
 
   - contract_name: RMN

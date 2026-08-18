@@ -11,6 +11,7 @@ inputs:
 related:
   - docs/runbooks/uncommitted-message.md   # incident triage for one specific stuck message
   - docs/metrics/commit-metrics.md         # design rationale + full metric-by-metric findings
+  - docs/metrics/reader-metrics.md         # data-source (reader + config poller) metrics & gaps
   - devenv/dashboards/commit-plugin.json   # Grafana rendering of this runbook (Health section)
 status: living
 ---
@@ -58,6 +59,18 @@ label key from each check's own query; don't assume one spelling applies file-wi
 per-node identity present on *every* commit metric series (confirmed against a live devenv, not
 just inferred). `live_oracle_count` is the only check that groups by it; nothing else in this
 checklist needs to.
+
+The `data_source` group (reader + config poller) breaks both conventions above: those metrics are
+shared with **execute**, carry **no** dest `chainID` label, and key on `chain` = the **numeric chain
+selector** plus `query`/`kind`/`state`. Filter them by the metric's own labels, not by
+`source_network_name`/`chainID`. They still inherit `node_id` + `csa_public_key` from the beholder
+client (like every commit series), so per-node vs DON-wide grouping works the same way.
+
+**One exception inside the group itself:** `ccip_reader_read_outcome` is recorded at the
+`observedCCIPReader` wrapper level (every reader call, not just the per-source-chain ones), so it
+carries `chainID` matching the **destination** chain — the same convention as the commit metrics
+above, not the `chain`-numeric-selector convention the rest of `data_source` uses. Filter it with
+`chainID=~"$destChain"`, not `chain`.
 
 ### Empty result sets: the rule that actually matters
 
@@ -220,9 +233,9 @@ checks:
     group: cursing_consensus
     always_emitted: false
     query: 'sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain"}[5m])) by (objectName, reason)'
-    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    severity: {warn_if: 'result > 0 and not (objectName="RMNRemoteConfig" and reason="insufficient_agreement")', info_if: 'result > 0 and objectName="RMNRemoteConfig" and reason="insufficient_agreement"', ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
-    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries source_network_name, so you can drill down to the affected lane. Empty result is OK, not UNKNOWN"
+    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries source_network_name, so you can drill down to the affected lane. EXCEPTION: objectName='RMNRemoteConfig', reason='insufficient_agreement' is EXPECTED benign noise when RMN is disabled (the RMN remote config is empty, so the DON can never agree on a meaningful value) -- report as INFO, do NOT let it drive the WARN/overall verdict. Empty result is OK, not UNKNOWN"
 
   - id: live_oracle_count
     group: cursing_consensus
@@ -264,6 +277,69 @@ checks:
     severity: {info: true}
     owner: ccip-commit-oncall
     note: "recorded once per transmission-check attempt; empty result means zero transmission cycles in the window, which is itself informational (report as INFO with value \"no data\"), not UNKNOWN. Rising attempts alongside report_transmission_gave_up firing is the actionable combination, not this alone"
+
+  # --- data source (reader + config poller) ---
+  # These are shared with execute and live in the reader/config-poller layers (see
+  # docs/metrics/reader-metrics.md). Unlike the commit metrics above, `chain` is the NUMERIC
+  # chain selector (not source_network_name) and there's no dest `chainID` label to filter on;
+  # every series carries `node_id` + `csa_public_key` inherited from the beholder client.
+  # They answer "is the plugin fine but being fed empty/partial/stale data?" -- upstream of,
+  # and a root cause for, several of the outcome checks above.
+  - id: reader_read_outcome_error
+    group: data_source
+    always_emitted: false
+    query: 'sum by (query) (rate(ccip_reader_read_outcome_total{chainID=~"$destChain", outcome="error"}[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "the consolidated ok/empty/error classification recorded at the observedCCIPReader wrapper for every reader call. This is the ERROR leg specifically -- a query that returned a hard error, not just an empty/partial result (that's reader_read_empty/reader_chain_gap below). Empty result here is OK (never happened). Filters by chainID=~\"$destChain\" (destination chain), NOT by `chain` numeric selector -- see the label key cheat sheet exception above. Split node-local vs DON-wide by csa_public_key before escalating"
+
+  - id: reader_read_empty
+    group: data_source
+    always_emitted: false
+    query: 'sum by (query, chain) (rate(ccip_reader_read_empty_total[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "a read returned nothing with no error -- the false-idle primitive. Empty result here is OK (the event never happened). Correlate `chain` (numeric selector) to a lane and split node-local vs DON-wide by csa_public_key"
+
+  - id: reader_chain_gap
+    group: data_source
+    always_emitted: false
+    query: 'sum by (query, chain, state) (rate(ccip_reader_chain_gap_total[5m]))'
+    severity: {warn_if: 'any series with state!="returned" > 0', ok_if: 'all series with state="returned" or empty result'}
+    owner: chain-infra-oncall
+    note: "per-chain outcome of a chain read -- serves as BOTH the subset flag and its reason. Actionable (non-returned) states: not_found|disabled|misconfigured|error|invalid|missing|stale|no_accessor|config_error|no_native_token|count_mismatch. count_mismatch = a message read came back with a count that doesn't match the requested range (partial/incomplete data). A read returning a subset = any requested chain in a non-returned state. (Consolidated: the separate ccip_reader_read_partial counter was removed; subset detection is chain_gap{state!=\"returned\"}.)"
+
+  - id: config_cache_stale
+    group: data_source
+    always_emitted: true
+    query: 'max by (chain, kind) (ccip_reader_config_cache_age_seconds)'
+    severity: {crit_if: 'kind="chain" and result > 90', ok_if: 'all kind="chain" result <= 90', info: 'kind="source" values (report, no verdict)'}
+    owner: chain-infra-oncall
+    note: "how stale the config-poller cache is. This is the SUSTAINED signal for config-refresh failure: because the code refuses to advance the refresh timestamp on an empty snapshot, the age only climbs across MULTIPLE consecutive empty/failed polls -- a single intermittent empty (flip-flop) is absorbed by the next good poll and keeps age low. CRIT at >90s (3x the 30s refresh period) means the poller genuinely cannot refresh, so every cached read (GetRMNRemoteConfig, GetRmnCurseInfo, config digest, router address) is running on hollow/stale data. Tie to config_cache_overwritten_empty / config_poll_failure to name why"
+
+  - id: config_poller_liveness
+    group: data_source
+    always_emitted: true
+    query: 'min by (chain) (ccip_reader_config_poller_last_success_timestamp)'
+    severity: {crit_if: "time() - result > 90", ok_if: "time() - result <= 90"}
+    owner: chain-infra-oncall
+    note: "last successful background config poll per chain; a wedged/missing poller goroutine makes every cache silently go stale. Uses last-success staleness, not rate(), for the same detection-lag reason as live_oracle_count"
+
+  - id: config_poll_failure
+    group: data_source
+    always_emitted: false
+    query: 'sum by (chain) (rate(ccip_reader_config_poll_failure_total[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "background config refresh failures -- exactly the per-chain accounting that a warn-only log used to hide (which chain, not just 'somewhere')"
+
+  - id: config_cache_overwritten_empty
+    group: data_source
+    always_emitted: false
+    query: 'sum by (kind) (rate(ccip_reader_config_cache_overwritten_empty_total[5m]))'
+    severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
+    owner: chain-infra-oncall
+    note: "accessor returned an EMPTY chain-config snapshot (no-bindings / empty-batch). Per-event this is NOT a page: a single occurrence is benign and the guard refuses to clobber a good cache for it. Only actionable when SUSTAINED -- which is captured by config_cache_stale (age > 90s), not by this counter alone. Use this to explain WHY the cache went stale (empty snapshot) and which chains. In dev/no-binding environments this can fire chronically as expected noise (unbound RMN/optional contracts); treat it as a signal only when accompanied by config_cache_stale climbing. WARN + see config_cache_stale for severity"
 ```
 
 ## Groups
@@ -299,7 +375,27 @@ a low oracle count is a root cause `fchain_read_errors` is structurally unable t
 own. `consensus_dropped` then names the *kind* of failure: `reason="split"` on `objectName="fChain"`
 points to H2 (oracles disagree), while `reason="insufficient_agreement"` on `objectName="fChain"`
 points to H1 (too few oracles could even report). `reason="threshold_not_defined"` is a config/data
-mismatch.
+mismatch. One chronic exception to treat as INFO, not a finding: on an **RMN-disabled** deployment,
+`objectName="RMNRemoteConfig", reason="insufficient_agreement"` fires constantly because the RMN
+remote config is empty and the DON can never agree on a meaningful value — ignore it here (it's a
+real signal only if RMN is actually enabled).
+
+### Data source (reader + config poller)
+
+This group is **upstream of the whole checklist**: it tests whether the commit plugin is healthy
+*but being fed empty/partial/stale data*. `reader_read_outcome_error` is the consolidated
+error-leg signal (a query failed outright) and is complementary to `reader_read_empty`/
+`reader_chain_gap` below it (which cover the empty/partial leg) — a query can show up in one
+without the other, check both. The `CRIT` here is **`config_cache_stale`** (sustained:
+cache age > 90s = the poller genuinely cannot refresh), which is the thing that makes every cached
+read (curse, RMN config, config digest, router address) run on hollow data. `config_cache_overwritten_empty`
+alone is only `WARN` — a single empty snapshot is benign (the guard refuses to clobber a good cache),
+and per-event empties only matter when they're *sustained*, which `config_cache_stale` already
+captures. Use the empty counter + `config_poll_failure` to explain *why* the cache went stale and
+which chain(s). `config_cache_stale` and `config_poller_liveness` are the two
+`always_emitted: true` checks in this group, so an empty result on them is `UNKNOWN` (pipeline
+broken), and they're the ones to check before trusting the *cached* inputs behind step4
+(cursing) and the config-digest mismatch check above.
 
 ### Report transmission
 
@@ -328,6 +424,15 @@ two explicit combination rules:
   `reason="split"` on `objectName="fChain"` is H2 (oracles disagree). `reason="insufficient_agreement"`
   on `objectName="fChain"` together with `fchain_read_errors` spiking is H1 (home-chain read outage).
   `reason="threshold_not_defined"` is a config/data mismatch independent of H1/H2.
+  Do NOT fold `objectName="RMNRemoteConfig", reason="insufficient_agreement"` into `concerns` at all
+  when RMN is disabled — it is expected chronic noise, and its only relevance is as a hint that the
+  config-poller was serving an empty RMN remote config (cross-check `config_cache_overwritten_empty`).
+- **A `data_source` finding firing at the same time as an outcome check (`pending_messages`
+  climbing, `reader_read_*` alongside `consensus_dropped`, `config_cache_stale` alongside a curse
+  or digest-mismatch reading) is the SAME incident, and the data-source check is the **root
+  cause**.** Fold it in as the named cause with the outcome check as the symptom — do not report
+  them as two unrelated problems (a plugin fed empty/partial/stale data is not broken; the reader
+  layer feeding it is).
 
 `UNKNOWN` is never silently dropped to `OK` — but per the [empty-result rule](#empty-result-sets-the-rule-that-actually-matters),
 most checks should legitimately resolve `UNKNOWN` only when an `always_emitted: true` check comes

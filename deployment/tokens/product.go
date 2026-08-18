@@ -100,15 +100,26 @@ type RateLimitReaderAdapter interface {
 	) (OnchainRateLimits, error)
 }
 
+// TokenAdminRegistryReader is a versionless interface for reading the active pool from a chain's
+// TokenAdminRegistry (or equivalent). Implementations are registered per chain family via
+// TokenAdapterRegistry.RegisterTokenAdminRegistryReader and can be looked up by family regardless
+// of pool version.
+type TokenAdminRegistryReader interface {
+	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
+	// as raw address bytes. Returns empty bytes (no error) when no pool is registered.
+	// Overrides are optional registry refs to use instead of the datastore default;
+	// the first one that resolves from the datastore is used.
+	GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error)
+	// GetTokenAdminRegistryRef resolves the TokenAdminRegistry ref for the given chain from the datastore.
+	GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error)
+}
+
 // TokenPoolMigrator is an optional interface implemented by adapters that can read an existing pool's
 // cross-chain configuration on-chain. It powers AutoMigrateRemoteChains: during an upgrade, the remote
 // chains/tokens/pools the active pool is configured for are read back (as raw bytes) and carried forward
 // onto the new pool. All addresses are raw on-chain bytes so the interface stays chain-family-agnostic;
 // callers convert them per family via the AddressNormalizer registry when a string form is needed.
 type TokenPoolMigrator interface {
-	// GetActivePool returns the pool currently registered for the token (tokenRef) in the TokenAdminRegistry
-	// (regRef), as raw address bytes. Returns empty bytes (no error) when no pool is registered.
-	GetActivePool(e deployment.Environment, chainSelector uint64, regRef datastore.AddressRef, tokenRef datastore.AddressRef) ([]byte, error)
 	// GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
 	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error)
 	// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
@@ -174,6 +185,10 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	// Must match one of the lockboxes in the new pool's getAllLockBoxConfigs. Ignored for
 	// non-siloed pools, which have a single lockbox.
 	UnsiloedLockBoxAddress string
+	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer
+	// instead of using the lockbox's deposit() function. This bypasses the Deposit event emission.
+	// Use only as a break-glass option when the standard deposit path is unavailable.
+	UsePlainTransfer bool
 	// SetPoolConfig, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
 	SetPoolConfig *MigrationSetPoolConfig
 }
@@ -447,16 +462,19 @@ type SetTokenTransferFeeSequenceInput struct {
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
-	tokenRefResolverReg map[string]TokenRefResolver
-	tokenAdapterReg     map[tokenAdapterID]TokenAdapter
-	tokenRefResolverMu  sync.Mutex
-	tokenAdapterMu      sync.Mutex
+	tokenRefResolverReg         map[string]TokenRefResolver
+	tokenAdminRegistryReaderReg map[string]TokenAdminRegistryReader
+	tokenAdapterReg             map[tokenAdapterID]TokenAdapter
+	tokenRefResolverMu          sync.Mutex
+	tokenAdminRegistryReaderMu  sync.Mutex
+	tokenAdapterMu              sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
-		tokenRefResolverReg: make(map[string]TokenRefResolver),
-		tokenAdapterReg:     make(map[tokenAdapterID]TokenAdapter),
+		tokenRefResolverReg:         make(map[string]TokenRefResolver),
+		tokenAdminRegistryReaderReg: make(map[string]TokenAdminRegistryReader),
+		tokenAdapterReg:             make(map[tokenAdapterID]TokenAdapter),
 	}
 }
 
@@ -475,6 +493,23 @@ func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRef
 	defer r.tokenRefResolverMu.Unlock()
 	resolver, ok := r.tokenRefResolverReg[chainFamily]
 	return resolver, ok
+}
+
+// RegisterTokenAdminRegistryReader registers a versionless TAR reader for the given chain family.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryReader(family string, reader TokenAdminRegistryReader) {
+	r.tokenAdminRegistryReaderMu.Lock()
+	defer r.tokenAdminRegistryReaderMu.Unlock()
+	if _, exists := r.tokenAdminRegistryReaderReg[family]; !exists {
+		r.tokenAdminRegistryReaderReg[family] = reader
+	}
+}
+
+// GetTokenAdminRegistryReader retrieves a registered TokenAdminRegistryReader for the given chain family.
+func (r *TokenAdapterRegistry) GetTokenAdminRegistryReader(family string) (TokenAdminRegistryReader, bool) {
+	r.tokenAdminRegistryReaderMu.Lock()
+	defer r.tokenAdminRegistryReaderMu.Unlock()
+	reader, ok := r.tokenAdminRegistryReaderReg[family]
+	return reader, ok
 }
 
 // RegisterTokenAdapter allows chains to register their changeset logic.
