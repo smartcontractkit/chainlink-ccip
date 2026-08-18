@@ -113,7 +113,7 @@ steps:
 
   - id: step1
     check: offramp_next_seq_num
-    query: 'max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~"$sourceChain"})'
+    query: 'max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})'
     condition: "result > $seqNum"
     if_true:  {action: "STOP", reason: "a root covering X already landed on the offramp; commit plugin's job is done, hand off to exec on-call for delivery status"}
     if_false: {action: "CONTINUE:step2"}
@@ -121,17 +121,17 @@ steps:
 
   - id: step2
     check: onramp_max_seq_num
-    query: 'max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain"})'
+    query: 'max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})'
     condition: "result < $seqNum"
-    if_true:  {action: "REPORT:chain-infra-oncall", reason: "onramp read is lagging; check ccip_commit_merkleroot_observation_errors_total by reason (no_bindings/timeout/rpc_error) for the source-chain read/infra issue", followup_query: 'sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain"}[5m])) by (reason)'}
+    if_true:  {action: "REPORT:chain-infra-oncall", reason: "onramp read is lagging; check ccip_commit_merkleroot_observation_errors_total by reason (no_bindings/timeout/rpc_error) for the source-chain read/infra issue", followup_query: 'sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m])) by (reason)'}
     if_false: {action: "CONTINUE:step2b"}
     automatable: true
 
   - id: step2b
     check: per_chain_consensus_dropped
     queries:
-      - 'sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)'
-      - 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain"}[5m]))'
+      - 'sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", chainID=~"$destChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)'
+      - 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))'
     condition: "any result > 0"
     if_true:  {action: "REPORT:ccip-commit-oncall", reason: "DON could not reach consensus on a per-chain value for this lane. For ccip_commit_consensus_dropped: reason='split' means disagreeing oracles, reason='insufficient_agreement' means too few oracles observed the key, reason='threshold_not_defined' is a config/data mismatch. ccip_commit_offramp_consensus_insufficient means the DON could not agree on OffRampNextSeqNums for this lane. The message cannot advance until the disagreement resolves."}
     if_false: {action: "CONTINUE:step2c"}
@@ -162,7 +162,7 @@ steps:
     queries:
       - 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="global"})'
       - 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="destination"})'
-      - 'max(ccip_commit_source_chain_cursed{source_network_name=~"$sourceChain"})'
+      - 'max(ccip_commit_source_chain_cursed{source_network_name=~"$sourceChain", chainID=~"$destChain"})'
     condition: "any result == 1"
     if_true:  {action: "REPORT:curse-owner", reason: "chain A or B is cursed; likely intentional/incident-flagged, hand off to whoever owns the curse. NOTE: curse state is served from the config-poller cache (GetRmnCurseInfo) -- if ccip_reader_config_cache_age_seconds{chain=<destSelector>,kind=\"chain\"} is high, the curse reading itself may be stale (a lifted curse still reporting active, or a fresh one unobserved); say so when reporting", followup_query: 'ccip_reader_config_cache_age_seconds{kind="chain"}'}
     if_false: {action: "CONTINUE:step5"}
@@ -170,10 +170,10 @@ steps:
 
   - id: step5
     check: report_transmission
-    query: 'sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChain"}[5m]))'
+    query: 'sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))'
     condition: "result > 0"
     if_true:  {action: "CONTINUE:scenario2", reason: "report is being built but never landing — see deep dive"}
-    if_false: {action: "REPORT:ccip-commit-oncall", reason: "no failure signal found; likely just backlog size — report ccip_commit_pending_messages and an ETA estimate from round cadence", followup_query: 'max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChain"})'}
+    if_false: {action: "REPORT:ccip-commit-oncall", reason: "no failure signal found; likely just backlog size — report ccip_commit_pending_messages and an ETA estimate from round cadence", followup_query: 'max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChain", chainID=~"$destChain"})'}
     automatable: true
 
   - id: scenario2
@@ -211,7 +211,7 @@ steps:
 
   - id: scenario3
     check: destination_wide_vs_lane_specific
-    query: 'max by (source_network_name) (ccip_commit_pending_messages{dest_network_name=~".*"})'
+    query: 'max by (source_network_name) (ccip_commit_pending_messages{chainID=~"$destChain"})'
     condition: "only $sourceChain's series is climbing, others into the same destChain are flat"
     if_true:  {action: "CONTINUE:step4", reason: "this branch is wrong if only one lane is affected — back to step4/step5"}
     if_false: {action: "CONTINUE:scenario3b", reason: "confirmed destination-chain-wide"}
@@ -266,19 +266,22 @@ continue to step1.
 ### step1 — is this even a commit-plugin problem?
 
 ```promql
-max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~"$sourceChain"})
+max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})
 ```
 `> $seqNum` → a root covering it already landed on the offramp. Commit plugin's job is done;
-hand off to exec on-call. `<= $seqNum` → continue.
+hand off to exec on-call. `<= $seqNum` → continue. `chainID=~"$destChain"` is required, not
+optional, here and on every per-lane query below it — without it you're reading this lane across
+*every* destination chain that reports into the same datasource, not just the one you're
+investigating (see the metric reference's note on `destChainAttrs`).
 
 ### step2 — has the plugin observed it on-chain yet?
 
 ```promql
-max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain"})
+max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})
 ```
 `< $seqNum` → onramp read is lagging. Check the reason breakdown:
 ```promql
-sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain"}[5m])) by (reason)
+sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m])) by (reason)
 ```
 (`no_bindings` / `timeout` / `rpc_error` / `msg_count_mismatch` / `hash_error` /
 `address_lookup_error`). This is a source-chain read/infra issue, not commit logic — report and
@@ -292,7 +295,7 @@ fails for this lane, the message will not advance even though the onramp read is
 
 Per-chain consensus failures:
 ```promql
-sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)
+sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", chainID=~"$destChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)
 ```
 
 `ccip_commit_consensus_dropped` `reason` values:
@@ -303,7 +306,7 @@ sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain"
 OffRampNextSeqNums consensus failures use a dedicated counter (same path conceptually, but a
 custom consensus helper):
 ```promql
-sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain"}[5m]))
+sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))
 ```
 
 Any of these `> 0` for the lane → the message cannot advance until the disagreement resolves.
@@ -344,7 +347,7 @@ Flat → continue.
 ```promql
 max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="global"})
 max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="destination"})
-max(ccip_commit_source_chain_cursed{source_network_name=~"$sourceChain"})
+max(ccip_commit_source_chain_cursed{source_network_name=~"$sourceChain", chainID=~"$destChain"})
 ```
 Any `== 1` → found it; likely intentional/incident-flagged, report to whoever owns the curse and
 stop. All `0` → continue.
@@ -356,12 +359,12 @@ stop. All `0` → continue.
 ### step5 — is a report being built but never landing?
 
 ```promql
-sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChain"}[5m]))
+sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))
 ```
 Incrementing/maxed → jump to [Scenario 2](#scenario-2--report-transmission-stuck-step5).
 Otherwise → likely just backlog size:
 ```promql
-max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChain"})
+max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChain", chainID=~"$destChain"})
 ```
 Report the backlog size and an ETA estimate from round cadence, and stop.
 
@@ -428,9 +431,11 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
 - **This is destination-chain-wide, not lane-specific.** Before going further, check whether
   *other* source chains reporting into this dest chain are also stalled:
   ```promql
-  max by (source_network_name) (ccip_commit_pending_messages{dest_network_name=~".*"})
+  max by (source_network_name) (ccip_commit_pending_messages{chainID=~"$destChain"})
   ```
-  If only `$sourceChain` is affected, this branch is wrong — back to step4/step5.
+  (Deliberately no `source_network_name` filter here — the whole point is comparing *every* lane
+  into `$destChain` side by side, not just `$sourceChain`'s.) If only `$sourceChain` is affected,
+  this branch is wrong — back to step4/step5.
 - **H0 — not enough oracles are even running.** *(Check this before H1/H2 — it's a distinct
   failure mode neither of them can detect, not a variant of either.)* `fchain_read_errors` below
   only reports a *surviving* oracle's own read failures; it has no way to see an oracle that
@@ -483,20 +488,20 @@ everything else is Beholder-only.
 |---|---|---|---|
 | `ccip_commit_plugin_heartbeat` | Counter | `chainFamily,chainID,phase` | beholder-only |
 | `ccip_commit_report_validation_rejected` | Counter | `chainFamily,chainID,phase,reason` | beholder-only |
-| `ccip_commit_onramp_max_seq_num` | Gauge | `sourceChainFamily,sourceChainID,source_network_name` | beholder-only |
-| `ccip_commit_offramp_next_seq_num` | Gauge | `sourceChainFamily,sourceChainID,source_network_name` | beholder-only |
-| `ccip_commit_pending_messages` | Gauge | `sourceChainFamily,sourceChainID,source_network_name` | beholder-only |
+| `ccip_commit_onramp_max_seq_num` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
+| `ccip_commit_offramp_next_seq_num` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
+| `ccip_commit_pending_messages` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
 | `ccip_commit_rmn_curse_active` | Gauge | `chain_family,chain_id,curse_type` | beholder-only |
-| `ccip_commit_source_chain_cursed` | Gauge | `sourceChainFamily,sourceChainID,source_network_name` | beholder-only |
-| `ccip_commit_merkleroot_observation_errors` | Counter | `...,reason` | beholder-only |
+| `ccip_commit_source_chain_cursed` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
+| `ccip_commit_merkleroot_observation_errors` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID,reason` | beholder-only |
 | `ccip_commit_fchain_read_errors` | Counter | `chainFamily,chainID` | beholder-only |
 | `ccip_commit_consensus_observation_failed` | Counter | `chain_family,chain_id` | beholder-only |
-| `ccip_commit_report_transmission_gave_up` | Counter | `sourceChainFamily,sourceChainID,source_network_name` | beholder-only |
+| `ccip_commit_report_transmission_gave_up` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
 | `ccip_commit_report_transmission_attempts` | Histogram | `chainFamily,chainID,success` | beholder-only |
-| `ccip_commit_range_truncated` | Counter | `...,source_network_name` | beholder-only |
-| `ccip_commit_offramp_lane_status` | Gauge | `...,status` | beholder-only |
-| `ccip_commit_seqnum_invariant_violation` | Counter | `...,type` | beholder-only |
-| `ccip_commit_offramp_consensus_insufficient` | Counter | `...,source_network_name` | beholder-only |
+| `ccip_commit_range_truncated` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
+| `ccip_commit_offramp_lane_status` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID,status` | beholder-only |
+| `ccip_commit_seqnum_invariant_violation` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID,type` | beholder-only |
+| `ccip_commit_offramp_consensus_insufficient` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
 | `ccip_commit_config_digest_mismatch` | Gauge | `chain_family,chain_id` | dual |
 | `ccip_commit_max_sequence_number` | Gauge | `chainFamily,chainID,sourceChainFamily,sourceChain,method,source_network_name,dest_network_name` | dual |
 | `ccip_commit_latest_round_id` | Gauge | `source_network_name,dest_network_name,contract_address,plugin` | dual |
@@ -508,6 +513,23 @@ everything else is Beholder-only.
 Note the label-casing inconsistency in the source (`chainFamily`/`chainID` vs.
 `chain_family`/`chain_id`) — copy the exact casing from this table per metric, it's not
 uniform across the file.
+
+**`chainFamily`/`chainID` on the per-lane metrics above (`onramp_max_seq_num` through
+`offramp_consensus_insufficient`) were added after staging testing surfaced that they were
+missing** (`commit/metrics/prom.go`'s `destChainAttrs()`, added to every `sourceChainAttrs()`
+call site except `consensus_dropped`, which already carried them). Before this fix, two plugin
+instances for different destination chains reading the *same* source chain emitted identical
+label sets and collided into one series — there was no way to tell which dest-chain plugin
+instance a given data point came from. Every query below that filters one of these metrics by
+`source_network_name` alone should also filter `chainID=~"$destChain"` now; a query missing that
+filter will silently mix lanes from every destination chain sharing this datasource, not just
+the one you're investigating.
+
+`ccip_commit_report_transmission_gave_up` carries *both* `source_network_name` and `chainID`
+because a single report can cover multiple source chains, and each one's lane can resolve
+independently before the overall check-attempt budget is exhausted (`pendingSources` in
+`merkleroot/outcome.go`) — `source_network_name` says *which lane* is still pending, `chainID`
+says *which destination chain's* report gave up on it. Neither label makes the other redundant.
 
 ### Reader / config-poller metrics (shared with execute)
 

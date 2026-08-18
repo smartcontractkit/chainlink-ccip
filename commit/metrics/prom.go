@@ -492,9 +492,22 @@ func (p *PromReporter) TrackReportValidationRejected(phase string, reason string
 	))
 }
 
+// destChainAttrs returns this reporter's own (destination) chain-family/chain-ID attributes. The
+// commit plugin runs one instance per destination chain, so every per-lane metric needs this to stay
+// unambiguous once the same source chain is reporting into more than one destination chain on the
+// same Beholder/Prometheus pipeline -- without it, two plugin instances (e.g. dest=chain-B and
+// dest=chain-C) both reading source=chain-A emit identical label sets and collide into one series.
+func (p *PromReporter) destChainAttrs() []attribute.KeyValue {
+	return []attribute.KeyValue{
+		attribute.String("chainFamily", p.chainFamily),
+		attribute.String("chainID", p.chainID),
+	}
+}
+
 // sourceChainAttrs resolves a source chain selector into the same family/ID/network-name attributes
 // used elsewhere in this reporter (see trackMaxSequenceNumber), so dashboards can join on network name
-// consistently across metrics.
+// consistently across metrics. Callers that identify a lane (source, but not dest) must also append
+// destChainAttrs() -- see its doc comment for why.
 func (p *PromReporter) sourceChainAttrs(sourceChainSelector cciptypes.ChainSelector) []attribute.KeyValue {
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
@@ -516,18 +529,18 @@ func (p *PromReporter) sourceChainAttrs(sourceChainSelector cciptypes.ChainSelec
 }
 
 func (p *PromReporter) TrackOnRampMaxSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum) {
-	p.bhOnRampMaxSeqNum.Record(context.Background(), int64(seqNum),
-		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	p.bhOnRampMaxSeqNum.Record(context.Background(), int64(seqNum), metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackOffRampNextSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum) {
-	p.bhOffRampNextSeqNum.Record(context.Background(), int64(seqNum),
-		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	p.bhOffRampNextSeqNum.Record(context.Background(), int64(seqNum), metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackPendingMessages(sourceChain cciptypes.ChainSelector, pending uint64) {
-	p.bhPendingMessages.Record(context.Background(), int64(pending),
-		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	p.bhPendingMessages.Record(context.Background(), int64(pending), metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackRmnCurseActive(curseType string, active bool) {
@@ -547,12 +560,13 @@ func (p *PromReporter) TrackSourceChainCursed(sourceChain cciptypes.ChainSelecto
 	if cursed {
 		value = 1
 	}
-	p.bhSourceChainCursed.Record(context.Background(), value,
-		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	p.bhSourceChainCursed.Record(context.Background(), value, metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackObservationError(sourceChain cciptypes.ChainSelector, reason string) {
-	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("reason", reason))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	attrs = append(attrs, attribute.String("reason", reason))
 	p.bhMerkleRootObservationErrs.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
@@ -570,9 +584,14 @@ func (p *PromReporter) TrackConsensusObservationFailed() {
 	))
 }
 
+// TrackReportTransmissionGaveUp reports one source-chain lane within a report abandoned before
+// transmission. sourceChain identifies which lane's seq-num range is still pending on this report --
+// a single report can cover multiple source chains, and they can each resolve independently (see
+// the pendingSources map in merkleroot/outcome.go); destChainAttrs identifies which destination
+// chain's offramp the report itself was headed for.
 func (p *PromReporter) TrackReportTransmissionGaveUp(sourceChain cciptypes.ChainSelector) {
-	p.bhReportTransmissionGaveUp.Add(context.Background(), 1,
-		metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	p.bhReportTransmissionGaveUp.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackReportTransmissionAttempts(attempts uint, success bool) {
@@ -584,7 +603,8 @@ func (p *PromReporter) TrackReportTransmissionAttempts(attempts uint, success bo
 }
 
 func (p *PromReporter) TrackRangeTruncated(sourceChain cciptypes.ChainSelector) {
-	p.bhRangeTruncated.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	p.bhRangeTruncated.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelector, status string, active bool) {
@@ -592,17 +612,20 @@ func (p *PromReporter) TrackOffRampLaneStatus(sourceChain cciptypes.ChainSelecto
 	if active {
 		value = 1
 	}
-	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("status", status))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	attrs = append(attrs, attribute.String("status", status))
 	p.bhOffRampLaneStatus.Record(context.Background(), value, metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackSeqNumInvariantViolation(sourceChain cciptypes.ChainSelector, violationType string) {
-	attrs := append(p.sourceChainAttrs(sourceChain), attribute.String("type", violationType))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	attrs = append(attrs, attribute.String("type", violationType))
 	p.bhSeqNumInvariantViolation.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackOffRampConsensusInsufficient(sourceChain cciptypes.ChainSelector) {
-	p.bhOffRampConsensusInsuff.Add(context.Background(), 1, metric.WithAttributes(p.sourceChainAttrs(sourceChain)...))
+	attrs := append(p.sourceChainAttrs(sourceChain), p.destChainAttrs()...)
+	p.bhOffRampConsensusInsuff.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackConsensusDropped(
