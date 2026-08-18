@@ -5,19 +5,21 @@ trigger: "message reported in-flight for > 15m: onramp seq num observed, no corr
 severity: page
 owner: ccip-commit-oncall
 inputs:
-  sourceChain: {type: string, description: "source_network_name label value, e.g. chain-a"}
-  destChain: {type: string, description: "chainID/chain_id label value of the destination chain, e.g. chain-b"}
+  sourceChain: {type: string, description: "source_network_name label value, e.g. chain-a. May be handed to you as a chain ID, chain selector, or name -- see docs/runbooks/chain-identifiers.md to translate"}
+  destChain: {type: string, description: "chainID/chain_id label value of the destination chain, e.g. chain-b. Same translation note as sourceChain"}
   seqNum: {type: integer, description: "onramp sequence number of the message under investigation (X)"}
   msgID: {type: string, description: "message ID, hex, for cross-referencing logs/explorers"}
   fRoleDON: {type: integer, required: false, description: "optional. If known, expected live oracle count for destChain's DON is 3*fRoleDON+1 and the consensus threshold is 2*fRoleDON+1. Omit if uncertain (e.g. local devenvs with a possible bootstrap-node offset) -- scenario3's H0 check reports the raw live oracle count either way, it just can't grade it against a threshold without this."}
 related:
   - docs/metrics/commit-metrics.md        # design rationale + full metric-by-metric findings
   - devenv/dashboards/commit-plugin.json  # Grafana rendering of this runbook (Guided Debug section)
+  - docs/runbooks/chain-identifiers.md    # translating chain ID / chain selector / chain name
 status: living
 ---
 
 - [Runbook: uncommitted message](#runbook-uncommitted-message)
    * [For agents](#for-agents)
+      + [Resolving inputs before you start](#resolving-inputs-before-you-start)
       + [A note on counter naming](#a-note-on-counter-naming)
    * [Decision graph](#decision-graph)
    * [Steps](#steps)
@@ -65,6 +67,21 @@ This doc is meant to be walked mechanically, not just read. Two things make that
 
 If a query's metric doesn't exist on your datasource, treat the result as unknown, not as
 `0`/flat — say so explicitly rather than silently treating "no such metric" as "no signal."
+
+### Resolving inputs before you start
+
+This runbook's frontmatter `inputs` are `sourceChain`, `destChain`, `seqNum`, `msgID` — but you're rarely
+handed exactly those four. You might instead have only a message ID, or only a transaction hash
+plus which chain it's on. Resolve the full set *before* starting the decision graph:
+
+- **Have a message ID or a tx hash, missing the rest?** Use `ccip-cli show` — see
+  [`README.md`'s message-identification section](README.md#identifying-a-ccip-message) for the
+  exact invocation. Its JSON output gives you source chain, dest chain, sequence number, and
+  message ID together, which is exactly this runbook's `inputs` block.
+- **Chain given as a selector or chain ID, but a query below needs a name (or vice versa)?** See
+  [`chain-identifiers.md`](chain-identifiers.md) — don't assume, translate explicitly, and keep
+  all three forms handy since different labels in this doc want different ones (see the
+  [metric reference](#metric-reference) for which).
 
 ### A note on counter naming
 

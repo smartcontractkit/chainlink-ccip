@@ -5,13 +5,14 @@ trigger: "ad hoc / scheduled health check, or as step0 before docs/runbooks/unco
 severity: informational
 owner: ccip-commit-oncall
 inputs:
-  destChain: {type: string, description: "chainID/chain_id label value of the node's destination chain"}
+  destChain: {type: string, description: "chainID/chain_id label value of the node's destination chain. May be handed to you as a chain ID, chain selector, or name -- see docs/runbooks/chain-identifiers.md to translate"}
   sourceChains: {type: string, description: "source_network_name regex filter; defaults to all lanes into destChain", default: ".*"}
   fRoleDON: {type: integer, required: false, description: "optional. If known, expected live oracle count for destChain's DON is 3*fRoleDON+1 and the consensus threshold is 2*fRoleDON+1. Omit if uncertain (e.g. local devenvs with a possible bootstrap-node offset) -- live_oracle_count reports the raw count either way, it just can't grade it against a threshold without this."}
 related:
   - docs/runbooks/uncommitted-message.md   # incident triage for one specific stuck message
   - docs/metrics/commit-metrics.md         # design rationale + full metric-by-metric findings
   - devenv/dashboards/commit-plugin.json   # Grafana rendering of this runbook (Health section)
+  - docs/runbooks/chain-identifiers.md     # translating chain ID / chain selector / chain name
 status: living
 ---
 
@@ -58,6 +59,11 @@ label key from each check's own query; don't assume one spelling applies file-wi
 per-node identity present on *every* commit metric series (confirmed against a live devenv, not
 just inferred). `live_oracle_count` is the only check that groups by it; nothing else in this
 checklist needs to.
+
+If `$destChain`/`$sourceChains` were handed to you as a chain selector or chain ID rather than the
+name these queries expect (or vice versa), translate first — see
+[`chain-identifiers.md`](chain-identifiers.md). Don't assume the label key tells you which
+representation to use; the two are independent (see the cheat sheet above vs. the table there).
 
 ### Empty result sets: the rule that actually matters
 
