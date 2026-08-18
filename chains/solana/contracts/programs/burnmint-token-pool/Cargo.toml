@@ -1,6 +1,6 @@
 [package]
 name = "burnmint-token-pool"
-version = "1.6.4"
+version = "1.6.4-rc"
 description = "Created with Anchor"
 edition = "2021"
 

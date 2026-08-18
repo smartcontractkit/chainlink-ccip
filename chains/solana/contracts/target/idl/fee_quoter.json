@@ -1,5 +1,5 @@
 {
-  "version": "1.6.4",
+  "version": "1.6.4-rc",
   "name": "fee_quoter",
   "instructions": [
     {
@@ -955,6 +955,42 @@
       }
     },
     {
+      "name": "SuiExtraArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "gasLimit",
+            "type": "u128"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "receiverObjectIds",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "SVM2AnyMessage",
       "type": {
         "kind": "struct",
@@ -1741,6 +1777,11 @@
       "code": 8037,
       "name": "DefaultOwnerProposal",
       "msg": "Proposed owner is the default pubkey"
+    },
+    {
+      "code": 8038,
+      "name": "InvalidSuiReceiverObjectIds",
+      "msg": "Invalid Sui receiver object ids"
     }
   ]
 }

@@ -1,5 +1,5 @@
 /// Methods in this module are used to deserialize AccountInfo into the state structs
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program};
 use ccip_common::seed;
 
 use crate::state::{BillingTokenConfig, BillingTokenConfigWrapper, PerChainPerTokenConfig};
@@ -8,7 +8,7 @@ use crate::FeeQuoterError;
 /// Returns Ok(None) when there's no chain-token configuration pair. The user must still
 /// specify the correct PDA, to ensure the configuration isn't ignored in the case it exists.
 pub fn per_chain_per_token_config<'info>(
-    account: &'info AccountInfo<'info>,
+    acc_info: &'info AccountInfo<'info>,
     token: Pubkey,
     dest_chain_selector: u64,
 ) -> Result<Option<PerChainPerTokenConfig>> {
@@ -21,30 +21,23 @@ pub fn per_chain_per_token_config<'info>(
         &crate::ID,
     );
     require_keys_eq!(
-        account.key(),
+        acc_info.key(),
         expected,
         FeeQuoterError::InvalidInputsPerChainPerTokenConfig
     );
-    let account = match Account::<PerChainPerTokenConfig>::try_from(account) {
-        Ok(account) => {
-            require_eq!(
-                account.version,
-                1, // the v1 version of the onramp will always be tied to version 1 of the state
-                FeeQuoterError::InvalidVersion
-            );
-            Some(account.into_inner())
-        }
-        Err(e) if e == ErrorCode::AccountNotInitialized.into() => None,
-        Err(e) => return Err(e),
-    };
+    if acc_info.owner == &system_program::ID {
+        return Ok(None);
+    }
+    let config = Account::<PerChainPerTokenConfig>::try_from(acc_info)?.into_inner();
+    require_eq!(config.version, 1, FeeQuoterError::InvalidVersion);
 
-    Ok(account)
+    Ok(Some(config))
 }
 
 /// Returns Ok(None) when there's no token specific billing config. The user must still
 /// specify the correct PDA, to ensure the configuration isn't ignored in the case it exists.
 pub fn billing_token_config<'info>(
-    account: &'info AccountInfo<'info>,
+    acc_info: &'info AccountInfo<'info>,
     token: Pubkey,
 ) -> Result<Option<BillingTokenConfig>> {
     let (expected, _) = Pubkey::find_program_address(
@@ -52,23 +45,16 @@ pub fn billing_token_config<'info>(
         &crate::ID,
     );
     require_keys_eq!(
-        account.key(),
+        acc_info.key(),
         expected,
         FeeQuoterError::InvalidInputsBillingTokenConfig
     );
+    if acc_info.owner == &system_program::ID {
+        return Ok(None);
+    }
 
-    let config = match Account::<BillingTokenConfigWrapper>::try_from(account) {
-        Ok(account) => {
-            require_eq!(
-                account.version,
-                1, // the v1 version of the onramp will always be tied to version 1 of the state
-                FeeQuoterError::InvalidVersion
-            );
-            Some(account.into_inner().config)
-        }
-        Err(e) if e == ErrorCode::AccountNotInitialized.into() => None,
-        Err(e) => return Err(e),
-    };
+    let config_wrapper = Account::<BillingTokenConfigWrapper>::try_from(acc_info)?.into_inner();
+    require_eq!(config_wrapper.version, 1, FeeQuoterError::InvalidVersion);
 
-    Ok(config)
+    Ok(Some(config_wrapper.config))
 }

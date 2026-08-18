@@ -185,7 +185,23 @@ fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         FeeQuoterError::InvalidInputsMissingTokenConfig
     );
-    let processed_extra_args = validate_svm2any(message, dest_chain, fee_token_config)?;
+    let dest_bytes_overhead = additional_token_configs_for_dest_chain
+        .iter()
+        .map(|config| match config {
+            Some(config)
+                if config.token_transfer_config.is_enabled
+                    && config.token_transfer_config.dest_bytes_overhead > 0 =>
+            {
+                config.token_transfer_config.dest_bytes_overhead
+            }
+            _ => CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        })
+        .sum::<u32>();
+
+    let validated_message =
+        validate_svm2any(message, dest_chain, fee_token_config, &dest_bytes_overhead)?;
+    let extra_args_data_len = validated_message.extra_args_data_len;
+    let processed_extra_args = validated_message.processed_extra_args;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
@@ -207,8 +223,9 @@ fn fee_for_msg(
     // This calculation is not exact, the goal is to not lose money on large payloads.
     // The fixed OCR report calldata overhead gas is accounted for in `dest_gas_overhead`.
     // It is not included in the calculation below for simplicity.
-    let calldata_length =
-        U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead;
+    let calldata_length = U256::new(message.data.len() as u128)
+        + U256::new(extra_args_data_len as u128)
+        + network_fee.transfer_bytes_overhead;
     let mut calldata_gas =
         calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
     let calldata_threshold =
@@ -475,7 +492,9 @@ mod tests {
     };
 
     use super::super::messages::tests::{sample_billing_config, sample_dest_chain, sample_message};
+    use crate::extra_args::{SVMExtraArgsV1, SuiExtraArgsV1};
     use crate::TokenTransferFeeConfig;
+    use ccip_common::{CHAIN_FAMILY_SELECTOR_SUI, CHAIN_FAMILY_SELECTOR_SVM};
 
     use super::*;
 
@@ -810,6 +829,83 @@ mod tests {
                 amount: 155328258355951652
             }
         );
+    }
+
+    #[test]
+    fn sui_receiver_object_ids_are_reflected_in_fee_retrieval() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let mut chain = sample_dest_chain();
+        chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SUI.to_be_bytes();
+
+        let mut message = sample_message();
+        message.extra_args = SuiExtraArgsV1 {
+            gas_limit: 0,
+            allow_out_of_order_execution: true,
+            receiver_object_ids: vec![],
+            ..Default::default()
+        }
+        .serialize_with_tag();
+
+        let fee_without_receiver_object_ids =
+            fee_for_msg(&message, &chain, &sample_billing_config(), &[], &[])
+                .unwrap()
+                .0
+                .amount;
+
+        message.extra_args = SuiExtraArgsV1 {
+            gas_limit: 0,
+            allow_out_of_order_execution: true,
+            receiver_object_ids: vec![[1; 32], [2; 32]],
+            ..Default::default()
+        }
+        .serialize_with_tag();
+
+        let fee_with_receiver_object_ids =
+            fee_for_msg(&message, &chain, &sample_billing_config(), &[], &[])
+                .unwrap()
+                .0
+                .amount;
+
+        assert!(fee_with_receiver_object_ids > fee_without_receiver_object_ids);
+    }
+
+    #[test]
+    fn svm_accounts_are_reflected_in_fee_retrieval() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let mut chain = sample_dest_chain();
+        chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+
+        let mut message = sample_message();
+        message.extra_args = SVMExtraArgsV1 {
+            compute_units: 0,
+            allow_out_of_order_execution: true,
+            accounts: vec![],
+            ..Default::default()
+        }
+        .serialize_with_tag();
+
+        let fee_without_accounts =
+            fee_for_msg(&message, &chain, &sample_billing_config(), &[], &[])
+                .unwrap()
+                .0
+                .amount;
+
+        message.extra_args = SVMExtraArgsV1 {
+            compute_units: 0,
+            allow_out_of_order_execution: true,
+            accounts: vec![[1; 32], [2; 32]],
+            ..Default::default()
+        }
+        .serialize_with_tag();
+
+        let fee_with_accounts = fee_for_msg(&message, &chain, &sample_billing_config(), &[], &[])
+            .unwrap()
+            .0
+            .amount;
+
+        assert!(fee_with_accounts > fee_without_accounts);
     }
 
     pub fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {

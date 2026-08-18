@@ -1,5 +1,5 @@
 export type BurnmintTokenPool = {
-  "version": "1.6.4",
+  "version": "1.6.4-rc",
   "name": "burnmint_token_pool",
   "instructions": [
     {
@@ -993,7 +993,7 @@ export type BurnmintTokenPool = {
 };
 
 export const IDL: BurnmintTokenPool = {
-  "version": "1.6.4",
+  "version": "1.6.4-rc",
   "name": "burnmint_token_pool",
   "instructions": [
     {

@@ -19,7 +19,7 @@ default = []
 anchor-lang = "0.29.0"
 anchor-spl = "0.29.0"
 solana-program = "1.17.25" # pin solana to 1.17
-example_ccip_receiver = { version = "1.6.2", path = "../example-ccip-receiver", features = [
+example_ccip_receiver = { path = "../example-ccip-receiver", features = [
     "no-entrypoint",
 ] }
 
