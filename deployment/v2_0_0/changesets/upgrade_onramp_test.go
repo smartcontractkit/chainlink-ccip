@@ -91,6 +91,23 @@ var noOpTransferSequence = cldf_ops.NewSequence(
 	},
 )
 
+var noOpAcceptOwnershipSequence = cldf_ops.NewSequence(
+	"test-accept-ownership",
+	deploy.MCMSVersion,
+	"emits a canned accept-ownership batch op",
+	func(
+		b cldf_ops.Bundle,
+		chains cldf_chain.BlockChains,
+		in deploy.TransferOwnershipPerChainInput,
+	) (seq_core.OnChainOutput, error) {
+		return seq_core.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{
+				fakeBatchOp(in.ChainSelector, "0xacc3e7"),
+			},
+		}, nil
+	},
+)
+
 func validMCMSInput() mcms.Input {
 	return mcms.Input{
 		TimelockAction: mcms_types.TimelockActionSchedule,
@@ -585,6 +602,11 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 			Once()
 
 		ownershipAdapter.EXPECT().
+			SequenceAcceptOwnership().
+			Return(noOpTransferSequence).
+			Once()
+
+		ownershipAdapter.EXPECT().
 			ShouldAcceptOwnershipWithTransferOwnership(
 				mock.Anything,
 				mock.MatchedBy(func(in deploy.TransferOwnershipPerChainInput) bool {
@@ -594,7 +616,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 						in.ProposedOwner == timelockAddr
 				}),
 			).
-			Return(false, nil).
+			Return(true, nil).
 			Once()
 
 		cs := changesets.UpgradeOnrampPhase1(
@@ -617,6 +639,17 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		prop := out.MCMSTimelockProposals[0]
 		assert.Equal(t, mcms_types.TimelockActionSchedule, prop.Action)
 		assert.NotZero(t, prop.ValidUntil)
+		txCounts := map[mcms_types.ChainSelector]int{}
+		for _, op := range prop.Operations {
+			txCounts[op.ChainSelector] += len(op.Transactions)
+		}
+
+		assert.Greater(
+			t,
+			txCounts[mcms_types.ChainSelector(chainA)],
+			0,
+			"source chain must contain the ownership accept operation",
+		)
 	})
 
 	t.Run("UnexpectedOnRampOnRemoteOffRamp", func(t *testing.T) {
