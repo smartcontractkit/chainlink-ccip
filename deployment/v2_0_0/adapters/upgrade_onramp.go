@@ -61,6 +61,16 @@ type OnRampUpgrader interface {
 	// routes destSelectors through the legacy OnRamp. Phase 3 uses it as a pre-flight check:
 	// anything else means Phase 3 already ran or an unexpected OnRamp is live for that dest.
 	VerifyLegacyOnRampOnProdRouter(e cldf.Environment, chainSelector uint64, destSelectors []uint64) error
+	// RollbackToLegacyRouters repoints the production router for each destination
+	// back to the legacy OnRamp.
+	//
+	// prodDestSelectors are destinations whose original production path is ProdRouter.
+	// testDestSelectors are destinations whose original production path is TestRouter.
+	//
+	// This is intentionally a traffic-only rollback. It does not modify the canonical
+	// new OnRamp's dest-chain configs, remote OffRamp allowlists, datastore refs, or
+	// verifier configuration.
+	RollbackToLegacyRouters(e cldf.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64) ([]mcms_types.BatchOperation, error)
 }
 
 // LaneClass partitions a chain's dest chains by which router currently fronts them.
