@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -12,6 +13,7 @@ import (
 
 	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
@@ -167,6 +169,16 @@ type DeployTokenPoolInput struct {
 	// (1-10000, where 10000 = 100%). Mutually exclusive with LiquidityMigrationAmount.
 	// See LiquidityMigrationAmount for details.
 	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,omitempty" json:"liquidityMigrationBasisPoints,omitempty"`
+	// UnsiloedLockBoxChainSelector names which lockbox receives the old pool's unsiloed (shared)
+	// balance, by naming any remote chain in the group that owns it. The group's lockbox is used.
+	//
+	// Required when seeding from a legacy SiloedLockReleaseTokenPool that holds unsiloed liquidity.
+	// The shared balance backs the old pool's non-siloed chains, which usually belong to a different
+	// group than any siloed chain, and nothing on-chain identifies which - so it is named rather
+	// than inferred. Migration fails loudly if it is needed and absent.
+	//
+	// Only meaningful alongside LockBoxGroups on a SiloedLockReleaseTokenPool. EVM 2.0.0+ only.
+	UnsiloedLockBoxChainSelector *uint64 `yaml:"unsiloedLockBoxChainSelector,omitempty" json:"unsiloedLockBoxChainSelector,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
@@ -367,11 +379,21 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				if tc := input.TokenTransferConfig; tc != nil {
 					seedRegistryRef = tc.RegistryRef
 				}
+				unsiloedLockBoxAddress, err := resolveUnsiloedLockBoxAddress(
+					deployTokenPoolInput.LockBoxGroups,
+					deployTokenPoolInput.UnsiloedLockBoxChainSelector,
+					deployTokenPoolReport.Output.Addresses,
+				)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve unsiloed lockbox on chain %d: %w", selector, err)
+				}
+
 				seedBatchOps, seedReports, err := buildSeedMigrationBatchOps(
 					e, tokenPoolRegistry, selector, *tokenPool, *tokenRef, seedRegistryRef,
 					deployTokenPoolInput.TimelockAddress,
 					deployTokenPoolInput.LiquidityMigrationAmount,
 					deployTokenPoolInput.LiquidityMigrationBasisPoints,
+					unsiloedLockBoxAddress,
 				)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to build seed migration on chain %d: %w", selector, err)
@@ -631,6 +653,56 @@ func ResolveAdapter(reg *TokenAdapterRegistry, sel uint64, tokenPoolVersion *sem
 	return adapter, family, nil
 }
 
+// resolveUnsiloedLockBoxAddress maps chain to the lockbox deployed for its silo
+// group. The deploy sequence emits one lockbox per group, in group order, so the group's position
+// selects the address without this package needing to know the chain-family qualifier scheme.
+//
+// Returns an empty address when the pool has no silo groups or when no
+// chain was named. The migration sequence reports the latter, and only if there is actually
+// unsiloed liquidity to move.
+func resolveUnsiloedLockBoxAddress(
+	lockBoxGroups [][]uint64,
+	unsiloedLockBoxChainSelector *uint64,
+	deployedAddresses []datastore.AddressRef,
+) (string, error) {
+	if len(lockBoxGroups) == 0 || unsiloedLockBoxChainSelector == nil {
+		return "", nil
+	}
+
+	groupIndex := -1
+	for i, group := range lockBoxGroups {
+		if slices.Contains(group, *unsiloedLockBoxChainSelector) {
+			groupIndex = i
+			break
+		}
+	}
+
+	if groupIndex < 0 {
+		return "", fmt.Errorf(
+			"unsiloedLockBoxChainSelector %d does not appear in any lockBoxGroups entry; it must name a chain in the group whose lockbox should hold the shared balance",
+			*unsiloedLockBoxChainSelector,
+		)
+	}
+
+	lockBoxType := datastore.ContractType(utils.ERC20LockBox)
+	lockBoxes := make([]datastore.AddressRef, 0, len(lockBoxGroups))
+
+	for _, ref := range deployedAddresses {
+		if ref.Type == lockBoxType {
+			lockBoxes = append(lockBoxes, ref)
+		}
+	}
+
+	if groupIndex >= len(lockBoxes) {
+		return "", fmt.Errorf(
+			"lockBoxGroups declares %d groups but the deploy reported %d lockboxes, so the lockbox for group %d cannot be identified",
+			len(lockBoxGroups), len(lockBoxes), groupIndex,
+		)
+	}
+
+	return lockBoxes[groupIndex].Address, nil
+}
+
 func buildSeedMigrationBatchOps(
 	e cldf.Environment,
 	tokenPoolRegistry *TokenAdapterRegistry,
@@ -640,6 +712,7 @@ func buildSeedMigrationBatchOps(
 	timelockAddr string,
 	amount *big.Int,
 	basisPoints *uint16,
+	unsiloedLockBoxAddress string,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	if amount == nil && basisPoints == nil {
 		return nil, nil, nil
@@ -691,13 +764,14 @@ func buildSeedMigrationBatchOps(
 	}
 
 	migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
-		ChainSelector:   selector,
-		OldPoolAddress:  oldPoolAddr,
-		NewPoolAddress:  fullPoolRef.Address,
-		TimelockAddress: timelockAddr,
-		BasisPoints:     basisPoints,
-		Amount:          amount,
-		SetPoolConfig:   nil,
+		ChainSelector:          selector,
+		OldPoolAddress:         oldPoolAddr,
+		NewPoolAddress:         fullPoolRef.Address,
+		TimelockAddress:        timelockAddr,
+		BasisPoints:            basisPoints,
+		Amount:                 amount,
+		UnsiloedLockBoxAddress: unsiloedLockBoxAddress,
+		SetPoolConfig:          nil,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build liquidity migration on chain %d: %w", selector, err)
