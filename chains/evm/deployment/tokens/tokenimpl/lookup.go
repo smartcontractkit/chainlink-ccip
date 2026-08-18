@@ -15,6 +15,7 @@ var tokenImpls = map[deployment.ContractType]Token{
 	dripV1_0_0.ContractType: tokenBurnMintERC20WithDripV1_0_0{},
 	utils.ERC677TokenHelper: tokenBurnMintERC677{},
 	utils.BurnMintToken:     tokenBurnMintERC677{},
+	utils.LinkToken:         tokenBurnMintERC677{},
 	bnmERC20.ContractType:   tokenBurnMintERC20{},
 	erc20.ContractType:      tokenERC20{},
 	tip20.ContractType:      tokenTIP20{},
