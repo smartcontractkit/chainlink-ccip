@@ -81,11 +81,30 @@ func (c *VerifierTestHelperContract) WithdrawFeeTokens(opts *bind.TransactOpts, 
 	return c.contract.Transact(opts, "withdrawFeeTokens", args)
 }
 
+func (c *VerifierTestHelperContract) GetRemoteChainConfig(opts *bind.CallOpts, args uint64) (GetRemoteChainConfigResult, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRemoteChainConfig", args)
+	outstruct := new(GetRemoteChainConfigResult)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.RemoteChainConfig = *abi.ConvertType(out[0], new(RemoteChainConfigArgs)).(*RemoteChainConfigArgs)
+	outstruct.AllowedSendersList = *abi.ConvertType(out[1], new([]common.Address)).(*[]common.Address)
+
+	return *outstruct, nil
+}
+
 type AllowlistConfigArgs struct {
 	DestChainSelector         uint64
 	AllowlistEnabled          bool
 	AddedAllowlistedSenders   []common.Address
 	RemovedAllowlistedSenders []common.Address
+}
+
+type GetRemoteChainConfigResult struct {
+	RemoteChainConfig  RemoteChainConfigArgs
+	AllowedSendersList []common.Address
 }
 
 type RemoteChainConfigArgs struct {
@@ -183,5 +202,16 @@ var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address,
 		args []common.Address,
 	) (*types.Transaction, error) {
 		return c.WithdrawFeeTokens(opts, args)
+	},
+})
+
+var GetRemoteChainConfig = contract.NewRead(contract.ReadParams[uint64, GetRemoteChainConfigResult, *VerifierTestHelperContract]{
+	Name:         "verifier-test-helper:get-remote-chain-config",
+	Version:      Version,
+	Description:  "Calls getRemoteChainConfig on the contract",
+	ContractType: ContractType,
+	NewContract:  NewVerifierTestHelperContract,
+	CallContract: func(c *VerifierTestHelperContract, opts *bind.CallOpts, args uint64) (GetRemoteChainConfigResult, error) {
+		return c.GetRemoteChainConfig(opts, args)
 	},
 })
