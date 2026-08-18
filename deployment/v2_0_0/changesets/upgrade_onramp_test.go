@@ -584,7 +584,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		ownershipReg, ownershipAdapter := mockTransferOwnershipRegistry(t)
 
-		// Assert that the populated default are passed through to the ownership adapter.
+		// Assert that the populated defaults are passed through to the ownership adapter.
 		ownershipAdapter.EXPECT().
 			InitializeTimelockAddress(
 				mock.Anything,
