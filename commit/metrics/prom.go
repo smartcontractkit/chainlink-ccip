@@ -243,6 +243,9 @@ func (p *PromReporter) TrackOutcome(outcome committypes.Outcome, round uint64) {
 	}
 }
 
+// used for labels values that could not be resolved.
+const unknownLabelValue = "unknown"
+
 func (p *PromReporter) trackLatestRoundID(
 	latestRoundID uint32, sourceChainSelector cciptypes.ChainSelector, onramp string, method string,
 ) {
@@ -250,16 +253,16 @@ func (p *PromReporter) trackLatestRoundID(
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
 		// graceful fallback - we could even alert on such a thing.
-		sourceFamily = "unknown"
-		sourceChainID = "unknown"
+		sourceFamily = unknownLabelValue
+		sourceChainID = unknownLabelValue
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		sourceName = "unknown"
+		sourceName = unknownLabelValue
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		destName = "unknown"
+		destName = unknownLabelValue
 	}
 
 	p.commitLatestRound.WithLabelValues(sourceName, destName, onramp, method).Set(float64(latestRoundID))
@@ -282,16 +285,16 @@ func (p *PromReporter) trackMaxSequenceNumber(
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
 		// graceful fallback - we could even alert on such a thing.
-		sourceFamily = "unknown"
-		sourceChainID = "unknown"
+		sourceFamily = unknownLabelValue
+		sourceChainID = unknownLabelValue
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		sourceName = "unknown"
+		sourceName = unknownLabelValue
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		destName = "unknown"
+		destName = unknownLabelValue
 	}
 
 	p.sequenceNumbers.
@@ -419,7 +422,7 @@ func (p *PromReporter) destChainAttrs() []attribute.KeyValue {
 		// graceful fallback - we could even alert on such a thing.
 		destChainInfo = chain_selectors.ChainDetails{
 			ChainSelector: 0,
-			ChainName:     "unknown",
+			ChainName:     unknownLabelValue,
 		}
 	}
 
@@ -440,13 +443,13 @@ func (p *PromReporter) sourceChainAttrs(sourceChainSelector cciptypes.ChainSelec
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
 		// graceful fallback - we could even alert on such a thing.
-		sourceFamily = "unknown"
-		sourceChainID = "unknown"
+		sourceFamily = unknownLabelValue
+		sourceChainID = unknownLabelValue
 	}
 
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		sourceName = "unknown"
+		sourceName = unknownLabelValue
 	}
 
 	return []attribute.KeyValue{

@@ -33,6 +33,9 @@ const (
 	chainFamilyLabelKey   = "chainFamily"
 	chainNameLabelKey     = "chainName"
 	chainSelectorLabelKey = "chainSelector"
+
+	// used for labels values that could not be resolved.
+	unknownLabelValue = "unknown"
 )
 
 // chainAttrs resolves a chain selector into chainID/chainFamily/chainName/chainSelector
@@ -45,13 +48,13 @@ func chainAttrs(chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(chainSelector)
 	if !ok {
 		// graceful fallback - we could even alert on such a thing.
-		chainFamily = "unknown"
-		chainID = "unknown"
+		chainFamily = unknownLabelValue
+		chainID = unknownLabelValue
 	}
 
 	chainName, err := libs.GetNameFromIDAndFamily(chainID, chainFamily)
 	if err != nil {
-		chainName = "unknown"
+		chainName = unknownLabelValue
 	}
 
 	return []attribute.KeyValue{
