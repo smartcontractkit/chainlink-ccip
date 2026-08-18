@@ -233,7 +233,7 @@ func (c *configPollerV2) GetChainConfig(
 	cache.chainConfigMu.RLock()
 	if !cache.chainConfigRefresh.IsZero() {
 		age := time.Since(cache.chainConfigRefresh)
-		c.metrics.RecordCacheAge(rcmetrics.ChainLabel(chainSel), "chain", int64(age.Seconds()))
+		c.metrics.RecordCacheAge(chainSel, "chain", int64(age.Seconds()))
 		defer cache.chainConfigMu.RUnlock()
 		c.lggr.Debugw("Returning cached chain config",
 			logutil.FieldChain, chainSel,
@@ -363,7 +363,7 @@ func (c *configPollerV2) recordSourceCacheAge(cache *chainCache) {
 	if cache.sourceChainRefresh.IsZero() {
 		return
 	}
-	c.metrics.RecordCacheAge(rcmetrics.ChainLabel(c.destChainSelector), "source",
+	c.metrics.RecordCacheAge(c.destChainSelector, "source",
 		int64(time.Since(cache.sourceChainRefresh).Seconds()))
 }
 
@@ -413,16 +413,15 @@ func (c *configPollerV2) refreshAllKnownChains() {
 	now := time.Now()
 	for _, chain := range chainsToRefresh {
 		ctx, cancel := context.WithTimeout(context.Background(), bgRefreshTimeout)
-		chainLabel := rcmetrics.ChainLabel(chain)
 		c.lggr.Debugw("Issuing background refresh for known chain",
 			logutil.FieldChain, chain, logutil.FieldDestChain, c.destChainSelector)
 		if err := c.batchRefreshChainAndSourceConfigs(ctx, chain); err != nil {
 			refreshFailed = true
-			c.metrics.RecordPollFailure(chainLabel)
+			c.metrics.RecordPollFailure(chain)
 			c.lggr.Warnw("Failed to batch refresh configs", logutil.FieldChain, chain, "error", err)
 		} else {
-			c.metrics.RecordPollSuccess(chainLabel)
-			c.metrics.RecordLastSuccess(chainLabel, now.Unix())
+			c.metrics.RecordPollSuccess(chain)
+			c.metrics.RecordLastSuccess(chain, now.Unix())
 		}
 		cancel()
 	}
@@ -488,7 +487,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	// to RecordCacheAge instead of being masked.
 	cache.chainConfigMu.Lock()
 	if reflect.DeepEqual(chainConfigSnapshot, cciptypes.ChainConfigSnapshot{}) {
-		c.metrics.RecordOverwrittenEmpty("chain")
+		c.metrics.RecordOverwrittenEmpty(chainSel, "chain")
 		c.lggr.Warnw("chain config snapshot returned empty, keeping existing cached config",
 			logutil.FieldChain, chainSel)
 	} else {

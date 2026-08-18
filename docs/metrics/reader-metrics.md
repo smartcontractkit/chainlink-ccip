@@ -74,12 +74,21 @@ promauto layer that exists tells you *how slow a read was*, never *what went wro
 
 All plugin-generic, keyed by `{queryName}`. ✅ = implemented; everything else is proposed.
 
+All chain-identity labels below come from `pkg/reader/rcmetrics`'s private `chainAttrs()` helper
+(mirrors `commit/metrics/prom.go`'s `destChainAttrs()`/`sourceChainAttrs()` pattern, but with no
+dest/source prefix — every one of these metrics describes exactly one chain, never a lane): a
+selector resolves to `chainID`, `chainFamily`, `chainName`, and `chainSelector` (the selector
+value itself, as a string), replacing the old bare numeric-selector `chain` label. Every
+`Record*` method on `ReaderMetrics`/`ObservedReaderMetrics`/`ConfigPollerMetrics`/`AccessorMetrics`
+now takes a `chainSelector ccipocr3.ChainSelector` parameter directly instead of a pre-formatted
+string, so callers never need `rcmetrics.ChainLabel(...)` (removed) at the call site.
+
 | Metric | Status | Why |
 |---|---|---|
-| `ccip_reader_read_outcome{chainID,query,outcome="ok"\|"empty"\|"error"}` | ✅ Implemented | Per-query classification ok/empty/error — the false-idle primitive (empty-with-no-error). |
-| `ccip_reader_read_empty{query,chain}` | ✅ Implemented | "Returned nothing with no error" — the single-chain false-idle primitive, wired at the concrete reads (`MsgsBetweenSeqNums`, `LatestMsgSeqNum`, `GetChainFeePriceUpdate`) where the source chain is known. |
-| `ccip_reader_chain_gap{query,chain,state}` | ✅ Implemented | Count of source chains in each state (`returned` vs `not_found`/`disabled`/`misconfigured`/`error`/`invalid`/`missing`/`stale`/`count_mismatch`/...). `count_mismatch` = a message read whose count doesn't match its requested range (partial/incomplete). This is the per-lane subset signal AND its reason. (Consolidated: the originally-proposed `ccip_reader_read_partial` counter was folded into `chain_gap{state!="returned"}` to avoid duplicate instrumentation.) |
-| `ccip_reader_chain_fee_components{chainFamily,chainID,feeType}` | ✅ Implemented | Beholder port of the existing promauto gauge (chainFee `exec`/`da`) — now NOP-visible. |
+| `ccip_reader_read_outcome{chainID,chainFamily,chainName,chainSelector,query,outcome="ok"\|"empty"\|"error"}` | ✅ Implemented | Per-query classification ok/empty/error — the false-idle primitive (empty-with-no-error). **Chain identity here is the reader instance's DESTINATION chain** (recorded once per query at the `observedCCIPReader` wrapper level), not whichever chain the query happens to be about — the one semantic exception to "chain = the chain this read is about" that every other row in this table follows. Since this metric now shares the exact same label *keys* as every other reader metric (no more `chain` vs `chainID` naming to flag it), don't assume `chainID` here means the same thing it means on `chain_gap`/`read_empty` two rows down — it doesn't. |
+| `ccip_reader_read_empty{chainID,chainFamily,chainName,chainSelector,query}` | ✅ Implemented | "Returned nothing with no error" — the single-chain false-idle primitive, wired at the concrete reads (`MsgsBetweenSeqNums`, `LatestMsgSeqNum`, `GetChainFeePriceUpdate`) where the source chain is known. Chain identity is whichever chain that specific read was about (source or dest, depending on the query). |
+| `ccip_reader_chain_gap{chainID,chainFamily,chainName,chainSelector,query,state}` | ✅ Implemented | Count of source chains in each state (`returned` vs `not_found`/`disabled`/`misconfigured`/`error`/`invalid`/`missing`/`stale`/`count_mismatch`/...). `count_mismatch` = a message read whose count doesn't match its requested range (partial/incomplete). This is the per-lane subset signal AND its reason. (Consolidated: the originally-proposed `ccip_reader_read_partial` counter was folded into `chain_gap{state!="returned"}` to avoid duplicate instrumentation.) |
+| `ccip_reader_chain_fee_components{chainID,chainFamily,chainName,chainSelector,feeType}` | ✅ Implemented | Beholder port of the existing promauto gauge (chainFee `exec`/`da`) — now NOP-visible. The promauto side (`observed_ccip.go`'s `PromChainFeeGauge`) is a separate, unchanged registration still keyed on bare `chainFamily,chainID` (old scheme) — the two paths use different label sets, same as `commit/metrics/legacy_prom.go`'s relationship to `commit/metrics/prom.go`. |
 | `ccip_reader_read_all_ok{query}` | Proposed | Folded into `read_outcome{outcome="ok"}`; not a separate instrument. |
 | `ccip_reader_msg_dropped{query,reason}` | Instrument added; no call site yet | Reads that returned data but dropped rows on validation/cast. Registered but not yet recorded anywhere — wire when the accessor wrapper lands. |
 | `ccip_reader_query_last_success_timestamp{query}` | Proposed | Per-member staleness for cache-feeding reads; the config-poller last-success timestamp below covers the poller side only. |
@@ -100,11 +109,11 @@ All plugin-generic, keyed by `{queryName}`. ✅ = implemented; everything else i
 
 | Metric | Status | Why |
 |---|---|---|
-| `ccip_reader_config_cache_age_seconds{chain,kind="chain"\|"source"}` gauge | ✅ Implemented | The poller's whole job is freshness, and for that exact number it computed `time.Since(chainConfigRefresh)` and **discarded it into `Debugw`** (`config_poller_v2.go`). Now exported so every behind-the-cache read (curse, RMN config, config digest, router address) can be judged for staleness. |
-| `ccip_reader_config_poll_success{chain}` / `ccip_reader_config_poll_failure{chain}` | ✅ Implemented | Per-chain refresh accounting, replacing the single chain-unlabeled `consecutiveFailedPolls` counter — now you can tell *which* chain is failing. |
-| `ccip_reader_config_cache_overwritten_empty{kind}` | ✅ Implemented (+ write guard) | Flags when a refresh **time-stamped an empty snapshot as fresh**; the code now also refuses to write/mark-fresh an empty snapshot (the bug fix in this branch). |
-| `ccip_reader_config_poller_last_success_timestamp{chain}` gauge | ✅ Implemented | The background polling goroutine's liveness via last-success staleness — a wedged poller is now page-able instead of invisible. |
-| `ccip_reader_config_poll_duration{chain}` / `ccip_reader_config_miss_refresh_duration{chain}` | Proposed | Per-poll and read-path miss-refresh latency; not implemented here. |
+| `ccip_reader_config_cache_age_seconds{chainID,chainFamily,chainName,chainSelector,kind="chain"\|"source"}` gauge | ✅ Implemented | The poller's whole job is freshness, and for that exact number it computed `time.Since(chainConfigRefresh)` and **discarded it into `Debugw`** (`config_poller_v2.go`). Now exported so every behind-the-cache read (curse, RMN config, config digest, router address) can be judged for staleness. |
+| `ccip_reader_config_poll_success{chainID,chainFamily,chainName,chainSelector}` / `ccip_reader_config_poll_failure{...}` | ✅ Implemented | Per-chain refresh accounting, replacing the single chain-unlabeled `consecutiveFailedPolls` counter — now you can tell *which* chain is failing. |
+| `ccip_reader_config_cache_overwritten_empty{chainID,chainFamily,chainName,chainSelector,kind}` | ✅ Implemented (+ write guard) | Flags when a refresh **time-stamped an empty snapshot as fresh**; the code now also refuses to write/mark-fresh an empty snapshot (the bug fix in this branch). The chain-identity labels were added alongside the `chainAttrs()` rollout — previously this metric had no chain label at all, even though the chain being refreshed (`chainSel`) was always in scope at the call site. |
+| `ccip_reader_config_poller_last_success_timestamp{chainID,chainFamily,chainName,chainSelector}` gauge | ✅ Implemented | The background polling goroutine's liveness via last-success staleness — a wedged poller is now page-able instead of invisible. |
+| `ccip_reader_config_poll_duration{chainID,...}` / `ccip_reader_config_miss_refresh_duration{chainID,...}` | Proposed | Per-poll and read-path miss-refresh latency; not implemented here. |
 | `ccip_reader_config_cache_overwritten_empty{kind="source"}` | Proposed (source-cache variant) | The guard/metric cover the chain snapshot; the source-channel configs partial-overwrite is untouched. |
 
 ## How this extends the runbooks (all additive)
@@ -411,26 +420,40 @@ on-chain config, and none of it is observable.
 
 ## Metric reference (to be added to runbook reference tables as metrics land)
 
-**Label convention:** every proposed beholder metric below carries `node_id` and `csa_public_key` labels
-(unique per node) in addition to the per-metric labels listed — this is what makes the
-per-oracle-vs-DON-wide distinction queryable (see [known boundaries](#known-boundaries-and-deferred-work)).
+**Label convention:** every implemented beholder metric below carries `chainID`, `chainFamily`,
+`chainName`, and `chainSelector` — resolved from a `ccipocr3.ChainSelector` by
+`pkg/reader/rcmetrics`'s private `chainAttrs()` helper (mirrors `commit/metrics/prom.go`'s
+`destChainAttrs()`/`sourceChainAttrs()`, minus the dest/source prefix, since each of these metrics
+only ever describes one chain). This replaced the old bare numeric-selector `chain` label — every
+`Record*` method on the `rcmetrics` interfaces now takes the selector directly
+(`chainSelector ccipocr3.ChainSelector`) rather than a pre-formatted string, so there's no more
+`rcmetrics.ChainLabel(...)` call at any site. **`ccip_reader_read_outcome` is the one exception**:
+its chain-identity labels describe the reader instance's destination chain, not "the chain this
+specific read is about" like every other row here — see its row below.
 
-| metric | otel_type | key labels | proposed registration |
+Proposed (not-yet-implemented) metrics below still carry `node_id` and `csa_public_key` labels
+(unique per node) in addition to whatever chain-identity/per-metric labels are listed — this is
+what makes the per-oracle-vs-DON-wide distinction queryable (see
+[known boundaries](#known-boundaries-and-deferred-work)).
+
+| metric | otel_type | key labels | registration |
 |---|---|---|---|
-| `ccip_reader_read_outcome` | Counter | `chainID,query,outcome` | beholder |
-| `ccip_reader_read_empty` | Counter | `query,chain` | beholder |
-| `ccip_reader_chain_gap` | Counter | `query,chain,state` | beholder |
-| `ccip_reader_query_last_success_timestamp` | Gauge | `query` | beholder |
-| `ccip_reader_msg_dropped` | Counter | `query,reason` | beholder |
-| `ccip_reader_chain_fee_components` | Gauge | `chainFamily,chainID,feeType` | dual (already promauto) |
-| `ccip_chainaccessor_batch_result` | Counter | `source,operation,outcome` | beholder |
-| `ccip_chainaccessor_row_drops` | Counter | `source,operation,reason` | beholder |
-| `ccip_chainaccessor_empty_read` | Counter | `source,operation` | beholder |
-| `ccip_chainaccessor_finality_violated` | Counter | `source` | beholder |
-| `ccip_chainaccessor_value_staleness_seconds` | Gauge | `chain,source` | beholder |
-| `ccip_chainaccessor_no_bindings` | Counter | `source` | beholder (Low) |
-| `ccip_reader_config_cache_age_seconds` | Gauge | `chain,kind` | beholder |
-| `ccip_reader_config_poll_success_total` / `ccip_reader_config_poll_failure_total` | Counter | `chain` | beholder |
-| `ccip_reader_config_cache_overwritten_empty` | Counter | `kind` | beholder |
-| `ccip_reader_config_poller_last_success_timestamp` | Gauge | `chain` | beholder |
-| `ccip_reader_config_miss_refresh_duration` | Histogram | `chain` | beholder |
+| `ccip_reader_read_outcome` | Counter | chain(dest) + `query,outcome` | beholder |
+| `ccip_reader_read_empty` | Counter | chain + `query` | beholder |
+| `ccip_reader_chain_gap` | Counter | chain + `query,state` | beholder |
+| `ccip_reader_query_last_success_timestamp` | Gauge | `query` | proposed, beholder |
+| `ccip_reader_msg_dropped` | Counter | `query,reason` (no chain — instrument registered, no call site yet) | beholder |
+| `ccip_reader_chain_fee_components` | Gauge | chain + `feeType` (beholder); promauto side unchanged, bare `chainFamily,chainID` | dual |
+| `ccip_chainaccessor_batch_result` | Counter | `source,operation,outcome` | proposed, beholder |
+| `ccip_chainaccessor_row_drops` | Counter | `source,operation,reason` | proposed, beholder |
+| `ccip_chainaccessor_empty_read` | Counter | `source,operation` | proposed, beholder |
+| `ccip_chainaccessor_finality_violated` | Counter | `source` | proposed, beholder |
+| `ccip_chainaccessor_value_staleness_seconds` | Gauge | `chain,source` | proposed, beholder |
+| `ccip_chainaccessor_no_bindings` | Counter | `source` | proposed, beholder (Low) |
+| `ccip_reader_config_cache_age_seconds` | Gauge | chain + `kind` | beholder |
+| `ccip_reader_config_poll_success_total` / `ccip_reader_config_poll_failure_total` | Counter | chain | beholder |
+| `ccip_reader_config_cache_overwritten_empty` | Counter | chain + `kind` | beholder |
+| `ccip_reader_config_poller_last_success_timestamp` | Gauge | chain | beholder |
+| `ccip_reader_config_miss_refresh_duration` | Histogram | chain | proposed, beholder |
+
+("chain" above = `chainID,chainFamily,chainName,chainSelector` from `chainAttrs()`.)

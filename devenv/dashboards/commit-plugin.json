@@ -1843,7 +1843,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "Upstream of the whole checklist above: tests whether the plugin is healthy *but being fed empty/partial/stale data*. Shared with execute \u2014 `chain` below is the **numeric chain selector**, not `sourceChainName`/`destChainID` \u2014 see `docs/metrics/reader-metrics.md`. The CRIT here is `config_cache_stale` (sustained: age > 90s means the poller genuinely can't refresh); `config_cache_overwritten_empty` alone is only WARN since a single empty snapshot is benign on its own guard. A finding here firing alongside an outcome check above (`pending_messages` climbing, `consensus_dropped`, a curse/digest-mismatch reading) is the SAME incident with the data-source check as the root cause, not two separate problems."
+    "content": "Upstream of the whole checklist above: tests whether the plugin is healthy *but being fed empty/partial/stale data*. Shared with execute \u2014 every panel below carries `chainID`/`chainFamily`/`chainName`/`chainSelector` (pkg/reader/rcmetrics chainAttrs(), replacing the old bare numeric-selector `chain` label), not `sourceChainName`/`destChainID` (those are commit-plugin-only labels) \u2014 see `docs/metrics/reader-metrics.md`. The CRIT here is `config_cache_stale` (sustained: age > 90s means the poller genuinely can't refresh); `config_cache_overwritten_empty` alone is only WARN since a single empty snapshot is benign on its own guard. A finding here firing alongside an outcome check above (`pending_messages` climbing, `consensus_dropped`, a curse/digest-mismatch reading) is the SAME incident with the data-source check as the root cause, not two separate problems."
    },
    "title": "Data Source (reader + config poller)",
    "type": "text",
@@ -1953,7 +1953,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). A read returned nothing with no error -- the false-idle primitive. chain is the numeric chain selector; correlate to a lane and split node-local vs DON-wide by csa_public_key.",
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). A read returned nothing with no error -- the false-idle primitive. chainID (from pkg/reader/rcmetrics chainAttrs()) is whichever chain that read was about; chainSelector on the same series carries the raw numeric selector if needed. Split node-local vs DON-wide by csa_public_key.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -2039,7 +2039,7 @@
      },
      "editorMode": "code",
      "expr": "sum by (query, chain) (rate(ccip_reader_read_empty_total[5m]))",
-     "legendFormat": "{{query}}/{{chain}}",
+     "legendFormat": "{{query}}/{{chainID}}",
      "range": true,
      "refId": "A"
     }
@@ -2138,7 +2138,7 @@
      },
      "editorMode": "code",
      "expr": "sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{state!=\"returned\"}[5m]))",
-     "legendFormat": "{{query}}/{{chain}}/{{state}}",
+     "legendFormat": "{{query}}/{{chainID}}/{{state}}",
      "range": true,
      "refId": "A"
     }
@@ -2236,8 +2236,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (chain, kind) (ccip_reader_config_cache_age_seconds)",
-     "legendFormat": "{{chain}}/{{kind}}",
+     "expr": "max by (chainID, kind) (ccip_reader_config_cache_age_seconds)",
+     "legendFormat": "{{chainID}}/{{kind}}",
      "range": true,
      "refId": "A"
     }
@@ -2250,7 +2250,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. crit_if time()-result>90, ok_if <=90. Checklist's own query is the raw timestamp (min by (chain) (ccip_reader_config_poller_last_success_timestamp)); this panel wraps it in time()-... for direct readability as a staleness duration. Last successful background config poll per chain; a wedged/missing poller goroutine makes every cache silently go stale.",
+   "description": "always_emitted: true. crit_if time()-result>90, ok_if <=90. Checklist's own query is the raw timestamp (min by (chainID) (ccip_reader_config_poller_last_success_timestamp)); this panel wraps it in time()-... for direct readability as a staleness duration. Last successful background config poll per chain; a wedged/missing poller goroutine makes every cache silently go stale.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -2335,8 +2335,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "time() - min by (chain) (ccip_reader_config_poller_last_success_timestamp)",
-     "legendFormat": "{{chain}}",
+     "expr": "time() - min by (chainID) (ccip_reader_config_poller_last_success_timestamp)",
+     "legendFormat": "{{chainID}}",
      "range": true,
      "refId": "A"
     }
@@ -2434,8 +2434,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum by (chain) (rate(ccip_reader_config_poll_failure_total[5m]))",
-     "legendFormat": "{{chain}}",
+     "expr": "sum by (chainID) (rate(ccip_reader_config_poll_failure_total[5m]))",
+     "legendFormat": "{{chainID}}",
      "range": true,
      "refId": "A"
     }
@@ -3192,7 +3192,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "The on/offramp gauges and consensus signals are *outcomes* \u2014 they can't tell \"plugin is broken\" apart from \"plugin is fine but fed empty/partial data.\" Any `read_empty`/non-`returned` `chain_gap` `> 0`, or `config_cache_age_seconds{kind=\"chain\"}` sustained above ~90s \u2192 **REPORT:chain-infra-oncall**, the data layer is degrading (a reader/chain-infra problem, not a commit-plugin defect); split single-node vs DON-wide by `csa_public_key` first. All flat \u2192 **CONTINUE:step3**. `chain` below is the numeric chain selector, shared with execute \u2014 see `docs/metrics/reader-metrics.md`. This is a data-layer *gate* placed before the consensus/transmission tree, exactly where a silently-empty reader would otherwise be misattributed to the plugin."
+    "content": "The on/offramp gauges and consensus signals are *outcomes* \u2014 they can't tell \"plugin is broken\" apart from \"plugin is fine but fed empty/partial data.\" Any `read_empty`/non-`returned` `chain_gap` `> 0`, or `config_cache_age_seconds{kind=\"chain\"}` sustained above ~90s \u2192 **REPORT:chain-infra-oncall**, the data layer is degrading (a reader/chain-infra problem, not a commit-plugin defect); split single-node vs DON-wide by `csa_public_key` first. All flat \u2192 **CONTINUE:step3**. `chainID`/`chainFamily`/`chainName`/`chainSelector` below (pkg/reader/rcmetrics chainAttrs()) describe whichever chain a read is about, shared with execute \u2014 see `docs/metrics/reader-metrics.md`. This is a data-layer *gate* placed before the consensus/transmission tree, exactly where a silently-empty reader would otherwise be misattributed to the plugin."
    },
    "title": "step2c \u2014 is the problem upstream in the data source instead?",
    "type": "text",
@@ -3289,7 +3289,7 @@
      },
      "editorMode": "code",
      "expr": "sum by (query, chain) (rate(ccip_reader_read_empty_total{query=~\"NextSeqNum|MsgsBetweenSeqNums|LatestMsgSeqNum\"}[5m]))",
-     "legendFormat": "{{query}}/{{chain}}",
+     "legendFormat": "{{query}}/{{chainID}}",
      "range": true,
      "refId": "A"
     }
@@ -3388,7 +3388,7 @@
      },
      "editorMode": "code",
      "expr": "sum by (query, chain, state) (rate(ccip_reader_chain_gap_total{query=~\"NextSeqNum|MsgsBetweenSeqNums|GetChainsFeeComponents|GetChainFeePriceUpdate\", state!=\"returned\"}[5m]))",
-     "legendFormat": "{{query}}/{{chain}}/{{state}}",
+     "legendFormat": "{{query}}/{{chainID}}/{{state}}",
      "range": true,
      "refId": "A"
     }
@@ -3486,8 +3486,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (chain, kind) (ccip_reader_config_cache_age_seconds)",
-     "legendFormat": "{{chain}}/{{kind}}",
+     "expr": "max by (chainID, kind) (ccip_reader_config_cache_age_seconds)",
+     "legendFormat": "{{chainID}}/{{kind}}",
      "range": true,
      "refId": "A"
     }
@@ -4178,8 +4178,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum by (chain, state) (rate(ccip_reader_chain_gap_total{query=\"MsgsBetweenSeqNums\", state!=\"returned\"}[15m]))",
-     "legendFormat": "chain_gap {{chain}}/{{state}}",
+     "expr": "sum by (chainID, state) (rate(ccip_reader_chain_gap_total{query=\"MsgsBetweenSeqNums\", state!=\"returned\"}[15m]))",
+     "legendFormat": "chain_gap {{chainID}}/{{state}}",
      "range": true,
      "refId": "A"
     },
@@ -4189,8 +4189,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum by (chain) (rate(ccip_reader_read_empty_total{query=\"MsgsBetweenSeqNums\"}[15m]))",
-     "legendFormat": "read_empty {{chain}}",
+     "expr": "sum by (chainID) (rate(ccip_reader_read_empty_total{query=\"MsgsBetweenSeqNums\"}[15m]))",
+     "legendFormat": "read_empty {{chainID}}",
      "range": true,
      "refId": "B"
     }
@@ -4571,7 +4571,7 @@
      },
      "editorMode": "code",
      "expr": "sum by (query, chain, csa_public_key) (rate(ccip_reader_read_empty_total[5m]))",
-     "legendFormat": "read_empty {{query}}/{{chain}}/{{csa_public_key}}",
+     "legendFormat": "read_empty {{query}}/{{chainID}}/{{csa_public_key}}",
      "range": true,
      "refId": "A"
     },
@@ -4582,7 +4582,7 @@
      },
      "editorMode": "code",
      "expr": "sum by (query, chain, state, csa_public_key) (rate(ccip_reader_chain_gap_total{state!=\"returned\"}[5m]))",
-     "legendFormat": "chain_gap {{query}}/{{chain}}/{{state}}/{{csa_public_key}}",
+     "legendFormat": "chain_gap {{query}}/{{chainID}}/{{state}}/{{csa_public_key}}",
      "range": true,
      "refId": "B"
     }

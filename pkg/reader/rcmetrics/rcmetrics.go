@@ -20,17 +20,55 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
+
+// Label key constants for the chain-identity attributes every instrument in this package uses -
+// kept as constants to reduce the chance of drift (mirrors commit/metrics/prom.go's pattern).
+const (
+	chainIDLabelKey       = "chainID"
+	chainFamilyLabelKey   = "chainFamily"
+	chainNameLabelKey     = "chainName"
+	chainSelectorLabelKey = "chainSelector"
+)
+
+// chainAttrs resolves a chain selector into chainID/chainFamily/chainName/chainSelector
+// attributes, replacing the old single numeric-selector-as-string "chain" label. Every metric in
+// this package describes exactly one chain (unlike commit/metrics/prom.go's destChainAttrs/
+// sourceChainAttrs, which need a dest-vs-source prefix because a single commit-plugin metric can
+// carry both a source and a dest chain at once) -- so no prefix is needed here.
+func chainAttrs(chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
+	// Could happen due to an out-of-date chain-selectors lib.
+	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(chainSelector)
+	if !ok {
+		// graceful fallback - we could even alert on such a thing.
+		chainFamily = "unknown"
+		chainID = "unknown"
+	}
+
+	chainName, err := libs.GetNameFromIDAndFamily(chainID, chainFamily)
+	if err != nil {
+		chainName = "unknown"
+	}
+
+	return []attribute.KeyValue{
+		attribute.String(chainIDLabelKey, chainID),
+		attribute.String(chainFamilyLabelKey, chainFamily),
+		attribute.String(chainNameLabelKey, chainName),
+		attribute.String(chainSelectorLabelKey, strconv.FormatUint(uint64(chainSelector), 10)),
+	}
+}
 
 // ReaderMetrics instruments the CcipReader's concrete methods (per-chain reads).
 type ReaderMetrics interface {
 	// RecordChainGap records, per read (query), how many source chains ended up in
 	// each state once the requested set is reconciled against what was returned.
-	RecordChainGap(query, chain, state string)
+	RecordChainGap(query string, chainSelector ccipocr3.ChainSelector, state string)
 	// RecordReadEmpty records a query that returned nothing with no error.
-	RecordReadEmpty(query, chain string)
+	RecordReadEmpty(query string, chainSelector ccipocr3.ChainSelector)
 	// RecordMsgDropped records a read record dropped on validation/cast.
 	RecordMsgDropped(query, reason string)
 }
@@ -62,19 +100,17 @@ func NewReaderMetrics(m metric.Meter) (ReaderMetrics, error) {
 	return rm, nil
 }
 
-func (r *readerMetrics) RecordChainGap(query, chain, state string) {
-	r.chainGap.Add(context.Background(), 1, metric.WithAttributes(
+func (r *readerMetrics) RecordChainGap(query string, chainSelector ccipocr3.ChainSelector, state string) {
+	attrs := append(chainAttrs(chainSelector),
 		attribute.String("query", query),
-		attribute.String("chain", chain),
 		attribute.String("state", state),
-	))
+	)
+	r.chainGap.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
-func (r *readerMetrics) RecordReadEmpty(query, chain string) {
-	r.readEmpty.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("query", query),
-		attribute.String("chain", chain),
-	))
+func (r *readerMetrics) RecordReadEmpty(query string, chainSelector ccipocr3.ChainSelector) {
+	attrs := append(chainAttrs(chainSelector), attribute.String("query", query))
+	r.readEmpty.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (r *readerMetrics) RecordMsgDropped(query, reason string) {
@@ -87,9 +123,9 @@ func (r *readerMetrics) RecordMsgDropped(query, reason string) {
 // ObservedReaderMetrics instruments the observedCCIPReader (per-query outcomes).
 type ObservedReaderMetrics interface {
 	// RecordReadOutcome records a reader query classified as ok/empty/error.
-	RecordReadOutcome(chainID, query, outcome string)
+	RecordReadOutcome(chainSelector ccipocr3.ChainSelector, query, outcome string)
 	// RecordChainFee records an observed chain fee component (exec/da) value.
-	RecordChainFee(chainFamily, chainID, feeType string, value int64)
+	RecordChainFee(chainSelector ccipocr3.ChainSelector, feeType string, value int64)
 }
 
 // observedReaderMetrics implements ObservedReaderMetrics against a meter.
@@ -115,33 +151,30 @@ func NewObservedReaderMetrics(m metric.Meter) (ObservedReaderMetrics, error) {
 	return om, nil
 }
 
-func (o *observedReaderMetrics) RecordReadOutcome(chainID, query, outcome string) {
-	o.readOutcome.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("chainID", chainID),
+func (o *observedReaderMetrics) RecordReadOutcome(chainSelector ccipocr3.ChainSelector, query, outcome string) {
+	attrs := append(chainAttrs(chainSelector),
 		attribute.String("query", query),
 		attribute.String("outcome", outcome),
-	))
+	)
+	o.readOutcome.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
-func (o *observedReaderMetrics) RecordChainFee(chainFamily, chainID, feeType string, value int64) {
-	o.bhChainFee.Record(context.Background(), value, metric.WithAttributes(
-		attribute.String("chainFamily", chainFamily),
-		attribute.String("chainID", chainID),
-		attribute.String("feeType", feeType),
-	))
+func (o *observedReaderMetrics) RecordChainFee(chainSelector ccipocr3.ChainSelector, feeType string, value int64) {
+	attrs := append(chainAttrs(chainSelector), attribute.String("feeType", feeType))
+	o.bhChainFee.Record(context.Background(), value, metric.WithAttributes(attrs...))
 }
 
 // ConfigPollerMetrics instruments the config poller background cache.
 type ConfigPollerMetrics interface {
 	// RecordCacheAge gauges how stale the served cache is, per chain/kind.
-	RecordCacheAge(chain, kind string, ageSeconds int64)
+	RecordCacheAge(chainSelector ccipocr3.ChainSelector, kind string, ageSeconds int64)
 	// RecordPollSuccess / RecordPollFailure count background refresh outcomes per chain.
-	RecordPollSuccess(chain string)
-	RecordPollFailure(chain string)
-	// RecordOverwrittenEmpty counts refreshes that time-stamped empty data as fresh.
-	RecordOverwrittenEmpty(kind string)
+	RecordPollSuccess(chainSelector ccipocr3.ChainSelector)
+	RecordPollFailure(chainSelector ccipocr3.ChainSelector)
+	// RecordOverwrittenEmpty counts refreshes that time-stamped empty data as fresh, per chain/kind.
+	RecordOverwrittenEmpty(chainSelector ccipocr3.ChainSelector, kind string)
 	// RecordLastSuccess records the last successful refresh (epoch seconds) per chain.
-	RecordLastSuccess(chain string, epochSeconds int64)
+	RecordLastSuccess(chainSelector ccipocr3.ChainSelector, epochSeconds int64)
 }
 
 // configPollerMetrics implements ConfigPollerMetrics against a meter.
@@ -179,45 +212,37 @@ func NewConfigPollerMetrics(m metric.Meter) (ConfigPollerMetrics, error) {
 	return cm, nil
 }
 
-func (c *configPollerMetrics) RecordCacheAge(chain, kind string, ageSeconds int64) {
-	c.cacheAgeSeconds.Record(context.Background(), ageSeconds, metric.WithAttributes(
-		attribute.String("chain", chain),
-		attribute.String("kind", kind),
-	))
+func (c *configPollerMetrics) RecordCacheAge(chainSelector ccipocr3.ChainSelector, kind string, ageSeconds int64) {
+	attrs := append(chainAttrs(chainSelector), attribute.String("kind", kind))
+	c.cacheAgeSeconds.Record(context.Background(), ageSeconds, metric.WithAttributes(attrs...))
 }
 
-func (c *configPollerMetrics) RecordPollSuccess(chain string) {
-	c.pollSuccess.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("chain", chain),
-	))
+func (c *configPollerMetrics) RecordPollSuccess(chainSelector ccipocr3.ChainSelector) {
+	c.pollSuccess.Add(context.Background(), 1, metric.WithAttributes(chainAttrs(chainSelector)...))
 }
 
-func (c *configPollerMetrics) RecordPollFailure(chain string) {
-	c.pollFailure.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("chain", chain),
-	))
+func (c *configPollerMetrics) RecordPollFailure(chainSelector ccipocr3.ChainSelector) {
+	c.pollFailure.Add(context.Background(), 1, metric.WithAttributes(chainAttrs(chainSelector)...))
 }
 
-func (c *configPollerMetrics) RecordOverwrittenEmpty(kind string) {
-	c.overwrittenEmpty.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("kind", kind),
-	))
+func (c *configPollerMetrics) RecordOverwrittenEmpty(chainSelector ccipocr3.ChainSelector, kind string) {
+	attrs := append(chainAttrs(chainSelector), attribute.String("kind", kind))
+	c.overwrittenEmpty.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
-func (c *configPollerMetrics) RecordLastSuccess(chain string, epochSeconds int64) {
-	c.lastSuccessTimestamp.Record(context.Background(), epochSeconds, metric.WithAttributes(
-		attribute.String("chain", chain),
-	))
+func (c *configPollerMetrics) RecordLastSuccess(chainSelector ccipocr3.ChainSelector, epochSeconds int64) {
+	attrs := chainAttrs(chainSelector)
+	c.lastSuccessTimestamp.Record(context.Background(), epochSeconds, metric.WithAttributes(attrs...))
 }
 
 // AccessorMetrics instruments the chain accessor wrapper (per-operation reads).
 // Retained for the interface-based pattern even though the accessor wrapper is
 // not yet wired; the NoOp fallback keeps callers nil-free when it lands.
 type AccessorMetrics interface {
-	RecordBatchResult(operation, chain, outcome string)
-	RecordEmptyRead(operation, chain string)
-	RecordRowDrop(operation, chain, reason string)
-	RecordFinalityViolated(chain string)
+	RecordBatchResult(operation string, chainSelector ccipocr3.ChainSelector, outcome string)
+	RecordEmptyRead(operation string, chainSelector ccipocr3.ChainSelector)
+	RecordRowDrop(operation string, chainSelector ccipocr3.ChainSelector, reason string)
+	RecordFinalityViolated(chainSelector ccipocr3.ChainSelector)
 }
 
 // accessorMetrics implements AccessorMetrics against a meter.
@@ -251,37 +276,27 @@ func NewAccessorMetrics(m metric.Meter) (AccessorMetrics, error) {
 	return am, nil
 }
 
-func (a *accessorMetrics) RecordBatchResult(operation, chain, outcome string) {
-	a.batchResult.Add(context.Background(), 1, metric.WithAttributes(
+func (a *accessorMetrics) RecordBatchResult(operation string, chainSelector ccipocr3.ChainSelector, outcome string) {
+	attrs := append(chainAttrs(chainSelector),
 		attribute.String("operation", operation),
-		attribute.String("chain", chain),
 		attribute.String("outcome", outcome),
-	))
+	)
+	a.batchResult.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
-func (a *accessorMetrics) RecordEmptyRead(operation, chain string) {
-	a.emptyRead.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("operation", operation),
-		attribute.String("chain", chain),
-	))
+func (a *accessorMetrics) RecordEmptyRead(operation string, chainSelector ccipocr3.ChainSelector) {
+	attrs := append(chainAttrs(chainSelector), attribute.String("operation", operation))
+	a.emptyRead.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
-func (a *accessorMetrics) RecordRowDrop(operation, chain, reason string) {
-	a.rowDrops.Add(context.Background(), 1, metric.WithAttributes(
+func (a *accessorMetrics) RecordRowDrop(operation string, chainSelector ccipocr3.ChainSelector, reason string) {
+	attrs := append(chainAttrs(chainSelector),
 		attribute.String("operation", operation),
-		attribute.String("chain", chain),
 		attribute.String("reason", reason),
-	))
+	)
+	a.rowDrops.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
-func (a *accessorMetrics) RecordFinalityViolated(chain string) {
-	a.finalityViolated.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String("chain", chain),
-	))
-}
-
-// ChainLabel resolves a chain selector to a human-readable label for metric
-// cardinality, falling back to the numeric selector when unknown.
-func ChainLabel(sel ccipocr3.ChainSelector) string {
-	return strconv.FormatUint(uint64(sel), 10)
+func (a *accessorMetrics) RecordFinalityViolated(chainSelector ccipocr3.ChainSelector) {
+	a.finalityViolated.Add(context.Background(), 1, metric.WithAttributes(chainAttrs(chainSelector)...))
 }

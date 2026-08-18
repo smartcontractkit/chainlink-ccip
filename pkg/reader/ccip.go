@@ -302,7 +302,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	// event index returned nothing". Surface it so the data-source gate can tell the
 	// reader failing to deliver data apart from a genuinely quiet lane.
 	if len(messages) == 0 {
-		r.rcMetrc.RecordReadEmpty("MsgsBetweenSeqNums", rcmetrics.ChainLabel(sourceChainSelector))
+		r.rcMetrc.RecordReadEmpty("MsgsBetweenSeqNums", sourceChainSelector)
 	}
 
 	// A message read whose count doesn't match the requested range means the read
@@ -312,9 +312,9 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	// it reaches a consensus/root stage. Aligned to the same expression so the two
 	// never disagree.
 	if uint64(len(messages)) != uint64(seqNumRange.End()-seqNumRange.Start()+1) {
-		r.rcMetrc.RecordChainGap("MsgsBetweenSeqNums", rcmetrics.ChainLabel(sourceChainSelector), "count_mismatch")
+		r.rcMetrc.RecordChainGap("MsgsBetweenSeqNums", sourceChainSelector, "count_mismatch")
 	} else {
-		r.rcMetrc.RecordChainGap("MsgsBetweenSeqNums", rcmetrics.ChainLabel(sourceChainSelector), "returned")
+		r.rcMetrc.RecordChainGap("MsgsBetweenSeqNums", sourceChainSelector, "returned")
 	}
 
 	return messages, nil
@@ -342,7 +342,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 	// message to dest" -> indistinguishable from "no message ever sent" upstream.
 	// Surface it so the data-source gate can see a possibly-empty read.
 	if seqNum == 0 {
-		r.rcMetrc.RecordReadEmpty("LatestMsgSeqNum", rcmetrics.ChainLabel(chain))
+		r.rcMetrc.RecordReadEmpty("LatestMsgSeqNum", chain)
 	}
 
 	return seqNum, nil
@@ -407,41 +407,39 @@ func (r *ccipChainReader) NextSeqNum(
 		minSeqNrMissing []cciptypes.ChainSelector
 	)
 	for _, chain := range chains {
-		chainLabel := rcmetrics.ChainLabel(chain)
-
 		cfg, exists := cfgs[chain]
 		if !exists {
 			configNotFound = append(configNotFound, chain)
-			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "not_found")
+			r.rcMetrc.RecordChainGap("NextSeqNum", chain, "not_found")
 			continue
 		}
 
 		if !cfg.IsEnabled {
 			disabledChains = append(disabledChains, chain)
-			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "disabled")
+			r.rcMetrc.RecordChainGap("NextSeqNum", chain, "disabled")
 			continue
 		}
 
 		if len(cfg.OnRamp) == 0 {
 			onRampMissing = append(onRampMissing, chain)
-			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "misconfigured")
+			r.rcMetrc.RecordChainGap("NextSeqNum", chain, "misconfigured")
 			continue
 		}
 
 		if len(cfg.Router) == 0 {
 			routerMissing = append(routerMissing, chain)
-			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "misconfigured")
+			r.rcMetrc.RecordChainGap("NextSeqNum", chain, "misconfigured")
 			continue
 		}
 
 		if cfg.MinSeqNr == 0 {
 			minSeqNrMissing = append(minSeqNrMissing, chain)
-			r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "misconfigured")
+			r.rcMetrc.RecordChainGap("NextSeqNum", chain, "misconfigured")
 			continue
 		}
 
 		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
-		r.rcMetrc.RecordChainGap("NextSeqNum", chainLabel, "returned")
+		r.rcMetrc.RecordChainGap("NextSeqNum", chain, "returned")
 	}
 
 	logutil.LogWhenExceedFrequency(&nextSeqNumLastLog, readerLogFrequency, func() {
@@ -498,10 +496,9 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 
 	for _, chain := range chains {
 		func(chain cciptypes.ChainSelector) {
-			chainLabel := rcmetrics.ChainLabel(chain)
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
-				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "no_accessor")
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chain, "no_accessor")
 				logutil.LogWhenExceedFrequency(&getChainsFeeComponentsAccessorLastLog, readerLogFrequency, func() {
 					lggr.Debugw("failed to get chain accessor", logutil.FieldChain, chain, "err", err)
 				})
@@ -512,7 +509,7 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			defer chainCancel()
 			feeComponent, err := chainAccessor.GetChainFeeComponents(chainCtx)
 			if err != nil {
-				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "error")
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chain, "error")
 				if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting chain fee components", logutil.FieldChain, chain)
 				} else {
@@ -523,12 +520,12 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 
 			if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
 				lggr.Errorw("execution fee is nil or non positive", logutil.FieldChain, chain)
-				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "invalid")
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chain, "invalid")
 				return
 			}
 			if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
 				lggr.Errorw("data availability fee is nil or negative", logutil.FieldChain, chain)
-				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "invalid")
+				r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chain, "invalid")
 				return
 			}
 
@@ -536,7 +533,7 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 				ExecutionFee:        feeComponent.ExecutionFee,
 				DataAvailabilityFee: feeComponent.DataAvailabilityFee,
 			}
-			r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chainLabel, "returned")
+			r.rcMetrc.RecordChainGap("GetChainsFeeComponents", chain, "returned")
 		}(chain)
 	}
 	return feeComponents
@@ -574,7 +571,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			chainAccessor, err := getChainAccessor(r.accessors, chain)
 			if err != nil {
-				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "no_accessor")
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "no_accessor")
 				logutil.LogWhenExceedFrequency(&wrappedNativeTokenPriceAccessorLastLog, readerLogFrequency, func() {
 					lggr.Debugw("chain accessor not found, chain native price skipped", logutil.FieldChain, chain, "err", err)
 				})
@@ -583,7 +580,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			config, err := r.configPoller.GetChainConfig(chainCtx, chain)
 			if err != nil {
-				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "config_error")
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "config_error")
 				if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting chain config for native token address", logutil.FieldChain, chain)
 				} else {
@@ -596,7 +593,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			nativeTokenAddress := config.Router.WrappedNativeAddress
 
 			if cciptypes.UnknownAddress(nativeTokenAddress).IsZeroOrEmpty() {
-				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "no_native_token")
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "no_native_token")
 				lggr.Debug("Native token address is zero or empty. Ignore for disabled chains otherwise "+
 					"check for router misconfiguration", "chain", chain, "address", nativeTokenAddress.String())
 				return
@@ -604,7 +601,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			price, err := chainAccessor.GetTokenPriceUSD(chainCtx, cciptypes.UnknownAddress(nativeTokenAddress))
 			if err != nil {
-				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "error")
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "error")
 				if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw(MsgTimedOutGettingNativeTokenPrice, logutil.FieldChain, chain, "address", nativeTokenAddress.String())
 				} else {
@@ -615,12 +612,12 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			}
 
 			if price.Timestamp == 0 {
-				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "stale")
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "stale")
 				lggr.Warnw(MsgNoNativeTokenPriceAvailable, logutil.FieldChain, chain)
 				return
 			}
 			if price.Value == nil || price.Value.Cmp(big.NewInt(0)) <= 0 {
-				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "invalid")
+				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "invalid")
 				lggr.Errorw(MsgNativeTokenPriceNilOrNonPositive, logutil.FieldChain, chain)
 				return
 			}
@@ -628,7 +625,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			mu.Lock()
 			prices[chain] = cciptypes.NewBigInt(price.Value)
 			mu.Unlock()
-			r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", rcmetrics.ChainLabel(chain), "returned")
+			r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "returned")
 		})
 	}
 
@@ -668,15 +665,14 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	// Reconcile requested vs returned: a chain missing from the result is a silent
 	// gap (the accessor does not log which chains it failed to include).
 	for _, chain := range selectors {
-		chainLabel := rcmetrics.ChainLabel(chain)
 		if _, ok := result[chain]; ok {
-			r.rcMetrc.RecordChainGap("GetChainFeePriceUpdate", chainLabel, "returned")
+			r.rcMetrc.RecordChainGap("GetChainFeePriceUpdate", chain, "returned")
 		} else {
-			r.rcMetrc.RecordChainGap("GetChainFeePriceUpdate", chainLabel, "missing")
+			r.rcMetrc.RecordChainGap("GetChainFeePriceUpdate", chain, "missing")
 		}
 	}
 	if len(result) == 0 {
-		r.rcMetrc.RecordReadEmpty("GetChainFeePriceUpdate", rcmetrics.ChainLabel(r.destChain))
+		r.rcMetrc.RecordReadEmpty("GetChainFeePriceUpdate", r.destChain)
 	}
 
 	return result
