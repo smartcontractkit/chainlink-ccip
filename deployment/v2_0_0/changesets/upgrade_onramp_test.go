@@ -603,7 +603,7 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 
 		ownershipAdapter.EXPECT().
 			SequenceAcceptOwnership().
-			Return(noOpTransferSequence).
+			Return(noOpAcceptOwnershipSequence).
 			Once()
 
 		ownershipAdapter.EXPECT().
@@ -644,11 +644,10 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 			txCounts[op.ChainSelector] += len(op.Transactions)
 		}
 
-		assert.Greater(
+		assert.Equal(
 			t,
+			3,
 			txCounts[mcms_types.ChainSelector(chainA)],
-			0,
-			"source chain must contain the ownership accept operation",
 		)
 	})
 
