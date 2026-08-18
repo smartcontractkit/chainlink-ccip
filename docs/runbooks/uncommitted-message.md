@@ -531,6 +531,15 @@ independently before the overall check-attempt budget is exhausted (`pendingSour
 `merkleroot/outcome.go`) — `source_network_name` says *which lane* is still pending, `chainID`
 says *which destination chain's* report gave up on it. Neither label makes the other redundant.
 
+**Every metric in this table also carries `destChainID`** — an additive, non-breaking alias
+(same value as that metric's `chainID` or `chain_id`, whichever it uses) added specifically
+because `chainID` alone doesn't say which side of a source/dest pair it names, and the two
+existing spellings (`chainID`/`chainFamily` vs. `chain_id`/`chain_family`) are themselves
+inconsistent across this file. Queries throughout this doc still use each metric's historic
+label for continuity; `destChainID=~"$destChain"` is there for new queries that don't want to
+consult the casing table above. This does not change cardinality — it's the same value under a
+second key, not a new dimension.
+
 ### Reader / config-poller metrics (shared with execute)
 
 These are the data-source signals used by step2c/step4/scenario2 above, defined in the reader and

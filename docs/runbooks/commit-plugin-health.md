@@ -66,6 +66,14 @@ by `source_network_name` silently mixed lanes across every dest chain sharing th
 `chainID=~"$destChain"`** — the queries below already do; if you hand-write a variant, don't drop
 the second filter.
 
+**Every metric in this checklist now also carries `destChainID`, an unambiguous alias for
+whichever of `chainID`/`chain_id` that metric happens to use** (added alongside, not instead of
+-- non-breaking, same value, no cardinality cost). The queries below still use each metric's
+historic spelling per the table above, for continuity with existing dashboards/alerts, but if
+you're writing a *new* query and don't want to consult the cheat sheet for which casing a given
+metric uses, `destChainID=~"$destChain"` works uniformly on all of them. `chainFamily`/`chain_family`
+still has the same two-spelling split and no alias yet.
+
 `csa_public_key` is a different kind of label — it's not used to filter by chain, it's a
 per-node identity present on *every* commit metric series (confirmed against a live devenv, not
 just inferred). `live_oracle_count` is the only check that groups by it; nothing else in this
