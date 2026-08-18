@@ -647,6 +647,8 @@ contracts:
         access: owner
       - name: withdrawFeeTokens
         access: public
+      - name: getRemoteChainConfig
+        access: public
 
   - contract_name: RMN
     version: "2.1.0"
