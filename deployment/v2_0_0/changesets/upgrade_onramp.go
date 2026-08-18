@@ -39,7 +39,7 @@ func validateUpgradeOnrampConfig(cfg UpgradeOnrampConfig) error {
 	return nil
 }
 
-func initUpgradeOnrampChangesets(upgradeOnrampRegistry *adapters.OnRampUpgraderRegistry, cfg UpgradeOnrampConfig) (string, adapters.OnRampUpgrader, error) {
+func initUpgradeOnrampChangesets(upgradeOnrampRegistry *adapters.OnRampUpgraderRegistry, cfg *UpgradeOnrampConfig) (string, adapters.OnRampUpgrader, error) {
 	if err := cfg.MCMS.PopulateDefaults(); err != nil {
 		return "", nil, err
 	}
@@ -86,7 +86,7 @@ func UpgradeOnrampPhase1(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(upgradeOnrampRegistry, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(upgradeOnrampRegistry, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -269,7 +269,7 @@ func UpgradeOnrampPhase2(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -337,7 +337,7 @@ func UpgradeOnrampPhase3(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgrader, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgrader, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -464,7 +464,7 @@ func UpgradeOnrampPhase3Rollback(
 	) (cldf.ChangesetOutput, error) {
 		family, upgrader, err := initUpgradeOnrampChangesets(
 			onrampUpgraderRegistry,
-			cfg,
+			&cfg,
 		)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
@@ -595,7 +595,7 @@ func UpgradeOnrampCleanup(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
