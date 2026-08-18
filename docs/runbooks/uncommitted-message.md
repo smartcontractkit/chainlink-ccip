@@ -5,8 +5,8 @@ trigger: "message reported in-flight for > 15m: onramp seq num observed, no corr
 severity: page
 owner: ccip-commit-oncall
 inputs:
-  sourceChain: {type: string, description: "source_network_name label value, e.g. chain-a. May be handed to you as a chain ID, chain selector, or name -- see docs/runbooks/chain-identifiers.md to translate"}
-  destChain: {type: string, description: "chainID/chain_id label value of the destination chain, e.g. chain-b. Same translation note as sourceChain"}
+  sourceChain: {type: string, description: "sourceChainName label value, e.g. chain-a (sourceChainID/sourceChainSelector also work -- see the metric reference). May be handed to you as a chain ID, chain selector, or name -- see docs/runbooks/chain-identifiers.md to translate if you need a form other than what you were given"}
+  destChain: {type: string, description: "destChainID label value of the destination chain, e.g. chain-b (destChainName/destChainSelector also work). Same translation note as sourceChain"}
   seqNum: {type: integer, description: "onramp sequence number of the message under investigation (X)"}
   msgID: {type: string, description: "message ID, hex, for cross-referencing logs/explorers"}
   fRoleDON: {type: integer, required: false, description: "optional. If known, expected live oracle count for destChain's DON is 3*fRoleDON+1 and the consensus threshold is 2*fRoleDON+1. Omit if uncertain (e.g. local devenvs with a possible bootstrap-node offset) -- scenario3's H0 check reports the raw live oracle count either way, it just can't grade it against a threshold without this."}
@@ -104,16 +104,16 @@ against your actual datasource's metric browser before trusting the rest; don't 
 steps:
   - id: step0
     check: plugin_heartbeat
-    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain"}[1m]))'
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain"}[1m]))'
     condition: "result == 0"
-    if_true:  {action: "REPORT:ccip-commit-oncall", reason: "plugin process is not running rounds at all; every other metric below may simply be stale, not bad. Always run followup_query before reporting -- a bare 'not running' is a real but unsatisfyingly blunt finding on its own (confirmed by live testing: an agent that stopped here reported a correct but generic conclusion, then went and ran this exact followup_query anyway 'out of curiosity' because the plain heartbeat result didn't feel actionable)", followup_query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))', followup_meaning: "live oracle headcount -- this is a DON-level signal, same trust tier as heartbeat itself, safe to check here even though lane-specific metrics below are not (yet) trustworthy. A low count turns 'plugin not running' into 'N of the DON's oracles are actually alive', which is what an on-call needs next regardless of whether it's below consensus threshold -- grade it against $fRoleDON per scenario3b's rule if known, otherwise report the raw number"}
+    if_true:  {action: "REPORT:ccip-commit-oncall", reason: "plugin process is not running rounds at all; every other metric below may simply be stale, not bad. Always run followup_query before reporting -- a bare 'not running' is a real but unsatisfyingly blunt finding on its own (confirmed by live testing: an agent that stopped here reported a correct but generic conclusion, then went and ran this exact followup_query anyway 'out of curiosity' because the plain heartbeat result didn't feel actionable)", followup_query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain", phase="observation"}) > time() - 60))', followup_meaning: "live oracle headcount -- this is a DON-level signal, same trust tier as heartbeat itself, safe to check here even though lane-specific metrics below are not (yet) trustworthy. A low count turns 'plugin not running' into 'N of the DON's oracles are actually alive', which is what an on-call needs next regardless of whether it's below consensus threshold -- grade it against $fRoleDON per scenario3b's rule if known, otherwise report the raw number"}
     if_false: {action: "CONTINUE:step1"}
     automatable: true
     note: "window is deliberately 1m, not 5m -- confirmed by live testing (see scenario3b's note) that rate() extrapolates across its whole window, so a plugin that died N minutes ago still reads as alive for up to [window] more minutes. Don't widen this without re-testing against a forced failure."
 
   - id: step1
     check: offramp_next_seq_num
-    query: 'max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})'
+    query: 'max by (sourceChainName) (ccip_commit_offramp_next_seq_num{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})'
     condition: "result > $seqNum"
     if_true:  {action: "STOP", reason: "a root covering X already landed on the offramp; commit plugin's job is done, hand off to exec on-call for delivery status"}
     if_false: {action: "CONTINUE:step2"}
@@ -121,17 +121,17 @@ steps:
 
   - id: step2
     check: onramp_max_seq_num
-    query: 'max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})'
+    query: 'max by (sourceChainName) (ccip_commit_onramp_max_seq_num{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})'
     condition: "result < $seqNum"
-    if_true:  {action: "REPORT:chain-infra-oncall", reason: "onramp read is lagging; check ccip_commit_merkleroot_observation_errors_total by reason (no_bindings/timeout/rpc_error) for the source-chain read/infra issue", followup_query: 'sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m])) by (reason)'}
+    if_true:  {action: "REPORT:chain-infra-oncall", reason: "onramp read is lagging; check ccip_commit_merkleroot_observation_errors_total by reason (no_bindings/timeout/rpc_error) for the source-chain read/infra issue", followup_query: 'sum(rate(ccip_commit_merkleroot_observation_errors_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain"}[5m])) by (reason)'}
     if_false: {action: "CONTINUE:step2b"}
     automatable: true
 
   - id: step2b
     check: per_chain_consensus_dropped
     queries:
-      - 'sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", chainID=~"$destChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)'
-      - 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))'
+      - 'sum(rate(ccip_commit_consensus_dropped_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)'
+      - 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain"}[5m]))'
     condition: "any result > 0"
     if_true:  {action: "REPORT:ccip-commit-oncall", reason: "DON could not reach consensus on a per-chain value for this lane. For ccip_commit_consensus_dropped: reason='split' means disagreeing oracles, reason='insufficient_agreement' means too few oracles observed the key, reason='threshold_not_defined' is a config/data mismatch. ccip_commit_offramp_consensus_insufficient means the DON could not agree on OffRampNextSeqNums for this lane. The message cannot advance until the disagreement resolves."}
     if_false: {action: "CONTINUE:step2c"}
@@ -147,11 +147,11 @@ steps:
     if_true:  {action: "REPORT:chain-infra-oncall", reason: "the plugin DATA SOURCE is degrading, which is upstream of -- and distinct from -- onramp-lag/consensus/transmission. Reads are returning empty (nothing) or partial (chains not returned, or a message read whose count doesn't match its range) or the config-poller cache went stale. This is the root cause the onramp-gauge stall looks like, not a commit-plugin bug. For ccip_reader_chain_gap, the actionable state values per (query,chain) are not_found|disabled|misconfigured|error|invalid|missing|stale|count_mismatch. Split node-local (one csa_public_key) from DON-wide (all series) before escalating.", followup_query: 'count by (csa_public_key) (ccip_reader_chain_gap_total{query="NextSeqNum"})'}
     if_false: {action: "CONTINUE:step3"}
     automatable: true
-    note: "ccip_reader_* / config-poller metrics are shared with execute and keyed by `chain` = the NUMERIC chain selector (NOT source_network_name) and by `query`; correlate `chain` to the incident lane via its selector. Every series carries node_id + csa_public_key inherited from the beholder client, so group by them to distinguish a single bad node from a DON-wide data/index/RPC failure. See docs/metrics/reader-metrics.md."
+    note: "ccip_reader_* / config-poller metrics are shared with execute and keyed by `chain` = the NUMERIC chain selector (NOT sourceChainName) and by `query`; correlate `chain` to the incident lane via its selector. Every series carries node_id + csa_public_key inherited from the beholder client, so group by them to distinguish a single bad node from a DON-wide data/index/RPC failure. See docs/metrics/reader-metrics.md."
 
   - id: step3
     check: consensus_observation_failed
-    query: 'sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~"$destChain"}[5m]))'
+    query: 'sum(rate(ccip_commit_consensus_observation_failed_total{destChainID=~"$destChain"}[5m]))'
     condition: "result > 0"
     if_true:  {action: "CONTINUE:scenario3", reason: "destination-chain-wide consensus failure — see deep dive"}
     if_false: {action: "CONTINUE:step4"}
@@ -160,9 +160,9 @@ steps:
   - id: step4
     check: cursing
     queries:
-      - 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="global"})'
-      - 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="destination"})'
-      - 'max(ccip_commit_source_chain_cursed{source_network_name=~"$sourceChain", chainID=~"$destChain"})'
+      - 'max(ccip_commit_rmn_curse_active{destChainID=~"$destChain", curse_type="global"})'
+      - 'max(ccip_commit_rmn_curse_active{destChainID=~"$destChain", curse_type="destination"})'
+      - 'max(ccip_commit_source_chain_cursed{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})'
     condition: "any result == 1"
     if_true:  {action: "REPORT:curse-owner", reason: "chain A or B is cursed; likely intentional/incident-flagged, hand off to whoever owns the curse. NOTE: curse state is served from the config-poller cache (GetRmnCurseInfo) -- if ccip_reader_config_cache_age_seconds{chain=<destSelector>,kind=\"chain\"} is high, the curse reading itself may be stale (a lifted curse still reporting active, or a fresh one unobserved); say so when reporting", followup_query: 'ccip_reader_config_cache_age_seconds{kind="chain"}'}
     if_false: {action: "CONTINUE:step5"}
@@ -170,15 +170,15 @@ steps:
 
   - id: step5
     check: report_transmission
-    query: 'sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))'
+    query: 'sum(rate(ccip_commit_report_transmission_gave_up_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain"}[5m]))'
     condition: "result > 0"
     if_true:  {action: "CONTINUE:scenario2", reason: "report is being built but never landing — see deep dive"}
-    if_false: {action: "REPORT:ccip-commit-oncall", reason: "no failure signal found; likely just backlog size — report ccip_commit_pending_messages and an ETA estimate from round cadence", followup_query: 'max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChain", chainID=~"$destChain"})'}
+    if_false: {action: "REPORT:ccip-commit-oncall", reason: "no failure signal found; likely just backlog size — report ccip_commit_pending_messages and an ETA estimate from round cadence", followup_query: 'max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})'}
     automatable: true
 
   - id: scenario2
     check: report_validation_rejected
-    query: 'sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain", phase="should_transmit"}[15m])) by (reason)'
+    query: 'sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~"$destChain", phase="should_transmit"}[15m])) by (reason)'
     condition: "any reason count > 0"
     if_true:
       config_digest_mismatch:  {action: "REPORT:ccip-commit-oncall", reason: "config sync issue; cross-check ccip_commit_config_digest_mismatch. Before trusting this, verify the digest is not coming from a stale config-poller cache -- ccip_reader_config_cache_age_seconds{kind=\"chain\"} high or ccip_reader_config_poller_last_success_timestamp old would make a mismatch read manufactured by stale data, i.e. a chain-reader issue, not a config-sync one"}
@@ -211,7 +211,7 @@ steps:
 
   - id: scenario3
     check: destination_wide_vs_lane_specific
-    query: 'max by (source_network_name) (ccip_commit_pending_messages{chainID=~"$destChain"})'
+    query: 'max by (sourceChainName) (ccip_commit_pending_messages{destChainID=~"$destChain"})'
     condition: "only $sourceChain's series is climbing, others into the same destChain are flat"
     if_true:  {action: "CONTINUE:step4", reason: "this branch is wrong if only one lane is affected — back to step4/step5"}
     if_false: {action: "CONTINUE:scenario3b", reason: "confirmed destination-chain-wide"}
@@ -219,7 +219,7 @@ steps:
 
   - id: scenario3b
     check: h0_live_oracle_count
-    query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))'
+    query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain", phase="observation"}) > time() - 60))'
     condition: "compare result against 2*fRoleDON+1 (consensus threshold) and 3*fRoleDON+1 (full DON), if fRoleDON was supplied as an input"
     if_true:
       below_threshold:   {action: "REPORT:ccip-commit-oncall", reason: "H0 — result < 2*fRoleDON+1: too few oracles are even running to reach consensus, full stop. This is the answer; don't proceed to H1/H2, they're checks for a *different* failure mode (an oracle that's running but can't read its home chain, or oracles that disagree) and will likely read as flat/inconclusive here even though they're not the cause."}
@@ -232,14 +232,14 @@ steps:
   - id: scenario3c
     check: h1_vs_h2
     queries:
-      - 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
+      - 'sum(rate(ccip_commit_fchain_read_errors_total{destChainID=~"$destChain"}[5m]))'
       - 'sum by (query, chain, csa_public_key) (rate(ccip_reader_read_empty_total[5m]))'
       - 'sum by (query, chain, state, csa_public_key) (rate(ccip_reader_chain_gap_total{state!="returned"}[5m]))'
     condition: "fchain_read_errors spiking broadly across oracles, OR reader read_empty/non-returned chain_gap firing across most/all csa_public_key values for the same query"
     if_true:  {action: "REPORT:home-chain-infra-oncall", reason: "H1 — too few oracles could read FChain; home-chain RPC/read outage. The reader-layer series (grouped by csa_public_key) give the direct data-level observation behind this: if read_empty/chain_gap fire for the SAME query across (nearly) every csa_public_key, that's DON-wide data-source failure, not one node's RPC -- report it as such rather than as a bare fchain_read_errors count. If only one or two csa_public_key values show up, that's a single bad node, not a DON-wide outage; say so explicitly, it changes the remediation."}
-    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Confirm with ccip_commit_consensus_dropped{objectName=\"fChain\", reason=\"split\"} and corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If the reader-layer series above are flat (no read_empty/chain_gap), that corroborates H2 -- oracles are reading fine, they're just disagreeing on the value. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}'}
+    if_false: {action: "REPORT:ccip-commit-oncall", reason: "H2 — oracles likely disagree (split vote). Confirm with ccip_commit_consensus_dropped{objectName=\"fChain\", reason=\"split\"} and corroborate with ccip_commit_config_digest_mismatch flipping for a subset of oracles around the same time. If the reader-layer series above are flat (no read_empty/chain_gap), that corroborates H2 -- oracles are reading fine, they're just disagreeing on the value. If scenario3b (H0) wasn't able to rule out insufficient participation (fRoleDON unknown), treat this H2 conclusion as low-confidence, not a firm diagnosis.", followup_query: 'ccip_commit_config_digest_mismatch{destChainID=~\"$destChain\"}'}
     automatable: true
-    note: "the reader-layer queries are shared with execute and keyed by `chain` (numeric selector, not source_network_name/chainID) -- see docs/metrics/reader-metrics.md and the data-layer note on step2c. Grouping by csa_public_key here is what turns 'H1 or H2' from a guess into a query: a bad read on every node's series is DON-wide; a bad read on one node's series is that node's RPC, regardless of what fchain_read_errors alone says."
+    note: "the reader-layer queries are shared with execute and keyed by `chain` (numeric selector, not sourceChainName/destChainID) -- see docs/metrics/reader-metrics.md and the data-layer note on step2c. Grouping by csa_public_key here is what turns 'H1 or H2' from a guess into a query: a bad read on every node's series is DON-wide; a bad read on one node's series is that node's RPC, regardless of what fchain_read_errors alone says."
 ```
 
 ## Steps
@@ -251,12 +251,12 @@ reports "no signal" identically whether the plugin is healthy-and-idle or wedged
 that out before reading anything else as a bad value.
 
 ```promql
-sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain"}[1m]))
+sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain"}[1m]))
 ```
 `0` → before reporting, also run the oracle headcount (same query as scenario3b's H0 —
 it's a DON-level signal, safe to check even though lane-specific metrics aren't trustworthy yet):
 ```promql
-count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))
+count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain", phase="observation"}) > time() - 60))
 ```
 Report both numbers together. "Plugin not running rounds" on its own is a real but blunt
 finding — confirmed by live testing that it's unsatisfying enough that whoever's investigating
@@ -266,10 +266,10 @@ continue to step1.
 ### step1 — is this even a commit-plugin problem?
 
 ```promql
-max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})
+max by (sourceChainName) (ccip_commit_offramp_next_seq_num{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})
 ```
 `> $seqNum` → a root covering it already landed on the offramp. Commit plugin's job is done;
-hand off to exec on-call. `<= $seqNum` → continue. `chainID=~"$destChain"` is required, not
+hand off to exec on-call. `<= $seqNum` → continue. `destChainID=~"$destChain"` is required, not
 optional, here and on every per-lane query below it — without it you're reading this lane across
 *every* destination chain that reports into the same datasource, not just the one you're
 investigating (see the metric reference's note on `destChainAttrs`).
@@ -277,11 +277,11 @@ investigating (see the metric reference's note on `destChainAttrs`).
 ### step2 — has the plugin observed it on-chain yet?
 
 ```promql
-max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~"$sourceChain", chainID=~"$destChain"})
+max by (sourceChainName) (ccip_commit_onramp_max_seq_num{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})
 ```
 `< $seqNum` → onramp read is lagging. Check the reason breakdown:
 ```promql
-sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m])) by (reason)
+sum(rate(ccip_commit_merkleroot_observation_errors_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain"}[5m])) by (reason)
 ```
 (`no_bindings` / `timeout` / `rpc_error` / `msg_count_mismatch` / `hash_error` /
 `address_lookup_error`). This is a source-chain read/infra issue, not commit logic — report and
@@ -295,7 +295,7 @@ fails for this lane, the message will not advance even though the onramp read is
 
 Per-chain consensus failures:
 ```promql
-sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain", chainID=~"$destChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)
+sum(rate(ccip_commit_consensus_dropped_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain", objectName=~"MerkleRoot|OnRampMaxSeqNums"}[5m])) by (objectName, reason)
 ```
 
 `ccip_commit_consensus_dropped` `reason` values:
@@ -306,7 +306,7 @@ sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~"$sourceChain"
 OffRampNextSeqNums consensus failures use a dedicated counter (same path conceptually, but a
 custom consensus helper):
 ```promql
-sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))
+sum(rate(ccip_commit_offramp_consensus_insufficient_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain"}[5m]))
 ```
 
 Any of these `> 0` for the lane → the message cannot advance until the disagreement resolves.
@@ -327,7 +327,7 @@ Any `read_empty` or non-`returned` `chain_gap` `> 0` (or any `config_cache_age_s
 single intermittent empty snap isn't enough) → the **data layer** feeding the
 commit plugin is degrading, so this is a `chain-infra`/reader problem, not a commit-plugin defect. Still
 split single-node (group by `csa_public_key`) vs DON-wide before escalating. All flat → continue.
-The `chain` label here is the **numeric chain selector** (not `source_network_name`); `query` names the
+The `chain` label here is the **numeric chain selector** (not `sourceChainName`); `query` names the
 read. These `ccip_reader_*`/config-poller metrics are shared with execute — see
 `docs/metrics/reader-metrics.md`.
 
@@ -337,7 +337,7 @@ read. These `ccip_reader_*`/config-poller metrics are shared with execute — se
 ### step3 — is the round producing outcomes at all?
 
 ```promql
-sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~"$destChain"}[5m]))
+sum(rate(ccip_commit_consensus_observation_failed_total{destChainID=~"$destChain"}[5m]))
 ```
 Incrementing → destination-chain-wide consensus failure, jump to [Scenario 3](#scenario-3--consensus-never-completes-step3).
 Flat → continue.
@@ -345,9 +345,9 @@ Flat → continue.
 ### step4 — is chain A or B cursed?
 
 ```promql
-max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="global"})
-max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type="destination"})
-max(ccip_commit_source_chain_cursed{source_network_name=~"$sourceChain", chainID=~"$destChain"})
+max(ccip_commit_rmn_curse_active{destChainID=~"$destChain", curse_type="global"})
+max(ccip_commit_rmn_curse_active{destChainID=~"$destChain", curse_type="destination"})
+max(ccip_commit_source_chain_cursed{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})
 ```
 Any `== 1` → found it; likely intentional/incident-flagged, report to whoever owns the curse and
 stop. All `0` → continue.
@@ -359,12 +359,12 @@ stop. All `0` → continue.
 ### step5 — is a report being built but never landing?
 
 ```promql
-sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChain", chainID=~"$destChain"}[5m]))
+sum(rate(ccip_commit_report_transmission_gave_up_total{sourceChainName=~"$sourceChain", destChainID=~"$destChain"}[5m]))
 ```
 Incrementing/maxed → jump to [Scenario 2](#scenario-2--report-transmission-stuck-step5).
 Otherwise → likely just backlog size:
 ```promql
-max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChain", chainID=~"$destChain"})
+max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})
 ```
 Report the backlog size and an ETA estimate from round cadence, and stop.
 
@@ -376,7 +376,7 @@ Three hypotheses, cheapest first.
 
 **A — never transmitted (rejected pre-send).**
 ```promql
-sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain", phase="should_transmit"}[15m])) by (reason)
+sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~"$destChain", phase="should_transmit"}[15m])) by (reason)
 ```
 - `config_digest_mismatch` climbing → cross-check `ccip_commit_config_digest_mismatch`; config
   sync issue.
@@ -431,9 +431,9 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
 - **This is destination-chain-wide, not lane-specific.** Before going further, check whether
   *other* source chains reporting into this dest chain are also stalled:
   ```promql
-  max by (source_network_name) (ccip_commit_pending_messages{chainID=~"$destChain"})
+  max by (sourceChainName) (ccip_commit_pending_messages{destChainID=~"$destChain"})
   ```
-  (Deliberately no `source_network_name` filter here — the whole point is comparing *every* lane
+  (Deliberately no `sourceChainName` filter here — the whole point is comparing *every* lane
   into `$destChain` side by side, not just `$sourceChain`'s.) If only `$sourceChain` is affected,
   this branch is wrong — back to step4/step5.
 - **H0 — not enough oracles are even running.** *(Check this before H1/H2 — it's a distinct
@@ -446,7 +446,7 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   this genuinely produced a stale headcount at `[5m]` that only corrected itself once enough
   time had passed:
   ```promql
-  count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))
+  count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain", phase="observation"}) > time() - 60))
   ```
   If `$fRoleDON` is known: `< 2*$fRoleDON+1` → this **is** the answer, stop here — don't let a
   flat H1 push you toward H2 below, H1/H2 are checks for a different failure mode and will likely
@@ -456,7 +456,7 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   haven't ruled this out.
 - **H1 — too few oracles could read it.**
   ```promql
-  sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))
+  sum(rate(ccip_commit_fchain_read_errors_total{destChainID=~"$destChain"}[5m]))
   ```
   Spiking broadly across oracles → home-chain RPC/read outage. Corroborate with the reader layer,
   grouped by node so "DON-wide" vs "one bad RPC" is a query, not a guess:
@@ -470,11 +470,11 @@ fails is the DON not reaching 2·fRoleDON+1 agreement on a single FChain value f
   below (oracles are reading fine, they're just disagreeing).
 - **H2 — oracles disagree (split vote).** Check `ccip_commit_consensus_dropped{objectName="fChain", reason="split"}`:
   ```promql
-  sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain", objectName="fChain", reason="split"}[5m])) by (key)
+  sum(rate(ccip_commit_consensus_dropped_total{destChainID=~"$destChain", objectName="fChain", reason="split"}[5m])) by (key)
   ```
   This is genuine disagreement among oracles that DID submit a value — not the same as H0's "too few submitted at all." Corroborate with `ccip_commit_config_digest_mismatch` flipping for a subset of oracles around the same time:
   ```promql
-  ccip_commit_config_digest_mismatch{chain_id=~"$destChain"}
+  ccip_commit_config_digest_mismatch{destChainID=~"$destChain"}
   ```
 
 ## Metric reference
@@ -484,68 +484,77 @@ pipeline — see [the naming note above](#a-note-on-counter-naming). `dual` mean
 *also* directly `promauto`-registered (scrapeable without going through Beholder/OTel at all);
 everything else is Beholder-only.
 
-| metric | otel_type | key labels | registration |
-|---|---|---|---|
-| `ccip_commit_plugin_heartbeat` | Counter | `chainFamily,chainID,phase` | beholder-only |
-| `ccip_commit_report_validation_rejected` | Counter | `chainFamily,chainID,phase,reason` | beholder-only |
-| `ccip_commit_onramp_max_seq_num` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
-| `ccip_commit_offramp_next_seq_num` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
-| `ccip_commit_pending_messages` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
-| `ccip_commit_rmn_curse_active` | Gauge | `chain_family,chain_id,curse_type` | beholder-only |
-| `ccip_commit_source_chain_cursed` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
-| `ccip_commit_merkleroot_observation_errors` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID,reason` | beholder-only |
-| `ccip_commit_fchain_read_errors` | Counter | `chainFamily,chainID` | beholder-only |
-| `ccip_commit_consensus_observation_failed` | Counter | `chain_family,chain_id` | beholder-only |
-| `ccip_commit_report_transmission_gave_up` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
-| `ccip_commit_report_transmission_attempts` | Histogram | `chainFamily,chainID,success` | beholder-only |
-| `ccip_commit_range_truncated` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
-| `ccip_commit_offramp_lane_status` | Gauge | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID,status` | beholder-only |
-| `ccip_commit_seqnum_invariant_violation` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID,type` | beholder-only |
-| `ccip_commit_offramp_consensus_insufficient` | Counter | `sourceChainFamily,sourceChainID,source_network_name,chainFamily,chainID` | beholder-only |
-| `ccip_commit_config_digest_mismatch` | Gauge | `chain_family,chain_id` | dual |
-| `ccip_commit_max_sequence_number` | Gauge | `chainFamily,chainID,sourceChainFamily,sourceChain,method,source_network_name,dest_network_name` | dual |
-| `ccip_commit_latest_round_id` | Gauge | `source_network_name,dest_network_name,contract_address,plugin` | dual |
-| `ccip_commit_processor_errors` | Counter | `chainFamily,chainID,processor,method` | dual |
-| `ccip_commit_processor_latency` | Histogram | `chainFamily,chainID,processor,method` | dual |
-| `ccip_commit_loopp_ccip_provider_supported` | Gauge | `chain_family` | dual |
-| `ccip_commit_consensus_dropped` | Counter | `chainFamily,chainID,objectName,key,reason,source_network_name` | beholder-only |
+Dest labels = `destChainID,destChainFamily,destChainName,destChainSelector` (from `destChainAttrs()`).
+Source labels = `sourceChainID,sourceChainFamily,sourceChainName,sourceChainSelector` (from
+`sourceChainAttrs()`). Every Beholder-emitted commit metric below is built purely from these two
+helpers plus its own extra dimensions (`phase`, `reason`, `status`, `type`, `success`, ...) — there
+are no bare/ad-hoc chain labels left anywhere on the Beholder side.
 
-Note the label-casing inconsistency in the source (`chainFamily`/`chainID` vs.
-`chain_family`/`chain_id`) — copy the exact casing from this table per metric, it's not
-uniform across the file.
+| metric | otel_type | key labels (Beholder) | key labels (promauto, where `dual`) | registration |
+|---|---|---|---|---|
+| `ccip_commit_plugin_heartbeat` | Counter | dest + `phase` | — | beholder-only |
+| `ccip_commit_report_validation_rejected` | Counter | dest + `phase,reason` | — | beholder-only |
+| `ccip_commit_onramp_max_seq_num` | Gauge | source + dest | — | beholder-only |
+| `ccip_commit_offramp_next_seq_num` | Gauge | source + dest | — | beholder-only |
+| `ccip_commit_pending_messages` | Gauge | source + dest | — | beholder-only |
+| `ccip_commit_rmn_curse_active` | Gauge | dest + `curse_type` (no source labels — global/destination curse, not lane-specific) | — | beholder-only |
+| `ccip_commit_source_chain_cursed` | Gauge | source + dest | — | beholder-only |
+| `ccip_commit_merkleroot_observation_errors` | Counter | source + dest + `reason` | — | beholder-only |
+| `ccip_commit_fchain_read_errors` | Counter | dest only (FChain is a destination-chain-wide value, no source lane) | — | beholder-only |
+| `ccip_commit_consensus_observation_failed` | Counter | dest only | — | beholder-only |
+| `ccip_commit_report_transmission_gave_up` | Counter | source + dest (see note below) | — | beholder-only |
+| `ccip_commit_report_transmission_attempts` | Histogram | dest + `success` (no source — one report, not one lane) | — | beholder-only |
+| `ccip_commit_range_truncated` | Counter | source + dest | — | beholder-only |
+| `ccip_commit_offramp_lane_status` | Gauge | source + dest + `status` | — | beholder-only |
+| `ccip_commit_seqnum_invariant_violation` | Counter | source + dest + `type` | — | beholder-only |
+| `ccip_commit_offramp_consensus_insufficient` | Counter | source + dest | — | beholder-only |
+| `ccip_commit_config_digest_mismatch` | Gauge | dest only | `chain_family,chain_id` (old scheme, unchanged) | dual |
+| `ccip_commit_max_sequence_number` | Gauge | source + dest + `method` | `chainFamily,chainID,sourceChainFamily,sourceChain,method,source_network_name,dest_network_name` (old scheme, unchanged) | dual |
+| `ccip_commit_latest_round_id` | Gauge | source + dest + `onrampAddress,method` | `source_network_name,dest_network_name,contract_address,plugin` (old scheme, unchanged — and note the promauto side's 4th value is actually `method`, not a real plugin name; pre-existing, not part of this rename) | dual |
+| `ccip_commit_processor_errors` | Counter | **none — see caveat below** | `chainFamily,chainID,processor,method` (old scheme, unchanged) | labeled `dual`, **behaves promauto-only** |
+| `ccip_commit_processor_latency` | Histogram | dest + `processor,method` | `chainFamily,chainID,processor,method` (old scheme, unchanged) | dual |
+| `ccip_commit_loopp_ccip_provider_supported` | Gauge | dest + `loopChainFamily` (the LOOPP provider's own family, distinct from `destChainFamily`) | `chain_family` (old scheme, unchanged — this is the LOOPP provider family too, not `p.chainFamily`) | dual |
+| `ccip_commit_consensus_dropped` | Counter | dest + `objectName,key,reason`, **plus source labels only when the drop is lane-scoped** (`objectName` ∈ `MerkleRoot`/`OnRampMaxSeqNums`); `objectName="fChain"` drops are dest-only, no source labels at all | — | beholder-only |
 
-**`chainFamily`/`chainID` on the per-lane metrics above (`onramp_max_seq_num` through
-`offramp_consensus_insufficient`) were added after staging testing surfaced that they were
-missing** (`commit/metrics/prom.go`'s `destChainAttrs()`, added to every `sourceChainAttrs()`
-call site except `consensus_dropped`, which already carried them). Before this fix, two plugin
-instances for different destination chains reading the *same* source chain emitted identical
-label sets and collided into one series — there was no way to tell which dest-chain plugin
-instance a given data point came from. Every query below that filters one of these metrics by
-`source_network_name` alone should also filter `chainID=~"$destChain"` now; a query missing that
-filter will silently mix lanes from every destination chain sharing this datasource, not just
-the one you're investigating.
+**Caveat — `ccip_commit_processor_errors` is effectively promauto-only in practice.** It's
+registered as a Beholder `Int64Counter` (`bhProcessorErrors`) in `NewPromReporter`, but
+`TrackProcessorLatency`'s error branch (`commit/metrics/prom.go`) only ever calls
+`p.processorErrors.WithLabelValues(...).Inc()` (the promauto counter) — `p.bhProcessorErrors` is
+never invoked anywhere in the file. Don't rely on this metric being visible via Beholder/OTel
+(e.g. for a mainnet NOP node that isn't Prometheus-scraped); it's only reliably available on the
+`promauto`/scrape path, with the old `chainFamily,chainID` labels, despite being marked `dual`
+here for consistency with the table's own registration column. This should probably either get a
+real `bhProcessorErrors.Add(...)` call or be re-labeled `promauto-only` in a follow-up.
 
-`ccip_commit_report_transmission_gave_up` carries *both* `source_network_name` and `chainID`
-because a single report can cover multiple source chains, and each one's lane can resolve
-independently before the overall check-attempt budget is exhausted (`pendingSources` in
-`merkleroot/outcome.go`) — `source_network_name` says *which lane* is still pending, `chainID`
-says *which destination chain's* report gave up on it. Neither label makes the other redundant.
+**Per-lane metrics carry both source and dest labels; destination-scoped metrics carry only
+dest.** A metric is per-lane (needs `sourceChainAttrs()` too) exactly when the plugin can observe
+it separately per source chain; it's destination-scoped (dest labels only) when the value is a
+single fact about the destination-chain round as a whole (heartbeat, FChain reads, consensus
+round outcome, report-transmission attempts/latency, the digest/processor/LOOPP-provider health
+gauges). Filtering a per-lane metric by `sourceChainName` alone without also filtering
+`destChainID=~"$destChain"` will silently mix every destination chain sharing this datasource
+that reads the same source chain — always filter both.
 
-**Every metric in this table also carries `destChainID`** — an additive, non-breaking alias
-(same value as that metric's `chainID` or `chain_id`, whichever it uses) added specifically
-because `chainID` alone doesn't say which side of a source/dest pair it names, and the two
-existing spellings (`chainID`/`chainFamily` vs. `chain_id`/`chain_family`) are themselves
-inconsistent across this file. Queries throughout this doc still use each metric's historic
-label for continuity; `destChainID=~"$destChain"` is there for new queries that don't want to
-consult the casing table above. This does not change cardinality — it's the same value under a
-second key, not a new dimension.
+`ccip_commit_report_transmission_gave_up` carries *both* full source and dest label sets because
+a single report can cover multiple source chains, and each one's lane can resolve independently
+before the overall check-attempt budget is exhausted (`pendingSources` in
+`merkleroot/outcome.go`) — the source labels say *which lane* is still pending, the dest labels
+say *which destination chain's* report gave up on it. Neither set makes the other redundant.
+
+The old bare labels this scheme replaced (`chainID`, `chain_id`, `chainFamily`, `chain_family`,
+`source_network_name`, `dest_network_name` on the Beholder side) are **gone, not aliased** — this
+was a full rename, not an additive alias. A saved query against any of those old names on a
+Beholder-emitted commit metric will now silently return empty, not error; the `promauto`/legacy
+path in `commit/metrics/legacy_prom.go` is the one place those old names are still genuinely live
+(see its `// TODO: consider removing these metrics entirely in a follow-up` — it's slated for
+removal, so don't build new tooling against it).
 
 ### Reader / config-poller metrics (shared with execute)
 
 These are the data-source signals used by step2c/step4/scenario2 above, defined in the reader and
 config-poller layers rather than the commit plugin. Every series is **beholder-only** and carries
 `node_id` + `csa_public_key` **inherited** from the beholder client. Two label conventions differ
-from the commit metrics above: `chain` is the **numeric chain selector** (not `source_network_name`),
+from the commit metrics above: `chain` is the **numeric chain selector** (not `sourceChainName`),
 and `query` names the specific read. Design + gap rationale: `docs/metrics/reader-metrics.md`.
 
 | metric | otel_type | key labels | registration |
@@ -564,7 +573,7 @@ and `query` names the specific read. Design + gap rationale: `docs/metrics/reade
 ¹ `ccip_reader_read_outcome` is the one exception to the "`chain` = numeric selector" convention
 above: it's recorded at the `observedCCIPReader` wrapper level for every reader call, so `chainID`
 is the **destination** chain, matching the commit-metric convention, not the numeric-selector one.
-Filter it with `chainID=~"$destChain"`.
+Filter it with `destChainID=~"$destChain"`.
 
 ## Known gaps
 

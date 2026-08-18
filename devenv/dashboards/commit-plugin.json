@@ -134,7 +134,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\", phase=\"observation\"}[1m]))",
+     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}[1m]))",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
@@ -201,7 +201,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\", phase=\"outcome\"}[1m]))",
+     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"outcome\"}[1m]))",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
@@ -215,7 +215,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. crit_if result==1, ok_if result==0. Home-chain config digest differs from the offramp's; root cause for a wide range of downstream rejections. Filtered to == 1 so only mismatched chain_id(s) appear as rows -- if $destChain matches more than one chain (multi-select/All), a bare max() collapses which chain mismatched; this table doesn't. No rows (including when nothing at all is selected) renders 'NO MISMATCH', which is the OK state here, not UNKNOWN.",
+   "description": "always_emitted: true. crit_if result==1, ok_if result==0. Home-chain config digest differs from the offramp's; root cause for a wide range of downstream rejections. Filtered to == 1 so only mismatched destChainID(s) appear as rows -- if $destChain matches more than one chain (multi-select/All), a bare max() collapses which chain mismatched; this table doesn't. No rows (including when nothing at all is selected) renders 'NO MISMATCH', which is the OK state here, not UNKNOWN.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -282,7 +282,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (chain_id) (ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}) == 1",
+     "expr": "max by (destChainID) (ccip_commit_config_digest_mismatch{destChainID=~\"$destChain\"}) == 1",
      "format": "table",
      "instant": true,
      "legendFormat": "__auto",
@@ -310,7 +310,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty result). Generic TrackedProcessor error counter; does not include swallowed per-goroutine failures (see merkleroot_observation_errors).",
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty result). Generic TrackedProcessor error counter; does not include swallowed per-goroutine failures (see merkleroot_observation_errors). STRAGGLER BUG (confirmed in commit/metrics/prom.go): this metric's Beholder counter (bhProcessorErrors) is registered but never actually incremented -- TrackProcessorLatency's error branch only calls the promauto counter, which still uses the OLD label scheme (chainFamily,chainID, not destChainID). This query intentionally keeps the old `chainID` label since `destChainID` would never match any series -- but on a datasource fed purely from Beholder/OTel (no promauto scrape), this panel will ALWAYS read empty/OK regardless of real errors. Treat as unreliable until bhProcessorErrors is actually called in code.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -494,7 +494,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_processor_latency_bucket{chainID=~\"$destChain\"}[15m])) by (le, processor, method))",
+     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_processor_latency_bucket{destChainID=~\"$destChain\"}[15m])) by (le, processor, method))",
      "legendFormat": "{{processor}}/{{method}} p95",
      "range": true,
      "refId": "A"
@@ -518,7 +518,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "Per source chain (`$sourceChain` regex) **and** destination chain (`$destChain`) \u2014 every query below filters both `source_network_name` and `chainID` now. This second filter was added after staging testing found these metrics carried no destination-chain label at all: two plugin instances for different dest chains reading the same source chain used to emit identical label sets and collide into one series (`commit/metrics/prom.go`'s `destChainAttrs()` fix). `seqnum_invariant_violation` and `offramp_lane_status=\"rmn_misconfigured\"` are the only CRITs here \u2014 both explicitly documented in-code as stall/config-drift signals, not routine noise. `pending_messages` and `offramp_lane_status` are `always_emitted: true`; don't read an empty result for either as \"no lanes, nothing to worry about.\""
+    "content": "Per source chain (`$sourceChain` regex) **and** destination chain (`$destChain`) \u2014 every query below filters both `sourceChainName` and `destChainID`, from `sourceChainAttrs()`/`destChainAttrs()` in `commit/metrics/prom.go`. The dest-chain filter was added after staging testing found these metrics carried no destination-chain label at all: two plugin instances for different dest chains reading the same source chain used to emit identical label sets and collide into one series. `seqnum_invariant_violation` and `offramp_lane_status=\"rmn_misconfigured\"` are the only CRITs here \u2014 both explicitly documented in-code as stall/config-drift signals, not routine noise. `pending_messages` and `offramp_lane_status` are `always_emitted: true`; don't read an empty result for either as \"no lanes, nothing to worry about.\""
    },
    "title": "Lane Throughput & Backlog",
    "type": "text",
@@ -614,8 +614,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"})",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -713,8 +713,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_range_truncated_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"}[15m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "sum(rate(ccip_commit_range_truncated_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -812,8 +812,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_seqnum_invariant_violation_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"}[15m])) by (source_network_name, type)",
-     "legendFormat": "{{source_network_name}}/{{type}}",
+     "expr": "sum(rate(ccip_commit_seqnum_invariant_violation_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName, type)",
+     "legendFormat": "{{sourceChainName}}/{{type}}",
      "range": true,
      "refId": "A"
     }
@@ -911,8 +911,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"}[15m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "sum(rate(ccip_commit_offramp_consensus_insufficient_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -1010,8 +1010,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name, status) (ccip_commit_offramp_lane_status{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"})",
-     "legendFormat": "{{source_network_name}}/{{status}}",
+     "expr": "max by (sourceChainName, status) (ccip_commit_offramp_lane_status{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}/{{status}}",
      "range": true,
      "refId": "A"
     }
@@ -1130,7 +1130,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max(ccip_commit_rmn_curse_active{chain_id=~\"$destChain\", curse_type=~\"global|destination\"}) by (curse_type)",
+     "expr": "max(ccip_commit_rmn_curse_active{destChainID=~\"$destChain\", curse_type=~\"global|destination\"}) by (curse_type)",
      "legendFormat": "{{curse_type}}",
      "range": true,
      "refId": "A"
@@ -1144,7 +1144,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active. chainID filter added by the same destChainAttrs fix as the lane_throughput group.",
+   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active. destChainID filter added by the same destChainAttrs fix as the lane_throughput group.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -1229,8 +1229,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_source_chain_cursed{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"})",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "max by (sourceChainName) (ccip_commit_source_chain_cursed{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -1328,7 +1328,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~\"$destChain\"}[5m]))",
+     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{destChainID=~\"$destChain\"}[5m]))",
      "legendFormat": "consensus_observation_failed",
      "range": true,
      "refId": "A"
@@ -1339,7 +1339,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{chainID=~\"$destChain\"}[5m]))",
+     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{destChainID=~\"$destChain\"}[5m]))",
      "legendFormat": "fchain_read_errors",
      "range": true,
      "refId": "B"
@@ -1438,7 +1438,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_consensus_dropped_total{chainID=~\"$destChain\", objectName!=\"RMNRemoteConfig\"}[5m])) by (objectName, reason)",
+     "expr": "sum(rate(ccip_commit_consensus_dropped_total{destChainID=~\"$destChain\", objectName!=\"RMNRemoteConfig\"}[5m])) by (objectName, reason)",
      "legendFormat": "{{objectName}}/{{reason}}",
      "range": true,
      "refId": "A"
@@ -1501,7 +1501,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
+     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
@@ -1621,7 +1621,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{chainID=~\"$destChain\"}[15m])) by (phase, reason)",
+     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~\"$destChain\"}[15m])) by (phase, reason)",
      "legendFormat": "{{phase}}/{{reason}}",
      "range": true,
      "refId": "A"
@@ -1635,7 +1635,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: false. crit_if any series>0, ok_if all series==0 (including empty). Previously a Warnw with no counter at all. Carries BOTH source_network_name and chainID: a single report can cover multiple source chains that resolve independently (pendingSources in merkleroot/outcome.go), so source_network_name says which lane gave up and chainID says which destination chain's report it was -- neither is redundant.",
+   "description": "always_emitted: false. crit_if any series>0, ok_if all series==0 (including empty). Previously a Warnw with no counter at all. Carries BOTH sourceChainName and destChainID: a single report can cover multiple source chains that resolve independently (pendingSources in merkleroot/outcome.go), so sourceChainName says which lane gave up and destChainID says which destination chain's report it was -- neither is redundant.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -1720,8 +1720,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"}[15m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -1819,7 +1819,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_report_transmission_attempts_bucket{chainID=~\"$destChain\"}[15m])) by (le, success))",
+     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_report_transmission_attempts_bucket{destChainID=~\"$destChain\"}[15m])) by (le, success))",
      "legendFormat": "{{success}}",
      "range": true,
      "refId": "A"
@@ -1843,7 +1843,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "Upstream of the whole checklist above: tests whether the plugin is healthy *but being fed empty/partial/stale data*. Shared with execute \u2014 `chain` below is the **numeric chain selector**, not `source_network_name`/`chainID` \u2014 see `docs/metrics/reader-metrics.md`. The CRIT here is `config_cache_stale` (sustained: age > 90s means the poller genuinely can't refresh); `config_cache_overwritten_empty` alone is only WARN since a single empty snapshot is benign on its own guard. A finding here firing alongside an outcome check above (`pending_messages` climbing, `consensus_dropped`, a curse/digest-mismatch reading) is the SAME incident with the data-source check as the root cause, not two separate problems."
+    "content": "Upstream of the whole checklist above: tests whether the plugin is healthy *but being fed empty/partial/stale data*. Shared with execute \u2014 `chain` below is the **numeric chain selector**, not `sourceChainName`/`destChainID` \u2014 see `docs/metrics/reader-metrics.md`. The CRIT here is `config_cache_stale` (sustained: age > 90s means the poller genuinely can't refresh); `config_cache_overwritten_empty` alone is only WARN since a single empty snapshot is benign on its own guard. A finding here firing alongside an outcome check above (`pending_messages` climbing, `consensus_dropped`, a curse/digest-mismatch reading) is the SAME incident with the data-source check as the root cause, not two separate problems."
    },
    "title": "Data Source (reader + config poller)",
    "type": "text",
@@ -2687,7 +2687,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\"}[1m]))",
+     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\"}[1m]))",
      "legendFormat": "plugin_heartbeat",
      "range": true,
      "refId": "A"
@@ -2698,7 +2698,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
+     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
      "legendFormat": "live_oracle_count",
      "range": true,
      "refId": "B"
@@ -2722,7 +2722,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "`result > $SeqNum` \u2192 **STOP** \u2014 a root covering it already landed on the offramp; commit plugin's job is done, hand off to exec on-call for delivery status. `result <= $SeqNum` \u2192 **CONTINUE:step2**. `chainID=~\"$destChain\"` is required on this and every per-lane query below \u2014 without it you're reading this lane across every destination chain sharing this datasource, not just the one under investigation."
+    "content": "`result > $SeqNum` \u2192 **STOP** \u2014 a root covering it already landed on the offramp; commit plugin's job is done, hand off to exec on-call for delivery status. `result <= $SeqNum` \u2192 **CONTINUE:step2**. `destChainID=~\"$destChain\"` is required on this and every per-lane query below \u2014 without it you're reading this lane across every destination chain sharing this datasource, not just the one under investigation."
    },
    "title": "step1 \u2014 is this even a commit-plugin problem?",
    "type": "text",
@@ -2818,8 +2818,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"})",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "max by (sourceChainName) (ccip_commit_offramp_next_seq_num{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -2938,8 +2938,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"})",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "max by (sourceChainName) (ccip_commit_onramp_max_seq_num{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -3037,7 +3037,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"}[5m])) by (reason)",
+     "expr": "sum(rate(ccip_commit_merkleroot_observation_errors_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[5m])) by (reason)",
      "legendFormat": "{{reason}}",
      "range": true,
      "refId": "A"
@@ -3157,7 +3157,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_consensus_dropped_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\", objectName=~\"MerkleRoot|OnRampMaxSeqNums\"}[5m])) by (objectName, reason)",
+     "expr": "sum(rate(ccip_commit_consensus_dropped_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\", objectName=~\"MerkleRoot|OnRampMaxSeqNums\"}[5m])) by (objectName, reason)",
      "legendFormat": "{{objectName}}/{{reason}}",
      "range": true,
      "refId": "A"
@@ -3168,7 +3168,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"}[5m]))",
+     "expr": "sum(rate(ccip_commit_offramp_consensus_insufficient_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[5m]))",
      "legendFormat": "offramp_consensus_insufficient",
      "range": true,
      "refId": "B"
@@ -3606,8 +3606,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~\"$destChain\"}[5m])) by (chain_id)",
-     "legendFormat": "{{chain_id}}",
+     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{destChainID=~\"$destChain\"}[5m])) by (destChainID)",
+     "legendFormat": "{{destChainID}}",
      "range": true,
      "refId": "A"
     }
@@ -3694,7 +3694,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max(ccip_commit_rmn_curse_active{chain_id=~\"$destChain\", curse_type=\"global\"})",
+     "expr": "max(ccip_commit_rmn_curse_active{destChainID=~\"$destChain\", curse_type=\"global\"})",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
@@ -3761,7 +3761,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max(ccip_commit_rmn_curse_active{chain_id=~\"$destChain\", curse_type=\"destination\"})",
+     "expr": "max(ccip_commit_rmn_curse_active{destChainID=~\"$destChain\", curse_type=\"destination\"})",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
@@ -3828,7 +3828,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max(ccip_commit_source_chain_cursed{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"})",
+     "expr": "max(ccip_commit_source_chain_cursed{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
@@ -3948,8 +3948,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"}[5m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}} gave_up",
+     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[5m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}} gave_up",
      "range": true,
      "refId": "A"
     },
@@ -3959,8 +3959,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~\"$sourceChain\", chainID=~\"$destChain\"})",
-     "legendFormat": "{{source_network_name}} pending",
+     "expr": "max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}} pending",
      "range": true,
      "refId": "B"
     }
@@ -4079,7 +4079,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{chainID=~\"$destChain\", phase=\"should_transmit\"}[15m])) by (reason)",
+     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~\"$destChain\", phase=\"should_transmit\"}[15m])) by (reason)",
      "legendFormat": "{{reason}}",
      "range": true,
      "refId": "A"
@@ -4224,7 +4224,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "condition: only $sourceChain's series is climbing, others flat \u2192 branch is wrong, back to step4/step5. Deliberately no source_network_name filter -- comparing every lane into $destChain is the point.",
+   "description": "condition: only $sourceChain's series is climbing, others flat \u2192 branch is wrong, back to step4/step5. Deliberately no sourceChainName filter -- comparing every lane into $destChain is the point.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -4309,8 +4309,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_pending_messages{chainID=~\"$destChain\"})",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "max by (sourceChainName) (ccip_commit_pending_messages{destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
     }
@@ -4372,7 +4372,7 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
+     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
@@ -4471,8 +4471,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{chainID=~\"$destChain\"}[5m])) by (chainID)",
-     "legendFormat": "{{chainID}}",
+     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{destChainID=~\"$destChain\"}[5m])) by (destChainID)",
+     "legendFormat": "{{destChainID}}",
      "range": true,
      "refId": "A"
     }
@@ -4680,8 +4680,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}",
-     "legendFormat": "{{chain_id}}",
+     "expr": "ccip_commit_config_digest_mismatch{destChainID=~\"$destChain\"}",
+     "legendFormat": "{{destChainID}}",
      "range": true,
      "refId": "A"
     }
@@ -4727,15 +4727,15 @@
      "type": "prometheus",
      "uid": "${DS_PROMETHEUS}"
     },
-    "definition": "label_values(ccip_commit_plugin_heartbeat_total, chainID)",
+    "definition": "label_values(ccip_commit_plugin_heartbeat_total, destChainID)",
     "hide": 0,
     "includeAll": true,
-    "label": "Dest chain (chainID)",
+    "label": "Dest chain (destChainID)",
     "multi": true,
     "name": "destChain",
     "options": [],
     "query": {
-     "query": "label_values(ccip_commit_plugin_heartbeat_total, chainID)",
+     "query": "label_values(ccip_commit_plugin_heartbeat_total, destChainID)",
      "refId": "StandardVariableQuery"
     },
     "refresh": 2,
@@ -4754,15 +4754,15 @@
      "type": "prometheus",
      "uid": "${DS_PROMETHEUS}"
     },
-    "definition": "label_values(ccip_commit_pending_messages, source_network_name)",
+    "definition": "label_values(ccip_commit_pending_messages, sourceChainName)",
     "hide": 0,
     "includeAll": true,
-    "label": "Source chain (network name)",
+    "label": "Source chain (sourceChainName)",
     "multi": true,
     "name": "sourceChain",
     "options": [],
     "query": {
-     "query": "label_values(ccip_commit_pending_messages, source_network_name)",
+     "query": "label_values(ccip_commit_pending_messages, sourceChainName)",
      "refId": "StandardVariableQuery"
     },
     "refresh": 2,

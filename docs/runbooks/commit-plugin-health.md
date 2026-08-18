@@ -5,8 +5,8 @@ trigger: "ad hoc / scheduled health check, or as step0 before docs/runbooks/unco
 severity: informational
 owner: ccip-commit-oncall
 inputs:
-  destChain: {type: string, description: "chainID/chain_id label value of the node's destination chain. May be handed to you as a chain ID, chain selector, or name -- see docs/runbooks/chain-identifiers.md to translate"}
-  sourceChains: {type: string, description: "source_network_name regex filter; defaults to all lanes into destChain", default: ".*"}
+  destChain: {type: string, description: "destChainID label value of the node's destination chain (destChainName/destChainSelector also work as an equivalent filter -- see the label key cheat sheet). May be handed to you as a chain ID, chain selector, or name -- see docs/runbooks/chain-identifiers.md to translate if you need a form other than what you were given"}
+  sourceChains: {type: string, description: "sourceChainName regex filter; defaults to all lanes into destChain", default: ".*"}
   fRoleDON: {type: integer, required: false, description: "optional. If known, expected live oracle count for destChain's DON is 3*fRoleDON+1 and the consensus threshold is 2*fRoleDON+1. Omit if uncertain (e.g. local devenvs with a possible bootstrap-node offset) -- live_oracle_count reports the raw count either way, it just can't grade it against a threshold without this."}
 related:
   - docs/runbooks/uncommitted-message.md   # incident triage for one specific stuck message
@@ -46,55 +46,62 @@ severity mapping, not a branch.
 
 ### Label key cheat sheet
 
-The destination chain is filtered by **two different label names depending on the metric** —
-this is a real inconsistency in `commit/metrics/prom.go`, not a typo to normalize away. Copy the
-label key from each check's own query; don't assume one spelling applies file-wide:
+**As of the `commit/metrics/prom.go` label overhaul, every commit-plugin metric uses one uniform
+chain-identity label set — this replaced the old per-metric `chainID`/`chain_id`/`source_network_name`
+inconsistency this section used to document, and it's a breaking rename, not an addition.** Every
+check below now carries four destination-chain labels from `destChainAttrs()`:
 
-| label key | checks that use it |
+| label key | meaning |
 |---|---|
-| `chainID` | `heartbeat_observation`, `heartbeat_outcome`, `processor_errors`, `processor_latency_p95`, `live_oracle_count`, `fchain_read_errors`, `report_validation_rejected`, `report_transmission_attempts_p95`, `consensus_dropped`, and (as of the `destChainAttrs` fix below) every check under `lane_throughput` plus `source_chain_cursed`, `report_transmission_gave_up` |
-| `chain_id` | `config_digest_mismatch`, `rmn_curse_active`, `consensus_observation_failed` |
-| `source_network_name` | every check under `lane_throughput`, plus `source_chain_cursed`, `report_transmission_gave_up` |
+| `destChainID` | destination chain ID (what `$destChain` filters against) |
+| `destChainFamily` | destination chain family (evm, solana, ...) |
+| `destChainName` | destination chain name, e.g. `ethereum-mainnet` |
+| `destChainSelector` | destination CCIP chain selector, as a string |
 
-**Every `lane_throughput` check plus `source_chain_cursed`/`report_transmission_gave_up` now
-also carries `chainID` (the destination chain), not just `source_network_name`.** This was a
-real gap found via staging testing: before `commit/metrics/prom.go`'s `destChainAttrs()` fix,
-these metrics carried only the source chain, so two plugin instances for different destination
-chains reading the same source chain were indistinguishable in the data — a query filtered only
-by `source_network_name` silently mixed lanes across every dest chain sharing the datasource.
-**Always filter these checks by both `source_network_name=~"$sourceChains"` AND
-`chainID=~"$destChain"`** — the queries below already do; if you hand-write a variant, don't drop
-the second filter.
+...and every per-lane check (everything under `lane_throughput`, plus `source_chain_cursed`,
+`report_transmission_gave_up`, and `consensus_dropped` when it carries a source chain) also
+carries the source-side equivalent from `sourceChainAttrs()`:
 
-**Every metric in this checklist now also carries `destChainID`, an unambiguous alias for
-whichever of `chainID`/`chain_id` that metric happens to use** (added alongside, not instead of
--- non-breaking, same value, no cardinality cost). The queries below still use each metric's
-historic spelling per the table above, for continuity with existing dashboards/alerts, but if
-you're writing a *new* query and don't want to consult the cheat sheet for which casing a given
-metric uses, `destChainID=~"$destChain"` works uniformly on all of them. `chainFamily`/`chain_family`
-still has the same two-spelling split and no alias yet.
+| label key | meaning |
+|---|---|
+| `sourceChainID` | source chain ID |
+| `sourceChainFamily` | source chain family |
+| `sourceChainName` | source chain name (this replaces the old `source_network_name`) |
+| `sourceChainSelector` | source CCIP chain selector, as a string |
+
+**The old labels are gone, not aliased.** `chainID`, `chain_id`, `chainFamily`, `chain_family`,
+`source_network_name`, and `dest_network_name` no longer appear on any Beholder-emitted series in
+this file — every query below now filters on `destChainID=~"$destChain"` and, where relevant,
+`sourceChainName=~"$sourceChains"`. If you have an old saved query or alert on this metric family,
+it now silently returns empty, not an error — re-check anything written before this rename before
+trusting a `UNKNOWN`/blank result from it. (The old names do still exist on a separate,
+`promauto`-only direct-scrape path for a handful of metrics in `commit/metrics/legacy_prom.go` —
+that path is unrelated to what this checklist queries and is flagged deprecated in-code; don't
+mix the two.)
+
+Since `destChainName`/`sourceChainName`/`destChainSelector`/`sourceChainSelector` are now
+first-class labels (not just something you compute via [`chain-identifiers.md`](chain-identifiers.md)),
+you can equally well filter `$destChain`/`$sourceChains` against whichever representation you were
+actually handed — `destChainSelector=~"..."` works exactly as well as `destChainID=~"..."` if a
+selector is all you have. Translating up front is still worth doing if you'll need multiple forms
+over the course of an investigation, but it's no longer strictly required just to run a query.
 
 `csa_public_key` is a different kind of label — it's not used to filter by chain, it's a
 per-node identity present on *every* commit metric series (confirmed against a live devenv, not
 just inferred). `live_oracle_count` is the only check that groups by it; nothing else in this
 checklist needs to.
 
-If `$destChain`/`$sourceChains` were handed to you as a chain selector or chain ID rather than the
-name these queries expect (or vice versa), translate first — see
-[`chain-identifiers.md`](chain-identifiers.md). Don't assume the label key tells you which
-representation to use; the two are independent (see the cheat sheet above vs. the table there).
+The `data_source` group (reader + config poller) is a different package (shared with **execute**)
+and was **not** touched by the commit-plugin label overhaul — it still keys on `chain` = the
+**numeric chain selector** plus `query`/`kind`/`state`, has no `destChainID`-style label, and
+carries `node_id` + `csa_public_key` inherited from the beholder client like every commit series.
 
-The `data_source` group (reader + config poller) breaks both conventions above: those metrics are
-shared with **execute**, carry **no** dest `chainID` label, and key on `chain` = the **numeric chain
-selector** plus `query`/`kind`/`state`. Filter them by the metric's own labels, not by
-`source_network_name`/`chainID`. They still inherit `node_id` + `csa_public_key` from the beholder
-client (like every commit series), so per-node vs DON-wide grouping works the same way.
-
-**One exception inside the group itself:** `ccip_reader_read_outcome` is recorded at the
-`observedCCIPReader` wrapper level (every reader call, not just the per-source-chain ones), so it
-carries `chainID` matching the **destination** chain — the same convention as the commit metrics
-above, not the `chain`-numeric-selector convention the rest of `data_source` uses. Filter it with
-`chainID=~"$destChain"`, not `chain`.
+**One exception inside the `data_source` group itself:** `ccip_reader_read_outcome` is recorded at
+the `observedCCIPReader` wrapper level (every reader call, not just the per-source-chain ones), so
+it still carries `chainID` (its own package, unrelated to the commit-plugin rename above) matching
+the **destination** chain, not the `chain`-numeric-selector convention the rest of `data_source`
+uses. Filter it with `chainID=~"$destChain"`, not `chain`, and not `destChainID` either — this one
+metric genuinely is a different label key from everything else in this doc.
 
 ### Empty result sets: the rule that actually matters
 
@@ -150,7 +157,7 @@ checks:
   - id: heartbeat_observation
     group: liveness
     always_emitted: true
-    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}[1m]))'
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain", phase="observation"}[1m]))'
     severity: {crit_if: "result == 0", ok_if: "result > 0"}
     owner: ccip-commit-oncall
     note: "unconditional per-round liveness signal for Observation(); 0 or empty means every other check below may simply be stale, not bad. Window is deliberately 1m, not 5m -- rate() extrapolates across its whole window, so a plugin that died N minutes ago still reads as alive for up to [window] more minutes; confirmed empirically (see live_oracle_count's note) that a 5m window delays detecting a real outage by up to 5 minutes. Don't widen this window without re-checking that tradeoff. The MAGNITUDE of a nonzero result is not meaningful -- this is rate(counter[1m]) on a counter incremented once per OCR round, so its steady-state value is a function of this DON's round cadence (itself a function of config, chain, and load), not a fixed target. A value like 0.5 is not 'half alive'; it just means roughly one round every 2s over the window. Don't compare this number across chains/environments or expect a specific magnitude -- the only threshold that means anything is exactly 0 (dead) vs strictly >0 (alive). Use it to answer 'is it running at all', and use pending_messages/lane-specific checks below to answer 'is it keeping up'"
@@ -158,7 +165,7 @@ checks:
   - id: heartbeat_outcome
     group: liveness
     always_emitted: true
-    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="outcome"}[1m]))'
+    query: 'sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain", phase="outcome"}[1m]))'
     severity: {crit_if: "result == 0", ok_if: "result > 0"}
     owner: ccip-commit-oncall
     note: "same signal for Outcome(); flat while observation is healthy means OCR is failing to schedule/deliver to the outcome stage. Same 1m-window rationale as heartbeat_observation, and the same 'magnitude isn't meaningful, only zero-vs-nonzero is' caveat -- see heartbeat_observation's note"
@@ -166,23 +173,24 @@ checks:
   - id: config_digest_mismatch
     group: liveness
     always_emitted: true
-    query: 'max(ccip_commit_config_digest_mismatch{chain_id=~"$destChain"})'
+    query: 'max(ccip_commit_config_digest_mismatch{destChainID=~"$destChain"})'
     severity: {crit_if: "result == 1", ok_if: "result == 0"}
     owner: ccip-commit-oncall
-    note: "home-chain config digest differs from the offramp's; root cause for a wide range of downstream rejections. If $destChain can match more than one chain (a multi-value/'All' selection), do NOT collapse with the bare max() above for reporting -- that only tells you at least one chain mismatches, not which. Use 'max by (chain_id) (ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}) == 1' instead (or the equivalent table view) to list only the mismatched chain_id(s) by name; report 'NO MISMATCH' rather than a blank/zero table when that query returns no rows, since an empty result here is the OK state, not UNKNOWN (always_emitted: true means the underlying gauge exists per chain, but a query filtered to ==1 legitimately returns nothing when nothing mismatches)"
+    note: "home-chain config digest differs from the offramp's; root cause for a wide range of downstream rejections. If $destChain can match more than one chain (a multi-value/'All' selection), do NOT collapse with the bare max() above for reporting -- that only tells you at least one chain mismatches, not which. Use 'max by (destChainID) (ccip_commit_config_digest_mismatch{destChainID=~\"$destChain\"}) == 1' instead (or the equivalent table view) to list only the mismatched destChainID(s); report 'NO MISMATCH' rather than a blank/zero table when that query returns no rows, since an empty result here is the OK state, not UNKNOWN (always_emitted: true means the underlying gauge exists per chain, but a query filtered to ==1 legitimately returns nothing when nothing mismatches)"
 
   - id: processor_errors
     group: liveness
     always_emitted: false
-    query: 'sum(rate(ccip_commit_processor_errors_total{chainID=~"$destChain"}[15m])) by (processor, method)'
+    query: 'sum(rate(ccip_commit_processor_errors_total{destChainID=~"$destChain"}[15m])) by (processor, method)'
+    fallback_query: 'sum(rate(ccip_commit_processor_errors_total{chainID=~"$destChain"}[15m])) by (processor, method)'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
-    note: "generic TrackedProcessor error counter; empty means zero errors, not unknown. Does not include swallowed per-goroutine failures (see merkleroot_observation_errors in uncommitted-message.md)"
+    note: "generic TrackedProcessor error counter; empty means zero errors, not unknown -- EXCEPT this metric is a live straggler bug, confirmed by reading `commit/metrics/prom.go`: it's registered as a Beholder Int64Counter (`bhProcessorErrors`) in NewPromReporter, but TrackProcessorLatency's error branch only ever calls the promauto counter (`p.processorErrors...Inc()`) -- `p.bhProcessorErrors` is never invoked anywhere in the file, despite the metric being labeled `dual` in the metric reference. On a datasource fed purely from the Beholder/OTel pipeline (this metric never leaves the node that way), the primary query above will ALWAYS return empty and read as OK regardless of real errors -- a silent false negative, not a benign empty result like the other checks here. If your datasource also scrapes the promauto endpoint directly, use fallback_query instead (old labels: `chainFamily,chainID`, not `destChainID`). Otherwise treat this check as unreliable until `bhProcessorErrors` actually gets called in code, and say so explicitly rather than reporting a clean bill of health. Does not include swallowed per-goroutine failures (see merkleroot_observation_errors in uncommitted-message.md)"
 
   - id: processor_latency_p95
     group: liveness
     always_emitted: true
-    query: 'histogram_quantile(0.95, sum(rate(ccip_commit_processor_latency_bucket{chainID=~"$destChain"}[15m])) by (le, processor, method))'
+    query: 'histogram_quantile(0.95, sum(rate(ccip_commit_processor_latency_bucket{destChainID=~"$destChain"}[15m])) by (le, processor, method))'
     severity: {info: true}
     owner: ccip-commit-oncall
     note: "report raw value only, this is a single point-in-time sample with nothing to trend against -- do not infer a trend from one run. If a value lands exactly on a bucket boundary (e.g. pinned at the histogram's max bucket), report that fact explicitly as it likely means real latency exceeds the highest defined bucket; still do not elevate this to WARN/CRIT, there is no defined SLO. UNIT WARNING, confirmed by live testing on staging: this histogram's buckets and recorded values are in NANOSECONDS (`commit/metrics/prom.go`'s promProcessorLatencyHistogram buckets are literal time.Duration constants, e.g. 20*time.Second == 2e10, and TrackProcessorLatency calls .Observe(float64(latency)) directly on the nanosecond-valued time.Duration) -- the histogram itself is internally consistent, but if you build a Grafana panel (or any display) with unit='s' on this query's raw result, a real value like 2e10 (20 real seconds) renders as 2e10 SECONDS, i.e. roughly 634 years. Either divide the query result by 1e9 to report actual seconds, or use a unit-aware display set to nanoseconds ('ns' in Grafana, which auto-scales to us/ms/s) -- do not display the raw number with a seconds unit"
@@ -191,7 +199,7 @@ checks:
   - id: pending_messages
     group: lane_throughput
     always_emitted: true
-    query: 'max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~"$sourceChains", chainID=~"$destChain"})'
+    query: 'max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~"$sourceChains", destChainID=~"$destChain"})'
     severity: {info: true}
     owner: ccip-commit-oncall
     note: "onRampMaxSeqNum - offRampNextSeqNum; no universal healthy value, watch for sustained growth not a single sample. Empty result here (no lanes matched) is UNKNOWN, not zero backlog -- this metric is always emitted per active lane"
@@ -199,7 +207,7 @@ checks:
   - id: range_truncated
     group: lane_throughput
     always_emitted: false
-    query: 'sum(rate(ccip_commit_range_truncated_total{source_network_name=~"$sourceChains", chainID=~"$destChain"}[15m])) by (source_network_name)'
+    query: 'sum(rate(ccip_commit_range_truncated_total{sourceChainName=~"$sourceChains", destChainID=~"$destChain"}[15m])) by (sourceChainName)'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
     note: "chain-throughput ceiling (MaxMerkleTreeSize) being hit"
@@ -207,7 +215,7 @@ checks:
   - id: seqnum_invariant_violation
     group: lane_throughput
     always_emitted: false
-    query: 'sum(rate(ccip_commit_seqnum_invariant_violation_total{source_network_name=~"$sourceChains", chainID=~"$destChain"}[15m])) by (source_network_name, type)'
+    query: 'sum(rate(ccip_commit_seqnum_invariant_violation_total{sourceChainName=~"$sourceChains", destChainID=~"$destChain"}[15m])) by (sourceChainName, type)'
     severity: {crit_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
     note: "offramp_ahead_of_onramp / onramp_max_zero / offramp_seqnum_regression -- documented in-code as stall signals, not routine noise"
@@ -215,7 +223,7 @@ checks:
   - id: offramp_consensus_insufficient
     group: lane_throughput
     always_emitted: false
-    query: 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~"$sourceChains", chainID=~"$destChain"}[15m])) by (source_network_name)'
+    query: 'sum(rate(ccip_commit_offramp_consensus_insufficient_total{sourceChainName=~"$sourceChains", destChainID=~"$destChain"}[15m])) by (sourceChainName)'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
     note: "DON couldn't agree on OffRampNextSeqNum for this chain; looks identical to \"no new messages\" without this"
@@ -223,7 +231,7 @@ checks:
   - id: offramp_lane_status
     group: lane_throughput
     always_emitted: true
-    query: 'max by (source_network_name, status) (ccip_commit_offramp_lane_status{source_network_name=~"$sourceChains", chainID=~"$destChain"})'
+    query: 'max by (sourceChainName, status) (ccip_commit_offramp_lane_status{sourceChainName=~"$sourceChains", destChainID=~"$destChain"})'
     severity: {crit_if: 'status="rmn_misconfigured" and result == 1', info_if: 'status=~"skipped_.*" and result == 1', ok_if: 'status="live" and result == 1'}
     owner: ccip-commit-oncall
     note: "rmn_misconfigured flags real config drift (a lane still expecting RMN blessing while RMN is globally off); skipped_* are expected states, not unhealthy. Reported for all four statuses every round by design, so empty result is UNKNOWN, not \"no active lanes\""
@@ -232,7 +240,7 @@ checks:
   - id: rmn_curse_active
     group: cursing_consensus
     always_emitted: true
-    query: 'max(ccip_commit_rmn_curse_active{chain_id=~"$destChain", curse_type=~"global|destination"}) by (curse_type)'
+    query: 'max(ccip_commit_rmn_curse_active{destChainID=~"$destChain", curse_type=~"global|destination"}) by (curse_type)'
     severity: {warn_if: "any series == 1", ok_if: "all series == 0"}
     owner: curse-owner
     note: "halts ALL reporting for the dest chain while active; often intentional/incident-flagged (see uncommitted-message.md step4) -- WARN not CRIT because an active curse is frequently expected, not a plugin bug"
@@ -240,7 +248,7 @@ checks:
   - id: source_chain_cursed
     group: cursing_consensus
     always_emitted: true
-    query: 'max by (source_network_name) (ccip_commit_source_chain_cursed{source_network_name=~"$sourceChains", chainID=~"$destChain"})'
+    query: 'max by (sourceChainName) (ccip_commit_source_chain_cursed{sourceChainName=~"$sourceChains", destChainID=~"$destChain"})'
     severity: {warn_if: "any series == 1", ok_if: "all series == 0"}
     owner: curse-owner
     note: "per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active"
@@ -248,7 +256,7 @@ checks:
   - id: consensus_observation_failed
     group: cursing_consensus
     always_emitted: false
-    query: 'sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~"$destChain"}[5m]))'
+    query: 'sum(rate(ccip_commit_consensus_observation_failed_total{destChainID=~"$destChain"}[5m]))'
     severity: {crit_if: "result > 0", ok_if: "result == 0 (including empty result)"}
     owner: ccip-commit-oncall
     note: "the only way a whole round fails: DON can't reach 2*fRoleDON+1 agreement on FChain for the dest chain. Destination-chain-wide by construction, not lane-specific"
@@ -256,15 +264,15 @@ checks:
   - id: consensus_dropped
     group: cursing_consensus
     always_emitted: false
-    query: 'sum(rate(ccip_commit_consensus_dropped_total{chainID=~"$destChain", objectName!="RMNRemoteConfig"}[5m])) by (objectName, reason)'
+    query: 'sum(rate(ccip_commit_consensus_dropped_total{destChainID=~"$destChain", objectName!="RMNRemoteConfig"}[5m])) by (objectName, reason)'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
-    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries source_network_name, so you can drill down to the affected lane. objectName='RMNRemoteConfig' is excluded from the query entirely (not just downgraded): with RMN disabled in prod, its remote config is permanently empty, so reason='insufficient_agreement' for it fires constantly and is pure expected noise, never a real finding -- if you need to confirm RMN's config state directly for some other reason, query ccip_commit_consensus_dropped_total{objectName=\"RMNRemoteConfig\"} without this exclusion. Empty result on the excluded-noise-free query is OK, not UNKNOWN"
+    note: "per-key consensus drop breakdown. reason='split' on objectName='fChain' is H2 (oracles disagree). reason='insufficient_agreement' on objectName='fChain' is H1 when fchain_read_errors is also spiking (too few oracles could report). reason='threshold_not_defined' is a config/data mismatch. For chain-keyed objectNames (MerkleRoot, OnRampMaxSeqNums, etc.) the metric also carries sourceChainName, so you can drill down to the affected lane. objectName='RMNRemoteConfig' is excluded from the query entirely (not just downgraded): with RMN disabled in prod, its remote config is permanently empty, so reason='insufficient_agreement' for it fires constantly and is pure expected noise, never a real finding -- if you need to confirm RMN's config state directly for some other reason, query ccip_commit_consensus_dropped_total{objectName=\"RMNRemoteConfig\"} without this exclusion. Empty result on the excluded-noise-free query is OK, not UNKNOWN"
 
   - id: live_oracle_count
     group: cursing_consensus
     always_emitted: true
-    query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{chainID=~"$destChain", phase="observation"}) > time() - 60))'
+    query: 'count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain", phase="observation"}) > time() - 60))'
     severity: {crit_if: "$fRoleDON known and result < 2*$fRoleDON+1", warn_if: "$fRoleDON known and 2*$fRoleDON+1 <= result < 3*$fRoleDON+1", ok_if: "$fRoleDON known and result >= 3*$fRoleDON+1", info: "$fRoleDON not supplied -- report the raw count, no verdict"}
     owner: ccip-commit-oncall
     note: "csa_public_key uniquely identifies each node in every commit metric series (confirmed empirically against a live devenv, not just inferred from source). This deliberately uses timestamp()-vs-time(), not rate()>0: confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops, because rate() extrapolates across its whole window using the oldest and newest samples it finds -- a node that died 3 minutes ago still reports a positive rate at the 5m window size, making the headcount silently wrong for the first several minutes of a real outage. timestamp() answers 'did this series get a sample in the last 60s' directly, with no extrapolation lag. This is the ONLY check in this file that can detect 'not enough oracles are even running' -- fchain_read_errors below only reports a *surviving* oracle's own read failures, it has no visibility into oracles that never started. If this comes back CRIT, it likely explains consensus_observation_failed on its own; don't let fchain_read_errors being flat push you toward blaming a split vote instead (see the aggregation rule)"
@@ -272,7 +280,7 @@ checks:
   - id: fchain_read_errors
     group: cursing_consensus
     always_emitted: false
-    query: 'sum(rate(ccip_commit_fchain_read_errors_total{chainID=~"$destChain"}[5m]))'
+    query: 'sum(rate(ccip_commit_fchain_read_errors_total{destChainID=~"$destChain"}[5m]))'
     severity: {warn_if: "result > 0", ok_if: "result == 0 (including empty result)"}
     owner: home-chain-infra-oncall
     note: "if this AND consensus_observation_failed are both firing, treat the combination as one CRIT finding, not two (see aggregation rule) -- likely H1, home-chain RPC/read outage"
@@ -281,7 +289,7 @@ checks:
   - id: report_validation_rejected
     group: report_transmission
     always_emitted: false
-    query: 'sum(rate(ccip_commit_report_validation_rejected_total{chainID=~"$destChain"}[15m])) by (phase, reason)'
+    query: 'sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~"$destChain"}[15m])) by (phase, reason)'
     severity: {warn_if: 'any series with reason!="stale" > 0', info_if: 'only reason="stale" > 0', ok_if: "empty result, or all series == 0"}
     owner: ccip-commit-oncall
     note: "reason=\"stale\" is usually benign (an overlapping report already landed); other reasons are worth a look"
@@ -289,7 +297,7 @@ checks:
   - id: report_transmission_gave_up
     group: report_transmission
     always_emitted: false
-    query: 'sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~"$sourceChains", chainID=~"$destChain"}[15m])) by (source_network_name)'
+    query: 'sum(rate(ccip_commit_report_transmission_gave_up_total{sourceChainName=~"$sourceChains", destChainID=~"$destChain"}[15m])) by (sourceChainName)'
     severity: {crit_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: ccip-commit-oncall
     note: "one of the most common on-call pages historically; previously a Warnw with no counter at all. If CRIT, uncommitted-message.md Scenario 2 may name a different owner (chain-b-txm-oncall) once root-caused -- this check alone doesn't know which"
@@ -297,7 +305,7 @@ checks:
   - id: report_transmission_attempts_p95
     group: report_transmission
     always_emitted: false
-    query: 'histogram_quantile(0.95, sum(rate(ccip_commit_report_transmission_attempts_bucket{chainID=~"$destChain"}[15m])) by (le, success))'
+    query: 'histogram_quantile(0.95, sum(rate(ccip_commit_report_transmission_attempts_bucket{destChainID=~"$destChain"}[15m])) by (le, success))'
     severity: {info: true}
     owner: ccip-commit-oncall
     note: "recorded once per transmission-check attempt; empty result means zero transmission cycles in the window, which is itself informational (report as INFO with value \"no data\"), not UNKNOWN. Rising attempts alongside report_transmission_gave_up firing is the actionable combination, not this alone"
@@ -305,7 +313,7 @@ checks:
   # --- data source (reader + config poller) ---
   # These are shared with execute and live in the reader/config-poller layers (see
   # docs/metrics/reader-metrics.md). Unlike the commit metrics above, `chain` is the NUMERIC
-  # chain selector (not source_network_name) and there's no dest `chainID` label to filter on;
+  # chain selector (not sourceChainName) and there's no dest `chainID` label to filter on;
   # every series carries `node_id` + `csa_public_key` inherited from the beholder client.
   # They answer "is the plugin fine but being fed empty/partial/stale data?" -- upstream of,
   # and a root cause for, several of the outcome checks above.
@@ -479,9 +487,9 @@ health_report:
                                 # regardless of how many grouping labels the query has: for each
                                 # series, join ALL of its grouping labels into one
                                 # "label1=v1,label2=v2" key, then ":", then the numeric result;
-                                # separate series with "; ". E.g. a `by (source_network_name,
+                                # separate series with "; ". E.g. a `by (sourceChainName,
                                 # status)` result becomes
-                                # "source_network_name=chain-a,status=live:1; source_network_name=chain-a,status=rmn_misconfigured:0; ...".
+                                # "sourceChainName=chain-a,status=live:1; sourceChainName=chain-a,status=rmn_misconfigured:0; ...".
                                 # This is the canonical non-paraphrased form, not free-form
                                 # summarization -- do not drop labels or collapse series to save space.
       note: string             # optional, only if it adds something the checklist note doesn't
