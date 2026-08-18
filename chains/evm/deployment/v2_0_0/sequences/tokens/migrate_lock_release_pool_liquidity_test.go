@@ -437,7 +437,7 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 	require.Equal(t, common.Address{}, rebalancerReport.Output,
 		"Rebalancer should be restored to original value (zero address)")
 
-	// Verify timelock was never added to lockbox authorized callers
+	// Verify the timelock was added to the lockbox authorized callers (deposit flow leaves it in place)
 	authCallersReport, err := operations.ExecuteOperation(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		erc20_lock_box.GetAllAuthorizedCallers,
@@ -448,8 +448,8 @@ func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T
 		},
 	)
 	require.NoError(t, err)
-	require.NotContains(t, authCallersReport.Output, s.deployer,
-		"Timelock should not be in lockbox authorized callers (transfer-only flow)")
+	require.Contains(t, authCallersReport.Output, s.deployer,
+		"Timelock should be in lockbox authorized callers (deposit flow)")
 }
 
 func TestMigrateLockReleasePoolLiquidity_UnsiloedFullBasisPoints(t *testing.T) {
@@ -996,11 +996,12 @@ func TestMigrateLockReleasePoolLiquidity_DoesNotTamperWithAuthorizedCallers(t *t
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
-			ChainSelector:   chainSel,
-			OldPoolAddress:  s.oldPoolAddr.Hex(),
-			NewPoolAddress:  s.newPoolAddr.Hex(),
-			TimelockAddress: s.deployer.Hex(),
-			BasisPoints:     &basisPoints,
+			ChainSelector:    chainSel,
+			OldPoolAddress:   s.oldPoolAddr.Hex(),
+			NewPoolAddress:   s.newPoolAddr.Hex(),
+			TimelockAddress:  s.deployer.Hex(),
+			BasisPoints:      &basisPoints,
+			UsePlainTransfer: true,
 		},
 	)
 
