@@ -463,11 +463,17 @@ func (p *PromReporter) TrackObservationError(sourceChain cciptypes.ChainSelector
 }
 
 func (p *PromReporter) TrackFChainReadError() {
-	p.bhFChainReadErrors.Add(context.Background(), 1, metric.WithAttributes(metricsutil.DestChainAttrs(p.chainSelector)...))
+	p.bhFChainReadErrors.Add(
+		context.Background(),
+		1,
+		metric.WithAttributes(metricsutil.DestChainAttrs(p.chainSelector)...))
 }
 
 func (p *PromReporter) TrackConsensusObservationFailed() {
-	p.bhConsensusObservationFailed.Add(context.Background(), 1, metric.WithAttributes(metricsutil.DestChainAttrs(p.chainSelector)...))
+	p.bhConsensusObservationFailed.Add(
+		context.Background(),
+		1,
+		metric.WithAttributes(metricsutil.DestChainAttrs(p.chainSelector)...))
 }
 
 // TrackReportTransmissionGaveUp reports one source-chain lane within a report abandoned before

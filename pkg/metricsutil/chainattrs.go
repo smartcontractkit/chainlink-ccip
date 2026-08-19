@@ -29,22 +29,22 @@ const unknownLabelValue = "unknown"
 // chain but reads about others), use DestChainAttrs/SourceChainAttrs for the other side instead
 // of calling this twice -- otherwise both chains attach identically-named labels and collide.
 func ChainAttrs(chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
-	return chainAttrs("", chainSelector)
+	return chainAttrsWithPrefix("", chainSelector)
 }
 
 // DestChainAttrs resolves chainSelector into destChainID/destChainFamily/destChainName/
 // destChainSelector attributes.
 func DestChainAttrs(chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
-	return chainAttrs("dest", chainSelector)
+	return chainAttrsWithPrefix("dest", chainSelector)
 }
 
 // SourceChainAttrs resolves chainSelector into sourceChainID/sourceChainFamily/sourceChainName/
 // sourceChainSelector attributes.
 func SourceChainAttrs(chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
-	return chainAttrs("source", chainSelector)
+	return chainAttrsWithPrefix("source", chainSelector)
 }
 
-func chainAttrs(prefix string, chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
+func chainAttrsWithPrefix(prefix string, chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
 	// Could happen due to an out-of-date chain-selectors lib.
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(chainSelector)
 	if !ok {
