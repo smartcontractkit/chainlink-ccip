@@ -257,6 +257,10 @@ func (p *Plugin) Observation(
 	// Unconditional heartbeat: fires before anything below can fail, so its absence -- not a bad value --
 	// is the "is the plugin scheduling rounds at all" signal. See docs/metrics/commit-metrics.md.
 	p.metricsReporter.TrackPluginHeartbeat(plugincommon.ObservationMethod)
+	// The plugin is really only running if its _out_ of the discovery state.
+	// Being perpetually in discovery is a bug, so we track it as a metric to make it easy to detect.
+	// This is only updated in the outcome, but we track it here.
+	p.metricsReporter.TrackDiscoveryState(p.contractsInitialized.Load())
 
 	if p.offchainCfg.DonBreakingChangesVersion < pluginconfig.DonBreakingChangesVersion1RoleDonSupport {
 		p.lggr.Info("running old observation")

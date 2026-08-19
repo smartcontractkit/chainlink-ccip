@@ -32,6 +32,10 @@ type Reporter interface {
 
 	TrackConfigDigestMismatch(mismatch bool)
 
+	// TrackDiscoveryState tracks whether the plugin has discovered the contracts
+	// that it needs to interact with.
+	TrackDiscoveryState(discovered bool)
+
 	// TrackPluginHeartbeat is called unconditionally near the top of Observation()/Outcome(), before
 	// anything downstream can fail, so it keeps ticking even if the rest of the round is wedged. Absence
 	// of this metric (not a bad value) is the signal: it means the plugin isn't scheduling rounds at all.
@@ -77,6 +81,7 @@ type CommitPluginReporter interface {
 	TrackConfigDigestMismatch(mismatch bool)
 	TrackPluginHeartbeat(phase string)
 	TrackReportValidationRejected(phase string, reason string)
+	TrackDiscoveryState(discovered bool)
 
 	// TrackConsensusDropped is documented on Reporter. It is exposed here because the
 	// commit plugin's top-level Outcome() also runs consensus on the main FChain map.
@@ -84,6 +89,8 @@ type CommitPluginReporter interface {
 }
 
 type Noop struct{}
+
+func (n *Noop) TrackDiscoveryState(discovered bool) {}
 
 func (n *Noop) TrackObservation(committypes.Observation, uint64) {}
 

@@ -48,7 +48,7 @@ func NewTrackedProcessor[Query any, Observation plugintypes.Trackable, Outcome p
 }
 
 func (p *TrackedProcessor[Query, Observation, Outcome]) Query(ctx context.Context, prev Outcome) (Query, error) {
-	return withTrackedMethod[Query](p, QueryMethod, func() (Query, error) {
+	return withTrackedMethod(p, QueryMethod, func() (Query, error) {
 		return p.PluginProcessor.Query(ctx, prev)
 	})
 }
@@ -58,7 +58,7 @@ func (p *TrackedProcessor[Query, Observation, Outcome]) Observation(
 	prev Outcome,
 	query Query,
 ) (Observation, error) {
-	obs, err := withTrackedMethod[Observation](p, ObservationMethod, func() (Observation, error) {
+	obs, err := withTrackedMethod(p, ObservationMethod, func() (Observation, error) {
 		return p.PluginProcessor.Observation(ctx, prev, query)
 	})
 	if err == nil {
@@ -73,7 +73,7 @@ func (p *TrackedProcessor[Query, Observation, Outcome]) Outcome(
 	query Query,
 	aos []AttributedObservation[Observation],
 ) (Outcome, error) {
-	out, err := withTrackedMethod[Outcome](p, OutcomeMethod, func() (Outcome, error) {
+	out, err := withTrackedMethod(p, OutcomeMethod, func() (Outcome, error) {
 		return p.PluginProcessor.Outcome(ctx, prev, query, aos)
 	})
 	if err == nil {
