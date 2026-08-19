@@ -3,7 +3,6 @@ package adapters
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"k8s.io/utils/ptr"
 
@@ -455,6 +454,77 @@ func (a *EVMOnRampUpgrader) VerifyNewOnRampOwner(e cldf.Environment, chainSelect
 	return nil
 }
 
+// RollbackToLegacyRouters implements [ccvadapters.OnRampUpgrader].
+//
+// This is a traffic-only rollback of Phase 3:
+//   - original ProdRouter lanes: ProdRouter -> legacy OnRamp
+//   - original TestRouter lanes: TestRouter -> legacy OnRamp
+//
+// It deliberately does not rewrite the new OnRamp's destination configs. In
+// particular, ProdRouter lanes may remain staged behind TestRouter -> new,
+// allowing the replacement OnRamp to continue being tested after rollback.
+func (a *EVMOnRampUpgrader) RollbackToLegacyRouters(
+	e cldf.Environment,
+	chainSelector uint64,
+	prodDestSelectors []uint64,
+	testDestSelectors []uint64,
+) ([]mcms_types.BatchOperation, error) {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("no EVM chain found for selector %d", chainSelector)
+	}
+
+	legacyRef, err := a.LegacyOnRampRef(e, chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("find legacy OnRamp: %w", err)
+	}
+	legacyAddr := common.HexToAddress(legacyRef.Address)
+
+	var batchOps []mcms_types.BatchOperation
+
+	if len(prodDestSelectors) > 0 {
+		prodRouterAddr, err := resolveProdRouter(e.DataStore, chainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("resolve prod Router: %w", err)
+		}
+
+		routerWrite, err := a.applyRouterUpdates(e, chain, chainSelector, legacyAddr, prodDestSelectors, prodRouterAddr)
+		if err != nil {
+			return nil, fmt.Errorf("rollback prod Router to legacy OnRamp: %w", err)
+		}
+
+		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{routerWrite})
+		if err != nil {
+			return nil, fmt.Errorf("build prod Router rollback batch op: %w", err)
+		}
+		if len(batchOp.Transactions) > 0 {
+			batchOps = append(batchOps, batchOp)
+		}
+	}
+
+	if len(testDestSelectors) > 0 {
+		testRouterAddr, err := resolveTestRouter(e.DataStore, chainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("resolve TestRouter: %w", err)
+		}
+
+		routerWrite, err := a.applyRouterUpdates(e, chain, chainSelector, legacyAddr, testDestSelectors, testRouterAddr)
+		if err != nil {
+			return nil, fmt.Errorf("rollback TestRouter to legacy OnRamp: %w", err)
+		}
+
+		batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{routerWrite})
+		if err != nil {
+			return nil, fmt.Errorf("build TestRouter rollback batch op: %w", err)
+		}
+		if len(batchOp.Transactions) > 0 {
+			batchOps = append(batchOps, batchOp)
+		}
+	}
+
+	return batchOps, nil
+}
+
 func (a *EVMOnRampUpgrader) findOldOnRamp(ds datastore.DataStore, chainSelector uint64) (datastore.AddressRef, error) {
 	ref, err := canonicalOnRampRef(ds, chainSelector)
 	if err != nil {
@@ -676,9 +746,9 @@ func readAllDestChainConfigs(b cldf_ops.Bundle, chain cldf_evm.Chain, chainSelec
 }
 
 func resolveRMNProxy(ds datastore.DataStore, chainSelector uint64) (common.Address, error) {
-	addr, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(rmnproxyops.ContractType),
-		Version: semver.MustParse("1.0.0"),
+		Version: rmnproxyops.Version,
 	}, chainSelector, evmds.ToEVMAddress)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("resolve RMNProxy on chain %d: %w", chainSelector, err)
@@ -687,7 +757,7 @@ func resolveRMNProxy(ds datastore.DataStore, chainSelector uint64) (common.Addre
 }
 
 func resolveTestRouter(ds datastore.DataStore, chainSelector uint64) (common.Address, error) {
-	bytes, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
+	bytes, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(router.TestRouterContractType),
 		Version: router.Version,
 	}, chainSelector, evmds.ToEVMAddressBytes)
@@ -767,7 +837,7 @@ func (a *EVMOnRampUpgrader) promoteOnrampToRouter(e cldf.Environment, chainSelec
 }
 
 func resolveProdRouter(ds datastore.DataStore, chainSelector uint64) (common.Address, error) {
-	bytes, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
+	bytes, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(router.ContractType),
 		Version: router.Version,
 	}, chainSelector, evmds.ToEVMAddressBytes)

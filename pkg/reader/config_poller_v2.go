@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +13,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader/rcmetrics"
 )
 
 // Analyzer-relevant log messages emitted by the config poller.
@@ -68,6 +70,8 @@ type configPollerV2 struct {
 	stopChan               chan struct{}
 	wg                     sync.WaitGroup
 	consecutiveFailedPolls atomic.Uint32
+
+	metrics rcmetrics.ConfigPollerMetrics
 }
 
 // chainCache represents the cache for a single chain.
@@ -100,6 +104,7 @@ func newConfigPollerV2(
 	accessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
 	destChainSelector cciptypes.ChainSelector,
 	refreshPeriod time.Duration,
+	metrics rcmetrics.ConfigPollerMetrics,
 ) *configPollerV2 {
 	return &configPollerV2{
 		chainCaches:       make(map[cciptypes.ChainSelector]*chainCache),
@@ -109,6 +114,7 @@ func newConfigPollerV2(
 		lggr:              lggr,
 		knownSourceChains: make(map[cciptypes.ChainSelector]struct{}),
 		stopChan:          make(chan struct{}),
+		metrics:           metrics,
 	}
 }
 
@@ -226,10 +232,12 @@ func (c *configPollerV2) GetChainConfig(
 	// Check if we have any data in cache
 	cache.chainConfigMu.RLock()
 	if !cache.chainConfigRefresh.IsZero() {
+		age := time.Since(cache.chainConfigRefresh)
+		c.metrics.RecordCacheAge(chainSel, "chain", int64(age.Seconds()))
 		defer cache.chainConfigMu.RUnlock()
 		c.lggr.Debugw("Returning cached chain config",
 			logutil.FieldChain, chainSel,
-			"cacheAge", time.Since(cache.chainConfigRefresh))
+			"cacheAge", age)
 		return cache.chainConfigData, nil
 	}
 	cache.chainConfigMu.RUnlock()
@@ -320,6 +328,7 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 
 	// If all chains are in cache, return them immediately
 	if len(missingChains) == 0 {
+		c.recordSourceCacheAge(destChainCache)
 		destChainCache.sourceChainMu.RUnlock()
 		c.lggr.Debugw("All source chain configs found in cache",
 			logutil.FieldDestChain, c.destChainSelector,
@@ -337,6 +346,7 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 	// Re-acquire the lock to return only the cached configs that were requested
 	destChainCache.sourceChainMu.RLock()
 	defer destChainCache.sourceChainMu.RUnlock()
+	c.recordSourceCacheAge(destChainCache)
 	result := make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
 	for _, chain := range filteredSourceChains {
 		if cfg, exists := destChainCache.staticSourceChainConfigs[chain]; exists {
@@ -344,6 +354,17 @@ func (c *configPollerV2) GetOfframpSourceChainConfigs(
 		}
 	}
 	return result, nil
+}
+
+// recordSourceCacheAge emits the source-chain config cache freshness. The caller
+// must hold destChainCache.sourceChainMu (read or write) — it reads the guard
+// timestamp and must not race a refresh overwrite.
+func (c *configPollerV2) recordSourceCacheAge(cache *chainCache) {
+	if cache.sourceChainRefresh.IsZero() {
+		return
+	}
+	c.metrics.RecordCacheAge(c.destChainSelector, "source",
+		int64(time.Since(cache.sourceChainRefresh).Seconds()))
 }
 
 // getOrCreateChainCache safely retrieves an existing cache or creates a new one for the specified chain.
@@ -434,6 +455,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	// Use chainAccessor to fetch ChainConfigSnapshot (and SourceChainConfigs if destChain)
 	accessor, err := getChainAccessor(c.chainAccessors, chainSel)
 	if err != nil {
+		c.metrics.RecordPollFailure(chainSel, "no_chain_accessor")
 		return fmt.Errorf("failed to get chain accessor for %s: %w", chainSel, err)
 	}
 
@@ -445,18 +467,31 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	)
 	if err != nil {
 		c.lggr.Errorw("Failed batch fetch via chainAccessor", logutil.FieldChain, chainSel, "error", err)
+		c.metrics.RecordPollFailure(chainSel, "batch_fetch_failed")
 		return err
 	}
 
 	cache := c.getOrCreateChainCache(chainSel)
 	if cache == nil {
+		c.metrics.RecordPollFailure(chainSel, "no_chain_cache")
 		return fmt.Errorf("failed to get chain cache for chain %s", chainSel)
 	}
 
-	// Acquire ChainConfigSnapshot lock and update
+	// Acquire ChainConfigSnapshot lock and update. Guard against the accessor
+	// returning an *empty* snapshot with a nil error (see reader-metrics.md:
+	// GetAllConfigsLegacy can do this on a "partial" failure): writing that here
+	// would time-stamp empty data as fresh and serve it to every consumer. Keep
+	// the previously-good cache and do NOT mark it fresh so the gap stays visible
+	// to RecordCacheAge instead of being masked.
 	cache.chainConfigMu.Lock()
-	cache.chainConfigData = chainConfigSnapshot
-	cache.chainConfigRefresh = time.Now()
+	if reflect.DeepEqual(chainConfigSnapshot, cciptypes.ChainConfigSnapshot{}) {
+		c.metrics.RecordOverwrittenEmpty(chainSel, "chain")
+		c.lggr.Warnw("chain config snapshot returned empty, keeping existing cached config",
+			logutil.FieldChain, chainSel)
+	} else {
+		cache.chainConfigData = chainConfigSnapshot
+		cache.chainConfigRefresh = time.Now()
+	}
 	cache.chainConfigMu.Unlock()
 
 	// Acquire StaticSourceChainConfigs lock and update
@@ -481,6 +516,8 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 		"chainConfigSnapshot", chainConfigSnapshot,
 		"sourceChainConfigs", sourceChainConfigs,
 	)
+	c.metrics.RecordPollSuccess(chainSel)
+	c.metrics.RecordLastSuccess(chainSel, time.Now().Unix())
 	return nil
 }
 
