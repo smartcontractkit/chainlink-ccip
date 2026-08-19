@@ -245,9 +245,6 @@ func (p *PromReporter) TrackOutcome(outcome committypes.Outcome, round uint64) {
 	}
 }
 
-// used for labels values that could not be resolved.
-const unknownLabelValue = "unknown"
-
 func (p *PromReporter) trackLatestRoundID(
 	latestRoundID uint32, sourceChainSelector cciptypes.ChainSelector, onramp string, method string,
 ) {
@@ -255,16 +252,16 @@ func (p *PromReporter) trackLatestRoundID(
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
 		// graceful fallback - we could even alert on such a thing.
-		sourceFamily = unknownLabelValue
-		sourceChainID = unknownLabelValue
+		sourceFamily = metricsutil.UnknownLabelValue
+		sourceChainID = metricsutil.UnknownLabelValue
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		sourceName = unknownLabelValue
+		sourceName = metricsutil.UnknownLabelValue
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		destName = unknownLabelValue
+		destName = metricsutil.UnknownLabelValue
 	}
 
 	p.commitLatestRound.WithLabelValues(sourceName, destName, onramp, method).Set(float64(latestRoundID))
@@ -292,16 +289,16 @@ func (p *PromReporter) trackMaxSequenceNumber(
 	sourceFamily, sourceChainID, ok := libs.GetChainInfoFromSelector(sourceChainSelector)
 	if !ok {
 		// graceful fallback - we could even alert on such a thing.
-		sourceFamily = unknownLabelValue
-		sourceChainID = unknownLabelValue
+		sourceFamily = metricsutil.UnknownLabelValue
+		sourceChainID = metricsutil.UnknownLabelValue
 	}
 	sourceName, err := libs.GetNameFromIDAndFamily(sourceChainID, sourceFamily)
 	if err != nil {
-		sourceName = unknownLabelValue
+		sourceName = metricsutil.UnknownLabelValue
 	}
 	destName, err := libs.GetNameFromIDAndFamily(p.chainID, p.chainFamily)
 	if err != nil {
-		destName = unknownLabelValue
+		destName = metricsutil.UnknownLabelValue
 	}
 
 	p.sequenceNumbers.

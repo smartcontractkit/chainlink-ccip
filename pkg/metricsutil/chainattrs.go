@@ -16,10 +16,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
 )
 
-// unknownLabelValue is used for any chain-identity label that couldn't be resolved (e.g. an
+// UnknownLabelValue is used for any chain-identity label that couldn't be resolved (e.g. an
 // out-of-date chain-selectors lib not recognizing a selector).
 // Pulled into a constant so that the linter doesn't complain.
-const unknownLabelValue = "unknown"
+const UnknownLabelValue = "unknown"
 
 // ChainAttrs resolves chainSelector into an unprefixed chainID/chainFamily/chainName/
 // chainSelector attribute set. Use this when a metric only ever describes one chain at a time.
@@ -49,13 +49,13 @@ func chainAttrsWithPrefix(prefix string, chainSelector ccipocr3.ChainSelector) [
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(chainSelector)
 	if !ok {
 		// graceful fallback - we could even alert on such a thing.
-		chainFamily = unknownLabelValue
-		chainID = unknownLabelValue
+		chainFamily = UnknownLabelValue
+		chainID = UnknownLabelValue
 	}
 
 	chainName, err := libs.GetNameFromIDAndFamily(chainID, chainFamily)
 	if err != nil {
-		chainName = unknownLabelValue
+		chainName = UnknownLabelValue
 	}
 
 	return []attribute.KeyValue{
