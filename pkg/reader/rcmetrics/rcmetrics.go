@@ -149,7 +149,7 @@ type ConfigPollerMetrics interface {
 	RecordCacheAge(chainSelector ccipocr3.ChainSelector, kind string, ageSeconds int64)
 	// RecordPollSuccess / RecordPollFailure count background refresh outcomes per chain.
 	RecordPollSuccess(chainSelector ccipocr3.ChainSelector)
-	RecordPollFailure(chainSelector ccipocr3.ChainSelector)
+	RecordPollFailure(chainSelector ccipocr3.ChainSelector, reason string)
 	// RecordOverwrittenEmpty counts refreshes that time-stamped empty data as fresh, per chain/kind.
 	RecordOverwrittenEmpty(chainSelector ccipocr3.ChainSelector, kind string)
 	// RecordLastSuccess records the last successful refresh (epoch seconds) per chain.
@@ -208,8 +208,9 @@ func (c *configPollerMetrics) RecordPollSuccess(chainSelector ccipocr3.ChainSele
 	c.pollSuccess.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
-func (c *configPollerMetrics) RecordPollFailure(chainSelector ccipocr3.ChainSelector) {
+func (c *configPollerMetrics) RecordPollFailure(chainSelector ccipocr3.ChainSelector, reason string) {
 	attrs := append(metricsutil.ChainAttrs(chainSelector), c.destAttrs...)
+	attrs = append(attrs, attribute.String("reason", reason))
 	c.pollFailure.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 

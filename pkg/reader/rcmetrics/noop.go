@@ -24,7 +24,7 @@ type NoopConfigPollerMetrics struct{}
 
 func (NoopConfigPollerMetrics) RecordCacheAge(ccipocr3.ChainSelector, string, int64)  {}
 func (NoopConfigPollerMetrics) RecordPollSuccess(ccipocr3.ChainSelector)              {}
-func (NoopConfigPollerMetrics) RecordPollFailure(ccipocr3.ChainSelector)              {}
+func (NoopConfigPollerMetrics) RecordPollFailure(ccipocr3.ChainSelector, string)      {}
 func (NoopConfigPollerMetrics) RecordOverwrittenEmpty(ccipocr3.ChainSelector, string) {}
 func (NoopConfigPollerMetrics) RecordLastSuccess(ccipocr3.ChainSelector, int64)       {}
 

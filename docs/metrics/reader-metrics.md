@@ -127,7 +127,7 @@ were individually correct. Always group/filter by `destChainID` (or `destChainSe
 | Metric | Status | Why |
 |---|---|---|
 | `ccip_reader_config_cache_age_seconds{chain+dest,kind="chain"\|"source"}` gauge | ✅ Implemented | The poller's whole job is freshness, and for that exact number it computed `time.Since(chainConfigRefresh)` and **discarded it into `Debugw`** (`config_poller_v2.go`). Now exported so every behind-the-cache read (curse, RMN config, config digest, router address) can be judged for staleness. **`dest` is required, not optional, once more than one destination chain shares a datasource**: a node runs one `configPollerV2` per destination chain, and two lanes both listing the same source chain (e.g. Solana) would otherwise collide into one `(chainID, node_id)` series — confirmed on staging, see [Known boundaries](#known-boundaries-and-deferred-work). |
-| `ccip_reader_config_poll_success{chain+dest}` / `ccip_reader_config_poll_failure{...}` | ✅ Implemented | Per-chain refresh accounting, replacing the single chain-unlabeled `consecutiveFailedPolls` counter — now you can tell *which* chain is failing, and (via `dest`) *which destination lane's* poller instance. |
+| `ccip_reader_config_poll_success{chain+dest}` / `ccip_reader_config_poll_failure{chain+dest,reason}` | ✅ Implemented | Per-chain refresh accounting, replacing the single chain-unlabeled `consecutiveFailedPolls` counter — now you can tell *which* chain is failing, and (via `dest`) *which destination lane's* poller instance. `config_poll_failure`'s `reason` (`no_chain_accessor`\|`batch_fetch_failed`\|`no_chain_cache`) names *why* without needing to correlate against logs. Recorded in `batchRefreshChainAndSourceConfigs` itself so on-demand cache-miss fetches count the same as background-refresh ones — see [Known boundaries](#known-boundaries-and-deferred-work). |
 | `ccip_reader_config_cache_overwritten_empty{chain+dest,kind}` | ✅ Implemented (+ write guard) | Flags when a refresh **time-stamped an empty snapshot as fresh**; the code now also refuses to write/mark-fresh an empty snapshot (the bug fix in this branch). The chain-identity labels were added alongside the `chainAttrs()` rollout — previously this metric had no chain label at all, even though the chain being refreshed (`chainSel`) was always in scope at the call site. |
 | `ccip_reader_config_poller_last_success_timestamp{chain+dest}` gauge | ✅ Implemented | The background polling goroutine's liveness via last-success staleness — a wedged poller is now page-able instead of invisible. |
 | `ccip_reader_config_poll_duration{chain+dest,...}` / `ccip_reader_config_miss_refresh_duration{chain+dest,...}` | Proposed | Per-poll and read-path miss-refresh latency; not implemented here. |
@@ -244,6 +244,21 @@ metrics cannot do this, because they legitimately don't move while nothing has b
   by `destChainID` alongside `chainID`/`node_id` on any of these metrics once more than one
   destination chain shares a datasource, exactly as you would group by `csa_public_key` for the
   per-oracle case.
+- **`config_poll_failure`/`config_poll_success`/`config_poller_last_success_timestamp` are now
+  recorded in `batchRefreshChainAndSourceConfigs` itself, not by its background-refresh caller.**
+  Found on staging while chasing the Solana RPC-outage incident above: `batchRefreshChainAndSourceConfigs`
+  is the single choke point all three callers go through (the background refresh loop, plus the two
+  on-demand cache-miss paths in `GetChainConfig`/`GetOfframpSourceChainConfigs`), but the poll-outcome
+  metrics were only ever recorded by the background-refresh caller. Any on-demand fetch failure —
+  e.g. the first fetch for a newly-tracked source chain, or any read hitting an empty cache in the
+  window before the background ticker's first tick — was logged (`"Failed batch fetch via
+  chainAccessor"`) but never counted, silently undercounting real failures. Moved the `RecordPollFailure`/
+  `RecordPollSuccess`/`RecordLastSuccess` calls into `batchRefreshChainAndSourceConfigs` so every
+  caller's outcome is counted consistently (matching where `RecordOverwrittenEmpty` already lived).
+  `RecordPollFailure` also gained a `reason` label (`no_chain_accessor`\|`batch_fetch_failed`\|
+  `no_chain_cache`) at the same time, naming *which* of the three failure points inside
+  `batchRefreshChainAndSourceConfigs` fired without needing to cross-reference logs — `batch_fetch_failed`
+  is the one that fired during the Solana `"no live nodes available"` incident.
 - **Event non-indexing is explicitly out of scope here.** These reader/accessor metrics make an
   empty result *visible and countable*, but they do not make it self-verifying: `read_empty` says
   "returned no data," not "should have returned data." Detecting a genuinely *un-indexed* event
@@ -494,7 +509,8 @@ what makes the per-oracle-vs-DON-wide distinction queryable (see
 | `ccip_chainaccessor_value_staleness_seconds` | Gauge | `chain,source` | proposed, beholder |
 | `ccip_chainaccessor_no_bindings` | Counter | `source` | proposed, beholder (Low) |
 | `ccip_reader_config_cache_age_seconds` | Gauge | chain+dest + `kind` | beholder |
-| `ccip_reader_config_poll_success_total` / `ccip_reader_config_poll_failure_total` | Counter | chain+dest | beholder |
+| `ccip_reader_config_poll_success_total` | Counter | chain+dest | beholder |
+| `ccip_reader_config_poll_failure_total` | Counter | chain+dest + `reason="no_chain_accessor"\|"batch_fetch_failed"\|"no_chain_cache"` | beholder |
 | `ccip_reader_config_cache_overwritten_empty` | Counter | chain+dest + `kind` | beholder |
 | `ccip_reader_config_poller_last_success_timestamp` | Gauge | chain+dest | beholder |
 | `ccip_reader_config_miss_refresh_duration` | Histogram | chain+dest | proposed, beholder |

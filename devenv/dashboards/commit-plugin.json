@@ -2349,7 +2349,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). Background config refresh failures, per chain. destChainID=~\"$destChain\" is REQUIRED: a rate summed across every destination-chain lane sharing this source chain can look deceptively moderate even when ONE specific lane's poller is failing nearly every cycle -- always scope to the lane you're investigating before judging this against config_cache_stale.",
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). Background config refresh failures, per chain and reason. reason=no_chain_accessor|batch_fetch_failed|no_chain_cache names WHY without needing logs: no_chain_accessor = misconfiguration (no accessor wired up for this chain); batch_fetch_failed = the accessor's fetch call itself errored (RPC/contract-binding problem -- this is the one that fired during the Solana 'no live nodes available' staging incident); no_chain_cache = internal cache-creation failure, should basically never fire. Recorded at the single batchRefreshChainAndSourceConfigs choke point, so on-demand cache-miss fetches count the same as background-refresh ones. destChainID=~\"$destChain\" is REQUIRED: a rate summed across every destination-chain lane sharing this source chain can look deceptively moderate even when ONE specific lane's poller is failing nearly every cycle -- always scope to the lane you're investigating before judging this against config_cache_stale.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -2434,8 +2434,8 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum by (chainID) (rate(ccip_reader_config_poll_failure_total{destChainID=~\"$destChain\"}[5m]))",
-     "legendFormat": "{{chainID}}",
+     "expr": "sum by (chainID, reason) (rate(ccip_reader_config_poll_failure_total{destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "{{chainID}} - {{reason}}",
      "range": true,
      "refId": "A"
     }

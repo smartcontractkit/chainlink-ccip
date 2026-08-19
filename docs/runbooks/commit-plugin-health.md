@@ -390,10 +390,10 @@ checks:
   - id: config_poll_failure
     group: data_source
     always_emitted: false
-    query: 'sum by (chainID) (rate(ccip_reader_config_poll_failure_total{destChainID=~"$destChain"}[5m]))'
+    query: 'sum by (chainID, reason) (rate(ccip_reader_config_poll_failure_total{destChainID=~"$destChain"}[5m]))'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: chain-infra-oncall
-    note: "background config refresh failures -- exactly the per-chain accounting that a warn-only log used to hide (which chain, not just 'somewhere'). destChainID=~\"$destChain\" is REQUIRED here too: without it, a rate summed across every destination-chain lane sharing this source chain can look deceptively moderate even when ONE specific lane's poller is failing nearly every single cycle -- always scope this to the lane you're actually investigating before judging the magnitude against config_cache_stale"
+    note: "background config refresh failures -- exactly the per-chain accounting that a warn-only log used to hide (which chain, not just 'somewhere'). reason=no_chain_accessor|batch_fetch_failed|no_chain_cache names WHY without needing to correlate against logs: no_chain_accessor = misconfiguration (chain has no accessor wired up at all); batch_fetch_failed = the accessor's GetAllConfigsLegacy call itself errored (RPC/contract-binding problem -- this is the one that fired during the Solana 'no live nodes available' staging incident, see config_digest_mismatch above); no_chain_cache = internal cache-creation failure, should basically never fire. Recorded at the single choke point (batchRefreshChainAndSourceConfigs) so on-demand cache-miss fetches count the same as background-refresh ones, not just the background ticker's failures. destChainID=~\"$destChain\" is REQUIRED here too: without it, a rate summed across every destination-chain lane sharing this source chain can look deceptively moderate even when ONE specific lane's poller is failing nearly every single cycle -- always scope this to the lane you're actually investigating before judging the magnitude against config_cache_stale"
 
   - id: config_cache_overwritten_empty
     group: data_source

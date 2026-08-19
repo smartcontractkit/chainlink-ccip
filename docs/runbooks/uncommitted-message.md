@@ -586,7 +586,7 @@ one). `query` names the specific read. Design + gap rationale: `docs/metrics/rea
 | `ccip_reader_chain_fee_components` | Gauge | chain+dest + `feeType` | beholder-only (promauto side unchanged, bare `chainFamily,chainID`, no dest disambiguation) |
 | `ccip_reader_config_cache_age_seconds` | Gauge | chain+dest + `kind="chain"\|"source"` | beholder-only |
 | `ccip_reader_config_poll_success` | Counter | chain+dest | beholder-only |
-| `ccip_reader_config_poll_failure` | Counter | chain+dest | beholder-only |
+| `ccip_reader_config_poll_failure` | Counter | chain+dest + `reason="no_chain_accessor"\|"batch_fetch_failed"\|"no_chain_cache"` | beholder-only |
 | `ccip_reader_config_cache_overwritten_empty` | Counter | chain+dest + `kind` | beholder-only |
 | `ccip_reader_config_poller_last_success_timestamp` | Gauge | chain+dest | beholder-only |
 
