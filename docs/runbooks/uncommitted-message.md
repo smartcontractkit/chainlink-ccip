@@ -24,7 +24,8 @@ status: living
       + [A note on counter naming](#a-note-on-counter-naming)
    * [Decision graph](#decision-graph)
    * [Steps](#steps)
-      + [step0 — is the plugin alive at all?](#step0-is-the-plugin-alive-at-all)
+      + [step0.1 — has the plugin discovered its contracts?](#step0.1-has-the-plugin-discovered-its-contracts)
+      + [step0.2 - heartbeat — is the plugin alive at all?](#step0.2-heartbeat-is-the-plugin-alive-at-all)
       + [step1 — is this even a commit-plugin problem?](#step1-is-this-even-a-commit-plugin-problem)
        + [step2 — has the plugin observed it on-chain yet?](#step2-has-the-plugin-observed-it-on-chain-yet)
        + [step2b — can the DON agree on this chain's per-chain values?](#step2b-can-the-don-agree-on-this-chains-per-chain-values)
@@ -102,7 +103,16 @@ against your actual datasource's metric browser before trusting the rest; don't 
 
 ```yaml
 steps:
-  - id: step0
+  - id: step0.1
+    check: discovery_state
+    query: 'max by (destChainID) (ccip_commit_discovery_state{destChainID=~"$destChain"})'
+    condition: "result == 0"
+    if_true:  {action: "REPORT:ccip-commit-oncall", reason: "the commit plugin has NOT discovered its contracts, so it is not healthy and cannot produce any observations -- this is the root cause, not a symptom: no downstream observation/outcome metric will read meaningfully while the plugin is stuck in discovery. Check the destination chain's RPC/reader health (ccip_reader_* / ccip_commit_consensus_observation_failed_total), since a single unhealthy RPC is what most commonly leaves the plugin perpetually in discovery. The discovery gauge is recorded even during discovery rounds, so value 0 here is a real signal, not an empty result", followup_query: 'sum by (destChainID) (rate(ccip_commit_consensus_observation_failed_total{destChainID=~"$destChain"}[5m]))'}
+    if_false: {action: "CONTINUE:heartbeat"}
+    automatable: true
+    note: "gated first because it is the one check that answers 'is the plugin actually ready to produce observations' rather than merely 'is it scheduling rounds'. ccip_commit_discovery_state is a gauge set per-round (from commit/plugin.go's Observation, via TrackDiscoveryState/contractsInitialized.Load()): 1 = discovered, 0 = still in discovery. Use max() so only a DON-wide 'none of the nodes exited discovery' hits the == 0 branch; a single node stuck in discovery (by csa_public_key) is a node-local finding, not a stoppage."
+
+  - id: step0.2
     check: plugin_heartbeat
     query: 'sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain"}[1m]))'
     condition: "result == 0"
@@ -244,11 +254,32 @@ steps:
 
 ## Steps
 
-### step0 — is the plugin alive at all?
+### step0.1 — has the plugin discovered its contracts?
+
+Check this before anything else, even the heartbeat: a plugin that has *not* discovered its
+contracts is not healthy and cannot produce any observations, regardless of how many rounds it
+keeps scheduling. Every observation/outcome metric below reports "no signal" identically whether
+the plugin is healthy-and-idle, still in discovery, or wedged/crashed — discovery state is the
+one direct signal that separates "still starting / can't even initialise" from the rest.
+
+```promql
+max by (destChainID) (ccip_commit_discovery_state{destChainID=~"$destChain"})
+```
+`0` → the plugin has not discovered its contracts. This is the root cause, not a symptom: report
+it (alongside the destination chain's RPC/reader health, since a single unhealthy RPC is what most
+commonly leaves the plugin stuck in discovery). `1` (or any `> 0`) → discovery complete, continue to
+the heartbeat gate. The gauge is recorded every round (including during discovery, from
+`commit/plugin.go`'s `Observation` via `TrackDiscoveryState`/`contractsInitialized.Load()`), so a
+`0` here is a real finding, not a benign empty result. Use `max()`: only a DON-wide "none of the
+nodes exited discovery" trips the `0` branch; one node stuck in discovery (group by `csa_public_key`)
+is a node-local finding, not a stoppage.
+
+### step0.2 - heartbeat — is the plugin alive at all?
 
 Not in the original design doc's walkthrough, but should be checked first: every metric below
 reports "no signal" identically whether the plugin is healthy-and-idle or wedged/crashed. Rule
-that out before reading anything else as a bad value.
+that out before reading anything else as a bad value. (Discovery state from step0 already told you
+the plugin is *ready*; this tells you it is *still scheduling rounds*.)
 
 ```promql
 sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~"$destChain"}[1m]))
@@ -500,6 +531,7 @@ are no bare/ad-hoc chain labels left anywhere on the Beholder side.
 | metric | otel_type | key labels (Beholder) | key labels (promauto, where `dual`) | registration |
 |---|---|---|---|---|
 | `ccip_commit_plugin_heartbeat` | Counter | dest + `phase` | — | beholder-only |
+| `ccip_commit_discovery_state` | Gauge | dest + `discovered` (bool; the 0/1 gauge value mirrors it) | — | beholder-only |
 | `ccip_commit_report_validation_rejected` | Counter | dest + `phase,reason` | — | beholder-only |
 | `ccip_commit_onramp_max_seq_num` | Gauge | source + dest | — | beholder-only |
 | `ccip_commit_offramp_next_seq_num` | Gauge | source + dest | — | beholder-only |
