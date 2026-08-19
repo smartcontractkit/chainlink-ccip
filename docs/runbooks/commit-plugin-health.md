@@ -100,6 +100,16 @@ metrics only ever describes one chain, never a lane). Every metric in this group
 `chain-identifiers.md`-style translation). Every series still also carries `node_id` +
 `csa_public_key` inherited from the beholder client like every commit series.
 
+**Every metric in this group also carries `destChainID`/`destChainFamily`/`destChainName`/
+`destChainSelector`** — a second, dest-scoped `destChainAttrs()` in the same file, resolved once
+per `configPollerV2`/`ccipChainReader` instance. This is required, not cosmetic: a node runs one
+config-poller/reader instance **per destination chain**, and more than one instance can
+independently track the same source chain (confirmed on staging — two destination-chain lanes both
+reading Solana as a source chain collided into one series per `(chainID, node_id)` without this,
+`max()`/`sum()` across them silently mixing a healthy lane's fast-refreshing cache with a
+different, broken lane's stuck one). Filter/group by `destChainID=~"$destChain"` on every
+`data_source` check below, the same way you'd filter a commit-plugin check.
+
 **One exception inside the `data_source` group itself:** `ccip_reader_read_outcome` is recorded at
 the `observedCCIPReader` wrapper level (every reader call, not just the per-source-chain ones), so
 its `chainID` (and the rest of its chain-identity labels) match the **destination** chain, not
@@ -109,7 +119,9 @@ the group's bare `chain`); now that every metric in this group shares identical 
 distinction is purely semantic and easy to miss — don't assume `reader_read_outcome_error`'s
 `chainID` means the same thing `reader_read_empty`'s or `reader_chain_gap`'s does. Filter
 `reader_read_outcome_error` with `chainID=~"$destChain"`, same as the destination-chain filter used
-throughout the rest of this doc.
+throughout the rest of this doc. (Its `destChainID` label carries the exact same value as `chainID`
+here — always the same destination chain for this one metric — so either filter works; the other
+`data_source` checks need `destChainID` specifically because their `chainID` means something else.)
 
 ### Empty result sets: the rule that actually matters
 
@@ -325,6 +337,13 @@ checks:
   # commit/metrics/prom.go's destChainAttrs(), just with no dest/source prefix -- each of these
   # metrics only ever describes one chain, never a lane). This replaced the old bare numeric-
   # selector `chain` label; chainSelector now carries that same numeric value if you need it.
+  # EVERY metric below ALSO now carries destChainID/destChainFamily/destChainName/destChainSelector
+  # (a second, dest-scoped chainAttrs() resolved once per configPollerV2/ccipChainReader instance)
+  # -- confirmed necessary by a real staging incident: a node runs one config-poller instance PER
+  # DESTINATION CHAIN, and two lanes sharing the same source chain (e.g. two dest chains both
+  # reading Solana) collide into one series per (chainID, node_id) without it -- max()/sum() across
+  # them silently mixed a healthy lane's fast-refreshing cache with a different, broken lane's
+  # stuck one. Filter every query below by destChainID=~"$destChain" too, not just node/chain.
   # Every series still also carries `node_id` + `csa_public_key` inherited from the beholder client.
   # They answer "is the plugin fine but being fed empty/partial/stale data?" -- upstream of,
   # and a root cause for, several of the outcome checks above.
@@ -334,55 +353,55 @@ checks:
     query: 'sum by (query) (rate(ccip_reader_read_outcome_total{chainID=~"$destChain", outcome="error"}[5m]))'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: chain-infra-oncall
-    note: "the consolidated ok/empty/error classification recorded at the observedCCIPReader wrapper for every reader call. This is the ERROR leg specifically -- a query that returned a hard error, not just an empty/partial result (that's reader_read_empty/reader_chain_gap below). Empty result here is OK (never happened). chainID here is the DESTINATION chain (this reader instance's), not whichever chain a specific read happens to be about -- the one semantic exception in this group, now that every metric here shares the SAME label keys (chainID/chainFamily/chainName/chainSelector), so nothing about the label name itself flags the difference anymore; don't assume this chainID means the same thing reader_read_empty/reader_chain_gap's chainID means two checks down. Split node-local vs DON-wide by csa_public_key before escalating"
+    note: "the consolidated ok/empty/error classification recorded at the observedCCIPReader wrapper for every reader call. This is the ERROR leg specifically -- a query that returned a hard error, not just an empty/partial result (that's reader_read_empty/reader_chain_gap below). Empty result here is OK (never happened). chainID here is the DESTINATION chain (this reader instance's) -- for THIS one metric chainID and destChainID are always the same value (redundant but harmless), so filtering by chainID=~\"$destChain\" alone is already lane-scoped correctly; you don't need destChainID here the way the checks below do. Split node-local vs DON-wide by csa_public_key before escalating"
 
   - id: reader_read_empty
     group: data_source
     always_emitted: false
-    query: 'sum by (query, chainID) (rate(ccip_reader_read_empty_total[5m]))'
+    query: 'sum by (query, chainID) (rate(ccip_reader_read_empty_total{destChainID=~"$destChain"}[5m]))'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: chain-infra-oncall
-    note: "a read returned nothing with no error -- the false-idle primitive. Empty result here is OK (the event never happened). chainID here is whichever chain that specific read was about (source or dest, depending on the query) -- NOT the destination-chain convention reader_read_outcome_error uses above. chainSelector (also on this series) carries the raw numeric selector if you need it for chain-identifiers.md-style translation. Split node-local vs DON-wide by csa_public_key"
+    note: "a read returned nothing with no error -- the false-idle primitive. Empty result here is OK (the event never happened). chainID here is whichever chain that specific read was about (source or dest, depending on the query) -- NOT the destination-chain convention reader_read_outcome_error uses above; destChainID=~\"$destChain\" is what actually scopes this to the lane under investigation. chainSelector (also on this series) carries the raw numeric selector if you need it for chain-identifiers.md-style translation. Split node-local vs DON-wide by csa_public_key"
 
   - id: reader_chain_gap
     group: data_source
     always_emitted: false
-    query: 'sum by (query, chainID, state) (rate(ccip_reader_chain_gap_total[5m]))'
+    query: 'sum by (query, chainID, state) (rate(ccip_reader_chain_gap_total{destChainID=~"$destChain"}[5m]))'
     severity: {warn_if: 'any series with state!="returned" > 0', ok_if: 'all series with state="returned" or empty result'}
     owner: chain-infra-oncall
-    note: "per-chain outcome of a chain read -- serves as BOTH the subset flag and its reason. Actionable (non-returned) states: not_found|disabled|misconfigured|error|invalid|missing|stale|no_accessor|config_error|no_native_token|count_mismatch. count_mismatch = a message read came back with a count that doesn't match the requested range (partial/incomplete data). A read returning a subset = any requested chain in a non-returned state. (Consolidated: the separate ccip_reader_read_partial counter was removed; subset detection is chain_gap{state!=\"returned\"}.) chainID is whichever chain the read was about, same convention as reader_read_empty."
+    note: "per-chain outcome of a chain read -- serves as BOTH the subset flag and its reason. Actionable (non-returned) states: not_found|disabled|misconfigured|error|invalid|missing|stale|no_accessor|config_error|no_native_token|count_mismatch. count_mismatch = a message read came back with a count that doesn't match the requested range (partial/incomplete data). A read returning a subset = any requested chain in a non-returned state. (Consolidated: the separate ccip_reader_read_partial counter was removed; subset detection is chain_gap{state!=\"returned\"}.) chainID is whichever chain the read was about, same convention as reader_read_empty; destChainID scopes to the lane under investigation."
 
   - id: config_cache_stale
     group: data_source
     always_emitted: true
-    query: 'max by (chainID, kind) (ccip_reader_config_cache_age_seconds)'
+    query: 'max by (chainID, kind) (ccip_reader_config_cache_age_seconds{destChainID=~"$destChain"})'
     severity: {crit_if: 'kind="chain" and result > 90', ok_if: 'all kind="chain" result <= 90', info: 'kind="source" values (report, no verdict)'}
     owner: chain-infra-oncall
-    note: "how stale the config-poller cache is. This is the SUSTAINED signal for config-refresh failure: because the code refuses to advance the refresh timestamp on an empty snapshot, the age only climbs across MULTIPLE consecutive empty/failed polls -- a single intermittent empty (flip-flop) is absorbed by the next good poll and keeps age low. CRIT at >90s (3x the 30s refresh period) means the poller genuinely cannot refresh, so every cached read (GetRMNRemoteConfig, GetRmnCurseInfo, config digest, router address) is running on hollow/stale data. Tie to config_cache_overwritten_empty / config_poll_failure to name why"
+    note: "how stale the config-poller cache is. This is the SUSTAINED signal for config-refresh failure: because the code refuses to advance the refresh timestamp on an empty snapshot, the age only climbs across MULTIPLE consecutive empty/failed polls -- a single intermittent empty (flip-flop) is absorbed by the next good poll and keeps age low. CRIT at >90s (3x the 30s refresh period) means the poller genuinely cannot refresh, so every cached read (GetRMNRemoteConfig, GetRmnCurseInfo, config digest, router address) is running on hollow/stale data. Tie to config_cache_overwritten_empty / config_poll_failure to name why. destChainID=~\"$destChain\" is REQUIRED here, not optional: confirmed on staging that omitting it lets a chain shared across multiple destination-chain lanes (e.g. Solana as a source into two different dest chains) silently max() together one healthy lane's fast-refreshing cache with a different, broken lane's cache stuck for hours -- a query without destChainID can look internally inconsistent against config_poll_failure below purely from this aggregation collapse, not because either metric is wrong"
 
   - id: config_poller_liveness
     group: data_source
     always_emitted: true
-    query: 'min by (chainID) (ccip_reader_config_poller_last_success_timestamp)'
+    query: 'min by (chainID) (ccip_reader_config_poller_last_success_timestamp{destChainID=~"$destChain"})'
     severity: {crit_if: "time() - result > 90", ok_if: "time() - result <= 90"}
     owner: chain-infra-oncall
-    note: "last successful background config poll per chain; a wedged/missing poller goroutine makes every cache silently go stale. Uses last-success staleness, not rate(), for the same detection-lag reason as live_oracle_count"
+    note: "last successful background config poll per chain; a wedged/missing poller goroutine makes every cache silently go stale. Uses last-success staleness, not rate(), for the same detection-lag reason as live_oracle_count. destChainID scopes this to the lane under investigation, same reasoning as config_cache_stale above"
 
   - id: config_poll_failure
     group: data_source
     always_emitted: false
-    query: 'sum by (chainID) (rate(ccip_reader_config_poll_failure_total[5m]))'
+    query: 'sum by (chainID) (rate(ccip_reader_config_poll_failure_total{destChainID=~"$destChain"}[5m]))'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: chain-infra-oncall
-    note: "background config refresh failures -- exactly the per-chain accounting that a warn-only log used to hide (which chain, not just 'somewhere')"
+    note: "background config refresh failures -- exactly the per-chain accounting that a warn-only log used to hide (which chain, not just 'somewhere'). destChainID=~\"$destChain\" is REQUIRED here too: without it, a rate summed across every destination-chain lane sharing this source chain can look deceptively moderate even when ONE specific lane's poller is failing nearly every single cycle -- always scope this to the lane you're actually investigating before judging the magnitude against config_cache_stale"
 
   - id: config_cache_overwritten_empty
     group: data_source
     always_emitted: false
-    query: 'sum by (chainID, kind) (rate(ccip_reader_config_cache_overwritten_empty_total[5m]))'
+    query: 'sum by (chainID, kind) (rate(ccip_reader_config_cache_overwritten_empty_total{destChainID=~"$destChain"}[5m]))'
     severity: {warn_if: "any series > 0", ok_if: "all series == 0 (including empty result)"}
     owner: chain-infra-oncall
-    note: "accessor returned an EMPTY chain-config snapshot (no-bindings / empty-batch). Per-event this is NOT a page: a single occurrence is benign and the guard refuses to clobber a good cache for it. Only actionable when SUSTAINED -- which is captured by config_cache_stale (age > 90s), not by this counter alone. Use this to explain WHY the cache went stale (empty snapshot) and which chains -- the chainID label was added alongside chainAttrs(); before that this metric had no chain identity at all, even though the chain being refreshed was always known at the call site. In dev/no-binding environments this can fire chronically as expected noise (unbound RMN/optional contracts); treat it as a signal only when accompanied by config_cache_stale climbing. WARN + see config_cache_stale for severity"
+    note: "accessor returned an EMPTY chain-config snapshot (no-bindings / empty-batch). Per-event this is NOT a page: a single occurrence is benign and the guard refuses to clobber a good cache for it. Only actionable when SUSTAINED -- which is captured by config_cache_stale (age > 90s), not by this counter alone. Use this to explain WHY the cache went stale (empty snapshot) and which chains -- the chainID label was added alongside chainAttrs(); before that this metric had no chain identity at all, even though the chain being refreshed was always known at the call site. If this returns empty while config_cache_stale is climbing for the same destChainID/chainID, that RULES OUT the empty-snapshot path as the cause -- look at config_poll_failure (a real accessor error) instead. In dev/no-binding environments this can fire chronically as expected noise (unbound RMN/optional contracts); treat it as a signal only when accompanied by config_cache_stale climbing. WARN + see config_cache_stale for severity"
 ```
 
 ## Groups

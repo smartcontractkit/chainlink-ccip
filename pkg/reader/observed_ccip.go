@@ -99,7 +99,7 @@ func NewObservedCCIPReader(
 	if len(meters) > 0 {
 		meter = meters[0]
 	}
-	obMetrics, err := rcmetrics.NewObservedReaderMetrics(meter)
+	obMetrics, err := rcmetrics.NewObservedReaderMetrics(meter, destChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("init observed reader metrics: %w", err)
 	}

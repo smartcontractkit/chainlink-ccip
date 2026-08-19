@@ -34,15 +34,21 @@ const (
 	chainNameLabelKey     = "chainName"
 	chainSelectorLabelKey = "chainSelector"
 
+	// destChain* labels identify which destination-chain instance (ccipChainReader/configPollerV2)
+	// recorded the series -- see destChainAttrs's doc comment for why this is needed.
+	destChainIDLabelKey       = "destChainID"
+	destChainFamilyLabelKey   = "destChainFamily"
+	destChainNameLabelKey     = "destChainName"
+	destChainSelectorLabelKey = "destChainSelector"
+
 	// used for labels values that could not be resolved.
 	unknownLabelValue = "unknown"
 )
 
 // chainAttrs resolves a chain selector into chainID/chainFamily/chainName/chainSelector
-// attributes, replacing the old single numeric-selector-as-string "chain" label. Every metric in
-// this package describes exactly one chain (unlike commit/metrics/prom.go's destChainAttrs/
-// sourceChainAttrs, which need a dest-vs-source prefix because a single commit-plugin metric can
-// carry both a source and a dest chain at once) -- so no prefix is needed here.
+// attributes, replacing the old single numeric-selector-as-string "chain" label. This describes
+// *which chain a specific read/refresh is about* -- it says nothing about which destination-chain
+// instance did the reading. See destChainAttrs below for that half.
 func chainAttrs(chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
 	// Could happen due to an out-of-date chain-selectors lib.
 	chainFamily, chainID, ok := libs.GetChainInfoFromSelector(chainSelector)
@@ -65,6 +71,39 @@ func chainAttrs(chainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
 	}
 }
 
+// destChainAttrs resolves the destination-chain selector a metrics-set instance is scoped to, into
+// destChainID/destChainFamily/destChainName/destChainSelector attributes -- the reader-layer
+// equivalent of commit/metrics/prom.go's destChainAttrs(). A single node runs one
+// ccipChainReader/configPollerV2 (and therefore one metrics-set instance) PER DESTINATION CHAIN it
+// serves, and several of those instances can independently track the SAME source chain (e.g. two
+// dest-chain lanes both reading Solana as a source). Without this, chainAttrs() alone -- which only
+// describes the chain a read/refresh is *about* -- can't distinguish those instances: their series
+// collide into one per (chain, node_id), silently averaging/maxing together an unrelated healthy
+// lane's fast refresh with a broken lane's stuck one. destChainAttrs is resolved once at
+// construction (the destination is fixed for the lifetime of the instance) and appended to every
+// Record* call automatically, so no call site needs to pass it explicitly.
+func destChainAttrs(destChainSelector ccipocr3.ChainSelector) []attribute.KeyValue {
+	// Could happen due to an out-of-date chain-selectors lib.
+	destChainFamily, destChainID, ok := libs.GetChainInfoFromSelector(destChainSelector)
+	if !ok {
+		// graceful fallback - we could even alert on such a thing.
+		destChainFamily = unknownLabelValue
+		destChainID = unknownLabelValue
+	}
+
+	destChainName, err := libs.GetNameFromIDAndFamily(destChainID, destChainFamily)
+	if err != nil {
+		destChainName = unknownLabelValue
+	}
+
+	return []attribute.KeyValue{
+		attribute.String(destChainIDLabelKey, destChainID),
+		attribute.String(destChainFamilyLabelKey, destChainFamily),
+		attribute.String(destChainNameLabelKey, destChainName),
+		attribute.String(destChainSelectorLabelKey, strconv.FormatUint(uint64(destChainSelector), 10)),
+	}
+}
+
 // ReaderMetrics instruments the CcipReader's concrete methods (per-chain reads).
 type ReaderMetrics interface {
 	// RecordChainGap records, per read (query), how many source chains ended up in
@@ -81,15 +120,17 @@ type readerMetrics struct {
 	chainGap   metric.Int64Counter
 	readEmpty  metric.Int64Counter
 	msgDropped metric.Int64Counter
+	destAttrs  []attribute.KeyValue
 }
 
-// NewReaderMetrics registers the reader instruments against m. Returns a NoOp
-// implementation (and no error) when m is nil.
-func NewReaderMetrics(m metric.Meter) (ReaderMetrics, error) {
+// NewReaderMetrics registers the reader instruments against m, scoped to destChainSelector (the
+// destination chain the owning ccipChainReader instance serves -- see destChainAttrs). Returns a
+// NoOp implementation (and no error) when m is nil.
+func NewReaderMetrics(m metric.Meter, destChainSelector ccipocr3.ChainSelector) (ReaderMetrics, error) {
 	if m == nil {
 		return NoopReaderMetrics{}, nil
 	}
-	rm := &readerMetrics{}
+	rm := &readerMetrics{destAttrs: destChainAttrs(destChainSelector)}
 	var err error
 	if rm.chainGap, err = m.Int64Counter("ccip_reader_chain_gap"); err != nil {
 		return nil, fmt.Errorf("register ccip_reader_chain_gap: %w", err)
@@ -104,7 +145,8 @@ func NewReaderMetrics(m metric.Meter) (ReaderMetrics, error) {
 }
 
 func (r *readerMetrics) RecordChainGap(query string, chainSelector ccipocr3.ChainSelector, state string) {
-	attrs := append(chainAttrs(chainSelector),
+	attrs := append(chainAttrs(chainSelector), r.destAttrs...)
+	attrs = append(attrs,
 		attribute.String("query", query),
 		attribute.String("state", state),
 	)
@@ -112,15 +154,18 @@ func (r *readerMetrics) RecordChainGap(query string, chainSelector ccipocr3.Chai
 }
 
 func (r *readerMetrics) RecordReadEmpty(query string, chainSelector ccipocr3.ChainSelector) {
-	attrs := append(chainAttrs(chainSelector), attribute.String("query", query))
+	attrs := append(chainAttrs(chainSelector), r.destAttrs...)
+	attrs = append(attrs, attribute.String("query", query))
 	r.readEmpty.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (r *readerMetrics) RecordMsgDropped(query, reason string) {
-	r.msgDropped.Add(context.Background(), 1, metric.WithAttributes(
+	// Copy destAttrs (shared across every call) before appending -- don't grow it in place.
+	attrs := append(append([]attribute.KeyValue{}, r.destAttrs...),
 		attribute.String("query", query),
 		attribute.String("reason", reason),
-	))
+	)
+	r.msgDropped.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 // ObservedReaderMetrics instruments the observedCCIPReader (per-query outcomes).
@@ -135,15 +180,19 @@ type ObservedReaderMetrics interface {
 type observedReaderMetrics struct {
 	readOutcome metric.Int64Counter
 	bhChainFee  metric.Int64Gauge
+	destAttrs   []attribute.KeyValue
 }
 
-// NewObservedReaderMetrics registers the observed-reader instruments against m.
-// Returns a NoOp implementation (and no error) when m is nil.
-func NewObservedReaderMetrics(m metric.Meter) (ObservedReaderMetrics, error) {
+// NewObservedReaderMetrics registers the observed-reader instruments against m, scoped to
+// destChainSelector (see destChainAttrs). Returns a NoOp implementation (and no error) when m is
+// nil.
+func NewObservedReaderMetrics(
+	m metric.Meter, destChainSelector ccipocr3.ChainSelector,
+) (ObservedReaderMetrics, error) {
 	if m == nil {
 		return NoopObservedReaderMetrics{}, nil
 	}
-	om := &observedReaderMetrics{}
+	om := &observedReaderMetrics{destAttrs: destChainAttrs(destChainSelector)}
 	var err error
 	if om.readOutcome, err = m.Int64Counter("ccip_reader_read_outcome"); err != nil {
 		return nil, fmt.Errorf("register ccip_reader_read_outcome: %w", err)
@@ -155,7 +204,12 @@ func NewObservedReaderMetrics(m metric.Meter) (ObservedReaderMetrics, error) {
 }
 
 func (o *observedReaderMetrics) RecordReadOutcome(chainSelector ccipocr3.ChainSelector, query, outcome string) {
-	attrs := append(chainAttrs(chainSelector),
+	// NOTE: for this metric chainAttrs(chainSelector) and o.destAttrs are always the same
+	// destination chain (recordReadOutcome is always called with the reader's own destChain) --
+	// see the "one semantic exception" note in docs/metrics/reader-metrics.md. Both are still
+	// attached for schema consistency with every other metric in this package.
+	attrs := append(chainAttrs(chainSelector), o.destAttrs...)
+	attrs = append(attrs,
 		attribute.String("query", query),
 		attribute.String("outcome", outcome),
 	)
@@ -163,7 +217,8 @@ func (o *observedReaderMetrics) RecordReadOutcome(chainSelector ccipocr3.ChainSe
 }
 
 func (o *observedReaderMetrics) RecordChainFee(chainSelector ccipocr3.ChainSelector, feeType string, value int64) {
-	attrs := append(chainAttrs(chainSelector), attribute.String("feeType", feeType))
+	attrs := append(chainAttrs(chainSelector), o.destAttrs...)
+	attrs = append(attrs, attribute.String("feeType", feeType))
 	o.bhChainFee.Record(context.Background(), value, metric.WithAttributes(attrs...))
 }
 
@@ -187,15 +242,21 @@ type configPollerMetrics struct {
 	pollFailure          metric.Int64Counter
 	overwrittenEmpty     metric.Int64Counter
 	lastSuccessTimestamp metric.Int64Gauge
+	destAttrs            []attribute.KeyValue
 }
 
-// NewConfigPollerMetrics registers the config poller instruments against m.
-// Returns a NoOp implementation (and no error) when m is nil.
-func NewConfigPollerMetrics(m metric.Meter) (ConfigPollerMetrics, error) {
+// NewConfigPollerMetrics registers the config poller instruments against m, scoped to
+// destChainSelector -- the destination chain the owning configPollerV2 instance serves. A node runs
+// one configPollerV2 per destination chain, and several of those instances can independently poll
+// the SAME source chain (e.g. two dest-chain lanes both listing Solana as a known source chain);
+// without destChainSelector here their series would collide into one per (chain, node_id),
+// indistinguishable from each other -- see destChainAttrs's doc comment. Returns a NoOp
+// implementation (and no error) when m is nil.
+func NewConfigPollerMetrics(m metric.Meter, destChainSelector ccipocr3.ChainSelector) (ConfigPollerMetrics, error) {
 	if m == nil {
 		return NoopConfigPollerMetrics{}, nil
 	}
-	cm := &configPollerMetrics{}
+	cm := &configPollerMetrics{destAttrs: destChainAttrs(destChainSelector)}
 	var err error
 	if cm.cacheAgeSeconds, err = m.Int64Gauge("ccip_reader_config_cache_age_seconds"); err != nil {
 		return nil, fmt.Errorf("register ccip_reader_config_cache_age_seconds: %w", err)
@@ -216,25 +277,29 @@ func NewConfigPollerMetrics(m metric.Meter) (ConfigPollerMetrics, error) {
 }
 
 func (c *configPollerMetrics) RecordCacheAge(chainSelector ccipocr3.ChainSelector, kind string, ageSeconds int64) {
-	attrs := append(chainAttrs(chainSelector), attribute.String("kind", kind))
+	attrs := append(chainAttrs(chainSelector), c.destAttrs...)
+	attrs = append(attrs, attribute.String("kind", kind))
 	c.cacheAgeSeconds.Record(context.Background(), ageSeconds, metric.WithAttributes(attrs...))
 }
 
 func (c *configPollerMetrics) RecordPollSuccess(chainSelector ccipocr3.ChainSelector) {
-	c.pollSuccess.Add(context.Background(), 1, metric.WithAttributes(chainAttrs(chainSelector)...))
+	attrs := append(chainAttrs(chainSelector), c.destAttrs...)
+	c.pollSuccess.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (c *configPollerMetrics) RecordPollFailure(chainSelector ccipocr3.ChainSelector) {
-	c.pollFailure.Add(context.Background(), 1, metric.WithAttributes(chainAttrs(chainSelector)...))
+	attrs := append(chainAttrs(chainSelector), c.destAttrs...)
+	c.pollFailure.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (c *configPollerMetrics) RecordOverwrittenEmpty(chainSelector ccipocr3.ChainSelector, kind string) {
-	attrs := append(chainAttrs(chainSelector), attribute.String("kind", kind))
+	attrs := append(chainAttrs(chainSelector), c.destAttrs...)
+	attrs = append(attrs, attribute.String("kind", kind))
 	c.overwrittenEmpty.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (c *configPollerMetrics) RecordLastSuccess(chainSelector ccipocr3.ChainSelector, epochSeconds int64) {
-	attrs := chainAttrs(chainSelector)
+	attrs := append(chainAttrs(chainSelector), c.destAttrs...)
 	c.lastSuccessTimestamp.Record(context.Background(), epochSeconds, metric.WithAttributes(attrs...))
 }
 
@@ -254,15 +319,16 @@ type accessorMetrics struct {
 	emptyRead        metric.Int64Counter
 	rowDrops         metric.Int64Counter
 	finalityViolated metric.Int64Counter
+	destAttrs        []attribute.KeyValue
 }
 
-// NewAccessorMetrics registers the accessor instruments against m.
-// Returns a NoOp implementation (and no error) when m is nil.
-func NewAccessorMetrics(m metric.Meter) (AccessorMetrics, error) {
+// NewAccessorMetrics registers the accessor instruments against m, scoped to destChainSelector (see
+// destChainAttrs). Returns a NoOp implementation (and no error) when m is nil.
+func NewAccessorMetrics(m metric.Meter, destChainSelector ccipocr3.ChainSelector) (AccessorMetrics, error) {
 	if m == nil {
 		return NoopAccessorMetrics{}, nil
 	}
-	am := &accessorMetrics{}
+	am := &accessorMetrics{destAttrs: destChainAttrs(destChainSelector)}
 	var err error
 	if am.batchResult, err = m.Int64Counter("ccip_reader_batch_result"); err != nil {
 		return nil, fmt.Errorf("register ccip_reader_batch_result: %w", err)
@@ -280,7 +346,8 @@ func NewAccessorMetrics(m metric.Meter) (AccessorMetrics, error) {
 }
 
 func (a *accessorMetrics) RecordBatchResult(operation string, chainSelector ccipocr3.ChainSelector, outcome string) {
-	attrs := append(chainAttrs(chainSelector),
+	attrs := append(chainAttrs(chainSelector), a.destAttrs...)
+	attrs = append(attrs,
 		attribute.String("operation", operation),
 		attribute.String("outcome", outcome),
 	)
@@ -288,12 +355,14 @@ func (a *accessorMetrics) RecordBatchResult(operation string, chainSelector ccip
 }
 
 func (a *accessorMetrics) RecordEmptyRead(operation string, chainSelector ccipocr3.ChainSelector) {
-	attrs := append(chainAttrs(chainSelector), attribute.String("operation", operation))
+	attrs := append(chainAttrs(chainSelector), a.destAttrs...)
+	attrs = append(attrs, attribute.String("operation", operation))
 	a.emptyRead.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
 func (a *accessorMetrics) RecordRowDrop(operation string, chainSelector ccipocr3.ChainSelector, reason string) {
-	attrs := append(chainAttrs(chainSelector),
+	attrs := append(chainAttrs(chainSelector), a.destAttrs...)
+	attrs = append(attrs,
 		attribute.String("operation", operation),
 		attribute.String("reason", reason),
 	)
@@ -301,5 +370,6 @@ func (a *accessorMetrics) RecordRowDrop(operation string, chainSelector ccipocr3
 }
 
 func (a *accessorMetrics) RecordFinalityViolated(chainSelector ccipocr3.ChainSelector) {
-	a.finalityViolated.Add(context.Background(), 1, metric.WithAttributes(chainAttrs(chainSelector)...))
+	attrs := append(chainAttrs(chainSelector), a.destAttrs...)
+	a.finalityViolated.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }

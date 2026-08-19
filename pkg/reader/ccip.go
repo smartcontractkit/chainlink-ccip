@@ -102,11 +102,11 @@ func newCCIPChainReaderWithConfigPollerInternal(
 		panic(fmt.Sprintf("failed to convert offramp address to string: %v", err))
 	}
 
-	rcMetrc, err := rcmetrics.NewReaderMetrics(meter)
+	rcMetrc, err := rcmetrics.NewReaderMetrics(meter, destChain)
 	if err != nil {
 		return nil, fmt.Errorf("init reader metrics: %w", err)
 	}
-	configPollerMetrics, err := rcmetrics.NewConfigPollerMetrics(meter)
+	configPollerMetrics, err := rcmetrics.NewConfigPollerMetrics(meter, destChain)
 	if err != nil {
 		return nil, fmt.Errorf("init config poller metrics: %w", err)
 	}
