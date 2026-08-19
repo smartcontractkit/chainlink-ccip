@@ -233,7 +233,7 @@ func (c *configPollerV2) GetChainConfig(
 	cache.chainConfigMu.RLock()
 	if !cache.chainConfigRefresh.IsZero() {
 		age := time.Since(cache.chainConfigRefresh)
-		c.metrics.RecordCacheAge(rcmetrics.ChainLabel(chainSel), "chain", int64(age.Seconds()))
+		c.metrics.RecordCacheAge(chainSel, "chain", int64(age.Seconds()))
 		defer cache.chainConfigMu.RUnlock()
 		c.lggr.Debugw("Returning cached chain config",
 			logutil.FieldChain, chainSel,
@@ -363,7 +363,7 @@ func (c *configPollerV2) recordSourceCacheAge(cache *chainCache) {
 	if cache.sourceChainRefresh.IsZero() {
 		return
 	}
-	c.metrics.RecordCacheAge(rcmetrics.ChainLabel(c.destChainSelector), "source",
+	c.metrics.RecordCacheAge(c.destChainSelector, "source",
 		int64(time.Since(cache.sourceChainRefresh).Seconds()))
 }
 
@@ -410,19 +410,13 @@ func (c *configPollerV2) refreshAllKnownChains() {
 	chainsToRefresh := c.getChainsToRefresh()
 
 	refreshFailed := false
-	now := time.Now()
 	for _, chain := range chainsToRefresh {
 		ctx, cancel := context.WithTimeout(context.Background(), bgRefreshTimeout)
-		chainLabel := rcmetrics.ChainLabel(chain)
 		c.lggr.Debugw("Issuing background refresh for known chain",
 			logutil.FieldChain, chain, logutil.FieldDestChain, c.destChainSelector)
 		if err := c.batchRefreshChainAndSourceConfigs(ctx, chain); err != nil {
 			refreshFailed = true
-			c.metrics.RecordPollFailure(chainLabel)
 			c.lggr.Warnw("Failed to batch refresh configs", logutil.FieldChain, chain, "error", err)
-		} else {
-			c.metrics.RecordPollSuccess(chainLabel)
-			c.metrics.RecordLastSuccess(chainLabel, now.Unix())
 		}
 		cancel()
 	}
@@ -461,6 +455,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	// Use chainAccessor to fetch ChainConfigSnapshot (and SourceChainConfigs if destChain)
 	accessor, err := getChainAccessor(c.chainAccessors, chainSel)
 	if err != nil {
+		c.metrics.RecordPollFailure(chainSel, "no_chain_accessor")
 		return fmt.Errorf("failed to get chain accessor for %s: %w", chainSel, err)
 	}
 
@@ -472,11 +467,13 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	)
 	if err != nil {
 		c.lggr.Errorw("Failed batch fetch via chainAccessor", logutil.FieldChain, chainSel, "error", err)
+		c.metrics.RecordPollFailure(chainSel, "batch_fetch_failed")
 		return err
 	}
 
 	cache := c.getOrCreateChainCache(chainSel)
 	if cache == nil {
+		c.metrics.RecordPollFailure(chainSel, "no_chain_cache")
 		return fmt.Errorf("failed to get chain cache for chain %s", chainSel)
 	}
 
@@ -488,7 +485,7 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 	// to RecordCacheAge instead of being masked.
 	cache.chainConfigMu.Lock()
 	if reflect.DeepEqual(chainConfigSnapshot, cciptypes.ChainConfigSnapshot{}) {
-		c.metrics.RecordOverwrittenEmpty("chain")
+		c.metrics.RecordOverwrittenEmpty(chainSel, "chain")
 		c.lggr.Warnw("chain config snapshot returned empty, keeping existing cached config",
 			logutil.FieldChain, chainSel)
 	} else {
@@ -519,6 +516,8 @@ func (c *configPollerV2) batchRefreshChainAndSourceConfigs(
 		"chainConfigSnapshot", chainConfigSnapshot,
 		"sourceChainConfigs", sourceChainConfigs,
 	)
+	c.metrics.RecordPollSuccess(chainSel)
+	c.metrics.RecordLastSuccess(chainSel, time.Now().Unix())
 	return nil
 }
 
