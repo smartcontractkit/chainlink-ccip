@@ -147,6 +147,20 @@ way to make this checklist wrong in practice, so the rule is:
    say so in `concerns`. You cannot tell "never happened" apart from "telemetry is broken" once
    you've already lost confidence in the pipeline.
 
+A **false-idle** caveat applies on top of rule 2 for a specific subset of `always_emitted: true`
+gauges: `pending_messages`, `offramp_lane_status`, `rmn_curse_active`, and `source_chain_cursed`.
+A genuinely healthy plugin keeps reporting these every round even while at rest — `pending_messages`
+per active lane (a `0` when caught up), `offramp_lane_status` for all four statuses, and the two
+curse gauges at `0` when not cursed. So an **empty** result for any of them (a lane under
+investigation showing *no series at all*, not a series sitting at `0`) is **not** a healthy "nothing
+going on" sign — under load it's the classic **false idle** signature: every oracle is silently
+starved of work the reader should have surfaced (flaky RPC, missed/unindexed events) and reports
+perfectly idle instead. On these gauges alone it's indistinguishable from real idle, so don't
+conclude healthy from their absence. Corroborate with the `data_source` group: an **increase** in
+reader errors (`ccip_reader_read_outcome_total{outcome="error"}` → `reader_read_outcome_error`) or
+in config-poller errors (`ccip_reader_config_poll_failure_total` → `config_poll_failure`) alongside
+the absence points at the reader layer / an RPC issue, not a quiet lane.
+
 For metric types, label sets, and the `_total`/`_bucket` suffix caveat, see
 [`uncommitted-message.md#metric-reference`](uncommitted-message.md#metric-reference).
 
@@ -222,7 +236,7 @@ checks:
     query: 'max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~"$sourceChains", destChainID=~"$destChain"})'
     severity: {info: true}
     owner: ccip-commit-oncall
-    note: "onRampMaxSeqNum - offRampNextSeqNum; no universal healthy value, watch for sustained growth not a single sample. Empty result here (no lanes matched) is UNKNOWN, not zero backlog -- this metric is always emitted per active lane"
+    note: "onRampMaxSeqNum - offRampNextSeqNum; no universal healthy value, watch for sustained growth not a single sample. Empty result here (no lanes matched) is UNKNOWN, not zero backlog -- this metric is always emitted per active lane. An empty result is ALSO not a healthy 'nothing pending' sign: a healthy plugin still reports this (at 0) for every active lane, so absent-while-load is false idle (upstream reader/RPC starving the lane) -- corroborate against reader_read_outcome_error / config_poll_failure"
 
   - id: range_truncated
     group: lane_throughput
@@ -254,7 +268,7 @@ checks:
     query: 'max by (sourceChainName, status) (ccip_commit_offramp_lane_status{sourceChainName=~"$sourceChains", destChainID=~"$destChain"})'
     severity: {crit_if: 'status="rmn_misconfigured" and result == 1', info_if: 'status=~"skipped_.*" and result == 1', ok_if: 'status="live" and result == 1'}
     owner: ccip-commit-oncall
-    note: "rmn_misconfigured flags real config drift (a lane still expecting RMN blessing while RMN is globally off); skipped_* are expected states, not unhealthy. Reported for all four statuses every round by design, so empty result is UNKNOWN, not \"no active lanes\""
+    note: "rmn_misconfigured flags real config drift (a lane still expecting RMN blessing while RMN is globally off); skipped_* are expected states, not unhealthy. Reported for all four statuses every round by design, so empty result is UNKNOWN, not \"no active lanes\" -- and not a healthy sign either: absence here is the false-idle signature (starved by an upstream reader/RPC issue), corroborate with reader_read_outcome_error / config_poll_failure before reading it as a quiet lane"
 
   # --- cursing & consensus ---
   - id: rmn_curse_active
@@ -263,7 +277,7 @@ checks:
     query: 'max(ccip_commit_rmn_curse_active{destChainID=~"$destChain", curse_type=~"global|destination"}) by (curse_type)'
     severity: {warn_if: "any series == 1", ok_if: "all series == 0"}
     owner: curse-owner
-    note: "halts ALL reporting for the dest chain while active; often intentional/incident-flagged (see uncommitted-message.md step4) -- WARN not CRIT because an active curse is frequently expected, not a plugin bug"
+    note: "halts ALL reporting for the dest chain while active; often intentional/incident-flagged (see uncommitted-message.md step4) -- WARN not CRIT because an active curse is frequently expected, not a plugin bug. Always emitted (at 0 when not cursed), so an empty result is UNKNOWN and NOT proof of 'not cursed' -- and curse state is served from the config-poller cache, so absence alongside rising config_poll_failure / reader_read_outcome_error means the reading itself is unreliable (a real curse unobserved = false idle on the curse checks)"
 
   - id: source_chain_cursed
     group: cursing_consensus
@@ -271,7 +285,7 @@ checks:
     query: 'max by (sourceChainName) (ccip_commit_source_chain_cursed{sourceChainName=~"$sourceChains", destChainID=~"$destChain"})'
     severity: {warn_if: "any series == 1", ok_if: "all series == 0"}
     owner: curse-owner
-    note: "per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active"
+    note: "per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active. Always emitted (at 0 when not cursed), so an empty result is UNKNOWN and not proof the lane is un-cursed -- corroborate with reader_read_outcome_error / config_poll_failure before trusting an absence as 'definitely not cursed'"
 
   - id: consensus_observation_failed
     group: cursing_consensus
@@ -420,8 +434,12 @@ Run per source chain (`$sourceChains` regex, default all lanes into `$destChain`
 `seqnum_invariant_violation` is the one `CRIT` here — it's explicitly documented in-code as a
 stall signal, not routine noise. `offramp_lane_status="rmn_misconfigured"` is the other `CRIT`:
 config drift, not a transient condition. Both `pending_messages` and `offramp_lane_status` are
-`always_emitted: true` — don't let an empty result for either read as "no lanes, nothing to
-worry about."
+`always_emitted: true` — an empty result is `UNKNOWN`, **not** "no lanes, nothing to worry about,"
+and under load it's the [false-idle](#empty-result-sets-the-rule-that-actually-matters) signature:
+a healthy plugin still reports both (at `0`/`live`) for every active lane, so their absence means
+work the reader should have surfaced isn't reaching the plugin. Corroborate an absence against the
+`data_source` group — a rising `reader_read_outcome_error` or `config_poll_failure` turns "no
+news" into "the reader layer / an RPC is the problem."
 
 ### Cursing & consensus
 
@@ -442,6 +460,13 @@ deployment its remote config is permanently empty, so `reason="insufficient_agre
 fires constantly and is pure noise, never a real finding — it's filtered out of the check rather
 than merely downgraded, since it isn't a signal worth surfacing at all while RMN stays disabled.
 
+`rmn_curse_active` and `source_chain_cursed` are the two `always_emitted: true` gauges here, so
+their absence is `UNKNOWN` — and **not** proof the chain/lane is un-cursed. Both are served from
+the config-poller cache (see `uncommitted-message.md` step4), so a rising `config_poll_failure` /
+`reader_read_outcome_error` makes a curse reading — or its absence — unreliable: a freshly-cast
+curse going unobserved is exactly the false-idle failure mode, a chain appearing healthy-quiet
+because the reader is no longer surfacing its real curse state.
+
 ### Data source (reader + config poller)
 
 This group is **upstream of the whole checklist**: it tests whether the commit plugin is healthy
@@ -459,6 +484,15 @@ which chain(s). `config_cache_stale` and `config_poller_liveness` are the two
 broken), and they're the ones to check before trusting the *cached* inputs behind step4
 (cursing) and the config-digest mismatch check above.
 
+This group is also the **corroborating evidence for the false-idle rule**: an *increase* in
+`reader_read_outcome_error` (`ccip_reader_read_outcome_total{outcome="error"}`) or
+`config_poll_failure` (`ccip_reader_config_poll_failure_total`) at the same time as lane/cursing
+gauges (`pending_messages`, `offramp_lane_status`, `rmn_curse_active`, `source_chain_cursed`) go
+silent is how you turn those absences from "looks idle" into "the reader layer / an RPC is plausibly
+the cause." The plugin isn't malformed; it's being fed nothing. Report it as one finding: the
+data-source error is the named cause, the absent gauges the symptom (see also the aggregation
+rule below).
+
 ### Report transmission
 
 `report_transmission_gave_up` is `CRIT`. `report_validation_rejected` is split by reason:
@@ -468,7 +502,7 @@ a fully empty result is `OK`, not `UNKNOWN`.
 ## Aggregation rule
 
 Overall status is the worst individual status, `CRIT` > `WARN` > `UNKNOWN` > `INFO`/`OK`, with
-two explicit combination rules:
+these explicit combination rules:
 
 - **`fchain_read_errors` (`WARN`) firing at the same time as `consensus_observation_failed`
   (`CRIT`) doesn't change the overall verdict (already `CRIT`) but should be called out together
@@ -495,6 +529,15 @@ two explicit combination rules:
   cause**.** Fold it in as the named cause with the outcome check as the symptom — do not report
   them as two unrelated problems (a plugin fed empty/partial/stale data is not broken; the reader
   layer feeding it is).
+- **The false-idle case folds into the same rule: absent always-emitted gauges
+  (`pending_messages`, `offramp_lane_status`, `rmn_curse_active`, `source_chain_cursed`) paired
+  with rising `reader_read_outcome_error` / `config_poll_failure` is ONE finding — the data source
+  / RPC as the named cause, the silent gauges as the symptom.** Do not report "no work, everything
+  quiet" and "reader errors" as two separate things: the reader errors are precisely what makes the
+  quiet look like false idle, and either alone — absent gauges without reader errors, or reader
+  errors while the gauges still emit — does not justify the false-idle conclusion (it could be a
+  genuinely unloaded lane, or a reader error the plugin absorbed without loss). It's their co-presence
+  that points at the reader layer or an RPC issue.
 
 `UNKNOWN` is never silently dropped to `OK` — but per the [empty-result rule](#empty-result-sets-the-rule-that-actually-matters),
 most checks should legitimately resolve `UNKNOWN` only when an `always_emitted: true` check comes
