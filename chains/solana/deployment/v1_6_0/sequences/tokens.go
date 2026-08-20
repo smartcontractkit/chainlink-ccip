@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -725,6 +726,178 @@ func (a *SolanaAdapter) GetOnchainRateLimits(
 			Rate:      new(big.Int).SetUint64(remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Rate),
 		},
 	}, nil
+}
+
+var _ tokenapi.TokenPoolMigrator = &SolanaAdapter{}
+
+// maxGetMultipleAccounts is the Solana JSON-RPC limit on pubkeys per getMultipleAccounts call.
+const maxGetMultipleAccounts = 100
+
+// batchGetAccounts fetches pdas via getMultipleAccounts (chunked to the RPC limit) instead of one
+// getAccountInfo round trip per pda. For every index whose account exists and whose data decodes
+// successfully into a fresh value from newAccountState, onFound is called with that index and the
+// decoded value.
+func batchGetAccounts(ctx context.Context, chain cldf_solana.Chain, pdas []solana.PublicKey, newAccountState func() any, onFound func(i int, accountState any) error) error {
+	for start := 0; start < len(pdas); start += maxGetMultipleAccounts {
+		end := min(start+maxGetMultipleAccounts, len(pdas))
+		resp, err := chain.Client.GetMultipleAccountsWithOpts(ctx, pdas[start:end], &rpc.GetMultipleAccountsOpts{
+			Commitment: cldf_solana.SolDefaultCommitment,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to batch-fetch accounts: %w", err)
+		}
+		for i, acct := range resp.Value {
+			if acct == nil {
+				continue
+			}
+			accountState := newAccountState()
+			if err := bin.NewBorshDecoder(acct.Data.GetBinary()).Decode(accountState); err != nil {
+				continue
+			}
+			if err := onFound(start+i, accountState); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// findTokenMintForPoolProgram resolves the token mint backing a burn-mint/lock-release pool program
+// deployed at poolProgramID on chainSelector. TokenPoolMigrator identifies a pool only by its
+// (program-wide, not per-mint) address, so the mint isn't available to callers - it's recovered by
+// batch-checking every SPL/SPL2022 token this environment knows about on chainSelector against the
+// pool config PDA it would derive (same idea as SolanaCCTPChainAdapter.findTokenMintForPool, but
+// as one getMultipleAccounts call instead of one getAccountInfo call per candidate).
+func (a *SolanaAdapter) findTokenMintForPoolProgram(e deployment.Environment, chainSelector uint64, poolProgramID solana.PublicKey) (solana.PublicKey, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return solana.PublicKey{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	var candidateMints []solana.PublicKey
+	var candidatePDAs []solana.PublicKey
+	for _, ref := range e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector)) {
+		if ref.Type != datastore.ContractType(utils.SPLTokens) && ref.Type != datastore.ContractType(utils.SPL2022Tokens) {
+			continue
+		}
+		mint, err := solana.PublicKeyFromBase58(ref.Address)
+		if err != nil {
+			continue
+		}
+		poolConfigPDA, err := tokens.TokenPoolConfigAddress(mint, poolProgramID)
+		if err != nil {
+			return solana.PublicKey{}, fmt.Errorf("failed to derive token pool config PDA for mint %s: %w", mint, err)
+		}
+		candidateMints = append(candidateMints, mint)
+		candidatePDAs = append(candidatePDAs, poolConfigPDA)
+	}
+
+	var found solana.PublicKey
+	err := batchGetAccounts(e.GetContext(), chain, candidatePDAs, func() any { return &burnmint_token_pool.State{} },
+		func(i int, _ any) error {
+			if found.IsZero() {
+				found = candidateMints[i]
+			}
+			return nil
+		})
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+	if found.IsZero() {
+		return solana.PublicKey{}, fmt.Errorf("failed to find token mint backing token pool program %s on chain %d", poolProgramID, chainSelector)
+	}
+	return found, nil
+}
+
+// GetSupportedChains implements tokenapi.TokenPoolMigrator. Solana pool programs expose no
+// instruction to enumerate configured remote chains, and their ChainConfig PDAs cannot be
+// reverse-derived from the pool address alone, so on-chain enumeration (as EVM does) isn't
+// possible. Instead every other chain selector this environment knows about is batch-probed (one
+// getMultipleAccounts call, chunked to the RPC limit, rather than one round trip per candidate)
+// for a ChainConfig account; the ones that resolve are the pool's supported chains.
+func (a *SolanaAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	poolProgramID := solana.PublicKeyFromBytes(poolAddr)
+	mint, err := a.findTokenMintForPoolProgram(e, chainSelector, poolProgramID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve token mint for pool %s on chain %d: %w", poolProgramID, chainSelector, err)
+	}
+
+	candidates := e.BlockChains.ListChainSelectors(cldf_chain.WithChainSelectorsExclusion([]uint64{chainSelector}))
+	pdas := make([]solana.PublicKey, len(candidates))
+	for i, candidate := range candidates {
+		pda, _, err := tokens.TokenPoolChainConfigPDA(candidate, mint, poolProgramID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive remote chain config PDA for candidate chain selector %d: %w", candidate, err)
+		}
+		pdas[i] = pda
+	}
+
+	var supported []uint64
+	err = batchGetAccounts(e.GetContext(), chain, pdas, func() any { return &burnmint_token_pool.ChainConfig{} },
+		func(i int, _ any) error {
+			supported = append(supported, candidates[i])
+			return nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to check remote chain configs for pool %s on chain %d: %w", poolProgramID, chainSelector, err)
+	}
+	return supported, nil
+}
+
+// GetRemoteToken implements tokenapi.TokenPoolMigrator.
+func (a *SolanaAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	poolProgramID := solana.PublicKeyFromBytes(poolAddr)
+	mint, err := a.findTokenMintForPoolProgram(e, chainSelector, poolProgramID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve token mint for pool %s on chain %d: %w", poolProgramID, chainSelector, err)
+	}
+	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, mint, poolProgramID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive remote chain config PDA for remote chain selector %d: %w", remoteSelector, err)
+	}
+	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
+	if err := chain.GetAccountDataBorshInto(e.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount); err != nil {
+		return nil, fmt.Errorf("pool %s on chain %d has no remote token registered for chain %d: %w", poolProgramID, chainSelector, remoteSelector, err)
+	}
+	remoteToken := remoteChainConfigAccount.Base.Remote.TokenAddress.Address
+	if len(remoteToken) == 0 {
+		return nil, fmt.Errorf("pool %s on chain %d has no remote token registered for chain %d", poolProgramID, chainSelector, remoteSelector)
+	}
+	return remoteToken, nil
+}
+
+// GetRemotePools implements tokenapi.TokenPoolMigrator.
+func (a *SolanaAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	poolProgramID := solana.PublicKeyFromBytes(poolAddr)
+	mint, err := a.findTokenMintForPoolProgram(e, chainSelector, poolProgramID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve token mint for pool %s on chain %d: %w", poolProgramID, chainSelector, err)
+	}
+	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, mint, poolProgramID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive remote chain config PDA for remote chain selector %d: %w", remoteSelector, err)
+	}
+	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
+	if err := chain.GetAccountDataBorshInto(e.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount); err != nil {
+		return nil, fmt.Errorf("failed to get remote pools for pool %s on chain %d for remote chain %d: %w", poolProgramID, chainSelector, remoteSelector, err)
+	}
+	remotePools := make([][]byte, 0, len(remoteChainConfigAccount.Base.Remote.PoolAddresses))
+	for _, p := range remoteChainConfigAccount.Base.Remote.PoolAddresses {
+		remotePools = append(remotePools, p.Address)
+	}
+	return remotePools, nil
 }
 
 func (a *SolanaAdapter) DeployToken() *cldf_ops.Sequence[tokenapi.DeployTokenInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
