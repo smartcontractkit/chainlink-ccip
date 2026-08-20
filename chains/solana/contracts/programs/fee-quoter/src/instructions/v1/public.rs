@@ -188,10 +188,7 @@ fn fee_for_msg(
     let dest_bytes_overhead = additional_token_configs_for_dest_chain
         .iter()
         .map(|config| match config {
-            Some(config)
-                if config.token_transfer_config.is_enabled
-                    && config.token_transfer_config.dest_bytes_overhead > 0 =>
-            {
+            Some(config) if config.token_transfer_config.dest_bytes_overhead > 0 => {
                 config.token_transfer_config.dest_bytes_overhead
             }
             _ => CCIP_LOCK_OR_BURN_V1_RET_BYTES,
@@ -906,6 +903,46 @@ mod tests {
             .amount;
 
         assert!(fee_with_accounts > fee_without_accounts);
+    }
+
+    #[test]
+    fn dest_bytes_overhead_override_is_used_even_when_token_fee_config_is_disabled() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let mut chain = sample_dest_chain();
+        chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+        chain.config.max_data_bytes = 500;
+
+        let (token_config, mut per_chain_per_token_config) = sample_additional_token();
+        per_chain_per_token_config.token_transfer_config.is_enabled = false;
+        per_chain_per_token_config
+            .token_transfer_config
+            .dest_bytes_overhead = 640;
+
+        let mut message = sample_message();
+        message.token_amounts = vec![SVMTokenAmount {
+            token: per_chain_per_token_config.mint,
+            amount: 1,
+        }];
+        message.extra_args = SVMExtraArgsV1 {
+            compute_units: 0,
+            allow_out_of_order_execution: true,
+            token_receiver: [1; 32],
+            ..Default::default()
+        }
+        .serialize_with_tag();
+
+        assert_eq!(
+            fee_for_msg(
+                &message,
+                &chain,
+                &sample_billing_config(),
+                &[Some(token_config)],
+                &[Some(per_chain_per_token_config)]
+            )
+            .unwrap_err(),
+            FeeQuoterError::MessageTooLarge.into()
+        );
     }
 
     pub fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
