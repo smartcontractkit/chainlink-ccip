@@ -49,14 +49,14 @@ type TokenTransferConfig struct {
 	// automatically with (token, pool, decimals, rate limits, and MigrationMetadata). Legacy lane fees are read
 	// from the fee quoter (v1.6+) or onramp (v1.5) and merged with any user-provided tokenTransferFeeConfig on each
 	// remote (set YAML fields win; unset fields are imported). Resolved connectivity, rate limits, and migration
-	// metadata are passed to ConfigureTokenForTransfersSequence for on-chain apply. Migration relies on the
-	// legacy (pre-V2 active pool) adapter implementing the TokenPoolMigrator interface; when it does, discovery
-	// also requires the RateLimitReaderAdapter interface. See (4) for when the migrator is absent. This knob has
-	// no effect if any of the following are true:
+	// metadata are passed to ConfigureTokenForTransfersSequence for on-chain apply. Forward migration runs only
+	// for a genuine V2 upgrade (configured target pool is v2.0.0+) and requires the legacy (pre-V2 active pool)
+	// adapter to implement the TokenPoolMigrator interface; discovery also requires the RateLimitReaderAdapter
+	// interface. This knob has no effect if any of the following are true:
 	//  (1) There is no active pool in TAR for the token
 	//  (2) The active pool in TAR is already the target pool (extend mode)
 	//  (3) The active pool in TAR is already v2.0.0 or higher
-	//  (4) The active pool's chain family is not on V2, so its adapter has no token pool migrator - the knob is a no-op for that chain since there is no V2 pool to migrate to
+	//  (4) The configured target pool is not v2.0.0+ (i.e. there is no V2 pool to migrate to), so the knob is a no-op for that chain regardless of its adapter's interfaces
 	//
 	// When discovery is skipped, the changeset logs at info level and does not error. Remote chains,
 	// connectivity, and fees are taken only from explicit RemoteChains YAML (same as autoMigrateRemoteChains: false).
@@ -85,8 +85,10 @@ type TokenTransferConfig struct {
 	//  - Forward propagation: A_new's RemoteChains are populated with all remotes discovered from the
 	//    active pool (A's legacy remotes B and C), so A_new is configured to reach B and C.
 	//  - Reverse propagation: B and C are each told to add A_new as an additional remote pool, so the
-	//    web stays reachable from B/C back to A_new. Same-batch peers being migrated in this changeset
-	//    are skipped for reverse propagation; forward config wires them instead.
+	//    web stays reachable from B/C back to A_new. Same-batch peers that are being REPLACED in this
+	//    changeset (their target pool differs from their active pool) are skipped for reverse
+	//    propagation; forward config wires them instead. Same-batch peers that are not being replaced
+	//    (e.g. non-V2 chains like Solana) are still reverse-propagated into so the web stays connected.
 	//
 	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
@@ -242,35 +244,39 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 						if err != nil {
 							return nil, nil, nil, fmt.Errorf("failed to resolve adapter for active pool on chain selector %d: %w", selector, err)
 						}
-						// Capability-based gate: only families whose legacy adapter implements the
-						// TokenPoolMigrator interface can be the source of an auto-migration (e.g.
-						// EVM on V2). A family that is not on V2 intentionally has no migrator, so
-						// treat auto-migrate as a no-op for that chain instead of hard failing the
-						// changeset.
-						legacyPoolMigrator, ok = legacyAdapter.(TokenPoolMigrator)
-						if !ok {
-							e.Logger.Infof("adapter for active pool version %s on chain selector %d does not support token pool migration, skipping auto-migration of remote chains", activePoolRef.Version, selector)
-						} else {
-							legacyRateLimitReader, ok = legacyAdapter.(RateLimitReaderAdapter)
-							if !ok {
-								return nil, nil, nil, fmt.Errorf(
-									"adapter for active pool version %s on chain selector %d does not implement RateLimitReaderAdapter",
-									activePoolRef.Version, selector,
-								)
-							}
-							tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
-							if err != nil {
-								return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
-							}
-							localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
-							if err != nil {
-								return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
-							}
-							if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
-								return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
+						// Auto-migration is only meaningful for a genuine V2 upgrade, so require the configured
+						// target pool to be v2.0.0+ - keying this on the target's version (rather than on which
+						// interfaces the active-pool adapter happens to implement) keeps the gate robust across
+						// chain families including adapters which implement TokenPoolMigrator while their chain
+						// is still not on V2. The active-pool adapter must also implement the TokenPoolMigrator
+						// interface for the discovery body to run; if either condition fails, auto-migrate is a
+						// no-op for that chain.
+						if tokenPool.Version != nil && tokenPool.Version.GreaterThanEqual(utils.Version_2_0_0) {
+							if legacyPoolMigrator, ok = legacyAdapter.(TokenPoolMigrator); ok {
+								if legacyRateLimitReader, ok = legacyAdapter.(RateLimitReaderAdapter); !ok {
+									return nil, nil, nil, fmt.Errorf(
+										"adapter for active pool version %s on chain selector %d does not implement RateLimitReaderAdapter",
+										activePoolRef.Version, selector,
+									)
+								}
+								tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
+								if err != nil {
+									return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
+								}
+								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
+								if err != nil {
+									return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
+								}
+								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
+									return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
+								} else {
+									allRemoteSelectors = supported
+								}
 							} else {
-								allRemoteSelectors = supported
+								e.Logger.Infof("adapter for active pool version %s on chain selector %d does not support token pool migration, skipping auto-migration of remote chains", activePoolRef.Version, selector)
 							}
+						} else {
+							e.Logger.Infof("Active pool version %s on chain selector %d has no v2.0.0+ migration target, skipping auto-migration of remote chains", activePoolRef.Version, selector)
 						}
 					} else {
 						e.Logger.Infof("Active pool on chain selector %d is already v2.0.0 or higher, skipping auto-migration of remote chains", selector)
@@ -465,21 +471,23 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
 			for _, ru := range discoveredRemotes {
-				// NOTE: for a counterpart being *REPLACED* in the same batch we skip reverse-propagation:
-				// running the full `ConfigureTokenForTransfers()` sequence on its not-yet-live pool would
-				// activate it `setPool()` prematurely so its own subsequent migration pass sees itself as
-				// "already the target pool", and skips auto-migration entirely (losing its legacy remotes
-				// and reverse-propagation). Wiring between same-batch peers is handled by each pool's own
-				// forward config; reverse-propagation only needs to reach every NON-migrating counterpart
-				// (already-active v2 or v1 pools) to keep them reachable.
+				// After a pool migrates reverse-propagation tells every peer it was connected to about the new
+				// pool, keeping the web reachable in both directions. We skip one case: a same-batch peer that
+				// is itself being REPLACED — its new pool isn't live yet, so configuring it now would activate
+				// it too early and break that peer's own migration. Its own forward config wires it instead.
 				//
-				// "Being replaced" is decided by capability, not by batch membership alone: a peer present
-				// in cfg but whose adapter has no TokenPoolMigrator is NOT being replaced, so it is safe —
-				// and necessary — to reverse-propagate into it so it stays reachable from this migration's
-				// new pool. Only a same-batch peer that is actually on V2 (i.e. its adapter implements the
-				// TokenPoolMigrator interface) is skipped.
+				// A peer is being replaced exactly when its configured TARGET pool is V2 (>= 2.0.0): such a
+				// peer is skipped. Any peer with a pre-V2 target is not being replaced and must still learn
+				// about the new pool. Example: in one batch say we migrate A and C to A2/C2 while B remains
+				// on its v1 pool. Processing A tells B about A2 but leaves C alone (C is getting C2 in this
+				// same batch); processing C tells B about C2 and leaves A alone. So B learns both A2 and C2,
+				// C2 pairs with A2 via C's own forward config, A2 pairse with C2 via A's own forward config,
+				// and the web stays fully connected.
+				//
+				// Deciding by the target version (not by which interfaces the peer's adapter implements) stays
+				// correct even if a non-V2 family later adds a migrator.
 				if _, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
-					if _, hasMigrator := ru.remoteAdapter.(TokenPoolMigrator); hasMigrator {
+					if ru.remotePoolRef.Version != nil && ru.remotePoolRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
 						continue
 					}
 				}
