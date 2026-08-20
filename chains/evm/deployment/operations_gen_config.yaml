@@ -608,6 +608,14 @@ contracts:
       - name: getFee
         access: public
 
+  - contract_name: VersionedVerifierResolver
+    version: "2.0.0"
+    functions:
+      - name: getFeeAggregator
+        access: public
+      - name: setFeeAggregator
+        access: owner
+
   - contract_name: CommitteeVerifier
     version: "2.0.0"
     functions:
