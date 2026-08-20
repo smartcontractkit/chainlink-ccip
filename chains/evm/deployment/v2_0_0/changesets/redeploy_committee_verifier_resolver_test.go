@@ -236,11 +236,12 @@ func redeployResolverDataStore(t *testing.T, f redeployResolverFixture, withLega
 	return ds.Seal()
 }
 
-func redeployResolverInput() cs_changesets.WithMCMS[changesets.RedeployCommitteeVerifierResolverCfg] {
+func redeployResolverInput(f redeployResolverFixture) cs_changesets.WithMCMS[changesets.RedeployCommitteeVerifierResolverCfg] {
 	return cs_changesets.WithMCMS[changesets.RedeployCommitteeVerifierResolverCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.RedeployCommitteeVerifierResolverCfg{
 			ChainSelectors:           []uint64{redeployResolverChainSel},
+			CanonicalCREATE2Factory:  f.create2Factory,
 			DisableTransferOwnership: true,
 		},
 	}
@@ -256,7 +257,7 @@ func newRedeployResolverEnv(t *testing.T, withLegacyOnRamp bool) (*deployment.En
 }
 
 func TestRedeployCommitteeVerifierResolver_VerifyPreconditions(t *testing.T) {
-	e, _ := newRedeployResolverEnv(t, true)
+	e, f := newRedeployResolverEnv(t, true)
 	cs := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil)
 
 	tests := []struct {
@@ -276,6 +277,22 @@ func TestRedeployCommitteeVerifierResolver_VerifyPreconditions(t *testing.T) {
 			expectedErr: "at least one chain must be configured",
 		},
 		{
+			desc: "canonical factory not set",
+			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
+				cfg.CanonicalCREATE2Factory = common.Address{}
+			},
+			expectedErr: "CanonicalCREATE2Factory is required",
+		},
+		{
+			// This is the Polygon and Base case. The chain has a CREATE2 factory at
+			// a non-canonical address, so every CREATE2 address on it differs.
+			desc: "factory is not at the canonical address",
+			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
+				cfg.CanonicalCREATE2Factory = common.HexToAddress("0xdead")
+			},
+			expectedErr: "but the canonical factory is at",
+		},
+		{
 			desc: "chain not in environment",
 			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
 				cfg.ChainSelectors = []uint64{redeployResolverInboundOnlySel}
@@ -293,7 +310,7 @@ func TestRedeployCommitteeVerifierResolver_VerifyPreconditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			input := redeployResolverInput()
+			input := redeployResolverInput(f)
 			test.mutate(&input.Cfg)
 			err := cs.VerifyPreconditions(*e, input)
 			if test.expectedErr != "" {
@@ -310,7 +327,7 @@ func TestRedeployCommitteeVerifierResolver_Apply(t *testing.T) {
 	chain := e.BlockChains.EVMChains()[redeployResolverChainSel]
 
 	out, err := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
-		Apply(*e, redeployResolverInput())
+		Apply(*e, redeployResolverInput(f))
 	require.NoError(t, err)
 
 	refs, err := out.DataStore.Addresses().Fetch()
@@ -393,7 +410,7 @@ func TestRedeployCommitteeVerifierResolver_Apply_WithoutLegacyOnRamp(t *testing.
 	chain := e.BlockChains.EVMChains()[redeployResolverChainSel]
 
 	_, err := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
-		Apply(*e, redeployResolverInput())
+		Apply(*e, redeployResolverInput(f))
 	require.NoError(t, err)
 
 	// The legacy OnRamp keeps the old resolver, because the datastore has no
@@ -402,10 +419,10 @@ func TestRedeployCommitteeVerifierResolver_Apply_WithoutLegacyOnRamp(t *testing.
 }
 
 func TestRedeployCommitteeVerifierResolver_Apply_FailsWhenAlreadyCanonical(t *testing.T) {
-	e, _ := newRedeployResolverEnv(t, true)
+	e, f := newRedeployResolverEnv(t, true)
 
 	out, err := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
-		Apply(*e, redeployResolverInput())
+		Apply(*e, redeployResolverInput(f))
 	require.NoError(t, err)
 
 	// Merge the result back. The resolver now sits at its canonical address, so a
@@ -424,15 +441,15 @@ func TestRedeployCommitteeVerifierResolver_Apply_FailsWhenAlreadyCanonical(t *te
 	e.DataStore = merged.Seal()
 
 	_, err = changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
-		Apply(*e, redeployResolverInput())
+		Apply(*e, redeployResolverInput(f))
 	require.ErrorContains(t, err, "already at the canonical CREATE2 address")
 }
 
 func TestRedeployCommitteeVerifierResolver_Apply_FailsWithoutResolverRef(t *testing.T) {
-	e, _ := newRedeployResolverEnv(t, true)
+	e, f := newRedeployResolverEnv(t, true)
 	e.DataStore = datastore.NewMemoryDataStore().Seal()
 
 	_, err := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
-		Apply(*e, redeployResolverInput())
+		Apply(*e, redeployResolverInput(f))
 	require.ErrorContains(t, err, `no CommitteeVerifierResolver with qualifier "default" found`)
 }

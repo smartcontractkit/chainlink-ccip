@@ -37,6 +37,17 @@ const (
 type RedeployCommitteeVerifierResolverCfg struct {
 	// ChainSelectors are the chains to repair.
 	ChainSelectors []uint64
+	// CanonicalCREATE2Factory is the expected address of the CREATE2 factory in
+	// this environment. The changeset fails if any chain has a factory at a
+	// different address.
+	//
+	// The CREATE2 address of the resolver is a function of the factory address,
+	// because ComputeAddress is a call on the factory. The factory itself is
+	// deployed with plain CREATE, so its address depends on the deployer and the
+	// nonce. A chain that got the factory at a different address therefore has
+	// every CREATE2 contract at a different address, the resolver included. Such
+	// a chain needs a canonical factory before this changeset can repair it.
+	CanonicalCREATE2Factory common.Address
 	// CommitteeQualifier is the qualifier of the committee. It defaults to "default".
 	CommitteeQualifier string
 	// DisableTransferOwnership keeps the new resolver on the deployer key. Use it
@@ -72,8 +83,12 @@ func (c RedeployCommitteeVerifierResolverCfg) Qualifier() string {
 //     belong to the timelock, so these writes become an MCMS proposal.
 //  5. It transfers ownership of the new resolver to the timelock.
 //
-// The changeset takes only a chain list. The resolver is chain-local, so the old
-// resolver, the ramp configs, and the CREATE2 factory ref give every other value.
+// The changeset takes a chain list and the canonical CREATE2 factory address. The
+// resolver is chain-local, so the old resolver, the ramp configs, and the CREATE2
+// factory ref give every other value.
+//
+// A preflight check rejects any chain whose CREATE2 factory is not at the
+// canonical address. See CanonicalCREATE2Factory for the reason.
 func RedeployCommitteeVerifierResolver(
 	mcmsRegistry *cs_changesets.MCMSReaderRegistry,
 	transferOwnershipReg *deploy.TransferOwnershipAdapterRegistry,
@@ -89,6 +104,9 @@ func makeVerifyRedeployCommitteeVerifierResolver() func(cldf_deployment.Environm
 		if len(cfg.Cfg.ChainSelectors) == 0 {
 			return fmt.Errorf("at least one chain must be configured")
 		}
+		if cfg.Cfg.CanonicalCREATE2Factory == (common.Address{}) {
+			return fmt.Errorf("CanonicalCREATE2Factory is required")
+		}
 		qualifier := cfg.Cfg.Qualifier()
 		for _, chainSel := range cfg.Cfg.ChainSelectors {
 			if _, ok := e.BlockChains.EVMChains()[chainSel]; !ok {
@@ -98,8 +116,16 @@ func makeVerifyRedeployCommitteeVerifierResolver() func(cldf_deployment.Environm
 			if _, err := findResolverRef(refs, qualifier); err != nil {
 				return fmt.Errorf("chain %d: %w", chainSel, err)
 			}
-			if _, err := findCREATE2Factory(refs); err != nil {
+			factory, err := findCREATE2Factory(refs)
+			if err != nil {
 				return fmt.Errorf("chain %d: %w", chainSel, err)
+			}
+			if factory != cfg.Cfg.CanonicalCREATE2Factory {
+				return fmt.Errorf(
+					"chain %d: CREATE2Factory is at %s, but the canonical factory is at %s. "+
+						"Every CREATE2 address on this chain, the resolver included, derives from the factory address. "+
+						"Deploy the canonical factory on this chain and update the datastore ref before you run this changeset",
+					chainSel, factory.Hex(), cfg.Cfg.CanonicalCREATE2Factory.Hex())
 			}
 		}
 		return nil
