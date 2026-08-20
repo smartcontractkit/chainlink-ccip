@@ -14,6 +14,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -156,6 +157,13 @@ func (ma *transfersTest_MockTokenAdapter) DeriveTokenAddress(e deployment.Enviro
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
 	return 18, nil
+}
+
+// GetOnchainRateLimits makes transfersTest_MockTokenAdapter implement RateLimitReaderAdapter while
+// deliberately NOT implementing TokenPoolMigrator. This mirrors the shape of a real non-V2 adapter
+// (e.g. Solana): it can read rate limits but has no pool migrator.
+func (ma *transfersTest_MockTokenAdapter) GetOnchainRateLimits(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, _ uint64, _ datastore.AddressRef, _ datastore.AddressRef, _ uint64, _ bool) (tokens.OnchainRateLimits, error) {
+	return tokens.OnchainRateLimits{}, nil
 }
 
 func (ma *transfersTest_MockTokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
@@ -1136,4 +1144,101 @@ func TestLegacyRateLimitsForAutoMigrate(t *testing.T) {
 			require.Equal(t, 0, tt.wantInbound.Rate.Cmp(got.Inbound.Rate))
 		})
 	}
+}
+
+type transfersTest_MockTokenAdminRegistryReader struct {
+	activePool []byte
+}
+
+func (r *transfersTest_MockTokenAdminRegistryReader) GetActivePool(_ deployment.Environment, _ uint64, _ datastore.AddressRef, _ ...datastore.AddressRef) ([]byte, error) {
+	return r.activePool, nil
+}
+
+func (r *transfersTest_MockTokenAdminRegistryReader) GetTokenAdminRegistryRef(_ deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
+	return datastore.AddressRef{ChainSelector: chainSelector}, nil
+}
+
+// transfersTest_IdentityNormalizer passes addresses through unchanged. It is registered for the
+// EVM family only in tests that need to reach the auto-migrate discovery path (which requires an
+// address normalizer). It is safe for sibling tests, which use non-hexaddresses that would trip a
+// real EVM normalizer.
+type transfersTest_IdentityNormalizer struct{}
+
+func (transfersTest_IdentityNormalizer) NormalizeAddress(address string) (string, error) {
+	return address, nil
+}
+
+func (transfersTest_IdentityNormalizer) BytesToString(address []byte) (string, error) {
+	return string(address), nil
+}
+
+func (transfersTest_IdentityNormalizer) StringToBytes(address string) ([]byte, error) {
+	return []byte(address), nil
+}
+
+// TestAutoMigrate_NonMigratableSourceSkips exercises the case where a chain sets
+// AutoMigrateRemoteChains=true but its legacy adapter does not implement TokenPoolMigrator (e.g.
+// Solana, which is not on V2). This must be treated as a no-op that skips auto-migration discovery
+// for that chain rather than a hard error. The active pool is registered and differs from the target
+// pool and is pre-V2, so the code genuinely reaches the migrator capability check.
+func TestAutoMigrate_NonMigratableSourceSkips(t *testing.T) {
+	const sel = 5009297550715157269
+	const (
+		targetPoolAddr = "target-pool"
+		activePoolAddr = "legacy-active-pool"
+	)
+
+	// Register mocks idempotently on the singleton registries. The "evm" normalizer is an identity
+	// normalizer so test addresses flow through unchanged.
+	tokenRegistry := tokens.GetTokenAdapterRegistry()
+
+	// Use a distinct pre-V2 version (1.5.0) so this test resolves its OWN adapter instance and is
+	// isolated from the shared mock that TestConfigureTokensForTransfers_Apply mutates (it sets
+	// error fields without clearing them, and RegisterTokenAdapter is a no-op once registered).
+	mockAdapter := &transfersTest_MockTokenAdapter{}
+	tokenRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.5.0"), mockAdapter)
+	tokenRegistry.RegisterTokenRefResolver("evm", mockAdapter)
+	tokenRegistry.RegisterTokenAdminRegistryReader("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
+	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, transfersTest_IdentityNormalizer{})
+	changesets.GetRegistry().RegisterMCMSReader("evm", &MockReader{})
+
+	legacyVersion := semver.MustParse("1.5.0")
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: sel, Address: targetPoolAddr, Type: "TokenPool", Version: legacyVersion, Qualifier: "default",
+	}))
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: sel, Address: activePoolAddr, Type: "TokenPool", Version: legacyVersion, Qualifier: "legacy-active",
+	}))
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: sel, Address: "registry", Type: "Registry", Version: legacyVersion,
+	}))
+
+	lggr, err := logger.New()
+	require.NoError(t, err)
+	bundle := cldf_ops.NewBundle(func() context.Context { return context.Background() }, lggr, cldf_ops.NewMemoryReporter())
+	env := deployment.Environment{OperationsBundle: bundle, Logger: lggr, DataStore: ds.Seal()}
+
+	cfg := tokens.ConfigureTokensForTransfersConfig{
+		Tokens: []tokens.TokenTransferConfig{
+			{
+				AutoMigrateRemoteChains: true,
+				ChainSelector:           sel,
+				TokenPoolRef: datastore.AddressRef{
+					Type: "TokenPool", Version: legacyVersion, ChainSelector: sel, Qualifier: "default",
+				},
+				RegistryRef: datastore.AddressRef{
+					Type: "Registry", Version: legacyVersion, ChainSelector: sel,
+				},
+			},
+		},
+		MCMS: basicMCMSInput,
+	}
+
+	// Regression: a pre-V2 source whose adapter has no TokenPoolMigrator must not error. Auto-migrate
+	// discovery and reverse-propagation are skipped for the non-migratable source (no batch ops are
+	// fabricated for it), and the changeset otherwise completes normally.
+	changeset := tokens.ConfigureTokensForTransfers(tokenRegistry, changesets.GetRegistry())
+	_, err = changeset.Apply(env, cfg)
+	require.NoError(t, err)
 }
