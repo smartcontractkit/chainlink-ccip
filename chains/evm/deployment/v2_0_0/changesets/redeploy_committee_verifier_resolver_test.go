@@ -41,17 +41,22 @@ var (
 	redeployResolverInboundOnlySel = chainsel.TEST_90000003.Selector
 
 	redeployResolverVersionTag = [4]byte{0xe9, 0xa0, 0x5a, 0x20}
+
+	// redeployResolverExtraVerifier is a second required verifier of a
+	// MockReceiver. The changeset must keep it.
+	redeployResolverExtraVerifier = common.HexToAddress("0x0A")
 )
 
 // redeployResolverFixture holds the contracts of the simulated chain.
 type redeployResolverFixture struct {
-	verifier        common.Address
-	oldResolver     common.Address
-	canonicalOnRamp common.Address
-	legacyOnRamp    common.Address
-	offRamp         common.Address
-	mockReceiver    common.Address
-	create2Factory  common.Address
+	verifier          common.Address
+	oldResolver       common.Address
+	canonicalOnRamp   common.Address
+	legacyOnRamp      common.Address
+	offRamp           common.Address
+	mockReceiver      common.Address
+	unrelatedReceiver common.Address
+	create2Factory    common.Address
 }
 
 // deployRedeployResolverFixture builds a chain in the broken state: a resolver
@@ -85,22 +90,34 @@ func deployRedeployResolverFixture(t *testing.T, e *deployment.Environment) rede
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
 
+	// This receiver requires two verifiers. Only the resolver may change; the
+	// second entry must survive the redeployment.
 	mockReceiver, tx, _, err := mock_receiver_bindings.DeployMockReceiverV2(
 		chain.DeployerKey, chain.Client,
-		[]common.Address{oldResolver}, []common.Address{}, 0,
+		[]common.Address{oldResolver, redeployResolverExtraVerifier}, []common.Address{}, 0,
+	)
+	require.NoError(t, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
+
+	// This receiver never names the resolver, so it must be left alone.
+	unrelatedReceiver, tx, _, err := mock_receiver_bindings.DeployMockReceiverV2(
+		chain.DeployerKey, chain.Client,
+		[]common.Address{redeployResolverExtraVerifier}, []common.Address{}, 0,
 	)
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
 
 	return redeployResolverFixture{
-		verifier:        verifier,
-		oldResolver:     oldResolver,
-		canonicalOnRamp: deployTestOnRamp(t, chain, oldResolver),
-		legacyOnRamp:    deployTestOnRamp(t, chain, oldResolver),
-		offRamp:         deployTestOffRamp(t, chain, oldResolver),
-		mockReceiver:    mockReceiver,
-		create2Factory:  deployRedeployResolverCREATE2Factory(t, e),
+		verifier:          verifier,
+		oldResolver:       oldResolver,
+		canonicalOnRamp:   deployTestOnRamp(t, chain, oldResolver),
+		legacyOnRamp:      deployTestOnRamp(t, chain, oldResolver),
+		offRamp:           deployTestOffRamp(t, chain, oldResolver),
+		mockReceiver:      mockReceiver,
+		unrelatedReceiver: unrelatedReceiver,
+		create2Factory:    deployRedeployResolverCREATE2Factory(t, e),
 	}
 }
 
@@ -229,6 +246,8 @@ func redeployResolverDataStore(t *testing.T, f redeployResolverFixture, withLega
 	add(datastore.ContractType(offramp_ops.ContractType), offramp_ops.Version, "", f.offRamp)
 	add(datastore.ContractType(mock_receiver_ops.ContractType), mock_receiver_ops.Version,
 		redeployResolverQualifier, f.mockReceiver)
+	add(datastore.ContractType(mock_receiver_ops.ContractType), mock_receiver_ops.Version,
+		"unrelated", f.unrelatedReceiver)
 	add(datastore.ContractType(create2_factory.ContractType), create2_factory.Version, "", f.create2Factory)
 	if withLegacyOnRamp {
 		add(datastore.ContractType(onramp_ops.ContractType), onramp_ops.Version, "legacy", f.legacyOnRamp)
@@ -275,6 +294,13 @@ func TestRedeployCommitteeVerifierResolver_VerifyPreconditions(t *testing.T) {
 				cfg.ChainSelectors = nil
 			},
 			expectedErr: "at least one chain must be configured",
+		},
+		{
+			desc: "duplicate chain selector",
+			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
+				cfg.ChainSelectors = []uint64{redeployResolverChainSel, redeployResolverChainSel}
+			},
+			expectedErr: "appears more than once",
 		},
 		{
 			desc: "canonical factory not set",
@@ -350,8 +376,9 @@ func TestRedeployCommitteeVerifierResolver_Apply(t *testing.T) {
 	newResolver := common.HexToAddress(resolverRefs[0].Address)
 	assert.NotEqual(t, f.oldResolver, newResolver, "the resolver must move to a new address")
 
-	// The MockReceiver ref keeps its qualifier and carries a new address.
-	require.Len(t, mockRefs, 1)
+	// Only the receiver that names the old resolver is redeployed. Its ref keeps
+	// the qualifier and carries a new address.
+	require.Len(t, mockRefs, 1, "the unrelated MockReceiver must not be redeployed")
 	assert.Equal(t, redeployResolverQualifier, mockRefs[0].Qualifier)
 	newMockReceiver := common.HexToAddress(mockRefs[0].Address)
 	assert.NotEqual(t, f.mockReceiver, newMockReceiver)
@@ -371,12 +398,19 @@ func TestRedeployCommitteeVerifierResolver_Apply(t *testing.T) {
 	assert.Equal(t, redeployResolverVersionTag, inbound[0].Version)
 	assert.Equal(t, f.verifier, inbound[0].Verifier)
 
-	// The MockReceiver requires the new resolver.
+	// The MockReceiver swaps the resolver and keeps its other required verifier.
 	receiver, err := mock_receiver_bindings.NewMockReceiverV2(newMockReceiver, chain.Client)
 	require.NoError(t, err)
 	ccvs, err := receiver.GetCCVsAndFinalityConfig(nil, redeployResolverChainSel, []byte{})
 	require.NoError(t, err)
-	assert.Equal(t, []common.Address{newResolver}, ccvs.RequiredVerifier)
+	assert.Equal(t, []common.Address{newResolver, redeployResolverExtraVerifier}, ccvs.RequiredVerifier)
+
+	// The unrelated receiver is untouched on chain.
+	unrelated, err := mock_receiver_bindings.NewMockReceiverV2(f.unrelatedReceiver, chain.Client)
+	require.NoError(t, err)
+	unrelatedCCVs, err := unrelated.GetCCVsAndFinalityConfig(nil, redeployResolverChainSel, []byte{})
+	require.NoError(t, err)
+	assert.Equal(t, []common.Address{redeployResolverExtraVerifier}, unrelatedCCVs.RequiredVerifier)
 
 	// Both OnRamps and the OffRamp use the new resolver. The deployer owns the
 	// ramps in this test, so the writes ran directly instead of going into a

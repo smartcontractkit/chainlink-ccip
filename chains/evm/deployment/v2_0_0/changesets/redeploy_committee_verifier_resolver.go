@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	resolver_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	cs_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	contract_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -108,7 +109,14 @@ func makeVerifyRedeployCommitteeVerifierResolver() func(cldf_deployment.Environm
 			return fmt.Errorf("CanonicalCREATE2Factory is required")
 		}
 		qualifier := cfg.Cfg.Qualifier()
+		seen := make(map[uint64]bool, len(cfg.Cfg.ChainSelectors))
 		for _, chainSel := range cfg.Cfg.ChainSelectors {
+			// A repeated selector would redeploy twice. The second attempt reverts
+			// in the factory, after the first attempt already changed the chain.
+			if seen[chainSel] {
+				return fmt.Errorf("chain %d appears more than once", chainSel)
+			}
+			seen[chainSel] = true
 			if _, ok := e.BlockChains.EVMChains()[chainSel]; !ok {
 				return fmt.Errorf("chain %d not found in environment", chainSel)
 			}
@@ -164,6 +172,26 @@ func makeApplyRedeployCommitteeVerifierResolver(
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: %w", chainSel, err)
 			}
 
+			// Compare the canonical address before any write.
+			expectedReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, create2_factory.ComputeAddress, chain, contract_utils.FunctionInput[create2_factory.ComputeAddressArgs]{
+				ChainSelector: chainSel,
+				Address:       create2Factory,
+				Args: create2_factory.ComputeAddressArgs{
+					ABI:             resolver_bindings.VersionedVerifierResolverMetaData.ABI,
+					Bin:             resolver_bindings.VersionedVerifierResolverMetaData.Bin,
+					ConstructorArgs: []any{},
+					Salt:            qualifier,
+				},
+			})
+			if err != nil {
+				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: failed to compute the canonical resolver address: %w", chainSel, err)
+			}
+			if expectedReport.Output == oldResolver {
+				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
+					"chain %d: resolver is already at the canonical CREATE2 address %s, nothing to redeploy",
+					chainSel, oldResolver.Hex())
+			}
+
 			// Step 1: redeploy the resolver at its canonical CREATE2 address.
 			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployVerifierResolverViaCREATE2, chain, sequences.DeployVerifierResolverViaCREATE2Input{
 				CREATE2Factory: create2Factory,
@@ -181,10 +209,10 @@ func makeApplyRedeployCommitteeVerifierResolver(
 			}
 			newResolverRef := deployReport.Output.Addresses[0]
 			newResolver := common.HexToAddress(newResolverRef.Address)
-			if newResolver == oldResolver {
+			if newResolver != expectedReport.Output {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
-					"chain %d: resolver is already at the canonical CREATE2 address %s, nothing to redeploy",
-					chainSel, oldResolver.Hex())
+					"chain %d: resolver deployed at %s, but the computed canonical address is %s",
+					chainSel, newResolver.Hex(), expectedReport.Output.Hex())
 			}
 
 			// The ref key is the same, so this upsert replaces the old address.
@@ -202,7 +230,7 @@ func makeApplyRedeployCommitteeVerifierResolver(
 			writes = append(writes, configWrites...)
 
 			// Step 3: redeploy the MockReceiver with the new resolver.
-			mockRefs, mockWrites, err := redeployMockReceivers(e, chainSel, refs, newResolver)
+			mockRefs, mockWrites, err := redeployMockReceivers(e, chainSel, refs, oldResolver, newResolver)
 			if err != nil {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: %w", chainSel, err)
 			}
@@ -309,9 +337,14 @@ func configureNewResolver(
 	return writes, nil
 }
 
-// redeployMockReceivers redeploys every MockReceiver on the chain with the new
-// resolver as its required verifier. The verifier list is a constructor argument
-// and has no setter, so an update in place is not possible.
+// redeployMockReceivers redeploys each MockReceiver that names the old resolver.
+// The verifier lists are constructor arguments and have no setter, so an update
+// in place is not possible.
+//
+// A MockReceiver can require more than one verifier
+// (`sequences/deploy_chain_contracts.go:68-77`), so the function replaces the old
+// resolver inside the current list and keeps every other entry. A receiver that
+// does not name the old resolver is left alone.
 //
 // The deployment uses a temporary qualifier, because MaybeDeployContract reuses
 // an existing ref that has the same type, version and qualifier. The returned ref
@@ -320,6 +353,7 @@ func redeployMockReceivers(
 	e cldf_deployment.Environment,
 	chainSel uint64,
 	refs []datastore.AddressRef,
+	oldResolver common.Address,
 	newResolver common.Address,
 ) ([]datastore.AddressRef, []contract_utils.WriteOutput, error) {
 	chain := e.BlockChains.EVMChains()[chainSel]
@@ -343,6 +377,12 @@ func redeployMockReceivers(
 			return nil, nil, fmt.Errorf("failed to read MockReceiver %s config: %w", ref.Address, err)
 		}
 
+		required, changed := replaceAddress(current.Output.RequiredVerifier, oldResolver, newResolver)
+		optional, optionalChanged := replaceAddress(current.Output.OptionalVerifiers, oldResolver, newResolver)
+		if !changed && !optionalChanged {
+			continue
+		}
+
 		tempQualifier := mockReceiverRedeployQualifier
 		if ref.Qualifier != "" {
 			tempQualifier = ref.Qualifier + "-" + mockReceiverRedeployQualifier
@@ -351,8 +391,8 @@ func redeployMockReceivers(
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(mock_receiver.ContractType, *ref.Version),
 			ChainSelector:  chainSel,
 			Args: mock_receiver.ConstructorArgs{
-				Required:  []common.Address{newResolver},
-				Optional:  current.Output.OptionalVerifiers,
+				Required:  required,
+				Optional:  optional,
 				Threshold: current.Output.Threshold,
 			},
 			Qualifier: &tempQualifier,
