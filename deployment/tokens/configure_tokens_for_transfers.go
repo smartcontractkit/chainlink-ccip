@@ -488,10 +488,10 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 					PoolType:                           ru.remotePoolRef.Type.String(),
 					RemoteChains: map[uint64]RemoteChainConfig[[]byte, string]{
 						selector: {
-							// Pad to match on-chain storage format (32-byte left-padded for EVM).
-							// The token comparison in ConfigureTokenPoolForRemoteChain (line 234)
-							// compares against on-chain bytes without padding, so a 20-byte input
-							// would mismatch and trigger a remove+re-add instead of addRemotePool
+							// Pad to match on-chain storage format (32-byte left-padded). The address
+							// comparisons in `ConfigureTokenPoolForRemoteChain()` compare against on-
+							// chain bytes without padding, so a 20-byte input would mismatch and fire
+							// a remove+re-add instead of addRemotePool
 							RemoteToken: common.LeftPadBytes(migratedTokenBytes, 32),
 							RemotePool:  common.LeftPadBytes(migratedPoolBytes, 32),
 						},
