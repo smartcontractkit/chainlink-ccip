@@ -45,6 +45,10 @@ var (
 	// redeployResolverExtraVerifier is a second required verifier of a
 	// MockReceiver. The changeset must keep it.
 	redeployResolverExtraVerifier = common.HexToAddress("0x0A")
+
+	// redeployResolverFeeAggregator is the fee aggregator of the old resolver.
+	// The replacement must keep it.
+	redeployResolverFeeAggregator = common.HexToAddress("0x0B")
 )
 
 // redeployResolverFixture holds the contracts of the simulated chain.
@@ -86,6 +90,14 @@ func deployRedeployResolverFixture(t *testing.T, e *deployment.Environment) rede
 	tx, err = resolver.ApplyInboundImplementationUpdates(chain.DeployerKey, []resolver_bindings.VersionedVerifierResolverInboundImplementationArgs{
 		{Version: redeployResolverVersionTag, Verifier: verifier},
 	})
+	require.NoError(t, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
+
+	// The resolver collects fee tokens as an OnRamp receipt issuer, so the
+	// replacement must keep the fee aggregator. It has no constructor, so a new
+	// resolver starts with a zero aggregator and withdrawFeeTokens reverts.
+	tx, err = resolver.SetFeeAggregator(chain.DeployerKey, redeployResolverFeeAggregator)
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
@@ -397,6 +409,11 @@ func TestRedeployCommitteeVerifierResolver_Apply(t *testing.T) {
 	require.Len(t, inbound, 1)
 	assert.Equal(t, redeployResolverVersionTag, inbound[0].Version)
 	assert.Equal(t, f.verifier, inbound[0].Verifier)
+
+	// The fee aggregator carries over, so withdrawFeeTokens keeps working.
+	feeAggregator, err := resolver.GetFeeAggregator(nil)
+	require.NoError(t, err)
+	assert.Equal(t, redeployResolverFeeAggregator, feeAggregator)
 
 	// The MockReceiver swaps the resolver and keeps its other required verifier.
 	receiver, err := mock_receiver_bindings.NewMockReceiverV2(newMockReceiver, chain.Client)

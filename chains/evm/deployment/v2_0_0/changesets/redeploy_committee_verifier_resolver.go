@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver_v2"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	versioned_verifier_resolver_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	resolver_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
@@ -311,6 +312,26 @@ func configureNewResolver(
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply outbound implementation updates: %w", err)
+		}
+		writes = append(writes, report.Output)
+	}
+
+	// Copy the old value when it is set.
+	feeAggregator, err := cldf_ops.ExecuteOperation(e.OperationsBundle, versioned_verifier_resolver_ops.GetFeeAggregator, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chainSel,
+		Address:       oldResolver,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the fee aggregator of the old resolver: %w", err)
+	}
+	if feeAggregator.Output != (common.Address{}) {
+		report, err := cldf_ops.ExecuteOperation(e.OperationsBundle, versioned_verifier_resolver_ops.SetFeeAggregator, chain, contract_utils.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       newResolver,
+			Args:          feeAggregator.Output,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set the fee aggregator: %w", err)
 		}
 		writes = append(writes, report.Output)
 	}
