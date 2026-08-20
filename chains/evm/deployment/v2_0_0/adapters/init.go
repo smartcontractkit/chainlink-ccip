@@ -87,6 +87,7 @@ func init() {
 	ccvadapters.GetDeployChainContractsRegistry().RegisterLaneVersionResolver(chainsel.FamilyEVM, &adapters1_2.LaneVersionResolver{})
 
 	ccvadapters.GetOnRampUpgraderRegistry().Register(chainsel.FamilyEVM, &EVMOnRampUpgrader{})
+	ccvadapters.GetTestVerifierChainRegistry().Register(chainsel.FamilyEVM, &EVMTestVerifierChainAdapter{})
 
 	tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v, NewTokenAdapter())
 	feeAggReg := fees.GetFeeAggregatorRegistry()

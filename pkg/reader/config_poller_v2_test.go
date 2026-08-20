@@ -46,7 +46,7 @@ func setupConfigPollerV2(t *testing.T) (*configPollerV2, map[cciptypes.ChainSele
 		chainAccessors[chain] = accessor
 	}
 
-	pollerMetrics, err := rcmetrics.NewConfigPollerMetrics(nil)
+	pollerMetrics, err := rcmetrics.NewConfigPollerMetrics(nil, destChain)
 	require.NoError(t, err)
 
 	cPollerV2 := newConfigPollerV2(

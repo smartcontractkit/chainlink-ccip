@@ -174,6 +174,17 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	// BasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
 	// Mutually exclusive with Amount. For siloed pools, only BasisPoints is supported.
 	BasisPoints *uint16
+	// UnsiloedLockBoxAddress names the lockbox that receives the old pool's unsiloed (shared) balance.
+	//
+	// Required when migrating a siloed pool that holds unsiloed liquidity. The shared balance backs
+	// the pool's non-siloed chains, and those chains may map to a different lockbox than any siloed
+	// chain, so there is nothing on-chain to infer the destination from. Guessing here would send the
+	// shared balance to a silo that does not own it: no funds are lost, but the chains that should
+	// draw on the shared balance cannot release.
+	//
+	// Must match one of the lockboxes in the new pool's getAllLockBoxConfigs. Ignored for
+	// non-siloed pools, which have a single lockbox.
+	UnsiloedLockBoxAddress string
 	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer
 	// instead of using the lockbox's deposit() function. This bypasses the Deposit event emission.
 	// Use only as a break-glass option when the standard deposit path is unavailable.

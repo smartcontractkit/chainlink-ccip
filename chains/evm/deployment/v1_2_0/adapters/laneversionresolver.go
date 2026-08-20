@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -11,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 
@@ -66,42 +68,70 @@ func (r *LaneVersionResolver) DeriveLaneVersionsForChain(e cldf.Environment, cha
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get offramps from router at address %s for chain %d: %w", routerAddr.Hex(), chainSel, err)
 	}
+	// Per-remote view calls are independent; bounded concurrency keeps wide
+	// routers (100+ offramp entries) from dominating pipeline runtime.
+	const derivationConcurrency = 10
+
 	remoteChains := make(map[uint64]struct{})
+	var mu sync.Mutex
+	grp, grpCtx := errgroup.WithContext(e.GetContext())
+	grp.SetLimit(derivationConcurrency)
 	for _, offRamp := range offRamps {
 		if offRamp.OffRamp == (common.Address{}) {
 			continue
 		}
-		supported, err := routerC.IsChainSupported(&bind.CallOpts{
-			Context: e.GetContext(),
-		}, offRamp.SourceChainSelector)
-		if err != nil {
-			return nil, nil, err
-		}
-		if supported {
-			remoteChains[offRamp.SourceChainSelector] = struct{}{}
-		}
+		grp.Go(func() error {
+			supported, err := routerC.IsChainSupported(&bind.CallOpts{
+				Context: grpCtx,
+			}, offRamp.SourceChainSelector)
+			if err != nil {
+				return err
+			}
+			if supported {
+				mu.Lock()
+				remoteChains[offRamp.SourceChainSelector] = struct{}{}
+				mu.Unlock()
+			}
+			return nil
+		})
+	}
+	if err := grp.Wait(); err != nil {
+		return nil, nil, err
 	}
 	versions := make(map[string]*semver.Version)
 	laneVersionForRemoteChain := make(map[uint64]*semver.Version)
 	// for all remote chains, find the onRamp and check its version , if unique add it to the list of versions to import
+	grp2, grpCtx2 := errgroup.WithContext(e.GetContext())
+	grp2.SetLimit(derivationConcurrency)
 	for remoteChain := range remoteChains {
-		onRamp, err := routerC.GetOnRamp(&bind.CallOpts{
-			Context: e.GetContext(),
-		}, remoteChain)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get onramp for remote chain %d from router at address %s for chain %d: %w", remoteChain, routerAddr.Hex(), chainSel, err)
-		}
-		if onRamp == (common.Address{}) {
-			continue
-		}
-		_, version, err := utils.TypeAndVersion(onRamp, chain.Client)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get version for onramp at address %s on chain %d: %w", onRamp.Hex(), chainSel, err)
-		}
-		if _, exists := versions[version.String()]; !exists {
-			versions[version.String()] = version
-		}
-		laneVersionForRemoteChain[remoteChain] = version
+		grp2.Go(func() error {
+			onRamp, err := routerC.GetOnRamp(&bind.CallOpts{
+				Context: grpCtx2,
+			}, remoteChain)
+			if err != nil {
+				return fmt.Errorf(
+					"failed to get onramp for remote chain %d from router at address %s for chain %d: %w",
+					remoteChain, routerAddr.Hex(), chainSel, err,
+				)
+			}
+			if onRamp == (common.Address{}) {
+				return nil
+			}
+			_, version, err := utils.TypeAndVersion(onRamp, chain.Client)
+			if err != nil {
+				return fmt.Errorf("failed to get version for onramp at address %s on chain %d: %w", onRamp.Hex(), chainSel, err)
+			}
+			mu.Lock()
+			if _, exists := versions[version.String()]; !exists {
+				versions[version.String()] = version
+			}
+			laneVersionForRemoteChain[remoteChain] = version
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := grp2.Wait(); err != nil {
+		return nil, nil, err
 	}
 	if len(versions) == 0 {
 		return nil, nil, fmt.Errorf("version not found for any onramps connected to router at address %s for chain %d", routerAddr.Hex(), chainSel)

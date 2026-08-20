@@ -99,7 +99,7 @@ func NewObservedCCIPReader(
 	if len(meters) > 0 {
 		meter = meters[0]
 	}
-	obMetrics, err := rcmetrics.NewObservedReaderMetrics(meter)
+	obMetrics, err := rcmetrics.NewObservedReaderMetrics(meter, destChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("init observed reader metrics: %w", err)
 	}
@@ -327,14 +327,14 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, execCostLabel).
 				Set(execFeeFloat)
-			o.obMetrics.RecordChainFee(chainFamily, chainID, execCostLabel, int64(execFeeFloat))
+			o.obMetrics.RecordChainFee(k, execCostLabel, int64(execFeeFloat))
 		}
 		if v.DataAvailabilityFee != nil {
 			dataFeeFloat, _ := new(big.Float).SetInt(v.DataAvailabilityFee).Float64()
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, dataCostLabel).
 				Set(dataFeeFloat)
-			o.obMetrics.RecordChainFee(chainFamily, chainID, dataCostLabel, int64(dataFeeFloat))
+			o.obMetrics.RecordChainFee(k, dataCostLabel, int64(dataFeeFloat))
 		}
 
 		o.lggr.Debugw(
@@ -394,7 +394,7 @@ func (o *observedCCIPReader) recordReadOutcome(queryName string, err error, hasS
 	case hasSizeFn && size == 0:
 		outcome = "empty"
 	}
-	o.obMetrics.RecordReadOutcome(o.destChain, queryName, outcome)
+	o.obMetrics.RecordReadOutcome(o.destChainSelector, queryName, outcome)
 }
 
 func sliceLength[T any](slice []T) float64 {
