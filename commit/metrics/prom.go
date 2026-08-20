@@ -70,7 +70,6 @@ type PromReporter struct {
 	bhSeqNumInvariantViolation   metric.Int64Counter
 	bhOffRampConsensusInsuff     metric.Int64Counter
 	bhConsensusDropped           metric.Int64Counter
-	bhDiscoveryState             metric.Int64Gauge
 }
 
 //nolint:gocyclo
@@ -178,10 +177,6 @@ func NewPromReporter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ccip_commit_consensus_dropped counter: %w", err)
 	}
-	discoveryState, err := bhClient.Meter.Int64Gauge("ccip_commit_discovery_state")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_commit_discovery_state gauge: %w", err)
-	}
 
 	return &PromReporter{
 		lggr:          lggr,
@@ -227,19 +222,7 @@ func NewPromReporter(
 		bhSeqNumInvariantViolation:   seqNumInvariantViolation,
 		bhOffRampConsensusInsuff:     offRampConsensusInsuff,
 		bhConsensusDropped:           consensusDropped,
-		bhDiscoveryState:             discoveryState,
 	}, nil
-}
-
-func (p *PromReporter) TrackDiscoveryState(discovered bool) {
-	var value int64
-	if discovered {
-		value = 1
-	}
-	attrs := append(
-		metricsutil.DestChainAttrs(p.chainSelector),
-		attribute.Bool("discovered", discovered))
-	p.bhDiscoveryState.Record(context.Background(), value, metric.WithAttributes(attrs...))
 }
 
 func (p *PromReporter) TrackObservation(obs committypes.Observation, round uint64) {
