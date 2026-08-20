@@ -340,6 +340,12 @@ destination-chain lanes sharing a source chain collide into one series per `(cha
 
 > This is the data-layer *gate*: it belongs before the consensus/transmission tree (steps 3-5), which is
 > exactly where a reader that silently returns empty/partial would be misattributed to the plugin.
+>
+> It's also the corroborator for the **false-idle** pattern across the runbook: if lane/cursing gauges go
+> silent (`pending_messages`, `offramp_lane_status`, `rmn_curse_active`, `source_chain_cursed`) while
+> reader errors (`ccip_reader_read_outcome_total{outcome="error"}`) or config-poller failures
+> (`ccip_reader_config_poll_failure_total`) here are rising, that's reader-layer/RPC-failure — not a
+> genuinely quiet lane — and the absent gauges are the symptom, not evidence of health.
 
 ### step3 — is the round producing outcomes at all?
 
@@ -357,7 +363,12 @@ max(ccip_commit_rmn_curse_active{destChainID=~"$destChain", curse_type="destinat
 max(ccip_commit_source_chain_cursed{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})
 ```
 Any `== 1` → found it; likely intentional/incident-flagged, report to whoever owns the curse and
-stop. All `0` → continue.
+stop. All `0` → continue. Note: both curse gauges are `always_emitted` — they report `0` every
+round when not cursed — so an **empty** result is not proof the chain/lane is un-cursed. Curse state
+is served from the config-poller cache, so if the curse gauges are absent *and*
+`ccip_reader_config_poll_failure_total` / `ccip_reader_read_outcome_total{outcome="error"}` are
+rising, the reading is unreliable: a real curse could be going unobserved (false idle), so treat
+that as a reader/RPC issue rather than concluding "not cursed."
 
 > RMN-signature branches (signed-roots-dropped, chain quorum, Byzantine root disagreement) are
 > intentionally absent from this runbook: `RMNEnabled` is hardcoded off in production, so those
@@ -373,7 +384,13 @@ Otherwise → likely just backlog size:
 ```promql
 max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~"$sourceChain", destChainID=~"$destChain"})
 ```
-Report the backlog size and an ETA estimate from round cadence, and stop.
+Report the backlog size and an ETA estimate from round cadence, and stop. **Caveat — don't call
+"no backlog" on an *absent* `pending_messages`:** this gauge is `always_emitted` per active lane, so
+a missing series isn't "zero pending," it's "the plugin isn't reporting this lane at all" — a false-idle
+shape. Before concluding "just backlog size," confirm the gauge is present (a real `0`/small number).
+If it's empty and `ccip_reader_read_outcome_total{outcome="error"}` or
+`ccip_reader_config_poll_failure_total` is rising, the reader layer / an RPC is the likely cause (see
+step2c), not a clean backlog.
 
 ## Deep dives
 

@@ -529,7 +529,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. info only \u2014 onRampMaxSeqNum - offRampNextSeqNum. No universal healthy value, watch for sustained growth. Empty result (no lanes matched) is UNKNOWN, not zero backlog.",
+   "description": "always_emitted: true. info only \u2014 onRampMaxSeqNum - offRampNextSeqNum. No universal healthy value, watch for sustained growth. Empty result (no lanes matched) is UNKNOWN, not zero backlog \u2014 and NOT a healthy 'nothing pending' sign either: a healthy plugin still reports 0 per active lane, so absence while under load is the false-idle signature (upstream reader/RPC starving the lane). Corroborate an absence against reader_read_outcome_error / config_poll_failure before reading it as a quiet lane.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -925,7 +925,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. crit_if status=rmn_misconfigured & result==1, info_if status=~skipped_.* & result==1, ok_if status=live & result==1. rmn_misconfigured flags real config drift; skipped_* are expected states. Reported for all four statuses every round \u2014 empty result is UNKNOWN, not \"no active lanes\".",
+   "description": "always_emitted: true. crit_if status=rmn_misconfigured & result==1, info_if status=~skipped_.* & result==1, ok_if status=live & result==1. rmn_misconfigured flags real config drift; skipped_* are expected states. Reported for all four statuses every round \u2014 empty result is UNKNOWN, not 'no active lanes', and not a healthy sign either: absence here is the false-idle signature (starved by an upstream reader/RPC issue). Corroborate with reader_read_outcome_error / config_poll_failure.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -1045,7 +1045,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Halts ALL reporting for the dest chain while active; often intentional/incident-flagged \u2014 WARN not CRIT.",
+   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Halts ALL reporting for the dest chain while active; often intentional/incident-flagged \u2014 WARN not CRIT. Empty result is UNKNOWN and NOT proof of 'not cursed' \u2014 curse state is served from the config-poller cache, so absence alongside rising config_poll_failure / reader_read_outcome_error makes the reading unreliable (a real curse unobserved = false idle).",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -1144,7 +1144,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active. destChainID filter added by the same destChainAttrs fix as the lane_throughput group.",
+   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active. Empty result is UNKNOWN and not proof the lane is un-cursed \u2014 corroborate with reader_read_outcome_error / config_poll_failure before trusting an absence as 'definitely not cursed'. destChainID filter added by the same destChainAttrs fix as the lane_throughput group.",
    "fieldConfig": {
     "defaults": {
      "color": {
