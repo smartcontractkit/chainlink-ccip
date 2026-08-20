@@ -1496,7 +1496,7 @@ func TestCCIPRouter(t *testing.T) {
 						ChainFamilySelector:     [4]uint8(config.SvmChainFamilySelector),
 						EnforceOutOfOrder:       true,
 						MaxNumberOfTokensPerMsg: 10,
-						MaxDataBytes:            100,
+						MaxDataBytes:            500,
 					},
 					config.FqConfigPDA,
 					config.FqSvmDestChainPDA,
