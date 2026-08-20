@@ -215,73 +215,6 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "always_emitted: true. crit_if result==0 (not discovered), ok_if result==1. Per-round readiness gauge, set from commit/plugin.go Observation() via contractsInitialized.Load(); 0 = plugin still in contract-discovery and can't produce observations, 1 = ready. Checked FIRST (gates the whole run): 0 while heartbeats still tick is the 'single unhealthy RPC left the DON stuck in discovery' shape where every other observation/outcome metric is absent or limited. Use max() so only a DON-wide 'no node exited discovery' reads 0.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "red",
-        "value": null
-       },
-       {
-        "color": "green",
-        "value": 0.5
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 4,
-    "w": 6,
-    "x": 12,
-    "y": 7
-   },
-   "id": 2065,
-   "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "textMode": "auto"
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max by (destChainID) (ccip_commit_discovery_state{destChainID=~\"$destChain\"})",
-     "legendFormat": "__auto",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "discovery_state",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
    "description": "always_emitted: true. crit_if result==1, ok_if result==0. Home-chain config digest differs from the offramp's; root cause for a wide range of downstream rejections. Filtered to == 1 so only mismatched destChainID(s) appear as rows -- if $destChain matches more than one chain (multi-select/All), a bare max() collapses which chain mismatched; this table doesn't. No rows (including when nothing at all is selected) renders 'NO MISMATCH', which is the OK state here, not UNKNOWN.",
    "fieldConfig": {
     "defaults": {
@@ -2658,9 +2591,9 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "`result == 0` \u2192 **REPORT:ccip-commit-oncall** (plugin has NOT discovered its contracts \u2014 it is not healthy and can\u2019t produce observations; check the destination RPC/reader health, e.g. the reader panels below). This is the gate: check it **before** the heartbeat panel. Only if `> 0` (discovered) does the heartbeat panel below decide \u201calive at all\u201d. Discovery gauge is recorded every round, so `0` is a real signal, not an empty result."
+    "content": "`result == 0` \u2192 **REPORT:ccip-commit-oncall** (also read the live-oracle-headcount panel below before reporting \u2014 turns \"not running\" into \"N of the DON's oracles are actually alive\"). `result > 0` \u2192 **CONTINUE:step1**. Window is `[1m]`, not `[5m]` \u2014 same rate()-extrapolation reasoning as the Liveness panels above."
    },
-   "title": "step0.1 \u2014 has the plugin discovered its contracts?",
+   "title": "step0 \u2014 is the plugin alive at all?",
    "type": "text",
    "transparent": true
   },
@@ -2769,20 +2702,9 @@
      "legendFormat": "live_oracle_count",
      "range": true,
      "refId": "B"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max by (destChainID) (ccip_commit_discovery_state{destChainID=~\"$destChain\"})",
-     "legendFormat": "discovery_state",
-     "range": true,
-     "refId": "C"
     }
    ],
-   "title": "step0.2 \u2014 plugin_heartbeat & live oracle headcount",
+   "title": "step0 \u2014 plugin_heartbeat & live oracle headcount",
    "type": "timeseries"
   },
   {

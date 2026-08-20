@@ -36,8 +36,8 @@ status: living
 Unlike [`uncommitted-message.md`](uncommitted-message.md), this isn't triggered by a specific
 stuck message — it's "is this commit plugin instance (and its merkle root processor) healthy
 right now." Run it periodically, on demand, or as the first thing you do before diving into a
-specific-message incident (its `step0` is a subset of this runbook's `discovery_state` /
-`heartbeat_observation` / `heartbeat_outcome` checks).
+specific-message incident (its `step0` is a subset of this runbook's `heartbeat_observation` /
+`heartbeat_outcome` checks).
 
 ## For agents
 
@@ -174,14 +174,6 @@ not assumed correct because the query still reads sensibly.
 ```yaml
 checks:
   # --- liveness ---
-  - id: discovery_state
-    group: liveness
-    always_emitted: true
-    query: 'max by (destChainID) (ccip_commit_discovery_state{destChainID=~"$destChain"})'
-    severity: {crit_if: "result == 0", ok_if: "result == 1"}
-    owner: ccip-commit-oncall
-    note: "per-round readiness gauge, recorded from `commit/plugin.go`'s Observation() via `contractsInitialized.Load()` and reported by `TrackDiscoveryState` in `commit/metrics`. 0 = the plugin is still in its contract-discovery phase, 1 = discovery complete. This is checked FIRST (it gates the whole run): a plugin that has not discovered its contracts is not healthy and cannot produce any observations, no matter how many rounds its heartbeat reports — the classic manifestation is a single unhealthy RPC leaving every committed RPC stuck in discovery while heartbeats keep ticking (see the commit that introduced the metric). Crit is `== 0` across every node: use max() so that only when NO node has exited discovery does this fire as not-ready; if max()==0, treat it as the root cause before reading any observation/outcome metric below, whose values are then suspect because the plugin was never ready to emit them. Aggregate rather than reporting per-node: if one node is stuck in discovery while its peers are not, that is a single-node finding (its observations can't reflect the lane), captured via `by (csa_public_key)` — not a DON-wide verdict"
-
   - id: heartbeat_observation
     group: liveness
     always_emitted: true
@@ -416,10 +408,7 @@ checks:
 
 ### Liveness
 
-`discovery_state` first — it gates the whole run: if the plugin has *not* discovered its
-contracts it is not healthy and cannot produce observations, so a `CRIT` here is not just a
-symptom but the reason every other observation/outcome check in this run is suspect. Then
-`heartbeat_observation` / `heartbeat_outcome` — if either is `CRIT` or `UNKNOWN`, every
+`heartbeat_observation` / `heartbeat_outcome` first — if either is `CRIT` or `UNKNOWN`, every
 other check's `OK` in this run is suspect (a wedged plugin can leave gauges parked at their
 last-good value, and an `always_emitted: false` check resolving empty-to-OK assumes the pipeline
 itself is trustworthy). `config_digest_mismatch` and `processor_errors` are the other two checks
