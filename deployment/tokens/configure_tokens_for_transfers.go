@@ -465,15 +465,23 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
 			for _, ru := range discoveredRemotes {
-				// NOTE: we skip reverse-propagation into a counterpart being migrated in this same batch:
+				// NOTE: for a counterpart being *REPLACED* in the same batch we skip reverse-propagation:
 				// running the full `ConfigureTokenForTransfers()` sequence on its not-yet-live pool would
 				// activate it `setPool()` prematurely so its own subsequent migration pass sees itself as
 				// "already the target pool", and skips auto-migration entirely (losing its legacy remotes
 				// and reverse-propagation). Wiring between same-batch peers is handled by each pool's own
 				// forward config; reverse-propagation only needs to reach every NON-migrating counterpart
 				// (already-active v2 or v1 pools) to keep them reachable.
+				//
+				// "Being replaced" is decided by capability, not by batch membership alone: a peer present
+				// in cfg but whose adapter has no TokenPoolMigrator is NOT being replaced, so it is safe —
+				// and necessary — to reverse-propagate into it so it stays reachable from this migration's
+				// new pool. Only a same-batch peer that is actually on V2 (i.e. its adapter implements the
+				// TokenPoolMigrator interface) is skipped.
 				if _, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
-					continue
+					if _, hasMigrator := ru.remoteAdapter.(TokenPoolMigrator); hasMigrator {
+						continue
+					}
 				}
 				reverseInput := ConfigureTokenForTransfersInput{
 					// Reverse propagation only *ADDS* this migration's new pool as an additional remote to an
