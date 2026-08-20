@@ -29,7 +29,7 @@
     "x": 0,
     "y": 0
    },
-   "id": 1001,
+   "id": 2001,
    "panels": [],
    "title": "HEALTH \u2014 Commit Plugin & Merkle Root Processor",
    "type": "row"
@@ -41,7 +41,7 @@
     "x": 0,
     "y": 1
    },
-   "id": 1002,
+   "id": 2002,
    "options": {
     "mode": "markdown",
     "code": {
@@ -49,7 +49,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "Liveness, throughput, cursing, consensus and report-transmission signals for the commit plugin and the merkle-root processor, filtered by the `$destChain` / `$sourceChain` template variables above. All metrics here are Beholder-ingested (see `commit/metrics/prom.go`) unless noted \u2014 set the `DS_PROMETHEUS` dashboard datasource variable to whichever Grafana datasource serves your Beholder pipeline before relying on this. Full metric rationale: `docs/metrics/commit-metrics.md`."
+    "content": "Every panel below is one check from `docs/runbooks/commit-plugin-health.md`'s checklist, filtered by the `$destChain` / `$sourceChain` template variables above. All metrics here are Beholder-ingested (see `commit/metrics/prom.go`) unless noted \u2014 set the `DS_PROMETHEUS` dashboard datasource variable to whichever Grafana datasource serves your Beholder pipeline before relying on this. **Grafana can't express the empty-result rule** (an empty result means UNKNOWN for `always_emitted: true` checks, OK for `always_emitted: false` checks) \u2014 a blank panel here means \"go re-read that check's row in the checklist,\" not \"assume healthy.\" Full rationale: `docs/runbooks/commit-plugin-health.md`."
    },
    "title": "About this section",
    "type": "text",
@@ -57,12 +57,12 @@
   },
   {
    "gridPos": {
-    "h": 2,
+    "h": 3,
     "w": 24,
     "x": 0,
     "y": 4
    },
-   "id": 1003,
+   "id": 2003,
    "options": {
     "mode": "markdown",
     "code": {
@@ -70,7 +70,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "**Step 0 of any triage**: is the plugin alive at all? A flat heartbeat means every other gauge below may simply be stale, not bad."
+    "content": "`heartbeat_observation`/`heartbeat_outcome` first \u2014 if either is 0, every other panel's OK-looking value in this run is suspect. Windows are `[1m]` for the two heartbeats specifically because `rate()` extrapolates across its whole window: a `[5m]` window was measured to keep reporting \"alive\" for up to 5 minutes after a real outage (see the runbook's rate()-detection-lag note) \u2014 don't widen these without re-testing against a forced failure."
    },
    "title": "Liveness",
    "type": "text",
@@ -81,7 +81,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "Unconditional per-round liveness signal, incremented at the top of Observation(), before any decode/state check. 0 = plugin not running rounds.",
+   "description": "always_emitted: true. crit_if result==0, ok_if result>0. Unconditional per-round liveness signal for Observation(); 0 or empty means every other check below may simply be stale, not bad. MAGNITUDE ISN'T MEANINGFUL: this is rate(counter[1m]) on a counter incremented once per OCR round, so a nonzero value like 0.5 just reflects this DON's round cadence, not '50% healthy' -- don't compare it across chains/environments or expect a specific number. The only threshold that matters is exactly 0 (dead) vs strictly >0 (alive).",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -109,9 +109,9 @@
     "h": 4,
     "w": 6,
     "x": 0,
-    "y": 6
+    "y": 7
    },
-   "id": 1004,
+   "id": 2004,
    "options": {
     "colorMode": "value",
     "graphMode": "area",
@@ -134,13 +134,13 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\", phase=\"observation\"}[5m]))",
+     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}[1m]))",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
     }
    ],
-   "title": "Heartbeat rate \u2014 observation()",
+   "title": "heartbeat_observation",
    "type": "stat"
   },
   {
@@ -148,7 +148,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "Same signal for Outcome(). If observation is healthy but outcome is flat, OCR is failing to schedule/deliver to the outcome stage.",
+   "description": "always_emitted: true. crit_if result==0, ok_if result>0. Same signal for Outcome(); flat while observation is healthy means OCR is failing to schedule/deliver to the outcome stage. Same 'magnitude isn't meaningful, only zero-vs-nonzero is' caveat as heartbeat_observation.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -176,9 +176,9 @@
     "h": 4,
     "w": 6,
     "x": 6,
-    "y": 6
+    "y": 7
    },
-   "id": 1005,
+   "id": 2005,
    "options": {
     "colorMode": "value",
     "graphMode": "area",
@@ -201,13 +201,13 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{chainID=~\"$destChain\", phase=\"outcome\"}[5m]))",
+     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"outcome\"}[1m]))",
      "legendFormat": "__auto",
      "range": true,
      "refId": "A"
     }
    ],
-   "title": "Heartbeat rate \u2014 outcome()",
+   "title": "heartbeat_outcome",
    "type": "stat"
   },
   {
@@ -215,11 +215,137 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "1 = this node's home-chain config digest differs from the offramp's. Root cause for a wide range of downstream rejections.",
+   "description": "always_emitted: true. crit_if result==1, ok_if result==0. Home-chain config digest differs from the offramp's; root cause for a wide range of downstream rejections. Filtered to == 1 so only mismatched destChainID(s) appear as rows -- if $destChain matches more than one chain (multi-select/All), a bare max() collapses which chain mismatched; this table doesn't. No rows (including when nothing at all is selected) renders 'NO MISMATCH', which is the OK state here, not UNKNOWN.",
    "fieldConfig": {
     "defaults": {
      "color": {
       "mode": "thresholds"
+     },
+     "custom": {
+      "align": "auto",
+      "cellOptions": {
+       "type": "auto"
+      },
+      "inspect": false
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       }
+      ]
+     },
+     "noValue": "NO MISMATCH"
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Value"
+      },
+      "properties": [
+       {
+        "id": "displayName",
+        "value": "Mismatch (1)"
+       }
+      ]
+     }
+    ]
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 24,
+    "x": 0,
+    "y": 11
+   },
+   "id": 2006,
+   "options": {
+    "cellHeight": "sm",
+    "footer": {
+     "countRows": false,
+     "fields": "",
+     "reducer": [
+      "sum"
+     ],
+     "show": false
+    },
+    "showHeader": true
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max by (destChainID) (ccip_commit_config_digest_mismatch{destChainID=~\"$destChain\"}) == 1",
+     "format": "table",
+     "instant": true,
+     "legendFormat": "__auto",
+     "range": false,
+     "refId": "A"
+    }
+   ],
+   "title": "config_digest_mismatch \u2014 mismatched chains only",
+   "transformations": [
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true
+      },
+      "indexByName": {},
+      "renameByName": {}
+     }
+    }
+   ],
+   "type": "table"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty result). Generic TrackedProcessor error counter; does not include swallowed per-goroutine failures (see merkleroot_observation_errors). STRAGGLER BUG (confirmed in commit/metrics/prom.go): this metric's Beholder counter (bhProcessorErrors) is registered but never actually incremented -- TrackProcessorLatency's error branch only calls the promauto counter, which still uses the OLD label scheme (chainFamily,chainID, not destChainID). This query intentionally keeps the old `chainID` label since `destChainID` would never match any series -- but on a datasource fed purely from Beholder/OTel (no promauto scrape), this panel will ALWAYS read empty/OK regardless of real errors. Treat as unreliable until bhProcessorErrors is actually called in code.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
      },
      "mappings": [],
      "thresholds": {
@@ -230,8 +356,8 @@
         "value": null
        },
        {
-        "color": "red",
-        "value": 1
+        "color": "orange",
+        "value": 0.001
        }
       ]
      },
@@ -240,25 +366,26 @@
     "overrides": []
    },
    "gridPos": {
-    "h": 4,
-    "w": 6,
-    "x": 12,
-    "y": 6
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 16
    },
-   "id": 1006,
+   "id": 2007,
    "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
+    "legend": {
      "calcs": [
-      "lastNotNull"
+      "lastNotNull",
+      "max"
      ],
-     "fields": "",
-     "values": false
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
     },
-    "textMode": "auto"
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
    },
    "pluginVersion": "10.1.0",
    "targets": [
@@ -268,88 +395,21 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max(ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"})",
-     "legendFormat": "__auto",
+     "expr": "sum(rate(ccip_commit_processor_errors_total{chainID=~\"$destChain\"}[15m])) by (processor, method)",
+     "legendFormat": "{{processor}}/{{method}}",
      "range": true,
      "refId": "A"
     }
    ],
-   "title": "Config digest mismatch",
-   "type": "stat"
+   "title": "processor_errors",
+   "type": "timeseries"
   },
   {
    "datasource": {
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "1 = supported, 0 = not supported, per chain family.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "red",
-        "value": null
-       },
-       {
-        "color": "green",
-        "value": 1
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 4,
-    "w": 6,
-    "x": 18,
-    "y": 6
-   },
-   "id": 1007,
-   "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "textMode": "auto"
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "min(ccip_commit_loopp_ccip_provider_supported{chain_family=~\".*\"})",
-     "legendFormat": "__auto",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "LOOPP CCIP provider supported",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "Generic TrackedProcessor instrumentation wrapping merkleroot/chainfee/tokenprice. Errors here only fire on a returned error, not on the swallowed per-goroutine failures below.",
+   "description": "always_emitted: true. info only \u2014 single point-in-time sample with nothing to trend against. If pinned at the highest bucket, real latency likely exceeds it; still don't elevate to WARN/CRIT, there is no defined SLO. UNIT: this histogram is recorded in NANOSECONDS (time.Duration cast straight to float64 in commit/metrics/prom.go) -- confirmed by live testing on staging that displaying it with a 'seconds' unit renders a real 20s bucket value as ~634 YEARS. This panel's unit is set to 'ns' (Grafana auto-scales ns/us/ms/s), not 's' -- do not change it to 's' without dividing the query by 1e9 first.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -397,6 +457,1748 @@
        {
         "color": "red",
         "value": 80
+       }
+      ]
+     },
+     "unit": "ns"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 23
+   },
+   "id": 2008,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_processor_latency_bucket{destChainID=~\"$destChain\"}[15m])) by (le, processor, method))",
+     "legendFormat": "{{processor}}/{{method}} p95",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "processor_latency_p95",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 30
+   },
+   "id": 2009,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "Per source chain (`$sourceChain` regex) **and** destination chain (`$destChain`) \u2014 every query below filters both `sourceChainName` and `destChainID`, from `sourceChainAttrs()`/`destChainAttrs()` in `commit/metrics/prom.go`. The dest-chain filter was added after staging testing found these metrics carried no destination-chain label at all: two plugin instances for different dest chains reading the same source chain used to emit identical label sets and collide into one series. `seqnum_invariant_violation` and `offramp_lane_status=\"rmn_misconfigured\"` are the only CRITs here \u2014 both explicitly documented in-code as stall/config-drift signals, not routine noise. `pending_messages` and `offramp_lane_status` are `always_emitted: true`; don't read an empty result for either as \"no lanes, nothing to worry about.\""
+   },
+   "title": "Lane Throughput & Backlog",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: true. info only \u2014 onRampMaxSeqNum - offRampNextSeqNum. No universal healthy value, watch for sustained growth. Empty result (no lanes matched) is UNKNOWN, not zero backlog \u2014 and NOT a healthy 'nothing pending' sign either: a healthy plugin still reports 0 per active lane, so absence while under load is the false-idle signature (upstream reader/RPC starving the lane). Corroborate an absence against reader_read_outcome_error / config_poll_failure before reading it as a quiet lane.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 33
+   },
+   "id": 2010,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "pending_messages",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). Chain-throughput ceiling (MaxMerkleTreeSize) being hit.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 40
+   },
+   "id": 2011,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_range_truncated_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "range_truncated",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. crit_if any series>0, ok_if all series==0 (including empty). offramp_ahead_of_onramp / onramp_max_zero / offramp_seqnum_regression \u2014 documented in-code as stall signals, not routine noise.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 47
+   },
+   "id": 2012,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_seqnum_invariant_violation_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName, type)",
+     "legendFormat": "{{sourceChainName}}/{{type}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "seqnum_invariant_violation",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). DON couldn't agree on OffRampNextSeqNum for this chain; looks identical to \"no new messages\" without this.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 54
+   },
+   "id": 2013,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_offramp_consensus_insufficient_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "offramp_consensus_insufficient",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: true. crit_if status=rmn_misconfigured & result==1, info_if status=~skipped_.* & result==1, ok_if status=live & result==1. rmn_misconfigured flags real config drift; skipped_* are expected states. Reported for all four statuses every round \u2014 empty result is UNKNOWN, not 'no active lanes', and not a healthy sign either: absence here is the false-idle signature (starved by an upstream reader/RPC issue). Corroborate with reader_read_outcome_error / config_poll_failure.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 61
+   },
+   "id": 2014,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max by (sourceChainName, status) (ccip_commit_offramp_lane_status{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}/{{status}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "offramp_lane_status",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 68
+   },
+   "id": 2015,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "Cursing is WARN not CRIT deliberately \u2014 an active curse is frequently an intentional, already-known state (see `uncommitted-message.md` step4), and paging on expected state trains people to ignore it. `consensus_observation_failed` is the unambiguous CRIT: by construction it can only mean DON-wide FChain agreement failed for this dest chain. If it fires, check `live_oracle_count` before `fchain_read_errors` \u2014 an oracle that never started can't emit `fchain_read_errors` at all, so a low oracle count is a root cause `fchain_read_errors` is structurally unable to surface on its own. `consensus_dropped`'s query below excludes `objectName=\"RMNRemoteConfig\"` outright \u2014 with RMN disabled in prod it fires constantly and is pure noise, not filtered client-side but removed from the query itself."
+   },
+   "title": "Cursing & Consensus",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Halts ALL reporting for the dest chain while active; often intentional/incident-flagged \u2014 WARN not CRIT. Empty result is UNKNOWN and NOT proof of 'not cursed' \u2014 curse state is served from the config-poller cache, so absence alongside rising config_poll_failure / reader_read_outcome_error makes the reading unreliable (a real curse unobserved = false idle).",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 71
+   },
+   "id": 2016,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max(ccip_commit_rmn_curse_active{destChainID=~\"$destChain\", curse_type=~\"global|destination\"}) by (curse_type)",
+     "legendFormat": "{{curse_type}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "rmn_curse_active",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: true. warn_if any series==1, ok_if all series==0. Per-lane curse; same intentional-vs-bug ambiguity as rmn_curse_active. Empty result is UNKNOWN and not proof the lane is un-cursed \u2014 corroborate with reader_read_outcome_error / config_poll_failure before trusting an absence as 'definitely not cursed'. destChainID filter added by the same destChainAttrs fix as the lane_throughput group.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 78
+   },
+   "id": 2017,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max by (sourceChainName) (ccip_commit_source_chain_cursed{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "source_chain_cursed",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "consensus_observation_failed: always_emitted: false, crit_if result>0 \u2014 the only way a whole round fails: DON can't reach 2*fRoleDON+1 agreement on FChain for the dest chain. fchain_read_errors: always_emitted: false, warn_if result>0 \u2014 if both fire together, treat as ONE finding (same incident), not two; only reports a *surviving* oracle's own read failures.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 85
+   },
+   "id": 2018,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "consensus_observation_failed",
+     "range": true,
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "fchain_read_errors",
+     "range": true,
+     "refId": "B"
+    }
+   ],
+   "title": "consensus_observation_failed & fchain_read_errors",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). Per-key consensus drop breakdown. reason=split on objectName=fChain is H2 (oracles disagree); reason=insufficient_agreement on objectName=fChain together with fchain_read_errors spiking is H1; reason=threshold_not_defined is a config/data mismatch. objectName=RMNRemoteConfig is excluded from this query entirely: with RMN disabled, its remote config is permanently empty so reason=insufficient_agreement fires constantly and is pure noise, never a real finding. Need its raw state anyway? Query ccip_commit_consensus_dropped_total{objectName=\"RMNRemoteConfig\"} directly.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 92
+   },
+   "id": 2019,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_consensus_dropped_total{destChainID=~\"$destChain\", objectName!=\"RMNRemoteConfig\"}[5m])) by (objectName, reason)",
+     "legendFormat": "{{objectName}}/{{reason}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "consensus_dropped (RMNRemoteConfig excluded)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: true. Grade manually against $fRoleDON: crit if <2*fRoleDON+1, warn if 2*fRoleDON+1<=result<3*fRoleDON+1, ok if >=3*fRoleDON+1 (leave $fRoleDON blank to just read the raw count). Uses timestamp()-vs-time(), not rate()>0 \u2014 confirmed by live testing that rate([5m])>0 stays true for up to 5 minutes after a node actually stops. The ONLY check that can detect \"not enough oracles are even running\"; if this is low, don't let a flat fchain_read_errors push you toward blaming a split vote instead.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 12,
+    "x": 0,
+    "y": 99
+   },
+   "id": 2020,
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "justifyMode": "auto",
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "textMode": "auto"
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
+     "legendFormat": "__auto",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "live_oracle_count",
+   "type": "stat"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 103
+   },
+   "id": 2021,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "`report_transmission_gave_up` is CRIT \u2014 one of the most common on-call pages historically. `report_validation_rejected` is split by reason: `stale` alone is INFO, anything else present is WARN, and \u2014 being `always_emitted: false` \u2014 a fully empty result is OK, not UNKNOWN."
+   },
+   "title": "Report Transmission",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series with reason!=stale>0, info_if only reason=stale>0, ok_if empty or all series==0. reason=stale is usually benign (an overlapping report already landed); other reasons are worth a look.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 106
+   },
+   "id": 2022,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~\"$destChain\"}[15m])) by (phase, reason)",
+     "legendFormat": "{{phase}}/{{reason}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "report_validation_rejected",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. crit_if any series>0, ok_if all series==0 (including empty). Previously a Warnw with no counter at all. Carries BOTH sourceChainName and destChainID: a single report can cover multiple source chains that resolve independently (pendingSources in merkleroot/outcome.go), so sourceChainName says which lane gave up and destChainID says which destination chain's report it was -- neither is redundant.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 113
+   },
+   "id": 2023,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[15m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "report_transmission_gave_up",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. info only \u2014 recorded once per transmission-check attempt; empty result means zero transmission cycles in the window (report as INFO \"no data\", not UNKNOWN). Rising attempts alongside report_transmission_gave_up firing is the actionable combination.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 120
+   },
+   "id": 2024,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_report_transmission_attempts_bucket{destChainID=~\"$destChain\"}[15m])) by (le, success))",
+     "legendFormat": "{{success}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "report_transmission_attempts_p95",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 127
+   },
+   "id": 2025,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "Upstream of the whole checklist above: tests whether the plugin is healthy *but being fed empty/partial/stale data*. Shared with execute \u2014 every panel below carries `chainID`/`chainFamily`/`chainName`/`chainSelector` (pkg/reader/rcmetrics chainAttrs(), replacing the old bare numeric-selector `chain` label). **Every panel also carries its own `destChainID`/`destChainFamily`/`destChainName`/`destChainSelector`** (a second, dest-scoped chainAttrs() resolved per reader/config-poller instance) \u2014 REQUIRED, not cosmetic, confirmed by a real staging incident: a node runs one reader/config-poller instance per destination chain, and more than one instance can independently track the same source chain (two dest-chain lanes both reading Solana collided into one series per (chainID, node_id) without this, silently mixing a healthy lane's fast-refreshing cache with a different, broken lane's stuck one). Every query here filters `destChainID=~\"$destChain\"` for that reason \u2014 see `docs/metrics/reader-metrics.md`. The CRIT here is `config_cache_stale` (sustained: age > 90s means the poller genuinely can't refresh); `config_cache_overwritten_empty` alone is only WARN since a single empty snapshot is benign on its own guard. A finding here firing alongside an outcome check above (`pending_messages` climbing, `consensus_dropped`, a curse/digest-mismatch reading) is the SAME incident with the data-source check as the root cause, not two separate problems."
+   },
+   "title": "Data Source (reader + config poller)",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). Consolidated error-leg classification from the observedCCIPReader wrapper -- a query returned a hard error, not just empty/partial (see reader_read_empty/reader_chain_gap for that leg). Filters by chainID=~\"$destChain\" (destination chain) -- for this one metric chainID and destChainID are always the same value, so either filter works; this is the one exception to this group's chain-selector convention. Split node-local vs DON-wide by csa_public_key before escalating.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 130
+   },
+   "id": 2026,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (query) (rate(ccip_reader_read_outcome_total{chainID=~\"$destChain\", outcome=\"error\"}[5m]))",
+     "legendFormat": "{{query}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "reader_read_outcome_error",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). A read returned nothing with no error -- the false-idle primitive. chainID (from pkg/reader/rcmetrics chainAttrs()) is whichever chain that read was about; destChainID=~\"$destChain\" is REQUIRED to scope this to the lane under investigation (see the panel group's note above); chainSelector on the same series carries the raw numeric selector if needed. Split node-local vs DON-wide by csa_public_key.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 137
+   },
+   "id": 2027,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (query, chainID) (rate(ccip_reader_read_empty_total{destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "{{query}}/{{chainID}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "reader_read_empty",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series with state!=returned>0, ok_if all state=returned or empty. Per-chain outcome of a chain read -- actionable states: not_found|disabled|misconfigured|error|invalid|missing|stale|no_accessor|config_error|no_native_token|count_mismatch. count_mismatch = a message read whose count didn't match the requested range (partial data). Query pre-filters state!=\"returned\" so only actionable rows appear; destChainID=~\"$destChain\" scopes to the lane under investigation.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 144
+   },
+   "id": 2028,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (query, chainID, state) (rate(ccip_reader_chain_gap_total{state!=\"returned\", destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "{{query}}/{{chainID}}/{{state}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "reader_chain_gap (non-returned states)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: true. crit_if kind=chain & result>90, ok_if all kind=chain result<=90, info for kind=source. SUSTAINED signal: age only climbs across multiple consecutive empty/failed polls (a single intermittent empty is absorbed by the next good poll). >90s (3x the 30s refresh period) means the poller genuinely cannot refresh, so every cached read (RMN config, curse info, config digest, router address) runs on hollow data. destChainID=~\"$destChain\" is REQUIRED: without it, a chain shared across multiple destination-chain lanes (e.g. Solana read by two different dest chains) can max() together one healthy lane's fresh cache with a different lane's cache stuck for hours -- confirmed on staging, see the panel group's note above.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 90
        }
       ]
      },
@@ -408,9 +2210,9 @@
     "h": 7,
     "w": 24,
     "x": 0,
-    "y": 10
+    "y": 151
    },
-   "id": 1008,
+   "id": 2029,
    "options": {
     "legend": {
      "calcs": [
@@ -434,114 +2236,82 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_processor_latency_bucket{chainID=~\"$destChain\"}[5m])) by (le, processor, method))",
-     "legendFormat": "{{processor}}/{{method}} p95",
+     "expr": "max by (chainID, kind) (ccip_reader_config_cache_age_seconds{destChainID=~\"$destChain\"})",
+     "legendFormat": "{{chainID}}/{{kind}}",
      "range": true,
      "refId": "A"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_processor_errors_total{chainID=~\"$destChain\"}[5m])) by (processor, method)",
-     "legendFormat": "{{processor}}/{{method}} errors/s",
-     "range": true,
-     "refId": "B"
     }
    ],
-   "title": "Processor latency (p95) & errors",
+   "title": "config_cache_stale (age, seconds)",
    "type": "timeseries"
   },
   {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: true. crit_if time()-result>90, ok_if <=90. Checklist's own query is the raw timestamp (min by (chainID) (ccip_reader_config_poller_last_success_timestamp{destChainID=~\"$destChain\"})); this panel wraps it in time()-... for direct readability as a staleness duration. Last successful background config poll per chain; a wedged/missing poller goroutine makes every cache silently go stale. destChainID scopes this to the lane under investigation, same reasoning as config_cache_stale.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     },
+     "unit": "s"
+    },
+    "overrides": []
+   },
    "gridPos": {
-    "h": 2,
+    "h": 7,
     "w": 24,
     "x": 0,
-    "y": 17
+    "y": 158
    },
-   "id": 1009,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "Per-source-chain read progress. Filter with `$sourceChain` to focus on one lane."
-   },
-   "title": "Lane Throughput & Backlog",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "If offramp_next > X, a root covering X already landed \u2014 commit plugin's job is done for that message (Runbook Step 1). If onramp_max < X, the onramp read itself is lagging (Runbook Step 2).",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 19
-   },
-   "id": 1010,
+   "id": 2030,
    "options": {
     "legend": {
      "calcs": [
@@ -565,24 +2335,13 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}} onramp max",
+     "expr": "time() - min by (chainID) (ccip_reader_config_poller_last_success_timestamp{destChainID=~\"$destChain\"})",
+     "legendFormat": "{{chainID}}",
      "range": true,
      "refId": "A"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}} offramp next",
-     "range": true,
-     "refId": "B"
     }
    ],
-   "title": "OnRamp max seq num vs OffRamp next seq num",
+   "title": "config_poller_liveness (staleness, seconds)",
    "type": "timeseries"
   },
   {
@@ -590,7 +2349,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "onRampMaxSeqNum - offRampNextSeqNum per source chain. Quantifies \"how far behind\" instead of mentally diffing the two gauges above.",
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). Background config refresh failures, per chain and reason. reason=no_chain_accessor|batch_fetch_failed|no_chain_cache names WHY without needing logs: no_chain_accessor = misconfiguration (no accessor wired up for this chain); batch_fetch_failed = the accessor's fetch call itself errored (RPC/contract-binding problem -- this is the one that fired during the Solana 'no live nodes available' staging incident); no_chain_cache = internal cache-creation failure, should basically never fire. Recorded at the single batchRefreshChainAndSourceConfigs choke point, so on-demand cache-miss fetches count the same as background-refresh ones. destChainID=~\"$destChain\" is REQUIRED: a rate summed across every destination-chain lane sharing this source chain can look deceptively moderate even when ONE specific lane's poller is failing nearly every cycle -- always scope to the lane you're investigating before judging this against config_cache_stale.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -624,7 +2383,7 @@
        "mode": "none"
       },
       "thresholdsStyle": {
-       "mode": "off"
+       "mode": "area"
       }
      },
      "mappings": [],
@@ -636,404 +2395,8 @@
         "value": null
        },
        {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 19
-   },
-   "id": 1011,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Pending messages (backlog)",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "Chain-throughput ceiling being hit \u2014 previously Debugf-only.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 8,
-    "x": 0,
-    "y": 27
-   },
-   "id": 1012,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_range_truncated_total{source_network_name=~\"$sourceChain\"}[5m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Range truncated (MaxMerkleTreeSize hit)",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "offramp_ahead_of_onramp / onramp_max_zero / offramp_seqnum_regression \u2014 documented in-code as stall signals.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 8,
-    "x": 8,
-    "y": 27
-   },
-   "id": 1013,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_seqnum_invariant_violation_total{source_network_name=~\"$sourceChain\"}[5m])) by (source_network_name, type)",
-     "legendFormat": "{{source_network_name}} / {{type}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Seq-num invariant violations",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "DON couldn't agree on OffRampNextSeqNum for this chain \u2014 looks identical to \"no new messages\" from the outside without this.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 8,
-    "x": 16,
-    "y": 27
-   },
-   "id": 1014,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_offramp_consensus_insufficient_total{source_network_name=~\"$sourceChain\"}[5m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "OffRamp consensus insufficient",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "live / skipped_not_a_lane / skipped_disabled / rmn_misconfigured, reported every round for all four buckets so a transition can't leave a stale \"still active\" value. rmn_misconfigured flags real config drift.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
+        "color": "orange",
+        "value": 0.001
        }
       ]
      },
@@ -1045,9 +2408,9 @@
     "h": 7,
     "w": 24,
     "x": 0,
-    "y": 34
+    "y": 165
    },
-   "id": 1015,
+   "id": 2031,
    "options": {
     "legend": {
      "calcs": [
@@ -1071,237 +2434,82 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name, status) (ccip_commit_offramp_lane_status{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}} / {{status}}",
+     "expr": "sum by (chainID, reason) (rate(ccip_reader_config_poll_failure_total{destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "{{chainID}} - {{reason}}",
      "range": true,
      "refId": "A"
     }
    ],
-   "title": "OffRamp lane status",
+   "title": "config_poll_failure",
    "type": "timeseries"
   },
   {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "always_emitted: false. warn_if any series>0, ok_if all series==0 (including empty). Accessor returned an EMPTY chain-config snapshot. Per-event this is NOT a page -- the guard refuses to clobber a good cache for a single empty. Only actionable when SUSTAINED, which config_cache_stale (above) already captures; use this one to explain WHY the cache went stale and which chains. If this stays empty while config_cache_stale is climbing for the same chainID/destChainID, that RULES OUT the empty-snapshot path -- look at config_poll_failure (a real accessor error) instead.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
    "gridPos": {
-    "h": 2,
+    "h": 7,
     "w": 24,
     "x": 0,
-    "y": 41
+    "y": 172
    },
-   "id": 1016,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "RMN cursing and home-chain / DON-agreement health. These are destination-chain-wide, not lane-specific."
-   },
-   "title": "Cursing & Consensus",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "1 = halts ALL reporting for the dest chain.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 1
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 5,
-    "w": 6,
-    "x": 0,
-    "y": 43
-   },
-   "id": 1017,
-   "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "textMode": "auto"
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max(ccip_commit_rmn_curse_active{chain_id=~\"$destChain\", curse_type=\"global\"})",
-     "legendFormat": "__auto",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "RMN global curse active",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 1
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 5,
-    "w": 6,
-    "x": 6,
-    "y": 43
-   },
-   "id": 1018,
-   "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "textMode": "auto"
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max(ccip_commit_rmn_curse_active{chain_id=~\"$destChain\", curse_type=\"destination\"})",
-     "legendFormat": "__auto",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "RMN destination curse active",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "1 = this specific lane is excluded (expected/hand-off), distinct from a wedged plugin.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 5,
-    "w": 12,
-    "x": 12,
-    "y": 43
-   },
-   "id": 1019,
+   "id": 2032,
    "options": {
     "legend": {
      "calcs": [
@@ -1325,452 +2533,13 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_source_chain_cursed{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}}",
+     "expr": "sum by (chainID, kind) (rate(ccip_reader_config_cache_overwritten_empty_total{destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "{{chainID}}/{{kind}}",
      "range": true,
      "refId": "A"
     }
    ],
-   "title": "Source chain cursed (per lane)",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "Consensus-observation-failed can ONLY happen when the DON fails to agree 2\u00b7fRoleDON+1 on a single FChain value for the dest chain \u2014 every other field degrades gracefully per-chain. If this fires, expect every source chain into this dest to stall simultaneously (see Guided Debug \u2192 Scenario 3).",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 48
-   },
-   "id": 1020,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~\"$destChain\"}[5m])) by (chain_id)",
-     "legendFormat": "{{chain_id}} consensus failed/s",
-     "range": true,
-     "refId": "A"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{chainID=~\"$destChain\"}[5m])) by (chainID)",
-     "legendFormat": "{{chainID}} fchain read errors/s",
-     "range": true,
-     "refId": "B"
-    }
-   ],
-   "title": "Consensus observation failed (dest-wide) & FChain read errors",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "Per-goroutine RPC/read failures (no_bindings/timeout/rpc_error/msg_count_mismatch/hash_error/address_lookup_error) that are swallowed and never trip the generic processor-error counter.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 48
-   },
-   "id": 1021,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~\"$sourceChain\"}[5m])) by (source_network_name, reason)",
-     "legendFormat": "{{source_network_name}} / {{reason}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Merkleroot observation errors by reason",
-   "type": "timeseries"
-  },
-  {
-   "gridPos": {
-    "h": 2,
-    "w": 24,
-    "x": 0,
-    "y": 56
-   },
-   "id": 1022,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "One of the most common on-call pages: a report is built but never lands."
-   },
-   "title": "Report Transmission",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "validateReport rejections from ShouldAcceptAttestedReport / ShouldTransmitAcceptedReport. Non-zero here BEFORE report_transmission_gave_up means the report never made it on-chain at all.",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 58
-   },
-   "id": 1023,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{chainID=~\"$destChain\"}[5m])) by (phase, reason)",
-     "legendFormat": "{{phase}} / {{reason}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Report validation rejected, by phase & reason",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "Previously a Warnw with no counter. Pair with the validation-rejected panel to distinguish \"never transmitted\" from \"transmitted but stuck/reverted on-chain\".",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 58
-   },
-   "id": 1024,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~\"$sourceChain\"}[5m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}} gave up/s",
-     "range": true,
-     "refId": "A"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "histogram_quantile(0.95, sum(rate(ccip_commit_report_transmission_attempts_bucket{chainID=~\"$destChain\"}[5m])) by (le, success))",
-     "legendFormat": "attempts p95, success={{success}}",
-     "range": true,
-     "refId": "B"
-    }
-   ],
-   "title": "Report transmission gave up & attempts (p95)",
+   "title": "config_cache_overwritten_empty",
    "type": "timeseries"
   },
   {
@@ -1779,11 +2548,11 @@
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 66
+    "y": 179
    },
-   "id": 1025,
+   "id": 2033,
    "panels": [],
-   "title": "GUIDED DEBUG \u2014 Incident Runbook (mirrors docs/metrics/commit-metrics.md)",
+   "title": "GUIDED DEBUG \u2014 Uncommitted Message (mirrors docs/runbooks/uncommitted-message.md)",
    "type": "row"
   },
   {
@@ -1791,9 +2560,9 @@
     "h": 3,
     "w": 24,
     "x": 0,
-    "y": 67
+    "y": 180
    },
-   "id": 1026,
+   "id": 2034,
    "options": {
     "mode": "markdown",
     "code": {
@@ -1801,7 +2570,7 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "**Alert**: message `$MsgID`, onramp sequence number `$SeqNum`, chain `$sourceChain` (source) \u2192 chain `$destChain` (dest), reported in-flight for 15 minutes. Set the variables above, then walk the steps below top to bottom \u2014 each stops the moment you have an answer. This is a direct dashboard rendering of the \"War games\" walkthroughs in `docs/metrics/commit-metrics.md`; read that doc for the full rationale."
+    "content": "**Alert**: message `$MsgID`, onramp sequence number `$SeqNum`, chain `$sourceChain` (source) \u2192 chain `$destChain` (dest), reported in-flight for >15 minutes. Set the variables above (don't have all of them? resolve via `ccip-cli show`, see `docs/runbooks/README.md#identifying-a-ccip-message`), then walk the steps below top to bottom \u2014 each stops the moment it has an answer. This is a direct rendering of `docs/runbooks/uncommitted-message.md`'s decision graph; read that doc for full rationale. Outcome vocabulary: **STOP** (resolved), **CONTINUE:\\<step\\>** (proceed), **REPORT:\\<owner\\>** (root cause found outside this runbook's scope \u2014 hand off, don't act)."
    },
    "title": "Starting point",
    "type": "text",
@@ -1809,12 +2578,12 @@
   },
   {
    "gridPos": {
-    "h": 4,
+    "h": 3,
     "w": 24,
     "x": 0,
-    "y": 70
+    "y": 183
    },
-   "id": 1027,
+   "id": 2035,
    "options": {
     "mode": "markdown",
     "code": {
@@ -1822,9 +2591,9 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "Check **OffRamp next seq num** for source `$sourceChain` \u2192 dest `$destChain`.\n\n- `> $SeqNum` \u2192 a root covering it already landed on the offramp. Commit plugin's job is done; **hand off to exec on-call. Stop.**\n- `<= $SeqNum` \u2192 continue to Step 2."
+    "content": "`result == 0` \u2192 **REPORT:ccip-commit-oncall** (also read the live-oracle-headcount panel below before reporting \u2014 turns \"not running\" into \"N of the DON's oracles are actually alive\"). `result > 0` \u2192 **CONTINUE:step1**. Window is `[1m]`, not `[5m]` \u2014 same rate()-extrapolation reasoning as the Liveness panels above."
    },
-   "title": "Step 1 \u2014 Is this even a commit-plugin problem?",
+   "title": "step0 \u2014 is the plugin alive at all?",
    "type": "text",
    "transparent": true
   },
@@ -1833,840 +2602,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 24,
-    "x": 0,
-    "y": 74
-   },
-   "id": 1028,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_offramp_next_seq_num{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Step 1 metric \u2014 ccip_commit_offramp_next_seq_num",
-   "type": "timeseries"
-  },
-  {
-   "gridPos": {
-    "h": 4,
-    "w": 24,
-    "x": 0,
-    "y": 80
-   },
-   "id": 1029,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "Check **OnRamp max seq num** for source `$sourceChain`.\n\n- `< $SeqNum` \u2192 onramp read is lagging. Check the errors-by-reason panel below (no_bindings / timeout / rpc_error). This is a source-chain read/infra issue, not commit logic. **Stop here and escalate to chain infra.**\n- `>= $SeqNum` \u2192 plugin has seen it; continue to Step 3."
-   },
-   "title": "Step 2 \u2014 Has the plugin observed it on-chain yet?",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 12,
-    "x": 0,
-    "y": 84
-   },
-   "id": 1030,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_onramp_max_seq_num{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Step 2 metric \u2014 ccip_commit_onramp_max_seq_num",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 12,
-    "x": 12,
-    "y": 84
-   },
-   "id": 1031,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_merkleroot_observation_errors_total{source_network_name=~\"$sourceChain\"}[5m])) by (reason)",
-     "legendFormat": "{{reason}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Step 2 metric \u2014 merkleroot_observation_errors by reason",
-   "type": "timeseries"
-  },
-  {
-   "gridPos": {
-    "h": 4,
-    "w": 24,
-    "x": 0,
-    "y": 90
-   },
-   "id": 1032,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "Check **rate(ccip_commit_consensus_observation_failed_total[5m])** for dest `$destChain`.\n\n- Incrementing \u2192 destination-chain-wide consensus failure. Jump to the **Scenario 3 deep dive** below.\n- Flat \u2192 continue to Step 4."
-   },
-   "title": "Step 3 \u2014 Is the round producing outcomes at all?",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 24,
-    "x": 0,
-    "y": 94
-   },
-   "id": 1033,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{chain_id=~\"$destChain\"}[5m])) by (chain_id)",
-     "legendFormat": "{{chain_id}}",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Step 3 metric \u2014 ccip_commit_consensus_observation_failed_total",
-   "type": "timeseries"
-  },
-  {
-   "gridPos": {
-    "h": 4,
-    "w": 24,
-    "x": 0,
-    "y": 100
-   },
-   "id": 1034,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "Check **RMN curse active** for dest `$destChain` and **source chain cursed** for `$sourceChain`.\n\n- Any `== 1` \u2192 found it; likely intentional/incident-flagged, hand off to whoever owns the curse. **Stop.**\n- All `0` \u2192 continue to Step 5."
-   },
-   "title": "Step 4 \u2014 Is chain A or B cursed?",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 1
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 8,
-    "x": 0,
-    "y": 104
-   },
-   "id": 1035,
-   "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "textMode": "auto"
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max(ccip_commit_rmn_curse_active{chain_id=~\"$destChain\", curse_type=\"global\"})",
-     "legendFormat": "__auto",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Step 4 metric \u2014 RMN global curse",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 1
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 8,
-    "x": 8,
-    "y": 104
-   },
-   "id": 1036,
-   "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "textMode": "auto"
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max(ccip_commit_rmn_curse_active{chain_id=~\"$destChain\", curse_type=\"destination\"})",
-     "legendFormat": "__auto",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Step 4 metric \u2014 RMN destination curse",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 1
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 8,
-    "x": 16,
-    "y": 104
-   },
-   "id": 1037,
-   "options": {
-    "colorMode": "value",
-    "graphMode": "area",
-    "justifyMode": "auto",
-    "orientation": "auto",
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "textMode": "auto"
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max(ccip_commit_source_chain_cursed{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "__auto",
-     "range": true,
-     "refId": "A"
-    }
-   ],
-   "title": "Step 4 metric \u2014 source chain cursed",
-   "type": "stat"
-  },
-  {
-   "gridPos": {
-    "h": 4,
-    "w": 24,
-    "x": 0,
-    "y": 110
-   },
-   "id": 1038,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "Check **report_transmission_gave_up** and **report_transmission_attempts** for `$sourceChain` / `$destChain`.\n\n- Incrementing/maxed \u2192 jump to the **Scenario 2 deep dive** below.\n- Otherwise \u2192 likely just backlog size; check **pending_messages** and estimate ETA from round cadence."
-   },
-   "title": "Step 5 \u2014 Is a report being built but never landing?",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "custom": {
-      "axisCenteredZero": false,
-      "axisColorMode": "text",
-      "axisLabel": "",
-      "axisPlacement": "auto",
-      "barAlignment": 0,
-      "drawStyle": "line",
-      "fillOpacity": 0,
-      "gradientMode": "none",
-      "hideFrom": {
-       "legend": false,
-       "tooltip": false,
-       "viz": false
-      },
-      "insertNulls": false,
-      "lineInterpolation": "linear",
-      "lineWidth": 1,
-      "pointSize": 5,
-      "scaleDistribution": {
-       "type": "linear"
-      },
-      "showPoints": "auto",
-      "spanNulls": false,
-      "stacking": {
-       "group": "A",
-       "mode": "none"
-      },
-      "thresholdsStyle": {
-       "mode": "off"
-      }
-     },
-     "mappings": [],
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 80
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 24,
-    "x": 0,
-    "y": 114
-   },
-   "id": 1039,
-   "options": {
-    "legend": {
-     "calcs": [
-      "lastNotNull",
-      "max"
-     ],
-     "displayMode": "table",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "pluginVersion": "10.1.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{source_network_name=~\"$sourceChain\"}[5m])) by (source_network_name)",
-     "legendFormat": "{{source_network_name}} gave up/s",
-     "range": true,
-     "refId": "A"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "${DS_PROMETHEUS}"
-     },
-     "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_pending_messages{source_network_name=~\"$sourceChain\"})",
-     "legendFormat": "{{source_network_name}} pending",
-     "range": true,
-     "refId": "B"
-    }
-   ],
-   "title": "Step 5 metric \u2014 gave up & pending backlog",
-   "type": "timeseries"
-  },
-  {
-   "gridPos": {
-    "h": 2,
-    "w": 24,
-    "x": 0,
-    "y": 120
-   },
-   "id": 1040,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": ""
-   },
-   "title": "\u26a0\ufe0f RMN-signature branches (signed-roots-dropped, chain quorum, Byzantine root disagreement) were dropped from this runbook: RMNEnabled is hardcoded off in production. Cursing (Step 4) is the one RMN-adjacent signal still live.",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "gridPos": {
-    "h": 6,
-    "w": 24,
-    "x": 0,
-    "y": 122
-   },
-   "id": 1041,
-   "options": {
-    "mode": "markdown",
-    "code": {
-     "language": "plaintext",
-     "showLineNumbers": false,
-     "showMiniMap": false
-    },
-    "content": "Three hypotheses, cheapest first:\n\n- **A \u2014 never transmitted (rejected pre-send).** Check the reason breakdown below for `phase=\"should_transmit\"`. `config_digest_mismatch` \u2192 cross-check the digest-mismatch panel above, config sync issue. `stale` \u2192 often benign, a different overlapping report already landed, re-check Step 1. `dest_not_supported` \u2192 transmission-schedule/config bug. `cursed` \u2192 converges with Step 4. All flat \u2192 move to B.\n- **B \u2014 transmitted, reverted/stuck on-chain.** *Outside commit-plugin metrics*: check chain B's TXM/tx-sender dashboards for the assigned transmitter (nonce gap, underpriced gas, wallet balance, revert reason).\n- **C \u2014 actually succeeded, read is lagging.** `offramp_next_seq_num` is sourced from this plugin's own chain-B reader; cross-check chain B's block explorer / chain-reader health directly before escalating further."
-   },
-   "title": "Deep dive: Scenario 2 \u2014 report transmission stuck (Step 5)",
-   "type": "text",
-   "transparent": true
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "${DS_PROMETHEUS}"
-   },
-   "description": "",
+   "description": "condition: result==0. Always run the followup (live oracle headcount) before reporting \u2014 confirmed by live testing that a bare \"not running\" reads as unsatisfyingly generic on its own.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -2725,9 +2661,9 @@
     "h": 7,
     "w": 24,
     "x": 0,
-    "y": 128
+    "y": 186
    },
-   "id": 1042,
+   "id": 2036,
    "options": {
     "legend": {
      "calcs": [
@@ -2751,23 +2687,34 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{chainID=~\"$destChain\", phase=\"should_transmit\"}[15m])) by (reason)",
-     "legendFormat": "{{reason}}",
+     "expr": "sum(rate(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\"}[1m]))",
+     "legendFormat": "plugin_heartbeat",
      "range": true,
      "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
+     "legendFormat": "live_oracle_count",
+     "range": true,
+     "refId": "B"
     }
    ],
-   "title": "Scenario 2 metric \u2014 report_validation_rejected{phase=\"should_transmit\"} by reason",
+   "title": "step0 \u2014 plugin_heartbeat & live oracle headcount",
    "type": "timeseries"
   },
   {
    "gridPos": {
-    "h": 8,
+    "h": 3,
     "w": 24,
     "x": 0,
-    "y": 135
+    "y": 193
    },
-   "id": 1043,
+   "id": 2037,
    "options": {
     "mode": "markdown",
     "code": {
@@ -2775,9 +2722,9 @@
      "showLineNumbers": false,
      "showMiniMap": false
     },
-    "content": "Grounded in `getConsensusObservation` (`merkleroot/outcome.go`): the *only* way the whole round fails is the DON not reaching 2\u00b7fRoleDON+1 agreement on a single FChain value for the **destination chain** \u2014 every other field degrades gracefully per-chain.\n\n- **This is destination-chain-wide, not lane-specific.** Before going further, check whether *other* source chains into this dest are also stalled (their pending-messages also climbing, panel below). If only `$sourceChain` is affected, this branch is wrong \u2014 back to Step 4/5.\n- **H1 \u2014 too few oracles could read it.** `fchain_read_errors` spiking broadly across oracles \u2192 home-chain RPC/read outage.\n- **H2 \u2014 oracles disagree.** *(Needs the not-yet-implemented `consensus.go` split-vote metric \u2014 `ccip_commit_consensus_dropped{objectName=\"fChain\", reason=\"split\"}`, reviewed design only per the metrics doc.)* Corroborate with `config_digest_mismatch` flipping for a subset of oracles around the same time."
+    "content": "`result > $SeqNum` \u2192 **STOP** \u2014 a root covering it already landed on the offramp; commit plugin's job is done, hand off to exec on-call for delivery status. `result <= $SeqNum` \u2192 **CONTINUE:step2**. `destChainID=~\"$destChain\"` is required on this and every per-lane query below \u2014 without it you're reading this lane across every destination chain sharing this datasource, not just the one under investigation."
    },
-   "title": "Deep dive: Scenario 3 \u2014 consensus never completes (Step 3)",
+   "title": "step1 \u2014 is this even a commit-plugin problem?",
    "type": "text",
    "transparent": true
   },
@@ -2786,7 +2733,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "The second series is intentionally unfiltered by $sourceChain \u2014 you need every lane into this dest chain to rule this branch in/out.",
+   "description": "condition: result > $SeqNum.",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -2842,12 +2789,12 @@
     "overrides": []
    },
    "gridPos": {
-    "h": 8,
+    "h": 7,
     "w": 24,
     "x": 0,
-    "y": 143
+    "y": 196
    },
-   "id": 1044,
+   "id": 2038,
    "options": {
     "legend": {
      "calcs": [
@@ -2871,24 +2818,133 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{chainID=~\"$destChain\"}[5m])) by (chainID)",
-     "legendFormat": "{{chainID}} fchain read errors/s",
+     "expr": "max by (sourceChainName) (ccip_commit_offramp_next_seq_num{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
      "refId": "A"
+    }
+   ],
+   "title": "step1 \u2014 offramp_next_seq_num",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 203
+   },
+   "id": 2039,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
     },
+    "content": "`result < $SeqNum` \u2192 **REPORT:chain-infra-oncall** \u2014 onramp read is lagging; check the errors-by-reason panel below (no_bindings/timeout/rpc_error/msg_count_mismatch/hash_error/address_lookup_error). Source-chain read/infra issue, not commit logic. `result >= $SeqNum` \u2192 **CONTINUE:step2b**."
+   },
+   "title": "step2 \u2014 has the plugin observed it on-chain yet?",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: result < $SeqNum.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 206
+   },
+   "id": 2040,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
     {
      "datasource": {
       "type": "prometheus",
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "max by (source_network_name) (ccip_commit_pending_messages{dest_network_name=~\".*\"})",
-     "legendFormat": "{{source_network_name}} pending (all lanes)",
+     "expr": "max by (sourceChainName) (ccip_commit_onramp_max_seq_num{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
      "range": true,
-     "refId": "B"
+     "refId": "A"
     }
    ],
-   "title": "Scenario 3 metric \u2014 fchain_read_errors & pending_messages across ALL source chains into $destChain",
+   "title": "step2 \u2014 onramp_max_seq_num",
    "type": "timeseries"
   },
   {
@@ -2896,7 +2952,7 @@
     "type": "prometheus",
     "uid": "${DS_PROMETHEUS}"
    },
-   "description": "",
+   "description": "Only relevant if step2 fired (onramp read lagging).",
    "fieldConfig": {
     "defaults": {
      "color": {
@@ -2952,12 +3008,12 @@
     "overrides": []
    },
    "gridPos": {
-    "h": 6,
+    "h": 7,
     "w": 24,
     "x": 0,
-    "y": 151
+    "y": 213
    },
-   "id": 1045,
+   "id": 2041,
    "options": {
     "legend": {
      "calcs": [
@@ -2981,13 +3037,1656 @@
       "uid": "${DS_PROMETHEUS}"
      },
      "editorMode": "code",
-     "expr": "ccip_commit_config_digest_mismatch{chain_id=~\"$destChain\"}",
-     "legendFormat": "{{chain_id}}",
+     "expr": "sum(rate(ccip_commit_merkleroot_observation_errors_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[5m])) by (reason)",
+     "legendFormat": "{{reason}}",
      "range": true,
      "refId": "A"
     }
    ],
-   "title": "Scenario 3 metric \u2014 config_digest_mismatch (corroborating H2)",
+   "title": "step2 followup \u2014 merkleroot_observation_errors by reason",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 220
+   },
+   "id": 2042,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "The onramp has been observed, but the DON still has to agree on the source-chain values that go into the merkle root. `any result > 0` \u2192 **REPORT:ccip-commit-oncall** \u2014 consensus_dropped reason=split means disagreeing oracles, reason=insufficient_agreement means too few oracles observed the key, reason=threshold_not_defined is a config/data mismatch; offramp_consensus_insufficient means the DON couldn't agree on OffRampNextSeqNums for this lane. The message cannot advance until the disagreement resolves. All flat \u2192 **CONTINUE:step2c**."
+   },
+   "title": "step2b \u2014 can the DON agree on this chain's per-chain values?",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: any result > 0.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 223
+   },
+   "id": 2043,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_consensus_dropped_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\", objectName=~\"MerkleRoot|OnRampMaxSeqNums\"}[5m])) by (objectName, reason)",
+     "legendFormat": "{{objectName}}/{{reason}}",
+     "range": true,
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_offramp_consensus_insufficient_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "offramp_consensus_insufficient",
+     "range": true,
+     "refId": "B"
+    }
+   ],
+   "title": "step2b \u2014 per-chain consensus_dropped & offramp_consensus_insufficient",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 230
+   },
+   "id": 2044,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "The on/offramp gauges and consensus signals are *outcomes* \u2014 they can't tell \"plugin is broken\" apart from \"plugin is fine but fed empty/partial data.\" Any `read_empty`/non-`returned` `chain_gap` `> 0`, or `config_cache_age_seconds{kind=\"chain\"}` sustained above ~90s \u2192 **REPORT:chain-infra-oncall**, the data layer is degrading (a reader/chain-infra problem, not a commit-plugin defect); split single-node vs DON-wide by `csa_public_key` first. All flat \u2192 **CONTINUE:step3**. `chainID`/`chainFamily`/`chainName`/`chainSelector` below (pkg/reader/rcmetrics chainAttrs()) describe whichever chain a read is about, shared with execute; every panel here ALSO filters `destChainID=~\"$destChain\"` (a second, dest-scoped chainAttrs()) -- REQUIRED, not optional, since a node runs one reader instance per destination chain and more than one instance can independently track the same source chain (confirmed on staging) \u2014 see `docs/metrics/reader-metrics.md`. This is a data-layer *gate* placed before the consensus/transmission tree, exactly where a silently-empty reader would otherwise be misattributed to the plugin."
+   },
+   "title": "step2c \u2014 is the problem upstream in the data source instead?",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: any result > 0.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 233
+   },
+   "id": 2045,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (query, chainID) (rate(ccip_reader_read_empty_total{query=~\"NextSeqNum|MsgsBetweenSeqNums|LatestMsgSeqNum\", destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "{{query}}/{{chainID}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "step2c \u2014 reader_read_empty (this lane's queries)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: any result > 0. Actionable states: not_found|disabled|misconfigured|error|invalid|missing|stale|count_mismatch.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 240
+   },
+   "id": 2046,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (query, chainID, state) (rate(ccip_reader_chain_gap_total{query=~\"NextSeqNum|MsgsBetweenSeqNums|GetChainsFeeComponents|GetChainFeePriceUpdate\", state!=\"returned\", destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "{{query}}/{{chainID}}/{{state}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "step2c \u2014 reader_chain_gap (non-returned states)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: kind=\"chain\" sustained above ~90s (3x refresh period) \u2014 a single intermittent empty poll isn't enough.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     },
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 247
+   },
+   "id": 2047,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max by (chainID, kind) (ccip_reader_config_cache_age_seconds{destChainID=~\"$destChain\"})",
+     "legendFormat": "{{chainID}}/{{kind}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "step2c \u2014 config_cache_age_seconds",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 254
+   },
+   "id": 2048,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "Incrementing \u2192 destination-chain-wide consensus failure, jump to **Scenario 3** below. Flat \u2192 **CONTINUE:step4**."
+   },
+   "title": "step3 \u2014 is the round producing outcomes at all?",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: result > 0.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "area"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 0.001
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 257
+   },
+   "id": 2049,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_consensus_observation_failed_total{destChainID=~\"$destChain\"}[5m])) by (destChainID)",
+     "legendFormat": "{{destChainID}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "step3 \u2014 consensus_observation_failed",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 264
+   },
+   "id": 2050,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "Any `== 1` \u2192 **REPORT:curse-owner** \u2014 found it; likely intentional/incident-flagged. Curse state is served from the config-poller cache: if `config_cache_age_seconds{kind=\"chain\"}` is high (see step2c panel above), the curse reading itself may be stale \u2014 say so when reporting. All `0` \u2192 **CONTINUE:step5**. RMN-signature branches (signed-roots-dropped, chain quorum, Byzantine root disagreement) are intentionally absent: `RMNEnabled` is hardcoded off in production, so those paths are dead code \u2014 cursing is the one RMN-adjacent signal still live."
+   },
+   "title": "step4 \u2014 is chain A or B cursed?",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: result==1.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 0,
+    "y": 267
+   },
+   "id": 2051,
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "justifyMode": "auto",
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "textMode": "auto"
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max(ccip_commit_rmn_curse_active{destChainID=~\"$destChain\", curse_type=\"global\"})",
+     "legendFormat": "__auto",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "step4 \u2014 RMN global curse",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: result==1.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 6,
+    "y": 267
+   },
+   "id": 2052,
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "justifyMode": "auto",
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "textMode": "auto"
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max(ccip_commit_rmn_curse_active{destChainID=~\"$destChain\", curse_type=\"destination\"})",
+     "legendFormat": "__auto",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "step4 \u2014 RMN destination curse",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: result==1.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 12,
+    "y": 267
+   },
+   "id": 2053,
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "justifyMode": "auto",
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "textMode": "auto"
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max(ccip_commit_source_chain_cursed{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "__auto",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "step4 \u2014 source chain cursed",
+   "type": "stat"
+  },
+  {
+   "gridPos": {
+    "h": 3,
+    "w": 24,
+    "x": 0,
+    "y": 271
+   },
+   "id": 2054,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "Incrementing/maxed \u2192 jump to **Scenario 2** below. Otherwise \u2192 likely just backlog size \u2014 report `pending_messages` and an ETA estimate from round cadence, and stop."
+   },
+   "title": "step5 \u2014 is a report being built but never landing?",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: report_transmission_gave_up result > 0.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 274
+   },
+   "id": 2055,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_report_transmission_gave_up_total{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"}[5m])) by (sourceChainName)",
+     "legendFormat": "{{sourceChainName}} gave_up",
+     "range": true,
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max by (sourceChainName) (ccip_commit_pending_messages{sourceChainName=~\"$sourceChain\", destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}} pending",
+     "range": true,
+     "refId": "B"
+    }
+   ],
+   "title": "step5 \u2014 report_transmission_gave_up & pending_messages",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 6,
+    "w": 24,
+    "x": 0,
+    "y": 281
+   },
+   "id": 2056,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "**A \u2014 never transmitted (rejected pre-send).** Branch by `reason` in the panel below: `config_digest_mismatch`\u2192config sync issue (cross-check config_digest_mismatch above); `config_digest_check_error`\u2192RPC/read error checking the digest, chain-infra-oncall, not a real mismatch; `stale`\u2192often benign, **STOP**, re-check step1; `dest_not_supported`\u2192transmission-schedule/config bug; `dest_support_check_error`\u2192RPC/read error, chain-infra-oncall; `cursed`\u2192converges with step4; `cursed_check_error`\u2192RPC/read error, chain-infra-oncall, don't conflate with step4's cursed=1; `empty_root` / `invalid_seqnum_range`\u2192report-builder produced an invalid report -- before blaming the processor, check the reader-corroboration panel below for a partial/empty read on `MsgsBetweenSeqNums` for this lane around the same time; `decode_report` / `decode_report_info`\u2192codec/chainlink-common version skew; `root_blessing_mismatch`\u2192on-chain blessing validation failed; **any other reason**\u2192do NOT guess which of the above it's \"close enough to\" \u2014 report the exact string and rate, say this runbook has no mapping for it yet. All flat \u2192 **CONTINUE:scenario2b**.\n\n**B \u2014 transmitted, reverted/stuck on-chain.** *(automatable: false)* Check chain B's TXM/tx-sender dashboards for the assigned transmitter (nonce gap, underpriced gas, wallet balance, revert reason).\n\n**C \u2014 actually succeeded, read is lagging.** *(automatable: false)* `offramp_next_seq_num` is sourced from this plugin's own chain-B reader; cross-check chain B's block explorer / chain-reader health directly before escalating further."
+   },
+   "title": "Deep dive \u2014 Scenario 2: report transmission stuck (step5)",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: any reason count > 0.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 287
+   },
+   "id": 2057,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~\"$destChain\", phase=\"should_transmit\"}[15m])) by (reason)",
+     "legendFormat": "{{reason}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "Scenario 2 \u2014 report_validation_rejected{phase=\"should_transmit\"} by reason",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "Only relevant if scenario2 fired with reason=empty_root or invalid_seqnum_range. chain_gap{state=\"count_mismatch\"} in particular can manufacture invalid_seqnum_range without any processor bug. Any firing for this lane around the same time \u2192 reader-layer issue, not a processor bug.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 294
+   },
+   "id": 2058,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (chainID, state) (rate(ccip_reader_chain_gap_total{query=\"MsgsBetweenSeqNums\", state!=\"returned\", destChainID=~\"$destChain\"}[15m]))",
+     "legendFormat": "chain_gap {{chainID}}/{{state}}",
+     "range": true,
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (chainID) (rate(ccip_reader_read_empty_total{query=\"MsgsBetweenSeqNums\", destChainID=~\"$destChain\"}[15m]))",
+     "legendFormat": "read_empty {{chainID}}",
+     "range": true,
+     "refId": "B"
+    }
+   ],
+   "title": "Scenario 2 followup \u2014 reader corroboration for empty_root/invalid_seqnum_range",
+   "type": "timeseries"
+  },
+  {
+   "gridPos": {
+    "h": 8,
+    "w": 24,
+    "x": 0,
+    "y": 301
+   },
+   "id": 2059,
+   "options": {
+    "mode": "markdown",
+    "code": {
+     "language": "plaintext",
+     "showLineNumbers": false,
+     "showMiniMap": false
+    },
+    "content": "Grounded in `getConsensusObservation` (`merkleroot/outcome.go`): the *only* way the whole round fails is the DON not reaching 2\u00b7fRoleDON+1 agreement on a single FChain value for the **destination chain** \u2014 every other field degrades gracefully per-chain.\n\n**Destination-chain-wide check first.** If only `$sourceChain`'s series is climbing in the panel below while others into the same dest are flat \u2192 this branch is wrong, **back to step4/step5**. Confirmed dest-wide \u2192 continue.\n\n**H0 \u2014 not enough oracles are even running.** *(Check before H1/H2 \u2014 a distinct failure mode neither of them can detect.)* If `$fRoleDON` known: `< 2*fRoleDON+1` \u2192 **this is the answer, REPORT:ccip-commit-oncall, stop here** \u2014 don't let a flat H1 push you toward H2, they check a different failure mode. `>= 2*fRoleDON+1` \u2192 continue to H1/H2. If `$fRoleDON` unknown \u2192 report the raw count as context and continue, but treat H1/H2's conclusion as lower-confidence.\n\n**H1 \u2014 too few oracles could read it.** Spiking broadly across oracles \u2192 **REPORT:home-chain-infra-oncall**, home-chain RPC/read outage. Corroborate with the reader-layer panel below, grouped by node: firing across (nearly) every `csa_public_key` for the same query is DON-wide data-source failure, not a split vote; one or two nodes only is that node's RPC. Both flat \u2192 corroborates H2 instead.\n\n**H2 \u2014 oracles disagree (split vote).** Confirm with consensus_dropped{objectName=fChain, reason=split}; corroborate with config_digest_mismatch flipping for a subset of oracles around the same time \u2192 **REPORT:ccip-commit-oncall**. If H0 couldn't rule out insufficient participation (fRoleDON unknown), treat this as low-confidence, not a firm diagnosis."
+   },
+   "title": "Deep dive \u2014 Scenario 3: consensus never completes (step3)",
+   "type": "text",
+   "transparent": true
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: only $sourceChain's series is climbing, others flat \u2192 branch is wrong, back to step4/step5. Deliberately no sourceChainName filter -- comparing every lane into $destChain is the point.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 309
+   },
+   "id": 2060,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "max by (sourceChainName) (ccip_commit_pending_messages{destChainID=~\"$destChain\"})",
+     "legendFormat": "{{sourceChainName}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "Scenario 3 \u2014 pending_messages across ALL lanes into $destChain",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: compare against 2*$fRoleDON+1 and 3*$fRoleDON+1 if $fRoleDON is known. Uses timestamp()-vs-time(), not rate()>0, for the same detection-lag reason as step0.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 24,
+    "x": 0,
+    "y": 316
+   },
+   "id": 2061,
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "justifyMode": "auto",
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "textMode": "auto"
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "count(count by (csa_public_key) (timestamp(ccip_commit_plugin_heartbeat_total{destChainID=~\"$destChain\", phase=\"observation\"}) > time() - 60))",
+     "legendFormat": "__auto",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "Scenario 3 (H0) \u2014 live_oracle_count",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "condition: spiking broadly across oracles \u2192 H1. Flat \u2192 H2, corroborate with the panels below.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 320
+   },
+   "id": 2062,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum(rate(ccip_commit_fchain_read_errors_total{destChainID=~\"$destChain\"}[5m])) by (destChainID)",
+     "legendFormat": "{{destChainID}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "Scenario 3 (H1/H2) \u2014 fchain_read_errors",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "Firing across (nearly) every csa_public_key for the same query \u2192 DON-wide data-source failure (H1), not a split vote. One or two csa_public_key values only \u2192 that node's RPC, not DON-wide. Both flat \u2192 corroborates H2.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 327
+   },
+   "id": 2063,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (query, chainID, csa_public_key) (rate(ccip_reader_read_empty_total{destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "read_empty {{query}}/{{chainID}}/{{csa_public_key}}",
+     "range": true,
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "sum by (query, chainID, state, csa_public_key) (rate(ccip_reader_chain_gap_total{state!=\"returned\", destChainID=~\"$destChain\"}[5m]))",
+     "legendFormat": "chain_gap {{query}}/{{chainID}}/{{state}}/{{csa_public_key}}",
+     "range": true,
+     "refId": "B"
+    }
+   ],
+   "title": "Scenario 3 (H1) \u2014 reader read_empty/chain_gap by node",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS_PROMETHEUS}"
+   },
+   "description": "Corroborates H2: a subset of oracles flipping this around the same time as the split vote.",
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "axisCenteredZero": false,
+      "axisColorMode": "text",
+      "axisLabel": "",
+      "axisPlacement": "auto",
+      "barAlignment": 0,
+      "drawStyle": "line",
+      "fillOpacity": 0,
+      "gradientMode": "none",
+      "hideFrom": {
+       "legend": false,
+       "tooltip": false,
+       "viz": false
+      },
+      "insertNulls": false,
+      "lineInterpolation": "linear",
+      "lineWidth": 1,
+      "pointSize": 5,
+      "scaleDistribution": {
+       "type": "linear"
+      },
+      "showPoints": "auto",
+      "spanNulls": false,
+      "stacking": {
+       "group": "A",
+       "mode": "none"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 334
+   },
+   "id": 2064,
+   "options": {
+    "legend": {
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ],
+     "displayMode": "table",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "pluginVersion": "10.1.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+     },
+     "editorMode": "code",
+     "expr": "ccip_commit_config_digest_mismatch{destChainID=~\"$destChain\"}",
+     "legendFormat": "{{destChainID}}",
+     "range": true,
+     "refId": "A"
+    }
+   ],
+   "title": "Scenario 3 (H2 corroboration) \u2014 config_digest_mismatch",
    "type": "timeseries"
   }
  ],
@@ -3028,15 +4727,15 @@
      "type": "prometheus",
      "uid": "${DS_PROMETHEUS}"
     },
-    "definition": "label_values(ccip_commit_plugin_heartbeat_total, chainID)",
+    "definition": "label_values(ccip_commit_plugin_heartbeat_total, destChainID)",
     "hide": 0,
     "includeAll": true,
-    "label": "Dest chain (chainID)",
+    "label": "Dest chain (destChainID)",
     "multi": true,
     "name": "destChain",
     "options": [],
     "query": {
-     "query": "label_values(ccip_commit_plugin_heartbeat_total, chainID)",
+     "query": "label_values(ccip_commit_plugin_heartbeat_total, destChainID)",
      "refId": "StandardVariableQuery"
     },
     "refresh": 2,
@@ -3055,15 +4754,15 @@
      "type": "prometheus",
      "uid": "${DS_PROMETHEUS}"
     },
-    "definition": "label_values(ccip_commit_pending_messages, source_network_name)",
+    "definition": "label_values(ccip_commit_pending_messages, sourceChainName)",
     "hide": 0,
     "includeAll": true,
-    "label": "Source chain (network name)",
+    "label": "Source chain (sourceChainName)",
     "multi": true,
     "name": "sourceChain",
     "options": [],
     "query": {
-     "query": "label_values(ccip_commit_pending_messages, source_network_name)",
+     "query": "label_values(ccip_commit_pending_messages, sourceChainName)",
      "refId": "StandardVariableQuery"
     },
     "refresh": 2,
@@ -3111,6 +4810,26 @@
     "query": "0x",
     "skipUrlSync": false,
     "type": "textbox"
+   },
+   {
+    "current": {
+     "selected": false,
+     "text": "",
+     "value": ""
+    },
+    "hide": 0,
+    "label": "fRoleDON (optional -- for grading live_oracle_count)",
+    "name": "fRoleDON",
+    "options": [
+     {
+      "selected": true,
+      "text": "",
+      "value": ""
+     }
+    ],
+    "query": "",
+    "skipUrlSync": false,
+    "type": "textbox"
    }
   ]
  },
@@ -3122,6 +4841,6 @@
  "timezone": "",
  "title": "CCIP Commit Plugin",
  "uid": "ccip-commit-plugin",
- "version": 1,
+ "version": 3,
  "weekStart": ""
 }

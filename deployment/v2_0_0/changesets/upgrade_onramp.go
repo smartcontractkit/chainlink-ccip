@@ -39,7 +39,7 @@ func validateUpgradeOnrampConfig(cfg UpgradeOnrampConfig) error {
 	return nil
 }
 
-func initUpgradeOnrampChangesets(upgradeOnrampRegistry *adapters.OnRampUpgraderRegistry, cfg UpgradeOnrampConfig) (string, adapters.OnRampUpgrader, error) {
+func initUpgradeOnrampChangesets(upgradeOnrampRegistry *adapters.OnRampUpgraderRegistry, cfg *UpgradeOnrampConfig) (string, adapters.OnRampUpgrader, error) {
 	if err := cfg.MCMS.PopulateDefaults(); err != nil {
 		return "", nil, err
 	}
@@ -86,7 +86,7 @@ func UpgradeOnrampPhase1(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(upgradeOnrampRegistry, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(upgradeOnrampRegistry, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -269,7 +269,7 @@ func UpgradeOnrampPhase2(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -337,7 +337,7 @@ func UpgradeOnrampPhase3(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgrader, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgrader, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -426,6 +426,135 @@ func UpgradeOnrampPhase3(
 	return cldf.CreateChangeSet(apply, validate)
 }
 
+// UpgradeOnrampPhase3Rollback rolls production traffic back to the legacy
+// OnRamp for the selected destination lanes.
+//
+// This is intentionally a traffic-only rollback:
+//   - original ProdRouter lanes: ProdRouter -> legacy OnRamp
+//   - original TestRouter lanes: TestRouter -> legacy OnRamp
+//
+// It does NOT:
+//   - modify the new OnRamp's dest-chain configs;
+//   - change remote OffRamp source-OnRamp allowlists;
+//   - change datastore refs;
+//   - change verifier jobs;
+//   - undo Phase 1.
+//
+// Pre-flight:
+//  1. Phase 3 must currently be active for every selected lane.
+//  2. The legacy OnRamp must still be allowlisted on every destination OffRamp.
+//
+// Therefore this rollback MUST NOT be used after UpgradeOnrampCleanup has
+// removed legacy from the remote OffRamps.
+func UpgradeOnrampPhase3Rollback(
+	onrampUpgraderRegistry *adapters.OnRampUpgraderRegistry,
+	chainFamilyRegistry *adapters.ChainFamilyRegistry,
+	mcmsReaderRegistry *changesetscore.MCMSReaderRegistry,
+) cldf.ChangeSetV2[UpgradeOnrampConfig] {
+	validate := func(e cldf.Environment, cfg UpgradeOnrampConfig) error {
+		if err := validateUpgradeOnrampConfig(cfg); err != nil {
+			return fmt.Errorf("invalid UpgradeOnrampConfig: %w", err)
+		}
+		return nil
+	}
+
+	apply := func(
+		e cldf.Environment,
+		cfg UpgradeOnrampConfig,
+	) (cldf.ChangesetOutput, error) {
+		family, upgrader, err := initUpgradeOnrampChangesets(
+			onrampUpgraderRegistry,
+			&cfg,
+		)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+
+		localAdapter, ok := chainFamilyRegistry.GetChainFamily(family)
+		if !ok {
+			return cldf.ChangesetOutput{},
+				fmt.Errorf("no chain family adapter for family %q", family)
+		}
+
+		// The legacy ref is both our rollback target and our proof that the
+		// upgrade has not been fully cleaned up.
+		legacyRef, err := upgrader.LegacyOnRampRef(e, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve legacy OnRamp: %w", err)
+		}
+
+		legacyOnRamp, err := wireEncodeOnRampRef(localAdapter, legacyRef, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("encode legacy OnRamp: %w", err)
+		}
+
+		newOnRamp, err := localAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve new OnRamp: %w", err)
+		}
+
+		// Classification comes from the legacy OnRamp, whose configs preserve
+		// each destination's original production router.
+		laneClass, err := upgrader.ClassifyDestChains(e, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("classify dest chains: %w", err)
+		}
+
+		scopedProdDestSelectors := scopeDestSelectors(laneClass.ProdRouterDests, cfg.DestSelectorsInScope)
+		scopedTestDestSelectors := scopeDestSelectors(laneClass.TestRouterDests, cfg.DestSelectorsInScope)
+
+		if len(scopedProdDestSelectors) == 0 && len(scopedTestDestSelectors) == 0 {
+			return cldf.ChangesetOutput{}, fmt.Errorf("none of the requested destination selectors belong to this OnRamp")
+		}
+
+		// Fail closed if Phase 3 is not currently active. This prevents an
+		// emergency rollback proposal from overwriting some unexpected router
+		// state.
+		if err := upgrader.VerifyPromotedToRouters(e, cfg.ChainSelector, scopedProdDestSelectors, scopedTestDestSelectors); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight Phase 3 state check: %w", err)
+		}
+
+		scopedDestSelectors := append(
+			append(
+				make([]uint64, 0,
+					len(scopedProdDestSelectors)+len(scopedTestDestSelectors)),
+				scopedProdDestSelectors...,
+			),
+			scopedTestDestSelectors...,
+		)
+
+		// The rollback is only safe while remote destinations still accept
+		// messages emitted by legacy.
+		//
+		// Allow only the known Phase-1 pair [legacy,new], and require legacy
+		// to actually be present.
+		for _, remoteSel := range scopedDestSelectors {
+			if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector, [][]byte{legacyOnRamp, newOnRamp}, nil, [][]byte{legacyOnRamp}); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf(
+					"pre-flight legacy OffRamp allowlist check for destination %d: %w",
+					remoteSel,
+					err,
+				)
+			}
+		}
+
+		// Use a fresh reporter for the rollback writes.
+		e.OperationsBundle = operations.NewBundle(func() context.Context { return context.Background() }, e.Logger, operations.NewMemoryReporter())
+
+		rollbackOps, err := upgrader.RollbackToLegacyRouters(e, cfg.ChainSelector, scopedProdDestSelectors, scopedTestDestSelectors)
+		if err != nil {
+			return cldf.ChangesetOutput{},
+				fmt.Errorf("rollback routers to legacy OnRamp: %w", err)
+		}
+
+		return changesetscore.NewOutputBuilder(e, mcmsReaderRegistry).
+			WithBatchOps(rollbackOps).
+			Build(cfg.MCMS)
+	}
+
+	return cldf.CreateChangeSet(apply, validate)
+}
+
 // Filter the destSelectors to only those in scope. Return an error if none are in scope.
 func scopeDestSelectors(destSelectors []uint64, scope []uint64) []uint64 {
 	scoped := make([]uint64, 0)
@@ -466,7 +595,7 @@ func UpgradeOnrampCleanup(
 	}
 
 	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
-		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, cfg)
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, &cfg)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}

@@ -207,8 +207,7 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 
 			return 0, messageID, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
 		}
-		fmt.Printf("CCIP message sent in block %d with tx %s", blockNum, tx.Hash().Hex())
-		it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
+	it, err := onRamp.FilterCCIPMessageSent(&bind.FilterOpts{
 			Start:   blockNum,
 			End:     &blockNum,
 			Context: ctx,
@@ -220,10 +219,9 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		if !it.Next() {
 			return 0, messageID, fmt.Errorf("no CCIP message sent event found")
 		}
-		messageID = hex.EncodeToString(it.Event.MessageId[:])
+	messageID = hex.EncodeToString(it.Event.MessageId[:])
 
-		fmt.Printf("Sent CCIP message %+v id %s from chain %d to chain %d\n", msg, messageID, a.Selector, destChainSelector)
-		return 0, messageID, nil
+	return 0, messageID, nil
 	}
 }
 

@@ -15,6 +15,7 @@ var CommitteeVerifierContractType cldf_deployment.ContractType = "CommitteeVerif
 var CommitteeVerifierResolverType cldf_deployment.ContractType = "CommitteeVerifierResolver"
 var CCTPVerifierResolverType cldf_deployment.ContractType = "CCTPVerifierResolver"
 var LombardVerifierResolverType cldf_deployment.ContractType = "LombardVerifierResolver"
+var TestVerifierResolverType cldf_deployment.ContractType = "TestVerifierResolver"
 
 var Version = semver.MustParse("2.0.0")
 

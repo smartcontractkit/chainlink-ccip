@@ -525,6 +525,86 @@ func (_c *MockOnRampUpgrader_PromoteOnrampToTestRouter_Call) RunAndReturn(run fu
 	return _c
 }
 
+// RollbackToLegacyRouters provides a mock function for the type MockOnRampUpgrader
+func (_mock *MockOnRampUpgrader) RollbackToLegacyRouters(e deployment.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64) ([]types.BatchOperation, error) {
+	ret := _mock.Called(e, chainSelector, prodDestSelectors, testDestSelectors)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RollbackToLegacyRouters")
+	}
+
+	var r0 []types.BatchOperation
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, []uint64, []uint64) ([]types.BatchOperation, error)); ok {
+		return returnFunc(e, chainSelector, prodDestSelectors, testDestSelectors)
+	}
+	if returnFunc, ok := ret.Get(0).(func(deployment.Environment, uint64, []uint64, []uint64) []types.BatchOperation); ok {
+		r0 = returnFunc(e, chainSelector, prodDestSelectors, testDestSelectors)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.BatchOperation)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(deployment.Environment, uint64, []uint64, []uint64) error); ok {
+		r1 = returnFunc(e, chainSelector, prodDestSelectors, testDestSelectors)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockOnRampUpgrader_RollbackToLegacyRouters_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RollbackToLegacyRouters'
+type MockOnRampUpgrader_RollbackToLegacyRouters_Call struct {
+	*mock.Call
+}
+
+// RollbackToLegacyRouters is a helper method to define mock.On call
+//   - e deployment.Environment
+//   - chainSelector uint64
+//   - prodDestSelectors []uint64
+//   - testDestSelectors []uint64
+func (_e *MockOnRampUpgrader_Expecter) RollbackToLegacyRouters(e any, chainSelector any, prodDestSelectors any, testDestSelectors any) *MockOnRampUpgrader_RollbackToLegacyRouters_Call {
+	return &MockOnRampUpgrader_RollbackToLegacyRouters_Call{Call: _e.mock.On("RollbackToLegacyRouters", e, chainSelector, prodDestSelectors, testDestSelectors)}
+}
+
+func (_c *MockOnRampUpgrader_RollbackToLegacyRouters_Call) Run(run func(e deployment.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64)) *MockOnRampUpgrader_RollbackToLegacyRouters_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 deployment.Environment
+		if args[0] != nil {
+			arg0 = args[0].(deployment.Environment)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		var arg2 []uint64
+		if args[2] != nil {
+			arg2 = args[2].([]uint64)
+		}
+		var arg3 []uint64
+		if args[3] != nil {
+			arg3 = args[3].([]uint64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockOnRampUpgrader_RollbackToLegacyRouters_Call) Return(batchOperations []types.BatchOperation, err error) *MockOnRampUpgrader_RollbackToLegacyRouters_Call {
+	_c.Call.Return(batchOperations, err)
+	return _c
+}
+
+func (_c *MockOnRampUpgrader_RollbackToLegacyRouters_Call) RunAndReturn(run func(e deployment.Environment, chainSelector uint64, prodDestSelectors []uint64, testDestSelectors []uint64) ([]types.BatchOperation, error)) *MockOnRampUpgrader_RollbackToLegacyRouters_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // VerifyLegacyOnRampOnProdRouter provides a mock function for the type MockOnRampUpgrader
 func (_mock *MockOnRampUpgrader) VerifyLegacyOnRampOnProdRouter(e deployment.Environment, chainSelector uint64, destSelectors []uint64) error {
 	ret := _mock.Called(e, chainSelector, destSelectors)

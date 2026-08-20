@@ -10,6 +10,7 @@ apart.
 |---|---|
 | [`uncommitted-message.md`](uncommitted-message.md) | reactive — you have a specific stuck message (source chain, dest chain, onramp seq num) and need to find where it's stuck |
 | [`commit-plugin-health.md`](commit-plugin-health.md) | proactive — no specific incident; is this commit plugin instance healthy right now |
+| [`chain-identifiers.md`](chain-identifiers.md) | reference, not a runbook — translating between chain ID / chain selector / chain name |
 
 Both currently cover the **commit plugin / merkle root processor** only, built from the metric
 coverage work in [`docs/metrics/commit-metrics.md`](../metrics/commit-metrics.md) and rendered
@@ -36,6 +37,73 @@ mirrors `uncommitted-message.md`).
    page or act. If a doc leads you to a `REPORT`, that's a handoff for you to make, not something
    the doc did for you.
 
+## Identifying a chain
+
+Every `destChain`/`sourceChain`/`sourceChains` input in these docs can be given to you as a chain
+ID (`1`), a CCIP chain selector (`5009297550715157269`), or a chain name (`ethereum-mainnet`) —
+and the PromQL label the query actually needs is not always the same one you were handed. See
+[`chain-identifiers.md`](chain-identifiers.md) for what each of these means, where they're
+defined, and how to translate between them before substituting into a query.
+
+## Identifying a CCIP message
+
+A message can be handed to you three ways: a message ID (32 bytes, `0x` + 64 hex chars), a
+`(sourceChain, destChain, sequence number)` triple (sequence number is a strictly-positive
+uint64), or a transaction hash plus the chain it was sent on. `uncommitted-message.md` wants the
+triple plus the message ID (its `inputs`); if you were only given one of the other forms, resolve
+the rest before starting the decision graph rather than guessing.
+
+[`ccip-cli`](https://www.npmjs.com/package/@chainlink/ccip-cli) (from
+[ccip-tools-ts](https://github.com/smartcontractkit/ccip-tools-ts); `npm install -g
+@chainlink/ccip-cli` or run via `npx @chainlink/ccip-cli`) does this resolution for you. Its
+`show` command takes either a transaction hash or a message ID and figures out the rest by
+reading the chain(s) directly:
+
+```bash
+ccip-cli show <tx-hash-or-message-id> \
+  --rpc <source-chain-rpc-url> \
+  --rpc <dest-chain-rpc-url> \
+  --format json
+```
+
+- You need at least the source chain's RPC (to find the send event); add the dest chain's RPC too
+  if you want execution/commit status rather than just the send.
+- Pass a transaction hash when that's what you have; pass the message ID directly when you don't
+  have a tx hash (e.g. it came from a log or a report) — `show` accepts both as the same
+  positional argument.
+- `--format json` gives you a stable, parseable shape (source/dest chain, sequence number,
+  message ID, status) instead of the pretty-printed table — use it when you're going to feed the
+  result into the next step rather than read it yourself.
+- If a transaction contains more than one CCIP message, `show` will ask you to disambiguate; pass
+  `--log-index <n>` once you know which one you want.
+- `show` reports chain name and chain selector, not necessarily the chain ID your PromQL queries
+  need — see [Identifying a chain](#identifying-a-chain) above to translate.
+
+## Providing credentials (e.g. a Grafana API key) to an agent
+
+Don't paste a Grafana (or any other datasource) API key into chat — anything you type is part of
+the conversation the agent sees and may retain. Instead, put the token in a local file the agent
+can read but you never speak aloud:
+
+```bash
+mkdir -p ~/.config/ccip-runbooks
+echo -n "<token>" > ~/.config/ccip-runbooks/grafana.token
+chmod 600 ~/.config/ccip-runbooks/grafana.token
+```
+
+Then tell the agent the *path*, not the value, e.g. "query Grafana at `https://<org>.grafana.net`
+using the token at `~/.config/ccip-runbooks/grafana.token`." Instruct it to:
+
+- read the file only to build the request itself, e.g.
+  `curl -H "Authorization: Bearer $(cat ~/.config/ccip-runbooks/grafana.token)" ...`;
+- never `cat`/print/echo the file's contents on their own, and never include the token in any
+  intermediate or final output (including the doc's own output contract);
+- treat the file as write-only from the agent's perspective — if a query fails with an auth
+  error, report that plainly rather than trying to dump the token to debug it.
+
+Keep the file outside any git-tracked directory (`~/.config/...` is fine; a repo-local `.env` is
+not, even if `.gitignore`d — it's too easy to `git add -f` by accident).
+
 ## Invoking an AI agent with a runbook
 
 Point the agent at the file and the query endpoint, give it the specific inputs, and ask for the
@@ -49,10 +117,12 @@ Read <path to runbook> fully, then execute it against <query endpoint, e.g.
 http://localhost:8428/api/v1/query for local devenv VictoriaMetrics>.
 
 Inputs:
-- destChain = "<value>"
-- sourceChain = "<value>"       # uncommitted-message.md only
+- destChain = "<chain ID, chain selector, or name -- translate per chain-identifiers.md as needed>"
+- sourceChain = "<same>"        # uncommitted-message.md only
 - seqNum = <value>              # uncommitted-message.md only
-- msgID = "<value>"             # uncommitted-message.md only
+- msgID = "<value>"             # uncommitted-message.md only; if you don't have this, or only
+                                 # have a tx hash, resolve it first with ccip-cli (see
+                                 # README.md#identifying-a-ccip-message) before starting the doc
 - sourceChains = "<regex>"      # commit-plugin-health.md only, default ".*"
 
 Follow the decision graph / checklist exactly as written, substituting the inputs above into
@@ -74,6 +144,10 @@ wrong even for an agent reading the doc carefully:
 - **Label keys are not uniform across metrics** (`chainID` vs `chain_id`, see each doc's cheat
   sheet). An agent that "normalizes" these to one spelling will get silent empty results, not an
   error.
+- **Label values aren't uniform either** — some labels want a chain name, others a chain ID, and
+  neither is the chain selector you may have been handed. See
+  [`chain-identifiers.md`](chain-identifiers.md); an agent that skips translating and passes
+  whatever value it was given straight into every query will get silent empty results here too.
 
 ### Re-testing a runbook after editing it
 

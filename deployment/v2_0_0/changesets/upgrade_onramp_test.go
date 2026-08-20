@@ -91,6 +91,23 @@ var noOpTransferSequence = cldf_ops.NewSequence(
 	},
 )
 
+var noOpAcceptOwnershipSequence = cldf_ops.NewSequence(
+	"test-accept-ownership",
+	deploy.MCMSVersion,
+	"emits a canned accept-ownership batch op",
+	func(
+		b cldf_ops.Bundle,
+		chains cldf_chain.BlockChains,
+		in deploy.TransferOwnershipPerChainInput,
+	) (seq_core.OnChainOutput, error) {
+		return seq_core.OnChainOutput{
+			BatchOps: []mcms_types.BatchOperation{
+				fakeBatchOp(in.ChainSelector, "0xacc3e7"),
+			},
+		}, nil
+	},
+)
+
 func validMCMSInput() mcms.Input {
 	return mcms.Input{
 		TimelockAction: mcms_types.TimelockActionSchedule,
@@ -514,6 +531,126 @@ func TestUpgradeOnrampPhase1(t *testing.T) {
 		require.ErrorContains(t, err, "boom")
 	})
 
+	t.Run("TransferOwnershipReceiveProperDefaultMCMSInput", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, oldOnRampAddr)
+
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		expectVerifyRequireUpgrade(upgrader, true)
+
+		upgrader.EXPECT().
+			ExistingOnRampUpgrade(mock.Anything, chainA).
+			Return(adapters.OnRampUpgradeResult{}, false, nil).
+			Once()
+
+		upgrader.EXPECT().
+			DestChainSelectors(mock.Anything, chainA).
+			Return([]uint64{chainB}, nil).
+			Once()
+
+		upgrader.EXPECT().
+			DeployNewOnRamp(mock.Anything, chainA).
+			Return(upgradeResult(chainB), nil).
+			Once()
+
+		familyReg, lane := newLaneMocks(t)
+
+		// Old OnRamp + newly deployed OnRamp wire encoding.
+		lane.family.EXPECT().
+			GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS)
+
+		// Phase 1 preflight.
+		lane.reader.EXPECT().
+			GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr)}, nil).
+			Once()
+
+		offRampUpdateOp := fakeBatchOp(chainB, "0x0ff9a")
+		lane.setter.EXPECT().
+			SetOffRampSourceOnRamps(
+				mock.Anything,
+				adapters.OffRampSetSourceOnRampsEntry{
+					LocalChainSelector:  chainB,
+					SourceChainSelector: chainA,
+					OnRamps: []string{
+						paddedAddrHex(oldOnRampAddr),
+						paddedAddrHex(newOnRampAddr),
+					},
+				},
+			).
+			Return(&offRampUpdateOp, false, nil).
+			Once()
+
+		ownershipReg, ownershipAdapter := mockTransferOwnershipRegistry(t)
+
+		// Assert that the populated defaults are passed through to the ownership adapter.
+		ownershipAdapter.EXPECT().
+			InitializeTimelockAddress(
+				mock.Anything,
+				mock.MatchedBy(func(input mcms.Input) bool {
+					return input.TimelockAction == mcms_types.TimelockActionSchedule &&
+						input.ValidUntil > 0
+				}),
+			).
+			Return(nil).
+			Once()
+
+		ownershipAdapter.EXPECT().
+			SequenceTransferOwnershipViaMCMS().
+			Return(noOpTransferSequence).
+			Once()
+
+		ownershipAdapter.EXPECT().
+			SequenceAcceptOwnership().
+			Return(noOpAcceptOwnershipSequence).
+			Once()
+
+		ownershipAdapter.EXPECT().
+			ShouldAcceptOwnershipWithTransferOwnership(
+				mock.Anything,
+				mock.MatchedBy(func(in deploy.TransferOwnershipPerChainInput) bool {
+					return in.ChainSelector == chainA &&
+						len(in.ContractRef) == 1 &&
+						in.ContractRef[0].Address == newOnRampAddr &&
+						in.ProposedOwner == timelockAddr
+				}),
+			).
+			Return(true, nil).
+			Once()
+
+		cs := changesets.UpgradeOnrampPhase1(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+			ownershipReg,
+		)
+
+		// Deliberately omit MCMS.
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+		})
+		require.NoError(t, err)
+
+		// Make sure a proposal was still produced.
+		require.Len(t, out.MCMSTimelockProposals, 1)
+
+		prop := out.MCMSTimelockProposals[0]
+		assert.Equal(t, mcms_types.TimelockActionSchedule, prop.Action)
+		assert.NotZero(t, prop.ValidUntil)
+		txCounts := map[mcms_types.ChainSelector]int{}
+		for _, op := range prop.Operations {
+			txCounts[op.ChainSelector] += len(op.Transactions)
+		}
+
+		assert.Equal(
+			t,
+			3,
+			txCounts[mcms_types.ChainSelector(chainA)],
+		)
+	})
+
 	t.Run("UnexpectedOnRampOnRemoteOffRamp", func(t *testing.T) {
 		e := newTestEnv(t)
 		seedOnRamp(t, &e, oldOnRampAddr)
@@ -639,6 +776,41 @@ func TestUpgradeOnrampPhase2(t *testing.T) {
 		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
 	})
 
+	t.Run("SuccessUsingDefaultMCMSInput", func(t *testing.T) {
+		e := newTestEnv(t)
+
+		stageOp := mcms_types.BatchOperation{ // onramp:apply-dest-chain-config-updates (OnRamp -> TestRouter) + router:apply-ramp-updates (TestRouter -> OnRamp)
+			ChainSelector: mcms_types.ChainSelector(chainA),
+			Transactions: []mcms_types.Transaction{
+				fakeTx("0xdeadbee3"),
+				fakeTx("0xdeadbee4"),
+			},
+		}
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		expectTimelockOwnership(upgrader)
+		upgrader.EXPECT().PromoteOnrampToTestRouter(mock.Anything, chainA, []uint64{chainB}).
+			Return([]mcms_types.BatchOperation{stageOp}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase2(
+			mockUpgraderRegistry(upgrader),
+			mockMCMSReaderRegistry(t),
+		)
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
+		assert.Equal(t, mcms_types.TimelockActionSchedule, prop.Action)
+		assert.NotZero(t, prop.ValidUntil)
+	})
+
 	t.Run("NoOpWhenNoProdRouterDests", func(t *testing.T) {
 		e := newTestEnv(t)
 
@@ -753,6 +925,52 @@ func TestUpgradeOnrampPhase3(t *testing.T) {
 		prop := out.MCMSTimelockProposals[0]
 		require.Len(t, prop.Operations, 1)
 		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
+	})
+
+	t.Run("SuccessUsingDefaultMCMSInput", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		promoteOp := mcms_types.BatchOperation{
+			ChainSelector: mcms_types.ChainSelector(chainA),
+			Transactions: []mcms_types.Transaction{
+				fakeTx("0xdeadbee6"), // onramp:apply-dest-chain-config-updates (OnRamp -> prod Router)
+				fakeTx("0xdeadbee7"), // router:apply-ramp-updates (prod Router -> OnRamp)
+			},
+		}
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		expectTimelockOwnership(upgrader)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().VerifyLegacyOnRampOnProdRouter(mock.Anything, chainA, []uint64{chainB}).
+			Return(nil).Once()
+		upgrader.EXPECT().PromoteOnrampToProdRouter(mock.Anything, chainA, []uint64{chainB}).
+			Return([]mcms_types.BatchOperation{promoteOp}, nil).Once()
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		// Pre-flight: the remote OffRamp already whitelists the new OnRamp.
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(newOnRampAddr)}, nil).Once()
+		cs := changesets.UpgradeOnrampPhase3(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
+		assert.Equal(t, mcms_types.TimelockActionSchedule, prop.Action)
+		assert.NotZero(t, prop.ValidUntil)
 	})
 
 	t.Run("TestRouterClassPromotesDirectly", func(t *testing.T) {
@@ -994,6 +1212,199 @@ func TestUpgradeOnrampPhase3(t *testing.T) {
 	})
 }
 
+func TestUpgradeOnrampPhase3Rollback(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		rollbackOp := fakeBatchOp(chainA, "0xdeadbee9")
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return(nil).Once()
+		upgrader.EXPECT().RollbackToLegacyRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return([]mcms_types.BatchOperation{rollbackOp}, nil).Once()
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		// Pre-flight: the remote OffRamp whitelists both legacy and new OnRamps.
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr), paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase3Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
+	})
+
+	t.Run("SuccessUsingDefaultMCMS", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		rollbackOp := fakeBatchOp(chainA, "0xdeadbee9")
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return(nil).Once()
+		upgrader.EXPECT().RollbackToLegacyRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return([]mcms_types.BatchOperation{rollbackOp}, nil).Once()
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		// Pre-flight: the remote OffRamp whitelists both legacy and new OnRamps.
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr), paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase3Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
+		assert.Equal(t, mcms_types.TimelockActionSchedule, prop.Action)
+		assert.NotZero(t, prop.ValidUntil)
+	})
+
+	t.Run("SuccessWithBypassMCMS", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		rollbackOp := fakeBatchOp(chainA, "0xdeadbee9")
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return(nil).Once()
+		upgrader.EXPECT().RollbackToLegacyRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return([]mcms_types.BatchOperation{rollbackOp}, nil).Once()
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		// Pre-flight: the remote OffRamp whitelists both legacy and new OnRamps.
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr), paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase3Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		mcmsInput := validMCMSInput()
+		mcmsInput.TimelockAction = mcms_types.TimelockActionBypass
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 mcmsInput,
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
+		assert.Equal(t, mcms_types.TimelockActionBypass, prop.Action)
+		assert.NotZero(t, prop.ValidUntil)
+	})
+
+	t.Run("Fail if legacy onramp is not allowed on dest", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return(nil).Once()
+		// RollbackToLegacyRouters must NOT be called: the pre-flight check fails first.
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		// The remote OffRamp only whitelists the new OnRamp; legacy is missing.
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase3Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		_, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.ErrorContains(t, err, "pre-flight legacy OffRamp allowlist check")
+		require.ErrorContains(t, err, "does not whitelist expected onramp")
+	})
+
+	t.Run("Fail if new onramp was not promoted", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		// Phase 3 is not active: new OnRamp has not been promoted to routers yet.
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return(errors.New("boom")).Once()
+		// RollbackToLegacyRouters must NOT be called: the pre-flight check fails first.
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+
+		cs := changesets.UpgradeOnrampPhase3Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		_, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.ErrorContains(t, err, "pre-flight Phase 3 state check")
+		require.ErrorContains(t, err, "boom")
+	})
+}
+
 func TestUpgradeOnrampCleanup(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		e := newTestEnv(t)
@@ -1041,6 +1452,55 @@ func TestUpgradeOnrampCleanup(t *testing.T) {
 		require.Len(t, out.MCMSTimelockProposals, 1)
 		prop := out.MCMSTimelockProposals[0]
 		require.Len(t, prop.Operations, 1)
+	})
+
+	t.Run("SuccessUsingDefaultMCMS", func(t *testing.T) {
+		e := newTestEnv(t)
+		// Post-merge state: the new OnRamp is the canonical one in the env datastore.
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().DestChainSelectors(mock.Anything, chainA).
+			Return([]uint64{chainB}, nil).Once()
+		// chainB is prod-router class, so cleanup also un-wires the TestRouter for it.
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64{chainB}, []uint64{}).
+			Return(nil).Once()
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		familyReg, lane := newLaneMocks(t)
+		// Called twice: new OnRamp from the env datastore, legacy OnRamp from the
+		// temp datastore used to wire-encode the legacy ref.
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Twice()
+		// Pre-flight: the remote OffRamp whitelists exactly the old and new OnRamps.
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr), paddedAddrBytes(newOnRampAddr)}, nil).Once()
+		// Cleanup allows only the new OnRamp on the remote OffRamp, dropping the old one.
+		cleanupOp := fakeBatchOp(chainB, "0x0ff9b")
+		lane.setter.EXPECT().SetOffRampSourceOnRamps(mock.Anything, adapters.OffRampSetSourceOnRampsEntry{
+			LocalChainSelector:  chainB,
+			SourceChainSelector: chainA,
+			OnRamps:             []string{paddedAddrHex(newOnRampAddr)},
+		}).Return(&cleanupOp, false, nil).Once()
+
+		cs := changesets.UpgradeOnrampCleanup(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, mcms_types.TimelockActionSchedule, prop.Action)
+		assert.NotZero(t, prop.ValidUntil)
 	})
 
 	t.Run("DestChainSelectorsError", func(t *testing.T) {

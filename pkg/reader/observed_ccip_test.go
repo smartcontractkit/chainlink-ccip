@@ -44,7 +44,8 @@ func Test_GetChainsFeeComponents(t *testing.T) {
 	}
 
 	origin := mock_reader.NewMockCCIPReader(t)
-	r := reader.NewObservedCCIPReader(origin, logger.Test(t), selector1)
+	r, err := reader.NewObservedCCIPReader(origin, logger.Test(t), selector1)
+	require.NoError(t, err)
 
 	origin.EXPECT().
 		GetChainsFeeComponents(mock.Anything, mock.Anything).
@@ -125,7 +126,8 @@ func Test_CommitReportsGTETimestamp(t *testing.T) {
 			cleanupMetrics()()
 
 			origin := mock_reader.NewMockCCIPReader(t)
-			r := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
+			r, errObs := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
+			require.NoError(t, errObs)
 
 			origin.EXPECT().
 				CommitReportsGTETimestamp(ctx, mock.Anything, mock.Anything, mock.Anything).
@@ -156,7 +158,8 @@ func Test_LatestMsgSeqNum(t *testing.T) {
 	t.Cleanup(cleanupMetrics())
 
 	origin := mock_reader.NewMockCCIPReader(t)
-	r := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
+	r, errObs := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
+	require.NoError(t, errObs)
 
 	seqNr := cciptypes.SeqNum(1234)
 	success := cciptypes.ChainSelector(rand.RandomInt64())
