@@ -15,6 +15,7 @@ import (
 
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
@@ -26,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/verifier_test_helper"
 	evm_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	resolver_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/versioned_verifier_resolver"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -237,7 +239,7 @@ var DeployTestVerifierChain = cldf_ops.NewSequence(
 
 		// 9. Deploy VersionedVerifierResolver via CREATE2, or reuse the existing one. The
 		// CREATE2 salt is fixed, so a second run would revert with FailedDeployment — check
-		// the datastore first.
+		// the datastore first, and then the chain.
 		resolverRefs := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.TestVerifierResolverType)),
@@ -255,22 +257,60 @@ var DeployTestVerifierChain = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("resolve CREATE2Factory on chain %d: %w", input.ChainSelector, err)
 			}
-			resolverReport, err := cldf_ops.ExecuteSequence(b, evm_sequences.DeployVerifierResolverViaCREATE2, chain, evm_sequences.DeployVerifierResolverViaCREATE2Input{
-				CREATE2Factory: create2FactoryAddr,
-				ChainSelector:  input.ChainSelector,
-				Qualifier:      TestVerifierResolverQualifier,
-				Type:           datastore.ContractType(versioned_verifier_resolver.TestVerifierResolverType),
-				Version:        versioned_verifier_resolver.Version,
+
+			// The datastore holds no ref, but the chain can still hold the contract. A
+			// run that fails after this step returns no address refs, and a confirmation
+			// timeout records a failed report while the chain records a success. The
+			// salt is fixed, so a second CREATE2 reverts with FailedDeployment. Ask the
+			// chain before any write.
+			expectedReport, err := cldf_ops.ExecuteOperation(b, create2_factory.ComputeAddress, chain, contract_utils.FunctionInput[create2_factory.ComputeAddressArgs]{
+				ChainSelector: input.ChainSelector,
+				Address:       create2FactoryAddr,
+				Args: create2_factory.ComputeAddressArgs{
+					ABI:             resolver_bindings.VersionedVerifierResolverMetaData.ABI,
+					Bin:             resolver_bindings.VersionedVerifierResolverMetaData.Bin,
+					ConstructorArgs: []any{},
+					Salt:            TestVerifierResolverQualifier,
+				},
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy test verifier resolver on chain %d: %w", input.ChainSelector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to compute the canonical resolver address on chain %d: %w", input.ChainSelector, err)
 			}
-			if len(resolverReport.Output.Addresses) != 1 {
-				return sequences.OnChainOutput{}, fmt.Errorf("expected exactly one resolver address on chain %d, got %d", input.ChainSelector, len(resolverReport.Output.Addresses))
+			expectedResolverAddr := expectedReport.Output
+
+			adopted, adoptWrites, err := adoptExistingResolver(b, chain, input.ChainSelector, create2FactoryAddr, expectedResolverAddr)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
 			}
-			resolverRef = resolverReport.Output.Addresses[0]
-			addresses = append(addresses, resolverRef)
-			writes = append(writes, resolverReport.Output.Writes...)
+
+			if adopted {
+				resolverRef = datastore.AddressRef{
+					ChainSelector: input.ChainSelector,
+					Address:       expectedResolverAddr.Hex(),
+					Qualifier:     TestVerifierResolverQualifier,
+					Type:          datastore.ContractType(versioned_verifier_resolver.TestVerifierResolverType),
+					Version:       versioned_verifier_resolver.Version,
+				}
+				addresses = append(addresses, resolverRef)
+				writes = append(writes, adoptWrites...)
+			} else {
+				resolverReport, err := cldf_ops.ExecuteSequence(b, evm_sequences.DeployVerifierResolverViaCREATE2, chain, evm_sequences.DeployVerifierResolverViaCREATE2Input{
+					CREATE2Factory: create2FactoryAddr,
+					ChainSelector:  input.ChainSelector,
+					Qualifier:      TestVerifierResolverQualifier,
+					Type:           datastore.ContractType(versioned_verifier_resolver.TestVerifierResolverType),
+					Version:        versioned_verifier_resolver.Version,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy test verifier resolver on chain %d: %w", input.ChainSelector, err)
+				}
+				if len(resolverReport.Output.Addresses) != 1 {
+					return sequences.OnChainOutput{}, fmt.Errorf("expected exactly one resolver address on chain %d, got %d", input.ChainSelector, len(resolverReport.Output.Addresses))
+				}
+				resolverRef = resolverReport.Output.Addresses[0]
+				addresses = append(addresses, resolverRef)
+				writes = append(writes, resolverReport.Output.Writes...)
+			}
 		}
 
 		// 10. Wire inbound implementation on resolver, skipping if already set.
@@ -315,6 +355,93 @@ var DeployTestVerifierChain = cldf_ops.NewSequence(
 		}, nil
 	},
 )
+
+// adoptExistingResolver reports whether the resolver already exists at its
+// canonical CREATE2 address, and completes the ownership transfer when the
+// earlier run stopped between the deployment and the accept.
+//
+// The datastore and the chain diverge whenever a run fails after step 9: the
+// changeset discards its address refs, but the contract stays. The CREATE2 salt
+// is fixed, so a second deployment can never succeed. The chain is therefore the
+// only reliable source of truth here.
+//
+// CREATE2Factory.createAndTransferOwnership deploys and calls
+// transferOwnership(deployer) in one transaction, and the resolver is
+// Ownable2StepMsgSender. So a complete run leaves the deployer as the owner, and
+// a run that lost the accept leaves the factory as the owner and the deployer as
+// the pending owner. The resolver exposes no pendingOwner getter, so owner() is
+// the only signal.
+//
+// The reads use WithForceExecute. They describe mutable chain state, and a
+// memoized report from the run that failed would send this function back into the
+// revert it exists to prevent.
+func adoptExistingResolver(
+	b cldf_ops.Bundle,
+	chain cldf_evm.Chain,
+	chainSelector uint64,
+	create2FactoryAddr common.Address,
+	resolverAddr common.Address,
+) (bool, []contract_utils.WriteOutput, error) {
+	code, err := chain.Client.CodeAt(b.GetContext(), resolverAddr, nil)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to read the code at the canonical resolver address %s on chain %d: %w", resolverAddr, chainSelector, err)
+	}
+	if len(code) == 0 {
+		return false, nil, nil
+	}
+
+	// Confirm the identity before any write. Another contract at this address
+	// means the salt or the creation code changed, which is never safe to adopt.
+	tvReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetTypeAndVersion, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       resolverAddr,
+	}, cldf_ops.WithForceExecute[contract_utils.FunctionInput[any], cldf_evm.Chain]())
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to read the type and version of the contract at %s on chain %d: %w", resolverAddr, chainSelector, err)
+	}
+	want := deployment.NewTypeAndVersion(versioned_verifier_resolver.ContractType, *versioned_verifier_resolver.Version).String()
+	if tvReport.Output != want {
+		return false, nil, fmt.Errorf(
+			"chain %d: the contract at the canonical resolver address %s reports %q, but %q is expected. Refusing to adopt it",
+			chainSelector, resolverAddr, tvReport.Output, want)
+	}
+
+	ownerReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.GetOwner, chain, contract_utils.FunctionInput[any]{
+		ChainSelector: chainSelector,
+		Address:       resolverAddr,
+	}, cldf_ops.WithForceExecute[contract_utils.FunctionInput[any], cldf_evm.Chain]())
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to read the owner of the resolver at %s on chain %d: %w", resolverAddr, chainSelector, err)
+	}
+
+	switch ownerReport.Output {
+	case chain.DeployerKey.From:
+		// The deployment and the accept both landed. Nothing is left to do.
+		b.Logger.Infof("Resolver %s on chain %d already exists and the deployer owns it; adopting it", resolverAddr, chainSelector)
+		return true, nil, nil
+
+	case create2FactoryAddr:
+		// The deployment landed and the accept did not. The deployer is the pending
+		// owner, so it can complete the transfer.
+		b.Logger.Infof("Resolver %s on chain %d exists but the CREATE2 factory still owns it; accepting ownership", resolverAddr, chainSelector)
+		acceptReport, err := cldf_ops.ExecuteOperation(b, versioned_verifier_resolver.AcceptOwnership, chain, contract_utils.FunctionInput[versioned_verifier_resolver.AcceptOwnershipArgs]{
+			ChainSelector: chainSelector,
+			Address:       resolverAddr,
+			Args:          versioned_verifier_resolver.AcceptOwnershipArgs{IsProposedOwner: true},
+		}, cldf_ops.WithForceExecute[contract_utils.FunctionInput[versioned_verifier_resolver.AcceptOwnershipArgs], cldf_evm.Chain]())
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to accept ownership of the resolver at %s on chain %d: %w", resolverAddr, chainSelector, err)
+		}
+		return true, []contract_utils.WriteOutput{acceptReport.Output}, nil
+
+	default:
+		// A rotated deployer key, or a resolver that already belongs to a timelock.
+		// An accept would revert, and a redeploy is impossible, so stop and report.
+		return false, nil, fmt.Errorf(
+			"chain %d: the resolver at %s is owned by %s, which is neither the deployer %s nor the CREATE2 factory %s. Refusing to adopt it",
+			chainSelector, resolverAddr, ownerReport.Output, chain.DeployerKey.From, create2FactoryAddr)
+	}
+}
 
 // ensureInboundImplementation sets the test verifier as the inbound implementation on the
 // resolver, skipping the write if the on-chain state already matches. Required for
