@@ -487,7 +487,10 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				// Deciding by the target version (not by which interfaces the peer's adapter implements) stays
 				// correct even if a non-V2 family later adds a migrator.
 				if _, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
-					if ru.remotePoolRef.Version != nil && ru.remotePoolRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
+					if ru.remotePoolRef.Version == nil {
+						return nil, nil, nil, fmt.Errorf("remote pool version is required for reverse propagation to counterpart chain selector %d for chain selector %d", ru.remoteSelector, selector)
+					}
+					if ru.remotePoolRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
 						continue
 					}
 				}
