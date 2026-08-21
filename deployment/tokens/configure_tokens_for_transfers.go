@@ -252,6 +252,9 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 						// interface for the discovery body to run; if either condition fails, auto-migrate is a
 						// no-op for that chain.
 						if tokenPool.Version != nil && tokenPool.Version.GreaterThanEqual(utils.Version_2_0_0) {
+							// For a genuine V2 target, discovery needs the active adapter to implement the migrator.
+							// If it doesn't then we fall back to the remotes listed explicitly in the input (this is
+							// the documented workaround e.g. `USDCTokenPoolProxy`)
 							if legacyPoolMigrator, ok = legacyAdapter.(TokenPoolMigrator); ok {
 								if legacyRateLimitReader, ok = legacyAdapter.(RateLimitReaderAdapter); !ok {
 									return nil, nil, nil, fmt.Errorf(
