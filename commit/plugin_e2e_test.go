@@ -109,6 +109,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceEvmChain1, SeqNum: 10},
 				{ChainSel: sourceSolChain, SeqNum: 20},
 			},
+			RMNRemoteCfg: params.rmnReportCfg,
 		},
 	}
 
@@ -127,6 +128,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceEvmChain1, SeqNum: 10},
 				{ChainSel: sourceSolChain, SeqNum: 20},
 			},
+			RMNRemoteCfg: params.rmnReportCfg,
 		},
 	}
 
@@ -169,7 +171,8 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 							MerkleRoot:    merkleRoot1,
 						},
 					},
-					PriceUpdates: ccipocr3.PriceUpdates{},
+					BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
+					PriceUpdates:       ccipocr3.PriceUpdates{},
 				},
 			},
 		},
@@ -254,7 +257,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expOutcome, decodedOutcome)
+			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
@@ -454,7 +457,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expOutcome, decodedOutcome)
+			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
@@ -703,11 +706,20 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 
 			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			require.NoError(t, err)
-			require.Equal(t, tc.expOutcome, decodedOutcome)
+			require.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
 			require.Len(t, res.Transmitted, tc.expTransmittedReportLen)
 		})
 	}
+}
+
+// normalizeOutcome converts empty slices to nil or nil slices to empty where needed.
+func normalizeOutcome(o committypes.Outcome) committypes.Outcome {
+	if len(o.MerkleRootOutcome.RMNRemoteCfg.ContractAddress) == 0 {
+		// Normalize to `nil` if it's an empty slice
+		o.MerkleRootOutcome.RMNRemoteCfg.ContractAddress = nil
+	}
+	return o
 }
 
 func prepareCcipReaderMock(
@@ -785,6 +797,7 @@ type SetupNodeParams struct {
 	chainCfg          map[ccipocr3.ChainSelector]reader.ChainConfig
 	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum
 	onRampLastSeqNum  map[ccipocr3.ChainSelector]ccipocr3.SeqNum
+	rmnReportCfg      ccipocr3.RemoteConfig
 	enableDiscovery   bool
 }
 
@@ -795,6 +808,12 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(params.t)
+	rmnHomeReader := readerpkg_mock.NewMockRMNHome(params.t)
+
+	rmnHomeReader.EXPECT().GetRMNEnabledSourceChains(mock.Anything).Return(map[ccipocr3.ChainSelector]bool{
+		sourceEvmChain1: false,
+		sourceSolChain:  false,
+	}, nil).Maybe()
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
@@ -882,13 +901,17 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	}
 
 	ccipReader.EXPECT().
+		GetRMNRemoteConfig(mock.Anything).
+		Return(params.rmnReportCfg, nil).Maybe()
+
+	ccipReader.EXPECT().
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
 	cfg := pluginconfig.CommitOffchainConfig{}
 	err := cfg.ApplyDefaultsAndValidate()
 	require.NoError(params.t, err)
-	reportBuilder, err := builder.NewReportBuilder(cfg.MaxMerkleRootsPerReport, cfg.MaxPricesPerReport)
+	reportBuilder, err := builder.NewReportBuilder(cfg.RMNEnabled, cfg.MaxMerkleRootsPerReport, cfg.MaxPricesPerReport)
 	require.NoError(params.t, err)
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(params.t)
@@ -903,6 +926,9 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		msgHasher,
 		params.lggr,
 		homeChainReader,
+		rmnHomeReader,
+		nil,
+		nil,
 		params.reportingCfg,
 		&metrics.Noop{},
 		mockAddrCodec,
@@ -965,6 +991,8 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		sourceSolChain:  19, // no new msg, still on 19
 	}
 
+	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
+
 	writeFrequency := *commonconfig.MustNewDuration(1 * time.Minute)
 	cfg := pluginconfig.CommitOffchainConfig{
 		NewMsgScanBatchSize:                100,
@@ -1000,6 +1028,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		chainCfg:          homeChainConfig,
 		offRampNextSeqNum: offRampNextSeqNum,
 		onRampLastSeqNum:  onRampLastSeqNum,
+		rmnReportCfg:      rmnRemoteCfg,
 		enableDiscovery:   false,
 	}
 
