@@ -49,14 +49,14 @@ type TokenTransferConfig struct {
 	// automatically with (token, pool, decimals, rate limits, and MigrationMetadata). Legacy lane fees are read
 	// from the fee quoter (v1.6+) or onramp (v1.5) and merged with any user-provided tokenTransferFeeConfig on each
 	// remote (set YAML fields win; unset fields are imported). Resolved connectivity, rate limits, and migration
-	// metadata are passed to ConfigureTokenForTransfersSequence for on-chain apply. Migration relies on the
-	// legacy (pre-V2 active pool) adapter implementing the TokenPoolMigrator interface; when it does, discovery
-	// also requires the RateLimitReaderAdapter interface. See (4) for when the migrator is absent. This knob has
-	// no effect if any of the following are true:
+	// metadata are passed to ConfigureTokenForTransfersSequence for on-chain apply. Forward migration runs only
+	// for a genuine V2 upgrade (configured target pool is v2.0.0+) and requires the legacy (pre-V2 active pool)
+	// adapter to implement the TokenPoolMigrator interface; discovery also requires the RateLimitReaderAdapter
+	// interface. This knob has no effect if any of the following are true:
 	//  (1) There is no active pool in TAR for the token
 	//  (2) The active pool in TAR is already the target pool (extend mode)
 	//  (3) The active pool in TAR is already v2.0.0 or higher
-	//  (4) The active pool's chain family is not on V2, so its adapter has no token pool migrator - the knob is a no-op for that chain since there is no V2 pool to migrate to
+	//  (4) The configured target pool is not v2.0.0+ (i.e. there is no V2 pool to migrate to), so the knob is a no-op for that chain regardless of its adapter's interfaces
 	//
 	// When discovery is skipped, the changeset logs at info level and does not error. Remote chains,
 	// connectivity, and fees are taken only from explicit RemoteChains YAML (same as autoMigrateRemoteChains: false).
@@ -85,8 +85,10 @@ type TokenTransferConfig struct {
 	//  - Forward propagation: A_new's RemoteChains are populated with all remotes discovered from the
 	//    active pool (A's legacy remotes B and C), so A_new is configured to reach B and C.
 	//  - Reverse propagation: B and C are each told to add A_new as an additional remote pool, so the
-	//    web stays reachable from B/C back to A_new. Same-batch peers being migrated in this changeset
-	//    are skipped for reverse propagation; forward config wires them instead.
+	//    web stays reachable from B/C back to A_new. Same-batch peers that are being REPLACED in this
+	//    changeset (their target pool differs from their active pool) are skipped for reverse
+	//    propagation; forward config wires them instead. Same-batch peers that are not being replaced
+	//    (e.g. non-V2 chains like Solana) are still reverse-propagated into so the web stays connected.
 	//
 	// Limitation: discovery calls getSupportedChains on the TAR-registered active pool. Pools that do not
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
@@ -138,8 +140,16 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 	reports := make([]cldf_ops.Report[any, any], 0)
 	ds := datastore.NewMemoryDataStore()
 
+	// If autoMigrateRemoteChains is enabled for any chain then we need to take a snapshot of
+	// the currently active pools for reverse propagation purposes. We *SHOULDN'T* do this in
+	// the loop below because the active pool may be updated in the same batch and we need to
+	// know the pre-batch state.
+	activePoolsSnapshot, err := snapshotActivePools(e, tokenRegistry, cfg)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to snapshot active pools for auto-migrate: %w", err)
+	}
+
 	// Process chains in deterministic (sorted) selector order (Go map iteration is randomized)
-	var err error
 	for _, selector := range slices.Sorted(maps.Keys(cfg)) {
 		token := cfg[selector]
 
@@ -189,10 +199,12 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 		}
 
 		type DiscoveredRemoteChain struct {
-			remoteSelector uint64
-			remoteTokenRef datastore.AddressRef
-			remotePoolRef  datastore.AddressRef
-			remoteAdapter  TokenAdapter
+			remoteNormalizer deploy.AddressNormalizer
+			remoteSelector   uint64
+			remoteTokenRef   datastore.AddressRef
+			remotePoolRef    datastore.AddressRef
+			remoteAdapter    TokenAdapter
+			remoteFamily     string
 		}
 
 		// When AutoMigrateRemoteChains = true, we read the legacy pool's remote chains and import them into
@@ -242,35 +254,35 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 						if err != nil {
 							return nil, nil, nil, fmt.Errorf("failed to resolve adapter for active pool on chain selector %d: %w", selector, err)
 						}
-						// Capability-based gate: only families whose legacy adapter implements the
-						// TokenPoolMigrator interface can be the source of an auto-migration (e.g.
-						// EVM on V2). A family that is not on V2 intentionally has no migrator, so
-						// treat auto-migrate as a no-op for that chain instead of hard failing the
-						// changeset.
-						legacyPoolMigrator, ok = legacyAdapter.(TokenPoolMigrator)
-						if !ok {
-							e.Logger.Infof("adapter for active pool version %s on chain selector %d does not support token pool migration, skipping auto-migration of remote chains", activePoolRef.Version, selector)
-						} else {
-							legacyRateLimitReader, ok = legacyAdapter.(RateLimitReaderAdapter)
-							if !ok {
-								return nil, nil, nil, fmt.Errorf(
-									"adapter for active pool version %s on chain selector %d does not implement RateLimitReaderAdapter",
-									activePoolRef.Version, selector,
-								)
-							}
-							tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
-							if err != nil {
-								return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
-							}
-							localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
-							if err != nil {
-								return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
-							}
-							if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
-								return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
+						if tokenPool.Version != nil && tokenPool.Version.GreaterThanEqual(utils.Version_2_0_0) {
+							// If TokenPoolMigrator is not implemented, then we intentionally won't treat this as
+							// a hard fail. Some pools (e.g. USDCTokenPoolProxy) cannot implement this interface,
+							// so operators should be allowed to manually list the remotes to workaround this.
+							if legacyPoolMigrator, ok = legacyAdapter.(TokenPoolMigrator); ok {
+								if legacyRateLimitReader, ok = legacyAdapter.(RateLimitReaderAdapter); !ok {
+									return nil, nil, nil, fmt.Errorf(
+										"adapter for active pool version %s on chain selector %d does not implement RateLimitReaderAdapter",
+										activePoolRef.Version, selector,
+									)
+								}
+								tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
+								if err != nil {
+									return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
+								}
+								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
+								if err != nil {
+									return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
+								}
+								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
+									return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
+								} else {
+									allRemoteSelectors = supported
+								}
 							} else {
-								allRemoteSelectors = supported
+								e.Logger.Infof("adapter for active pool version %s on chain selector %d does not support token pool migration, skipping auto-migration of remote chains", activePoolRef.Version, selector)
 							}
+						} else {
+							e.Logger.Infof("Active pool version %s on chain selector %d has no v2.0.0+ migration target, skipping auto-migration of remote chains", activePoolRef.Version, selector)
 						}
 					} else {
 						e.Logger.Infof("Active pool on chain selector %d is already v2.0.0 or higher, skipping auto-migration of remote chains", selector)
@@ -329,10 +341,12 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 					return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
 				}
 				discoveredRemotes = append(discoveredRemotes, DiscoveredRemoteChain{
-					remoteSelector: remoteSelector,
-					remoteTokenRef: remoteTokenRef,
-					remotePoolRef:  remotePoolRef,
-					remoteAdapter:  remoteAdapter,
+					remoteNormalizer: remoteNormalizer,
+					remoteSelector:   remoteSelector,
+					remoteTokenRef:   remoteTokenRef,
+					remotePoolRef:    remotePoolRef,
+					remoteAdapter:    remoteAdapter,
+					remoteFamily:     remoteFamily,
 				})
 				remoteTokenDecimals, err := remoteAdapter.DeriveTokenDecimals(e, remoteSelector, remotePoolRef, remoteTokenBytes)
 				if err != nil {
@@ -465,15 +479,27 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
 			for _, ru := range discoveredRemotes {
-				// NOTE: we skip reverse-propagation into a counterpart being migrated in this same batch:
-				// running the full `ConfigureTokenForTransfers()` sequence on its not-yet-live pool would
-				// activate it `setPool()` prematurely so its own subsequent migration pass sees itself as
-				// "already the target pool", and skips auto-migration entirely (losing its legacy remotes
-				// and reverse-propagation). Wiring between same-batch peers is handled by each pool's own
-				// forward config; reverse-propagation only needs to reach every NON-migrating counterpart
-				// (already-active v2 or v1 pools) to keep them reachable.
+				// After a pool is migrated, we need to tell every connected chain about the new pool so that the
+				// web stays reachable in both directions. One edge case to consider - suppose we have a web with
+				// pools A1, B1, C1, where A1 + B1 are being migrated to A2 and B2. When A2's reverse propagation
+				// runs, it should *skip* B2 otherwise it would prematurely activate it and breaks B's migration.
+				// Instead we let B2's own forward propagation handle this case. One nuance to keep in mind: it's
+				// also possible that we could have a web like A1, B2, C1 where B2 is already migrated. If we are
+				// migrating A1 to A2, then A2's reverse propagation should *not skip* B2 since it's already live
+				// and we want to tell it about A2. To differentiate between these two cases, we compare the pool
+				// that the counterpart chain is currently using (from the pre-batch snapshot) with the pool that
+				// it is being migrated to in this changeset. If they differ, or it has no current pool then it's
+				// getting a new pool and we leave it alone. If they are the same, then it keeps its current pool
+				// and should be told about the new pool.
 				if _, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
-					continue
+					targetBytes, err := ru.remoteNormalizer.StringToBytes(ru.remotePoolRef.Address)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("failed to convert remote pool ref to bytes for chain selector %d: %w", ru.remoteSelector, err)
+					}
+					activeBytes := activePoolsSnapshot[ru.remoteSelector]
+					if len(activeBytes) == 0 || !bytes.Equal(activeBytes, targetBytes) {
+						continue
+					}
 				}
 				reverseInput := ConfigureTokenForTransfersInput{
 					// Reverse propagation only *ADDS* this migration's new pool as an additional remote to an
@@ -488,10 +514,10 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 					PoolType:                           ru.remotePoolRef.Type.String(),
 					RemoteChains: map[uint64]RemoteChainConfig[[]byte, string]{
 						selector: {
-							// Pad to match on-chain storage format (32-byte left-padded for EVM).
-							// The token comparison in ConfigureTokenPoolForRemoteChain (line 234)
-							// compares against on-chain bytes without padding, so a 20-byte input
-							// would mismatch and trigger a remove+re-add instead of addRemotePool
+							// Pad to match on-chain storage format (32-byte left-padded). The address
+							// comparisons in `ConfigureTokenPoolForRemoteChain()` compare against on-
+							// chain bytes without padding, so a 20-byte input would mismatch and fire
+							// a remove+re-add instead of addRemotePool
 							RemoteToken: common.LeftPadBytes(migratedTokenBytes, 32),
 							RemotePool:  common.LeftPadBytes(migratedPoolBytes, 32),
 						},
@@ -516,6 +542,44 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 	}
 
 	return batchOps, reports, ds, nil
+}
+
+// snapshotActivePools reads each chain's active pool from its TokenAdminRegistry. This must run before
+// any peer is forward-configured (see the call site)
+func snapshotActivePools(e cldf.Environment, tokenRegistry *TokenAdapterRegistry, cfg map[uint64]TokenTransferConfig) (map[uint64][]byte, error) {
+	var needsSnapshot bool
+	for _, tc := range cfg {
+		if tc.AutoMigrateRemoteChains {
+			needsSnapshot = true
+			break
+		}
+	}
+	if !needsSnapshot {
+		return nil, nil
+	}
+
+	snapshot := make(map[uint64][]byte, len(cfg))
+	for selector, tc := range cfg {
+		family, err := chain_selectors.GetSelectorFamily(selector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain family for selector %d: %w", selector, err)
+		}
+		reader, ok := tokenRegistry.GetTokenAdminRegistryReader(family)
+		if !ok {
+			return nil, fmt.Errorf("no token admin registry reader for chain family %s", family)
+		}
+		_, _, _, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, selector, tc.TokenPoolRef, tc.TokenRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve token for pre-batch snapshot of chain selector %d: %w", selector, err)
+		}
+		activePool, err := reader.GetActivePool(e, selector, fullTokenRef, tc.RegistryRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read pre-batch active pool for chain selector %d: %w", selector, err)
+		}
+		snapshot[selector] = activePool
+	}
+
+	return snapshot, nil
 }
 
 func applyTokenTransferFeeConfig(

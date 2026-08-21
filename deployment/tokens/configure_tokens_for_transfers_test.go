@@ -1176,11 +1176,11 @@ func (transfersTest_IdentityNormalizer) StringToBytes(address string) ([]byte, e
 	return []byte(address), nil
 }
 
-// TestAutoMigrate_NonMigratableSourceSkips exercises the case where a chain sets
-// AutoMigrateRemoteChains=true but its legacy adapter does not implement TokenPoolMigrator (e.g.
-// Solana, which is not on V2). This must be treated as a no-op that skips auto-migration discovery
-// for that chain rather than a hard error. The active pool is registered and differs from the target
-// pool and is pre-V2, so the code genuinely reaches the migrator capability check.
+// TestAutoMigrate_NonMigratableSourceSkips exercises the case where a chain sets AutoMigrateRemoteChains=true
+// for a source whose configured target pool is not v2.0.0+ and whose adapter does not implement TokenPoolMigrator.
+// This must be treated as a no-op that skips auto-migration discovery for that chain rather than a hard error. The
+// active pool is registered and differs from the target pool and is pre-V2, so the code genuinely reaches the
+// migration gate.
 func TestAutoMigrate_NonMigratableSourceSkips(t *testing.T) {
 	const sel = 5009297550715157269
 	const (
@@ -1241,4 +1241,87 @@ func TestAutoMigrate_NonMigratableSourceSkips(t *testing.T) {
 	changeset := tokens.ConfigureTokensForTransfers(tokenRegistry, changesets.GetRegistry())
 	_, err = changeset.Apply(env, cfg)
 	require.NoError(t, err)
+}
+
+// transfersTest_MigratingMockTokenAdapter is transfersTest_MockTokenAdapter extended to implement
+// TokenPoolMigrator, so it can model a source whose adapter HAS a migrator while the chain is still
+// not on V2 (e.g. Solana after #2273). getSupportedChainsCalls records whether forward discovery ran.
+type transfersTest_MigratingMockTokenAdapter struct {
+	*transfersTest_MockTokenAdapter
+	getSupportedChainsCalls int
+}
+
+func (ma *transfersTest_MigratingMockTokenAdapter) GetSupportedChains(_ deployment.Environment, _ uint64, _ []byte) ([]uint64, error) {
+	ma.getSupportedChainsCalls++
+	return []uint64{5009297550715157269}, nil
+}
+
+func (ma *transfersTest_MigratingMockTokenAdapter) GetRemoteToken(_ deployment.Environment, _ uint64, _ []byte, _ uint64) ([]byte, error) {
+	return []byte("mocked-remote-token-address"), nil
+}
+
+func (ma *transfersTest_MigratingMockTokenAdapter) GetRemotePools(_ deployment.Environment, _ uint64, _ []byte, _ uint64) ([][]byte, error) {
+	return [][]byte{[]byte("mocked-remote-pool")}, nil
+}
+
+// TestAutoMigrate_V2TargetRequired exercises the case where a source's adapter DOES implement
+// TokenPoolMigrator but its configured target pool is not v2.0.0+ (a non-V2 family that has grown a
+// migrator). Auto-migration must still be a no-op — forward discovery must not run — because there is
+// no V2 pool to migrate to.
+func TestAutoMigrate_V2TargetRequired(t *testing.T) {
+	const sel = 5009297550715157269
+	const (
+		targetPoolAddr = "target-pool"
+		activePoolAddr = "legacy-active-pool"
+	)
+
+	tokenRegistry := tokens.GetTokenAdapterRegistry()
+	// Distinct version (1.5.1) so Register records THIS instance and we can observe discovery calls. The test is
+	// self-contained (registers the resolver + evm identity normalizer + MCMS reader) so it passes standalone.
+	mockAdapter := &transfersTest_MigratingMockTokenAdapter{transfersTest_MockTokenAdapter: &transfersTest_MockTokenAdapter{}}
+	tokenRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), mockAdapter)
+	tokenRegistry.RegisterTokenRefResolver("evm", mockAdapter)
+	tokenRegistry.RegisterTokenAdminRegistryReader("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
+	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, transfersTest_IdentityNormalizer{})
+	changesets.GetRegistry().RegisterMCMSReader("evm", &MockReader{})
+
+	legacyVersion := semver.MustParse("1.5.1")
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: sel, Address: targetPoolAddr, Type: "TokenPool", Version: legacyVersion, Qualifier: "default",
+	}))
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: sel, Address: activePoolAddr, Type: "TokenPool", Version: legacyVersion, Qualifier: "legacy-active",
+	}))
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: sel, Address: "registry", Type: "Registry", Version: legacyVersion,
+	}))
+
+	lggr, err := logger.New()
+	require.NoError(t, err)
+	bundle := cldf_ops.NewBundle(func() context.Context { return context.Background() }, lggr, cldf_ops.NewMemoryReporter())
+	env := deployment.Environment{OperationsBundle: bundle, Logger: lggr, DataStore: ds.Seal()}
+
+	cfg := tokens.ConfigureTokensForTransfersConfig{
+		Tokens: []tokens.TokenTransferConfig{
+			{
+				AutoMigrateRemoteChains: true,
+				ChainSelector:           sel,
+				TokenPoolRef: datastore.AddressRef{
+					Type: "TokenPool", Version: legacyVersion, ChainSelector: sel, Qualifier: "default",
+				},
+				RegistryRef: datastore.AddressRef{
+					Type: "Registry", Version: legacyVersion, ChainSelector: sel,
+				},
+			},
+		},
+		MCMS: basicMCMSInput,
+	}
+
+	changeset := tokens.ConfigureTokensForTransfers(tokenRegistry, changesets.GetRegistry())
+	_, err = changeset.Apply(env, cfg)
+	require.NoError(t, err)
+	// Even though this adapter implements TokenPoolMigrator, forward discovery must NOT run: the target is
+	// pre-V2, so auto-migration is a no-op (there is no V2 pool to migrate to).
+	require.Zero(t, mockAdapter.getSupportedChainsCalls, "discovery should not run without a v2.0.0+ migration target")
 }
