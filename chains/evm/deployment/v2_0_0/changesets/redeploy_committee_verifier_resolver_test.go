@@ -15,6 +15,7 @@ import (
 	mock_receiver_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
 	offramp_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	onramp_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	committee_verifier_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/committee_verifier"
 	mock_receiver_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
@@ -39,6 +40,9 @@ var (
 	// dest of any outbound lane. It proves that the OffRamp update does not depend
 	// on the OnRamp dest set.
 	redeployResolverInboundOnlySel = chainsel.TEST_90000003.Selector
+	// redeployResolverLateSourceSel is a lane that appears after the first run.
+	// It makes the config of the first run stale.
+	redeployResolverLateSourceSel = chainsel.TEST_90000004.Selector
 
 	redeployResolverVersionTag = [4]byte{0xe9, 0xa0, 0x5a, 0x20}
 
@@ -338,6 +342,32 @@ func TestRedeployCommitteeVerifierResolver_VerifyPreconditions(t *testing.T) {
 			expectedErr: "not found in environment",
 		},
 		{
+			desc: "previous resolvers without skip redeploy",
+			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
+				cfg.PreviousResolvers = map[uint64]common.Address{
+					redeployResolverChainSel: common.HexToAddress("0xbeef"),
+				}
+			},
+			expectedErr: "PreviousResolvers is only valid with SkipRedeploy",
+		},
+		{
+			desc: "skip redeploy without a previous resolver",
+			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
+				cfg.SkipRedeploy = true
+			},
+			expectedErr: "SkipRedeploy needs a PreviousResolvers entry",
+		},
+		{
+			desc: "skip redeploy with the current address",
+			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
+				cfg.SkipRedeploy = true
+				cfg.PreviousResolvers = map[uint64]common.Address{
+					redeployResolverChainSel: f.oldResolver,
+				}
+			},
+			expectedErr: "which is the address of the current resolver ref",
+		},
+		{
 			desc: "unknown committee qualifier",
 			mutate: func(cfg *changesets.RedeployCommitteeVerifierResolverCfg) {
 				cfg.CommitteeQualifier = "secondary"
@@ -478,6 +508,17 @@ func TestRedeployCommitteeVerifierResolver_Apply_FailsWhenAlreadyCanonical(t *te
 
 	// Merge the result back. The resolver now sits at its canonical address, so a
 	// second run has nothing to redeploy.
+	mergeRedeployResolverDataStore(t, e, out)
+
+	_, err = changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
+		Apply(*e, redeployResolverInput(f))
+	require.ErrorContains(t, err, "already at the canonical CREATE2 address")
+}
+
+// mergeRedeployResolverDataStore folds the output refs back into the environment,
+// as the pipeline does after a successful run.
+func mergeRedeployResolverDataStore(t *testing.T, e *deployment.Environment, out deployment.ChangesetOutput) {
+	t.Helper()
 	merged := datastore.NewMemoryDataStore()
 	existing, err := e.DataStore.Addresses().Fetch()
 	require.NoError(t, err)
@@ -490,10 +531,94 @@ func TestRedeployCommitteeVerifierResolver_Apply_FailsWhenAlreadyCanonical(t *te
 		require.NoError(t, merged.Addresses().Upsert(ref))
 	}
 	e.DataStore = merged.Seal()
+}
 
-	_, err = changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
+// resolverRefAddress returns the resolver address that the datastore holds.
+func resolverRefAddress(t *testing.T, e *deployment.Environment) common.Address {
+	t.Helper()
+	refs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(redeployResolverChainSel),
+		datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType)),
+	)
+	require.Len(t, refs, 1)
+	return common.HexToAddress(refs[0].Address)
+}
+
+// TestRedeployCommitteeVerifierResolver_Apply_SkipRedeploy covers the rerun case.
+// The first run deployed the resolver, but its proposal was never executed. A new
+// lane then appeared, so the proposal must be built again from the current state
+// of the OffRamp.
+func TestRedeployCommitteeVerifierResolver_Apply_SkipRedeploy(t *testing.T) {
+	e, f := newRedeployResolverEnv(t, true)
+	chain := e.BlockChains.EVMChains()[redeployResolverChainSel]
+
+	out, err := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
 		Apply(*e, redeployResolverInput(f))
-	require.ErrorContains(t, err, "already at the canonical CREATE2 address")
+	require.NoError(t, err)
+	mergeRedeployResolverDataStore(t, e, out)
+	newResolver := resolverRefAddress(t, e)
+
+	// A real rerun is a new pipeline run with a new reporter. The bundle memoizes
+	// each operation by its input hash, so a shared reporter would give the rerun
+	// the ramp state of the first run.
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	// A lane arrives after the first run. Its source config names the old
+	// resolver, so the config of the first run is now stale.
+	offRamp, err := offramp_bindings.NewOffRamp(f.offRamp, chain.Client)
+	require.NoError(t, err)
+	tx, err := offRamp.ApplySourceChainConfigUpdates(chain.DeployerKey, []offramp_bindings.OffRampSourceChainConfigArgs{{
+		Router:              common.HexToAddress("0x04"),
+		SourceChainSelector: redeployResolverLateSourceSel,
+		IsEnabled:           true,
+		OnRamps:             [][]byte{common.HexToAddress("0x07").Bytes()},
+		DefaultCCVs:         []common.Address{f.oldResolver},
+		LaneMandatedCCVs:    []common.Address{},
+	}})
+	require.NoError(t, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
+
+	input := redeployResolverInput(f)
+	input.Cfg.SkipRedeploy = true
+	input.Cfg.PreviousResolvers = map[uint64]common.Address{redeployResolverChainSel: f.oldResolver}
+
+	cs := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil)
+	require.NoError(t, cs.VerifyPreconditions(*e, input))
+	rerun, err := cs.Apply(*e, input)
+	require.NoError(t, err)
+
+	// Every source config now names the new resolver, the late lane included.
+	for _, sourceSel := range []uint64{redeployResolverDestSel, redeployResolverInboundOnlySel, redeployResolverLateSourceSel} {
+		sourceCfg, err := offRamp.GetSourceChainConfig(nil, sourceSel)
+		require.NoError(t, err)
+		assert.Equal(t, []common.Address{newResolver}, sourceCfg.DefaultCCVs,
+			"source config %d must use the new resolver", sourceSel)
+	}
+
+	// The rerun deploys nothing. The resolver keeps its address, and the
+	// MockReceiver already names the new resolver, so it is not redeployed.
+	mergeRedeployResolverDataStore(t, e, rerun)
+	assert.Equal(t, newResolver, resolverRefAddress(t, e))
+	rerunRefs, err := rerun.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	assert.Empty(t, rerunRefs, "a rerun must not produce new address refs")
+}
+
+func TestRedeployCommitteeVerifierResolver_Apply_SkipRedeployRejectsNonCanonicalRef(t *testing.T) {
+	// The resolver was never redeployed, so the ref still holds the plain CREATE
+	// address. SkipRedeploy is wrong in this state.
+	e, f := newRedeployResolverEnv(t, true)
+
+	input := redeployResolverInput(f)
+	input.Cfg.SkipRedeploy = true
+	input.Cfg.PreviousResolvers = map[uint64]common.Address{
+		redeployResolverChainSel: common.HexToAddress("0xbeef"),
+	}
+
+	_, err := changesets.RedeployCommitteeVerifierResolver(cs_changesets.GetRegistry(), nil).
+		Apply(*e, input)
+	require.ErrorContains(t, err, "Run without SkipRedeploy to deploy the resolver first")
 }
 
 func TestRedeployCommitteeVerifierResolver_Apply_FailsWithoutResolverRef(t *testing.T) {

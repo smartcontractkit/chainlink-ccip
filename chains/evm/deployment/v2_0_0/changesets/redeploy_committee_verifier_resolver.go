@@ -55,6 +55,21 @@ type RedeployCommitteeVerifierResolverCfg struct {
 	// DisableTransferOwnership keeps the new resolver on the deployer key. Use it
 	// only in tests and in environments that have no timelock.
 	DisableTransferOwnership bool
+	// SkipRedeploy reruns the changeset against a resolver that is already at its
+	// canonical CREATE2 address. It skips step 1 and does every other step.
+	//
+	// Use it when a previous run deployed the resolver, but the MCMS proposal was
+	// not executed. The proposal then holds a stale ramp config, and a rerun must
+	// build a new proposal from the current state of the ramps.
+	//
+	// The CREATE2 factory reverts on a repeated salt, so a plain rerun fails. The
+	// mode also needs PreviousResolvers, because the datastore ref now holds the
+	// new address and the old address is no longer available.
+	SkipRedeploy bool
+	// PreviousResolvers maps a chain selector to the resolver address that the
+	// ramps and the MockReceivers still name. It is required when SkipRedeploy is
+	// true, and it must be empty otherwise.
+	PreviousResolvers map[uint64]common.Address
 }
 
 // Qualifier returns the committee qualifier, or the default value.
@@ -91,6 +106,9 @@ func (c RedeployCommitteeVerifierResolverCfg) Qualifier() string {
 //
 // A preflight check rejects any chain whose CREATE2 factory is not at the
 // canonical address. See CanonicalCREATE2Factory for the reason.
+//
+// Steps 2 to 5 are idempotent. Each one reads the current state and writes only
+// a difference. Set SkipRedeploy to rerun the changeset after step 1 succeeded.
 func RedeployCommitteeVerifierResolver(
 	mcmsRegistry *cs_changesets.MCMSReaderRegistry,
 	transferOwnershipReg *deploy.TransferOwnershipAdapterRegistry,
@@ -109,6 +127,9 @@ func makeVerifyRedeployCommitteeVerifierResolver() func(cldf_deployment.Environm
 		if cfg.Cfg.CanonicalCREATE2Factory == (common.Address{}) {
 			return fmt.Errorf("CanonicalCREATE2Factory is required")
 		}
+		if !cfg.Cfg.SkipRedeploy && len(cfg.Cfg.PreviousResolvers) > 0 {
+			return fmt.Errorf("PreviousResolvers is only valid with SkipRedeploy")
+		}
 		qualifier := cfg.Cfg.Qualifier()
 		seen := make(map[uint64]bool, len(cfg.Cfg.ChainSelectors))
 		for _, chainSel := range cfg.Cfg.ChainSelectors {
@@ -122,8 +143,25 @@ func makeVerifyRedeployCommitteeVerifierResolver() func(cldf_deployment.Environm
 				return fmt.Errorf("chain %d not found in environment", chainSel)
 			}
 			refs := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
-			if _, err := findResolverRef(refs, qualifier); err != nil {
+			resolverRef, err := findResolverRef(refs, qualifier)
+			if err != nil {
 				return fmt.Errorf("chain %d: %w", chainSel, err)
+			}
+			if cfg.Cfg.SkipRedeploy {
+				previous, ok := cfg.Cfg.PreviousResolvers[chainSel]
+				if !ok || previous == (common.Address{}) {
+					return fmt.Errorf(
+						"chain %d: SkipRedeploy needs a PreviousResolvers entry. "+
+							"The datastore ref holds the new address %s, so the pre-run address "+
+							"must come from the config",
+						chainSel, resolverRef.Address)
+				}
+				if previous == common.HexToAddress(resolverRef.Address) {
+					return fmt.Errorf(
+						"chain %d: PreviousResolvers holds %s, which is the address of the current resolver ref. "+
+							"The two addresses must differ",
+						chainSel, previous.Hex())
+				}
 			}
 			factory, err := findCREATE2Factory(refs)
 			if err != nil {
@@ -162,11 +200,11 @@ func makeApplyRedeployCommitteeVerifierResolver(
 			}
 			refs := e.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel))
 
-			oldResolverRef, err := findResolverRef(refs, qualifier)
+			resolverRef, err := findResolverRef(refs, qualifier)
 			if err != nil {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: %w", chainSel, err)
 			}
-			oldResolver := common.HexToAddress(oldResolverRef.Address)
+			refResolver := common.HexToAddress(resolverRef.Address)
 
 			create2Factory, err := findCREATE2Factory(refs)
 			if err != nil {
@@ -187,40 +225,62 @@ func makeApplyRedeployCommitteeVerifierResolver(
 			if err != nil {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: failed to compute the canonical resolver address: %w", chainSel, err)
 			}
-			if expectedReport.Output == oldResolver {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
-					"chain %d: resolver is already at the canonical CREATE2 address %s, nothing to redeploy",
-					chainSel, oldResolver.Hex())
-			}
+			var (
+				oldResolver    common.Address
+				newResolver    common.Address
+				newResolverRef = resolverRef
+				writes         []contract_utils.WriteOutput
+			)
 
-			// Step 1: redeploy the resolver at its canonical CREATE2 address.
-			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployVerifierResolverViaCREATE2, chain, sequences.DeployVerifierResolverViaCREATE2Input{
-				CREATE2Factory: create2Factory,
-				ChainSelector:  chainSel,
-				Type:           datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
-				Version:        versioned_verifier_resolver.Version,
-				Qualifier:      qualifier,
-			})
-			if err != nil {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: failed to redeploy resolver: %w", chainSel, err)
-			}
-			reports = append(reports, deployReport.ExecutionReports...)
-			if len(deployReport.Output.Addresses) != 1 {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: expected 1 resolver address, got %d", chainSel, len(deployReport.Output.Addresses))
-			}
-			newResolverRef := deployReport.Output.Addresses[0]
-			newResolver := common.HexToAddress(newResolverRef.Address)
-			if newResolver != expectedReport.Output {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
-					"chain %d: resolver deployed at %s, but the computed canonical address is %s",
-					chainSel, newResolver.Hex(), expectedReport.Output.Hex())
-			}
+			if cfg.Cfg.SkipRedeploy {
+				// Step 1 already ran. The ref holds the new address, and the config
+				// gives the address that the ramps still name.
+				if refResolver != expectedReport.Output {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
+						"chain %d: SkipRedeploy is set, but the resolver ref is at %s and the canonical "+
+							"CREATE2 address is %s. Run without SkipRedeploy to deploy the resolver first",
+						chainSel, refResolver.Hex(), expectedReport.Output.Hex())
+				}
+				oldResolver = cfg.Cfg.PreviousResolvers[chainSel]
+				newResolver = refResolver
+			} else {
+				oldResolver = refResolver
+				if expectedReport.Output == oldResolver {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
+						"chain %d: resolver is already at the canonical CREATE2 address %s, nothing to redeploy. "+
+							"Set SkipRedeploy and PreviousResolvers to rebuild the proposal from the current state",
+						chainSel, oldResolver.Hex())
+				}
 
-			// The ref key is the same, so this upsert replaces the old address.
-			if err := newDS.Addresses().Add(newResolverRef); err != nil {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: failed to add resolver ref: %w", chainSel, err)
+				// Step 1: redeploy the resolver at its canonical CREATE2 address.
+				deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployVerifierResolverViaCREATE2, chain, sequences.DeployVerifierResolverViaCREATE2Input{
+					CREATE2Factory: create2Factory,
+					ChainSelector:  chainSel,
+					Type:           datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+					Version:        versioned_verifier_resolver.Version,
+					Qualifier:      qualifier,
+				})
+				if err != nil {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: failed to redeploy resolver: %w", chainSel, err)
+				}
+				reports = append(reports, deployReport.ExecutionReports...)
+				if len(deployReport.Output.Addresses) != 1 {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: expected 1 resolver address, got %d", chainSel, len(deployReport.Output.Addresses))
+				}
+				newResolverRef = deployReport.Output.Addresses[0]
+				newResolver = common.HexToAddress(newResolverRef.Address)
+				if newResolver != expectedReport.Output {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
+						"chain %d: resolver deployed at %s, but the computed canonical address is %s",
+						chainSel, newResolver.Hex(), expectedReport.Output.Hex())
+				}
+
+				// The ref key is the same, so this upsert replaces the old address.
+				if err := newDS.Addresses().Add(newResolverRef); err != nil {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain %d: failed to add resolver ref: %w", chainSel, err)
+				}
+				writes = append(writes, deployReport.Output.Writes...)
 			}
-			writes := deployReport.Output.Writes
 
 			// Step 2: configure the new resolver. The deployer owns it, so these
 			// writes execute directly and stay out of the proposal.
