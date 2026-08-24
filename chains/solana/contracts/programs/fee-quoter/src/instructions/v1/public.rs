@@ -168,14 +168,14 @@ fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         FeeQuoterError::InvalidInputsMissingTokenConfig
     );
-    let token_transfer_bytes_overhead =
-        get_token_transfers_cost(additional_token_configs_for_dest_chain);
+    let token_transfer_bytes_overhead_for_validation =
+        get_token_transfer_bytes_overhead(additional_token_configs_for_dest_chain);
 
     let validated_message = validate_svm2any(
         message,
         dest_chain,
         fee_token_config,
-        &token_transfer_bytes_overhead,
+        &token_transfer_bytes_overhead_for_validation,
     )?;
     // extra_args_data_length is 0 for EVM/Aptos/TVM. For SUI/SVM it captures the additional bytes from
     // accounts and per-token constant overhead that the destination chain must process.
@@ -236,7 +236,7 @@ fn fee_for_msg(
     ))
 }
 
-fn get_token_transfers_cost(
+fn get_token_transfer_bytes_overhead(
     additional_token_configs_for_dest_chain: &[Option<PerChainPerTokenConfig>],
 ) -> u32 {
     let dest_bytes_overhead = additional_token_configs_for_dest_chain
@@ -464,6 +464,37 @@ mod tests {
         }
     }
 
+    fn expected_evm_legacy_fee_amount(
+        message: &SVM2AnyMessage,
+        dest_chain: &DestChain,
+        fee_token_config: &BillingTokenConfig,
+        premium_fee: Usd18Decimals,
+        token_transfer_gas: U256,
+        token_transfer_bytes_overhead: U256,
+        extra_args_data_length: u32,
+        gas_limit: u128,
+    ) -> u64 {
+        let fee_token_price = get_validated_token_price(fee_token_config).unwrap();
+        let PackedPrice {
+            execution_gas_price,
+            ..
+        } = get_validated_gas_price(dest_chain).unwrap();
+
+        let dest_call_data_cost = (U256::new(message.data.len() as u128)
+            + U256::new(extra_args_data_length as u128)
+            + token_transfer_bytes_overhead)
+            * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
+        let total_dest_chain_gas = U256::new(dest_chain.config.dest_gas_overhead as u128)
+            + token_transfer_gas
+            + dest_call_data_cost
+            + U256::new(gas_limit);
+        let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
+        let fee_token_value = (premium_fee * premium_multiplier)
+            + execution_gas_price * total_dest_chain_gas * 1u32.e(18);
+
+        (fee_token_value.0 / fee_token_price.0).try_into().unwrap()
+    }
+
     #[test]
     // NOTE: This test is unique in that the return value of `fee_for_msg` has been
     // directly validated against a `getFee` query in the Ethereum mainnet -> Avalanche Fuji
@@ -488,6 +519,200 @@ mod tests {
                 amount: 45957271569960255
             }
         );
+    }
+
+    #[test]
+    fn get_validated_fee_equivalent_empty_message_is_non_zero() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let fee = fee_for_msg(
+            &sample_message(),
+            &sample_dest_chain(),
+            &sample_billing_config(),
+            &[],
+            &[],
+        )
+        .unwrap()
+        .0;
+
+        assert!(fee.amount > 0);
+    }
+
+    #[test]
+    fn get_validated_fee_equivalent_high_gas_message_is_non_zero() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let chain = sample_dest_chain();
+        let mut message = sample_message();
+        message.data = vec![0; chain.config.max_data_bytes as usize];
+        message.extra_args = crate::extra_args::GenericExtraArgsV2 {
+            gas_limit: chain.config.max_per_msg_gas_limit as u128,
+            allow_out_of_order_execution: true,
+        }
+        .serialize_with_tag();
+
+        let fee = fee_for_msg(&message, &chain, &sample_billing_config(), &[], &[])
+            .unwrap()
+            .0;
+
+        assert!(fee.amount > 0);
+    }
+
+    #[test]
+    fn get_validated_fee_equivalent_message_with_token_is_non_zero() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let (token_config, per_chain_per_token_config) = sample_additional_token();
+        let mut message = sample_message();
+        message.token_amounts = vec![SVMTokenAmount {
+            token: per_chain_per_token_config.mint,
+            amount: 10_000,
+        }];
+
+        let fee = fee_for_msg(
+            &message,
+            &sample_dest_chain(),
+            &sample_billing_config(),
+            &[Some(token_config)],
+            &[Some(per_chain_per_token_config)],
+        )
+        .unwrap()
+        .0;
+
+        assert!(fee.amount > 0);
+    }
+
+    #[test]
+    fn get_validated_fee_equivalent_message_with_data_and_token_is_non_zero() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let (token_config, per_chain_per_token_config) = sample_additional_token();
+        let mut message = sample_message();
+        message.data =
+            b"random bits and bytes that should be factored into the cost of the message".to_vec();
+        message.token_amounts = vec![SVMTokenAmount {
+            token: per_chain_per_token_config.mint,
+            amount: 10_000,
+        }];
+        message.extra_args = crate::extra_args::GenericExtraArgsV2 {
+            gas_limit: 1_000_000,
+            allow_out_of_order_execution: true,
+        }
+        .serialize_with_tag();
+
+        let fee = fee_for_msg(
+            &message,
+            &sample_dest_chain(),
+            &sample_billing_config(),
+            &[Some(token_config)],
+            &[Some(per_chain_per_token_config)],
+        )
+        .unwrap()
+        .0;
+
+        assert!(fee.amount > 0);
+    }
+
+    #[test]
+    fn fee_matches_evm_legacy_formula_for_message_only() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let mut chain = sample_dest_chain();
+        chain.config.dest_gas_per_payload_byte_threshold = 1;
+        chain.config.dest_gas_per_payload_byte_high = 1_000_000;
+        chain.config.gas_multiplier_wei_per_eth = 2_000_000_000_000_000_000;
+
+        let mut message = sample_message();
+        message.data = vec![0; 4_000];
+        message.extra_args = crate::extra_args::GenericExtraArgsV2 {
+            gas_limit: 500_000,
+            allow_out_of_order_execution: true,
+        }
+        .serialize_with_tag();
+
+        let fee_token_config = sample_billing_config();
+        let fee = fee_for_msg(&message, &chain, &fee_token_config, &[], &[])
+            .unwrap()
+            .0;
+        let expected = expected_evm_legacy_fee_amount(
+            &message,
+            &chain,
+            &fee_token_config,
+            Usd18Decimals::from_usd_cents(chain.config.network_fee_usdcents),
+            U256::ZERO,
+            U256::ZERO,
+            0,
+            500_000,
+        );
+
+        assert_eq!(fee.amount, expected);
+    }
+
+    #[test]
+    fn fee_matches_evm_legacy_formula_for_svm_token_transfer() {
+        set_syscall_stubs(Box::new(TestStubs));
+
+        let mut chain = sample_dest_chain();
+        chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+        chain.config.dest_gas_per_payload_byte_threshold = 1;
+        chain.config.dest_gas_per_payload_byte_high = 1_000_000;
+        chain.config.gas_multiplier_wei_per_eth = 2_000_000_000_000_000_000;
+
+        let (token_config, per_chain_per_token_config) = sample_additional_token();
+        let mut message = sample_message();
+        message.data = vec![0; 100];
+        message.token_amounts = vec![SVMTokenAmount {
+            token: per_chain_per_token_config.mint,
+            amount: 1,
+        }];
+        message.extra_args = SVMExtraArgsV1 {
+            compute_units: 500_000,
+            allow_out_of_order_execution: true,
+            token_receiver: [1; 32],
+            accounts: vec![[2; 32], [3; 32]],
+            ..Default::default()
+        }
+        .serialize_with_tag();
+
+        let fee_token_config = sample_billing_config();
+        let fee = fee_for_msg(
+            &message,
+            &chain,
+            &fee_token_config,
+            &[Some(token_config)],
+            &[Some(per_chain_per_token_config.clone())],
+        )
+        .unwrap()
+        .0;
+        let extra_args_data_length = ((2 + 2) * 32
+            + crate::instructions::v1::messages::SVM_TOKEN_TRANSFER_DATA_OVERHEAD)
+            as u32;
+        let expected = expected_evm_legacy_fee_amount(
+            &message,
+            &chain,
+            &fee_token_config,
+            Usd18Decimals::from_usd_cents(
+                per_chain_per_token_config
+                    .token_transfer_config
+                    .min_fee_usdcents,
+            ),
+            U256::new(
+                per_chain_per_token_config
+                    .token_transfer_config
+                    .dest_gas_overhead
+                    .into(),
+            ),
+            U256::new(
+                per_chain_per_token_config
+                    .token_transfer_config
+                    .dest_bytes_overhead
+                    .into(),
+            ),
+            extra_args_data_length,
+            500_000,
+        );
+
+        assert_eq!(fee.amount, expected);
     }
 
     #[test]
