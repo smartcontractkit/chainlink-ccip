@@ -71,16 +71,6 @@ carries the source-side equivalent from `sourceChainAttrs()`:
 | `sourceChainName` | source chain name (this replaces the old `source_network_name`) |
 | `sourceChainSelector` | source CCIP chain selector, as a string |
 
-**The old labels are gone, not aliased.** `chainID`, `chain_id`, `chainFamily`, `chain_family`,
-`source_network_name`, and `dest_network_name` no longer appear on any Beholder-emitted series in
-this file — every query below now filters on `destChainID=~"$destChain"` and, where relevant,
-`sourceChainName=~"$sourceChains"`. If you have an old saved query or alert on this metric family,
-it now silently returns empty, not an error — re-check anything written before this rename before
-trusting a `UNKNOWN`/blank result from it. (The old names do still exist on a separate,
-`promauto`-only direct-scrape path for a handful of metrics in `commit/metrics/legacy_prom.go` —
-that path is unrelated to what this checklist queries and is flagged deprecated in-code; don't
-mix the two.)
-
 Since `destChainName`/`sourceChainName`/`destChainSelector`/`sourceChainSelector` are now
 first-class labels (not just something you compute via [`chain-identifiers.md`](chain-identifiers.md)),
 you can equally well filter `$destChain`/`$sourceChains` against whichever representation you were
