@@ -32,7 +32,7 @@
     ".solhintignore-test"
   ],
   "engines": {
-    "node": ">=20",
+    "node": ">=22",
     "pnpm": ">=10"
   },
   "dependencies": {
@@ -48,5 +48,14 @@
     "solhint": "^6.2.4",
     "solhint-plugin-chainlink-solidity": "github:smartcontractkit/chainlink-solhint-rules#v1.2.1",
     "forge-std": "github:foundry-rs/forge-std#v1.16.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "js-yaml": "^4.2.0",
+      "lodash": "^4.17.23",
+      "fast-uri": "^3.1.2",
+      "brace-expansion": "^5.0.9"
+    },
+    "onlyBuiltDependencies": []
   }
 }
