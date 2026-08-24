@@ -14,6 +14,8 @@ related:
   - docs/metrics/reader-metrics.md         # data-source (reader + config poller) metrics & gaps
   - devenv/dashboards/commit-plugin.json   # Grafana rendering of this runbook (Health section)
   - docs/runbooks/chain-identifiers.md     # translating chain ID / chain selector / chain name
+  - docs/runbooks/evm.md                   # chain-family deep dive when the dest chain is EVM (data_source/report_transmission)
+  - docs/runbooks/solana.md                # chain-family deep dive when the dest chain is Solana (data_source/report_transmission)
 status: living
 ---
 
@@ -498,6 +500,16 @@ rule below).
 `report_transmission_gave_up` is `CRIT`. `report_validation_rejected` is split by reason:
 `stale` alone is `INFO`, anything else present is `WARN`, and — being `always_emitted: false` —
 a fully empty result is `OK`, not `UNKNOWN`.
+
+**On a reverting/pre-send give-up, or any `data_source` finding, this checklist can't see too
+far "down" — it answers at the plugin layer.** If `report_transmission_gave_up` fires and
+`report_validation_rejected` doesn't explain it (nothing rejected locally, nothing landing), or if
+the `data_source` group fires at all, drop down into the **chain-family layer** the plugin reads
+and transmits through: [`evm.md`](evm.md) for an EVM `destChain` (RPC pool, log poller, gas, TXM)
+or [`solana.md`](solana.md) for a Solana `destChain` (log poller, block-history fee estimator,
+Txm). Those are the runbooks the `REPORT:chain-b-txm-oncall` / `chain-a-*/chain-b-*-infra-oncall`
+owners of this checklist's `CRIT`s would run next, and they use the chain-family repos' metrics
+rather than the `ccip_commit_*`/`ccip_reader_*` series here.
 
 ## Aggregation rule
 
