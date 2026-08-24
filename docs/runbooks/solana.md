@@ -1,6 +1,6 @@
 ---
 name: solana-chain-family
-description: Chain-family deep dive for a Solana chain feeding or receiving a CCIP commit plugin. Drills into the Solana chain-family library (chainlink-solana) layers -- log poller, block-history fee estimator, and the Solana transaction manager (Txm) -- that underpin the commit plugin's data-source (reader) and report-transmission paths. Enter this doc when the commit runbooks hand off with REPORT:...-txm-oncall / REPORT:...-infra-oncall, or when a data_source / report_transmission check in commit-plugin-health.md fires for a Solana chain.
+description: Chain-family deep dive for a Solana chain feeding or receiving a CCIP commit plugin. Drills into the Solana chain-family library (chainlink-solana) layers -- multinode node pool (RPC health), log poller, block-history fee estimator, and the Solana transaction manager (Txm) -- that underpin the commit plugin's data-source (reader) and report-transmission paths. Enter this doc when the commit runbooks hand off with REPORT:...-txm-oncall / REPORT:...-infra-oncall, or when a data_source / report_transmission check in commit-plugin-health.md fires for a Solana chain.
 trigger: "entered from docs/runbooks/commit-plugin-health.md (data_source or report_transmission group CRIT/WARN) or docs/runbooks/uncommitted-message.md (step2c, or Scenario 2 'report transmission stuck') when the destination chain is Solana. Not triggered standalone."
 severity: page
 owner: chain-solana-oncall
@@ -25,8 +25,9 @@ status: living
       + [Counter _total suffixing and the promauto-only read-path gap](#counter-total-suffixing-and-the-promauto-only-read-path-gap)
    * [Decision graph](#decision-graph)
    * [Steps](#steps)
-      + [Stage A0 -- log poller: keeping up with slots?](#stage-a0--log-poller-keeping-up-with-slots)
-      + [Stage B0 -- fee layer (block-history estimator): pricing sends?](#stage-b0--fee-layer-block-history-estimator-pricing-sends)
+       + [Stage A0 -- log poller: keeping up with slots?](#stage-a0--log-poller-keeping-up-with-slots)
+       + [Stage A0b -- node pool / RPC health (the "no nodes healthy" signal)](#stage-a0b--node-pool--rpc-health-the-no-nodes-healthy-signal)
+       + [Stage B0 -- fee layer (block-history estimator): pricing sends?](#stage-b0--fee-layer-block-history-estimator-pricing-sends)
       + [Stage B1 -- Txm broadcast: are reports landing at all?](#stage-b1--txm-broadcast-are-reports-landing-at-all)
       + [Stage B2 -- Txm failure taxonomy: which kind of non-landing?](#stage-b2--txm-failure-taxonomy-which-kind-of-non-landing)
    * [Metric reference](#metric-reference)
@@ -71,6 +72,9 @@ ID you already had.
 | label key | appears on | meaning |
 |---|---|---|
 | `chainID` | all metrics here | the Solana chain ID / cluster. Every beholder series also inherits `node_id` + `csa_public_key` from the beholder client for per-node splitting |
+| `network` | `multi_node_states`, `pool_rpc_node_*` (A0b) | the chain family, `"solana"` / `"EVM"` -- a dimension the other metrics don't carry. Filter `network="solana"` on every node-pool query alongside `chainID`, or you'll mix chains/families |
+| `state` | `multi_node_states` | the node FSM state, **PascalCase** (`Alive`, `Unreachable`, `OutOfSync`, `Syncing`, `InvalidChainID`, `Unusable`, ...) -- filter with the exact casing |
+| `nodeName` | `pool_rpc_node_*` (A0b) | which RPC node a poll/transition/verify/head belongs to -- use it to name the dead node(s) |
 | `# (outcome suffix)` | `solana_log_poller_txs_truncated_*`, `solana_log_poller_txs_log_parsing_error_*` | `_succeeded` vs `_reverted` -- whether the truncated/parse-failed tx ultimately succeeded or reverted on-chain |
 
 ### What Solana's TXM calls a failure -- and why the taxonomy matters
@@ -112,13 +116,15 @@ repeats per report until the underlying state or the fee budget changes. That is
 ### Empty result sets
 
 Same discipline as the other runbooks. The gauges that should be continuously present while the
-process runs are `solana_log_poller_last_processed_slot` (A0) and `solana_bhe_compute_unit_price`
+process runs are `solana_log_poller_last_processed_slot` (A0), `multi_node_states` (A0b -- reported
+for **every** state every report, zeros included, so an empty here is "multinode not on this
+node / not reaching the datasource," not "zero nodes"), and `solana_bhe_compute_unit_price`
 (B0): an **empty** result on those means the metric isn't reaching your datasource, not "zero" --
 report `UNKNOWN`. Every counter here (`solana_log_poller_blocks_skipped`,
-`solana_log_poller_txs_*`, all `solana_txm_*` error/success counters, `solana_txm_fee_bumps`) is
-an event counter: **empty == it never happened == 0**, grade normally. As ever, if a continuously-
-emitted gauge is itself empty in the same run, don't trust counter-emptiness to mean "confirmed
-clean."
+`solana_log_poller_txs_*`, all `solana_txm_*` error/success counters, `solana_txm_fee_bumps`, and
+the `pool_rpc_node_*` *failure/transition* counters) is an event counter: **empty == it never
+happened == 0**, grade normally. As ever, if a continuously-emitted gauge is itself empty in the
+same run, don't trust counter-emptiness to mean "confirmed clean."
 
 ### Counter _total suffixing and the promauto-only read-path gap
 
@@ -128,13 +134,16 @@ browser. (Among these, `solana_log_poller_blocks_skipped`, `solana_txm_tx_*`,
 `solana_txm_fee_bumps` will typically get a `_total` appended by an OTel→Prometheus exporter;
 `solana_log_poller_txs_truncated_*` etc. likewise.)
 
-**About the read-path RPC signal:** unlike EVM, chainlink-solana has **no beholder record for its
-RPC client calls** -- the per-node/client metrics (`solana_client_latency_ms`, deprecated; and the
-chainlink-framework `rpc_call_latency` promauto gauge) are **promauto-only**. They are still
-available on a direct-scrape datasource, so this doc can use them, but know that they will not
-appear on a strictly beholder-fed pipeline, and there is no `solana_pool_rpc_node_calls_*`
-beholder equivalent to EVM's. On a beholder-only datasource, leave the read-path RPC question to
-the commit-plugin reader metrics (`ccip_reader_read_outcome_error`) rather than this doc.
+**About the read-path RPC signal:** split it in two. **(1) Node *pool health*** is **beholder-emitted**
+(via chainlink-framework's `NewGenericMultiNodeMetrics`, wired by chainlink-solana): the
+`multi_node_states` gauge and the `pool_rpc_node_*` family (polls/transitions/verifies/highest-seen-block)
+all run through the OTel/beholder path and are the node-health signal this doc's Stage A0b uses. **(2)
+Per-call RPC latency** is **promauto-only** -- `solana_client_latency_ms` (deprecated) and the
+chainlink-framework `rpc_call_latency` promauto gauge are direct-scrape only and will not appear on
+a strictly beholder-fed pipeline. So: for "are there any live nodes," use Stage A0b (beholder); for
+per-call latency on a beholder-only datasource, fall back to the commit-plugin reader metrics
+(`ccip_reader_read_outcome_error`) rather than this doc. There is no `solana_pool_rpc_node_calls_*`
+beholder equivalent to EVM's.
 
 ## Decision graph
 
@@ -146,8 +155,20 @@ steps:
     query: 'solana_log_poller_last_processed_slot{chainID="$chainID"}'
     condition: "value stale (no fresh sample in the last couple of poll intervals) OR clearly lagging the current slot (cross-check on the explorer) OR blocks_skipped climbing"
     if_true:
-      stale_or_lag: {action: "REPORT:chain-solana-oncall", reason: "the Solana log poller for $chainID is stuck or behind -- every commit/reader log read routes through it, so a wedge here surfaces as clean reader read_empty / chain_gap (false idle) in the commit docs, or batch_fetch_failed in the config poller. Report as a Solana chain-family / infra finding, not a reader one. Corroborate blocks_skipped: solana_log_poller_blocks_skipped{chainID=\"$chainID\"}."}
-    if_false: {action: "CONTINUE:$entry == \"report_transmission\" ? B0 : STOP", reason: "log poller keeping up. Stop if you came in via data_source."}
+      stale_or_lag: {action: "CONTINUE:A0b", reason: "the Solana log poller for $chainID is stuck or behind -- but before reporting it as a log-poller issue, rule out the node pool: a log poller that can't reach any RPC wedges the same way. Continue to the node-pool health check to attribute it correctly (a genuinely wedged poller with healthy nodes is a different owner than 'no live nodes'). Corroborate blocks_skipped: solana_log_poller_blocks_skipped{chainID=\"$chainID\"}."}
+    if_false: {action: "CONTINUE:A0b", reason: "log poller keeping up -- still confirm the node pool is healthy before moving on"}
+    automatable: true
+
+  - id: A0b
+    check: solana_node_pool_health
+    queries:
+      - 'sum(multi_node_states{network="solana", chainID="$chainID", state="Alive"}) by (state)'
+      - 'sum(multi_node_states{network="solana", chainID="$chainID"}) by (state)'
+    condition: "state=\"Alive\" count == 0 (no node is reachable/healthy), OR some live nodes but more in a dead state (Unreachable/OutOfSync/Syncing/InvalidChainID/Unusable) than alive"
+    if_true:
+      no_nodes_alive: {action: "REPORT:chain-solana-oncall", reason: "the multinode node pool for $chainID has zero nodes in state=\"Alive\" -- this IS your 'no nodes healthy'/'No live RPC nodes available' (ErrNodeError). It explains every downstream signal (reader read_empty/read_outcome_error, config_poll batch_fetch_failed, log-poller stall, ccip_commit_fchain_read_errors, report_transmission_gave_up); do not re-attribute it to the plugin. Name the dead states by carrying the state breakdown, and which node(s), then check the transition/poll counters below for why."}
+      degraded: {action: "REPORT:chain-solana-oncall", reason: "some Solana nodes are down ($count alive of $total) -- degraded redundancy, not full outage. Carry the alive-total split and the dead state names. Worth checking the transition counters below for whether nodes are flapping."}
+    if_false: {action: "CONTINUE:$entry == \"report_transmission\" ? B0 : STOP", reason: "node pool has a live node and the read path is healthy. Stop if you came in via data_source; continue to the write path if report_transmission."}
     automatable: true
 
   # ---- WRITE PATH (report transmission) ----
@@ -233,6 +254,49 @@ count txs whose logs were truncated or failed to parse (split by whether the tx 
 messages even while the poller as a whole advances. If either climbs and you're investigating a
 specific message that "should have been seen," that is the first place to look.
 
+### Stage A0b -- node pool / RPC health (the no nodes healthy signal)
+
+The Solana client's RPC access is backed by a **multinode node pool** (chainlink-framework's
+`multi-node`, wired by chainlink-solana with `metrics.NewGenericMultiNodeMetrics`), and its health
+is the most fundamental read-path precondition: if the pool has no live node, *every* read, send,
+and log-poller poll fails. The metric that corresponds directly to the "no nodes healthy" /
+"`No live RPC nodes available`" condition is **`multi_node_states`** -- a gauge counting nodes in
+each FSM state, reported for **every state every report** (zeros included):
+
+```promql
+sum(multi_node_states{network="solana", chainID="$chainID"}) by (state)
+sum(multi_node_states{network="solana", chainID="$chainID", state="Alive"})   # the live-node headcount
+```
+
+`state` values are **PascalCase** (`Alive`, `Unreachable`, `OutOfSync`, `Syncing`, `InvalidChainID`,
+`Unusable`, `Undialed`, `Dialed`, `Closed`, `FinalizedBlockOutOfSync`, `FinalizedStateNotAvailable`)
+-- filter with the exact casing. When the pool goes "no nodes healthy," `state="Alive"` drops to `0`
+and one or more of the dead states rises. Because every state is reported, an **empty** result here
+means the metric isn't reaching your datasource (or multinode isn't on this node), **not** "zero
+nodes" -- handle it as `UNKNOWN`.
+
+To name *why* nodes left the alive set, the per-node `pool_rpc_node_*` family (same `network`/
+`chainID`/`nodeName` labels):
+
+```promql
+sum(rate(pool_rpc_node_num_transitions_to_unreachable{chainID="$chainID"}[15m])) by (nodeName)
+sum(rate(pool_rpc_node_num_transitions_to_out_of_sync{chainID="$chainID"}[15m])) by (nodeName)
+sum(rate(pool_rpc_node_polls_failed{chainID="$chainID"}[15m])) by (nodeName)        # health-poll failures
+sum(rate(pool_rpc_node_verifies_failed{chainID="$chainID"}[15m])) by (nodeName)    # chain-ID verify failures
+pool_rpc_node_highest_seen_block{chainID="$chainID"}                               # is a node advancing at all
+```
+
+`pool_rpc_node_highest_seen_block` is the "reachable ≠ actually progressing" check -- a node that's
+`Alive` but whose highest-seen-block is frozen is silently useless and worth calling out even with a
+nonzero live count. An absent `pool_rpc_node_*fault` counter is healthy (event counters, haven't
+fired).
+
+**This stage is a root cause for, and runs *before* you should report, the A0 log-poller finding and
+several upstream commit-doc signals**: a node pool with no live nodes produces exactly the
+reader `read_empty`/`read_outcome_error`, the `config_poll_failure reason="batch_fetch_failed"`,
+and the `report_transmission_gave_up` the commit runbooks surface -- attribution should land here,
+not on the plugin. If A0b is healthy, a genuine A0 stall is a log-poller problem (different owner).
+
 ### Stage B0 -- fee layer (block-history estimator): pricing sends?
 
 Solana transactions are priced by a **compute-unit-price** the block-history estimator derives
@@ -309,6 +373,23 @@ beholder) for the log-poller and Txm families; the read-path RPC metric is **pro
 | `solana_txm_fee_bumps` | Counter | `chainID` | dual |
 | `solana_client_latency_ms` | Gauge | `request,url` | promauto-only (deprecated) |
 | `rpc_call_latency` (Solana) | Histogram | `chainFamily,chainID,rpcUrl,isSendOnly,success,callName` | promauto-only via chainlink-framework |
+| `multi_node_states` | Gauge | `network,chainID,state` (PascalCase states) | dual (via chainlink-framework multinode; beholder-emitted) |
+| `pool_rpc_node_polls_total` | Counter | `network,chainID,nodeName` | dual |
+| `pool_rpc_node_polls_failed` / `pool_rpc_node_polls_success` | Counter | `network,chainID,nodeName` | dual (fires only on events) |
+| `pool_rpc_node_verifies_total` / `_verifies_failed` / `_verifies_success` | Counter | `network,chainID,nodeName` | dual |
+| `pool_rpc_node_highest_seen_block` / `pool_rpc_node_highest_finalized_block` | Gauge | `network,chainID,nodeName` | dual |
+| `pool_rpc_node_num_seen_blocks` | Counter | `network,chainID,nodeName` | dual |
+| `pool_rpc_node_num_transitions_to_alive` / `_to_unreachable` / `_to_out_of_sync` / `_to_syncing` / `_to_invalid_chain_id` / `_to_unusable` / `_to_in_sync` / `_to_finalized_state_not_available` | Counter | `network,chainID,nodeName` | dual (fires only on a transition) |
+| `pool_rpc_node_finalized_state_failed` | Counter | `network,chainID,nodeName` | dual (fires only on a failure) |
+| `multi_node_invariant_violations` | Counter | `network,chainID,invariant` | dual (fires only on a violation) |
+
+The `multi_node_states` / `pool_rpc_node_*` rows are the node-pool/RPC-health family for **Stage A0b**
+(chainlink-framework multinode, wired by chainlink-solana). They are **beholder-emitted** and shared
+by any chain family (the `network` label separates them). All are **dual** with promauto; note the
+promauto side of `multi_node_states` spells the ID label `chainId` while the beholder side spells it
+`chainID` -- check the metric browser for which your datasource shows. Their *failure/transition*
+counters are event-only (absent = healthy); `multi_node_states` and the `*_highest_*_block` gauges are
+continuous.
 
 (`--succeeded`/`--reverted` here are suffixes on the two log-poller tx-outcome counters, produced
 by chainlink-solana's `outcomeDependantMetric` helper.)
@@ -326,7 +407,7 @@ solana_finding:
   timestamp: string           # ISO8601
   verdict: OK | ISSUE
   steps_run:
-    - id: string              # A0 | B0 | B0_detail | B1 | B2
+    - id: string              # A0 | A0b | B0 | B0_detail | B1 | B2
       outcome: STOP | CONTINUE:<step> | REPORT:<owner>
       value: string           # the gauges/counter rates that drove the outcome, verbatim
   findings:                   # one per REPORT; empty list if none
