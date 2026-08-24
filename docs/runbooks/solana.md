@@ -75,6 +75,7 @@ ID you already had.
 | `network` | `multi_node_states`, `pool_rpc_node_*` (A0b) | the chain family, `"solana"` / `"EVM"` -- a dimension the other metrics don't carry. Filter `network="solana"` on every node-pool query alongside `chainID`, or you'll mix chains/families |
 | `state` | `multi_node_states` | the node FSM state, **PascalCase** (`Alive`, `Unreachable`, `OutOfSync`, `Syncing`, `InvalidChainID`, `Unusable`, ...) -- filter with the exact casing |
 | `nodeName` | `pool_rpc_node_*` (A0b) | which RPC node a poll/transition/verify/head belongs to -- use it to name the dead node(s) |
+| `env` / `product` (and other platform resource attrs) | all beholder series, but required on `multi_node_states` / `pool_rpc_node_*` | platform-injected environment/product labels -- **on a shared datasource these are needed to isolate YOUR nodes from non-CCIP ones** (these general multinode metrics are emitted by every chainlink node). Add them to A0b queries if present in your datasource; the exact keys/spellings are platform-specific -- check the metric browser |
 | `# (outcome suffix)` | `solana_log_poller_txs_truncated_*`, `solana_log_poller_txs_log_parsing_error_*` | `_succeeded` vs `_reverted` -- whether the truncated/parse-failed tx ultimately succeeded or reverted on-chain |
 
 ### What Solana's TXM calls a failure -- and why the taxonomy matters
@@ -165,6 +166,7 @@ steps:
       - 'sum(multi_node_states{network="solana", chainID="$chainID", state="Alive"}) by (state)'
       - 'sum(multi_node_states{network="solana", chainID="$chainID"}) by (state)'
     condition: "state=\"Alive\" count == 0 (no node is reachable/healthy), OR some live nodes but more in a dead state (Unreachable/OutOfSync/Syncing/InvalidChainID/Unusable) than alive"
+    note: "these are general multinode metrics emitted by EVERY chainlink node on a shared datasource -- add your platform's env/product labels (e.g. env=\"staging\", product=\"ccip\") to the queries or you'll aggregate non-CCIP nodes into the count (see Stage A0b prose for exact keys). An empty result is 'multinode not on this node / wrong labels', NOT 'zero nodes'."
     if_true:
       no_nodes_alive: {action: "REPORT:chain-solana-oncall", reason: "the multinode node pool for $chainID has zero nodes in state=\"Alive\" -- this IS your 'no nodes healthy'/'No live RPC nodes available' (ErrNodeError). It explains every downstream signal (reader read_empty/read_outcome_error, config_poll batch_fetch_failed, log-poller stall, ccip_commit_fchain_read_errors, report_transmission_gave_up); do not re-attribute it to the plugin. Name the dead states by carrying the state breakdown, and which node(s), then check the transition/poll counters below for why."}
       degraded: {action: "REPORT:chain-solana-oncall", reason: "some Solana nodes are down ($count alive of $total) -- degraded redundancy, not full outage. Carry the alive-total split and the dead state names. Worth checking the transition counters below for whether nodes are flapping."}
@@ -279,17 +281,51 @@ To name *why* nodes left the alive set, the per-node `pool_rpc_node_*` family (s
 `chainID`/`nodeName` labels):
 
 ```promql
-sum(rate(pool_rpc_node_num_transitions_to_unreachable{chainID="$chainID"}[15m])) by (nodeName)
-sum(rate(pool_rpc_node_num_transitions_to_out_of_sync{chainID="$chainID"}[15m])) by (nodeName)
-sum(rate(pool_rpc_node_polls_failed{chainID="$chainID"}[15m])) by (nodeName)        # health-poll failures
-sum(rate(pool_rpc_node_verifies_failed{chainID="$chainID"}[15m])) by (nodeName)    # chain-ID verify failures
-pool_rpc_node_highest_seen_block{chainID="$chainID"}                               # is a node advancing at all
+sum(rate(pool_rpc_node_num_transitions_to_unreachable{chainID="$chainID"}[1h])) by (nodeName)
+sum(rate(pool_rpc_node_num_transitions_to_out_of_sync{chainID="$chainID"}[1h])) by (nodeName)
+sum(rate(pool_rpc_node_polls_failed{chainID="$chainID"}[1h])) by (nodeName)         # health-poll failures
+sum(rate(pool_rpc_node_verifies_failed{chainID="$chainID"}[1h])) by (nodeName)     # chain-ID verify failures (mostly at dial/verify time)
+pool_rpc_node_highest_seen_block{chainID="$chainID"}                               # raw value: is a node advancing at all
 ```
 
-`pool_rpc_node_highest_seen_block` is the "reachable ≠ actually progressing" check -- a node that's
-`Alive` but whose highest-seen-block is frozen is silently useless and worth calling out even with a
-nonzero live count. An absent `pool_rpc_node_*fault` counter is healthy (event counters, haven't
-fired).
+Reading these correctly matters -- each has a "quiet = healthy" and a "quiet = no signal recorded, not
+healthy" reading:
+
+- **The transition / poll-failure / verify-failure counters fire only on events**, and   two of the
+  triggers stop firing once a node is `Unreachable`: the per-node poll loop `return`s after
+  `declareUnreachable()` (`node_lifecycle.go:154-155`), so `polls_failed` climbs *during* the climb
+  to Unreachable then goes flat; `num_transitions_to_unreachable` fires **once per node at the
+  transition moment**. With a window that began after the outage, `rate(...)` is 0. **So absence here
+  is NOT evidence of health -- treat it as "no transition/poll telemetry recorded in this window,"**
+  especially when `state="Alive"` is 0 (use a `[1h]`+ window so it spans when the nodes actually
+  died). Verify the series even exist for your scope first (metric browser) before trusting an empty.
+- **`pool_rpc_node_highest_seen_block` / `pool_rpc_node_highest_finalized_block` are gauges --
+  query them RAW, never wrapped in `rate()`** (a frozen block number is a constant, so `rate()` of
+  it just reads 0). They are the "reachable ≠ actually progressing" check: a node that's `Alive` but
+  whose block height is flat is silently useless -- call it out even with a nonzero live count.
+  Read the value over time: **flat at a block number** = node was alive then went unreachable
+  (obvious stale gauge); **no series at all** = the node never got a head (unreachable-from-start)
+  or the metric isn't exported for that scope -- distinguish the two, since only the former points
+  at "was healthy then lost it."
+
+**Scope these queries to your environment and product -- they're general multinode metrics, not
+CCIP-specific.** `multi_node_states` / `pool_rpc_node_*` come from chainlink-framework's multinode
+pool, so **every** chainlink node in a shared datasource emits them (CCIP, non-CCIP, other products),
+and the same `chainID` appears on every node that serves that chain. On a shared deployment, a query
+narrowed only by `chainID` will aggregate across unrelated nodes. Beholder attaches platform
+resource attributes to every series (alongside the inherited `node_id`/`csa_public_key`), so add
+whatever environment/product/tenant labels your platform injects -- e.g.:
+
+```promql
+sum(multi_node_states{network="solana", chainID="$chainID", state="Alive", env="staging", product="ccip"})
+sum(rate(pool_rpc_node_polls_failed{chainID="$chainID", env="staging", product="ccip"}[15m])) by (nodeName)
+```
+
+If `env`/`product` aren't present on your datasource (e.g. a bare dev env), omit them; but if they
+exist and you drop them, expect false readings on a shared datasource. Pick the label *keys* your
+platform actually uses (here `env`, `product`) rather than assuming these spellings -- check the
+metric browser. This same inherited-resource-attribute scoping applies to the other CCIP-vs-non-CCIP
+ambiguous beholder series, but it bites hardest here because these metrics are the most general.
 
 **This stage is a root cause for, and runs *before* you should report, the A0 log-poller finding and
 several upstream commit-doc signals**: a node pool with no live nodes produces exactly the
