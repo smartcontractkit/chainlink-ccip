@@ -55,8 +55,7 @@ plugin got its data and how it gets its reports out:
   through the **transaction manager (TXM)**, which must price them (gas estimators), broadcast
   them, and shepherd them to inclusion. When `report_transmission_gave_up` fires in the commit
   plugin, the root cause usually lives in one of: can't afford a send (fee layer), can't broadcast
-  (RPC), or the tx is stuck/reverting (nonce gap, max attempts, lifecycle failure). Stages
-  **B0/B1/B2**.
+  (RPC), or the tx is stuck/backing up the send queue. Stages **B0/B1/B2**.
 
 Read A0 and A1 if your `entry` is `data_source`; read B0-B2 if it's `report_transmission`. The
 two halves are independent and you can enter directly at the relevant quarter.
@@ -81,14 +80,13 @@ empty here.
 
 | label key | appears on | meaning |
 |---|---|---|
-| `chainID` | all EVM beholder metrics | the EVM chain ID (== commit's `destChainID` value for the dest chain) |
+| `chainID` | all EVM beholder metrics | the EVM chain ID (== commit's `destChainID` value for the dest chain). **Live gas/TXM metrics only exist on the destination/tx-sending chain** -- a query scoped to a chain the node doesn't send txs on returns empty, legitimately |
+| `chainFamily` | all EVM beholder metrics | `"EVM"` on the pool counters, `"evm"` on the log-poller and gas-updater gauges -- **case is not consistent**; don't regex against a single spelling |
 | `evmChainID` | the promauto pool counters (`evm_pool_rpc_node_calls_*`), gas-updater gauges (promauto side only) | same value, old promauto spelling. Only on the direct-scrape path, not the beholder path |
 | `nodeName` | `evm_pool_rpc_node_calls_*` | which RPC node -- use this to split a single bad RPC from the whole pool failing |
 | `rpcDomain` | `evm_pool_rpc_node_calls_*` (beholder), `rpc_call_latency` | the RPC endpoint/domain (sanitized) the call went to |
 | `callName` / `rpcCallName` | RPC metrics | which JSON-RPC method / logical call |
-| `address` | `txm_rpc_nonce` | the wallet address whose on-chain nonce is reported |
-| `stage` | `txm_transaction_lifecycle_failure_total` | where in the lifecycle the failure happened (`create`, `in_flight_subset`, `max_in_flight`, `broadcast`, `nonce_at`) |
-| `percentile` | the gas-updater gauges | which price percentile (`p25`, `p50`, ...) the gauge carries |
+| `percentile` | the gas-updater gauges | which price percentile, formatted as a **string like `"60%"`** (not `p25/p50`) |
 | `mode` | `block_history_estimator_connectivity_failure_count` | `legacy` or `eip1559` |
 
 The pool metrics are effectively **dual-registered** (same name on promauto and beholder), which
@@ -116,26 +114,22 @@ side.)
 
 ### Which TXM metrics actually carry a chainID label (not all do)
 
-`pkg/txm/metrics.go` constructs a `metrics.Labeler` with `chainID` and carries it on the struct --
-but the beholder `.Add(...)`/`.Record(...)` calls for **most** of the `txm_*` instruments pass
-**no attributes** (`m.numBroadcastedTxs.Add(ctx, 1)`, etc.), so those beholder series get only the
-beholder client's inherited identity labels (`node_id`, `csa_public_key`), **no `chainID`**. Only
-**`txm_transaction_lifecycle_failure_total`** explicitly attaches `chainID` + `stage`. The
-consequences, and the escape hatches:
+**What is actually live in a CCIP EVM deployment:** the counters `tx_manager_num_broadcasted_total`,
+`tx_manager_num_confirmed_transactions_total`, `tx_manager_num_successful_transactions_total`,
+`tx_manager_num_finalized_transactions_total`, the gauges `txm_pending_tx_queue_utilization`,
+`tx_manager_tx_oldest_non_terminal_age_seconds`, `tx_manager_tx_attempt_count`, and (on a revert)
+`tx_manager_num_tx_reverted_total`. **Every one of these carries a `chainID` label**, 
+so all write-path queries in this doc are chain-scoped reliably. They appear
+only on the **destination (tx-sending) chain** -- the same chain the commit plugin transmits on --
+so filter `$chainID` against that dest chain specifically.
 
-- On a **beholder-fed** datasource, the counters `txm_num_broadcasted_transactions`,
-  `txm_num_confirmed_transactions`, `txm_num_nonce_gaps`, the gauge `txm_reached_max_attempts`,
-  the histogram `txm_time_until_tx_confirmed`, and the gauge `txm_rpc_nonce` **are not filterable
-  by `$chainID`**. Queries against them on a node hosting multiple chains will mix chains. Scope
-  them per `node_id`/`csa_public_key` instead, or use the **`txm_transaction_lifecycle_failure_total`**
-  (`chainID` + `stage`) as the chain-scoped backbone of stage B2.
-- The **promauto** dual-writes for all of these **do** carry `chainID` (and `txm_rpc_nonce` adds
-  `address`). If your datasource scrapes the node's prometheus endpoint directly, prefer the
-  pramaauto names for chain-scoped TXM questions.
-
-The queries in this doc are written to be correct on either path, but the label caveat is why stage
-B2 leans on `txm_transaction_lifecycle_failure_total` rather than assuming every TXM counter is
-chain-filterable.
+Concretely, the live family maps onto the EVM V1 vocabulary:
+- no per-address nonce-gap counter → the "one stuck thing" read is `txm_pending_tx_queue_utilization`
+  climbing + `tx_manager_tx_oldest_non_terminal_age_seconds` climbing + `tx_manager_tx_attempt_count`
+  rising, *not* the V2 `txm_num_nonce_gaps`;
+- no lifecycle-failure stage breakdown → owe the *kind* of stuck (`max_in_flight` vs `broadcast`)
+  to logs/TXM config, not to a metric;
+- broadcast-vs-confirm gap is `tx_manager_num_broadcasted_total` vs `tx_manager_num_confirmed_transactions_total`.
 
 ### Empty result sets
 
@@ -143,31 +137,34 @@ No metric in this doc is an unconditional per-round heartbeat like the commit pl
 event counters that only get a time series after they fire, or gauges reported on their own
 ticker. The same two rules from `commit-plugin-health.md#empty-result-sets` apply:
 
-1. The **staleness/liveness gauges** -- `evm_log_poller_last_processed_block` (A1),
-   `txm_reached_max_attempts`, `txm_rpc_nonce` (B2) -- are reported continuously while the process
-   runs, so an **empty** result (no series at all) means the metric isn't reaching your datasource,
-   not "value zero." Report `UNKNOWN` there, don't grade it against thresholds.
-2. Everything else is an **event counter** (`evm_pool_rpc_node_calls_*`, `rpc_call_latency`
-   buckets, `block_history_estimator_connectivity_failure_count`, `txm_num_*`,
-   `txm_transaction_lifecycle_failure_total`): **empty == the event never happened == value 0.**
-   Grade normally. The one exception is the same as the commit docs: if a `UNKNOWN`-class gauge in
-   the same run is itself empty, don't trust counter-emptiness -- say so in `concerns`.
+1. The **continuous gauges** -- `evm_log_poller_last_processed_block`, `evm_pool_rpc_node_calls_*`
+   (counters, but accumulate rapidly), `gas_updater_current_base_fee`, and the txmgr gauges
+   `txm_pending_tx_queue_utilization`, `tx_manager_tx_oldest_non_terminal_age_seconds`,
+   `tx_manager_tx_attempt_count` -- are all emitted continuously while the process runs (the gauges)
+   or as fast-moving counters, so an **empty** result means the metric isn't reaching your
+   datasource (or you're looking at a chain the node isn't sending txs on -- the gas/TXM family only
+   exists on the destination/tx-sending chain), not "value zero." Report `UNKNOWN`, don't grade it.
+2. Everything else is an **event counter** fired only on occurrence
+   (`evm_pool_rpc_node_calls_failed`, `tx_manager_num_*_total`, `tx_manager_num_tx_reverted_total`,
+   `block_history_estimator_connectivity_failure_count`): **empty == the event never happened ==
+   value 0.** Grade normally. The one exception is the same as the commit docs: if a `UNKNOWN`-class
+   gauge in the same run is itself empty, don't trust counter-emptiness -- say so in `concerns`.
 
-`rpc_call_latency` and `txm_time_until_tx_confirmed` are histograms; if you only have their
-`_count`/`_bucket` forms on your datasource, derive `rate()`s and quantiles from those, treating an
-absent `_count` for a window as "no calls (or none clearing the first bucket) in that window."
+`rpc_call_latency_milliseconds` is a histogram; if you only have `_count`/`_bucket` forms on your
+datasource, derive `rate()`s and quantiles from those, treating an absent `_count` for a window as
+"no calls (or none clearing the first bucket) in that window."
 
 ### Counter _total suffixing
 
-Same pipeline caveat as the commit runbooks: OTel counters that reach Prometheus via a
-prometheusremotewrite/OTel-collector exporter get a `_total` appended **unless the name already
-ends in `_total`**. Several EVM metrics are registered with `_total` already baked in
-(`evm_pool_rpc_node_calls_total`, `txm_transaction_lifecycle_failure_total`,
-`block_history_estimator_connectivity_failure_count` does *not*), so on such a datasource these
-names are *not* doubled -- but the fee/other counters also registered without `_total`
-(`gas_updater_set_gas_price` is a gauge; `txm_num_nonce_gaps` is a counter and would gain a
-`_total`). **Check one query against your datasource's metric browser before trusting the rest.**
-The doc lists the metric as registered; your pipeline may suffix it.
+OTel counters that reach Prometheus via the otel-collector's
+`prometheusremotewrite` exporter get a `_total` appended **unless the name already ends in `_total`**.
+`evm_pool_rpc_node_calls_total` (already suffixed) stayed as-is, while `evm_pool_rpc_node_calls_success`
+became `evm_pool_rpc_node_calls_success_total` and `tx_manager_num_broadcasted` became
+`tx_manager_num_broadcasted_total`. Two unit-suffix gotchas also seen live: the framework `rpc_call_latency`
+histogram reaches Prometheus as **`rpc_call_latency_milliseconds_*`** (OTel appends the `ms` unit),
+and the `gas_updater_*` gauges carry `percentile="60%"`-style values, not `p25/p50`. **Check one
+query against your datasource's metric browser before trusting the rest.** The doc lists the metric
+as registered; your pipeline may suffix/rename it.
 
 ## Decision graph
 
@@ -217,11 +214,11 @@ steps:
   - id: B1
     check: txm_broadcast_flow
     queries:
-      - 'sum(rate(txm_num_confirmed_transactions{chainID="$chainID"}[15m]))'
-      - 'sum(rate(txm_num_broadcasted_transactions{chainID="$chainID"}[15m]))'
+      - 'sum(rate(tx_manager_num_confirmed_transactions{chainID="$chainID"}[15m]))'
+      - 'sum(rate(tx_manager_num_broadcasted{chainID="$chainID"}[15m]))'
     condition: "confirmed == 0 AND broadcasted == 0 over the window"
-    note: "these two counters do NOT carry chainID on a beholder-only datasource (see the label cheat sheet) -- the {chainID=...} filter here works only if your datasource also has the promauto forms. If {chainID=...} returns empty on a datasource you believe is beholder-only, re-run WITHOUT chainID and split by node_id/csa_public_key instead; an empty-result treated as 'zero' here is exactly the trap the cheat sheet warns about."
-    if_true: {action: "CONTINUE:B2", reason: "nothing being broadcast at all -- the give-up is a 'no reports are even being sent' situation, dig into stuck/lifecycle markers"}
+    note: "these are the framework/txmgr counters actually emitted by a CCIP EVM node (verified live -- the V2 txm_* variants are NOT emitted, see the cheat sheet). All carry chainID, so {chainID=...} is reliable here. Both are counters with a _total suffix on an OTel pipeline."
+    if_true: {action: "CONTINUE:B2", reason: "nothing being broadcast at all -- the give-up is a 'no reports are even being sent' situation, dig into the queue/stuck gauges"}
     if_false:
       confirmed_zero_broadcasted_positive: {action: "CONTINUE:B2", reason: "reports ARE being broadcast but NONE confirm in window -- a land/drop/revert problem, not a send problem"}
       both_positive: {action: "STOP", reason: "TXN is broadcasting and confirming reports normally for $chainID. If report_transmission_gave_up still fires, it's almost certainly a per-report revert or a backlog-size / round-cadence issue, not the EVM node stack. Escalate with this evidence rather than assuming the EVM layer broken. (If you were handed a specific $txHash, sanity-check it on the explorer before stopping.)"}
@@ -229,41 +226,14 @@ steps:
 
   - id: B2
     check: txm_stuck_signals
-    query: 'sum by (stage) (rate(txm_transaction_lifecycle_failure_total{chainID="$chainID"}[15m]))'
-    condition: "any series > 0"
-    if_true: {action: "CONTINUE:B2_detail", reason: "transaction lifecycle failures present; stage names the phase"}
-    if_false: {action: "CONTINUE:B2_nonce", reason: "no lifecycle-failure counter; the stuck signal (give-up, zero confirms) must come from nonce or max-attempts instead"}
-    automatable: true
-
-  - id: B2_detail
-    check: lifecycle_failure_stage
-    query: 'sum by (stage) (rate(txm_transaction_lifecycle_failure_total{chainID="$chainID"}[15m]))'
-    condition: "report the dominant stage(s)"
-    if_true:
-      nonce_at:       {action: "REPORT:chain-evm-oncall", reason: "lifecycle failing at the nonce stage -- nonce tracking issue. Cross-check txm_rpc_nonce (per address) vs expected and the nonce gap counter (nonce_gap) below."}
-      max_in_flight:  {action: "REPORT:chain-evm-oncall", reason: "lifecycle failing at max_in_flight -- the TXM's max inflight budget is exhausted (slow finality or too many concurrent reports). Throttling, not an RPC failure."}
-      broadcast:      {action: "REPORT:chain-evm-oncall", reason: "lifecycle failing at broadcast -- the RPC rejected/dropped the send; corroborate with evm_pool_rpc_node_calls_failed at the same time."}
-      create:         {action: "REPORT:chain-evm-oncall", reason: "lifecycle failing at create -- the tx could not be constructed (e.g. missing wallet/crypto, keystore). Check infrastructure, not the chain."}
-      default:        {action: "REPORT:chain-evm-oncall", reason: "dominant/most relevant of the above, or a stage not named here -- report the exact stage string with the rate, don't guess."}
-    if_false: {action: "CONTINUE:B2_nonce", reason: "no strongly dominant stage; continue to the nonce/max-attempt check"}
-    automatable: true
-
-  - id: B2_nonce
-    check: nonce_gaps_and_max_attempts
     queries:
-      - 'sum(rate(txm_num_nonce_gaps{chainID="$chainID"}[15m]))'
-      - 'max(txm_reached_max_attempts{chainID="$chainID"})'
-    condition: "nonce gaps rate > 0 OR reached_max_attempts == 1"
-    note: "same chainID caveat as B1 -- txm_num_nonce_gaps / txm_reached_max_attempts / txm_rpc_nonce lack chainID on beholder-only datasources. Prefer the chainID-bearing txm_transaction_lifecycle_failure_total from B2 when the datasource gives you no promauto forms; treat an empty {chainID=...} result here as 'cannot scope', not 'zero'."
-    if_true:
-      nonce_gaps:
-        action: "REPORT:chain-evm-oncall"
-        reason: "the TXM is filling nonce gaps for $chainID -- a stalled out-of-order tx is parking the sender's nonce and blocking subsequent reports (classic report_transmission_gave_up root cause). Cross-check txm_rpc_nonce per address to see the parked nonce."
-        followup_query: 'txm_rpc_nonce{chainID="$chainID"}'
-      max_attempts:
-        action: "REPORT:chain-evm-oncall"
-        reason: "reached_max_attempts == 1 -- the TXM gave up on a tx after exhausting its bump budget (combined with B0 if the bump was suppressed by a connectivity failure, or with B2's broadcast stage if the RPC dropped it). Any report behind that tx will report_transmission_gave_up until the wallet nonce recovers."
-    if_false: {action: "STOP", reason: "no nonce gaps and no max-attempt kill. Broadcasts were happening but nothing confirms and no stuck marker is firing -- this is most likely an RPC/indexing lag on the confirmation side (tx landed but isn't seen as finalized). Verify against the chain explorer / $txHash before escalating further."}
+      - 'max(txm_pending_tx_queue_utilization{chainID="$chainID"})'
+      - 'max(tx_manager_tx_oldest_non_terminal_age_seconds{chainID="$chainID"})'
+      - 'max(tx_manager_tx_attempt_count{chainID="$chainID"})'
+    condition: "queue_utilization rising toward 1, OR oldest_non_terminal_age climbing (well above normal block-time), OR attempt_count climbing"
+    note: "these three framework gauges (live on the dest chain) are the 'one stuck thing' read this deployment actually exposes -- there is no nonce-gap or lifecycle-stage metric in the live family (V2 txm_* is not emitted). Treat 'queue near full' + 'oldest non-terminal age climbing' + 'attempts rising' together as the stuck signature."
+    if_true: {action: "REPORT:chain-evm-oncall", reason: "the TXM queue is backing up / the oldest tx is aging / attempts are rising -- a stuck transaction is blocking the send path, which surfaces upstream as report_transmission_gave_up. Say which of the three gauges is the driver and its value. Pair with B0 if the fee layer is also suppressing bumps."}
+    if_false: {action: "STOP", reason: "no nonce/queue stuck signature and nothing aging. Broadcasts were happening but nothing confirms and no stuck marker is firing -- most likely an RPC/indexing lag on the confirmation side (tx landed but isn't seen as finalized). Verify against the chain explorer / $txHash before escalating."}
     automatable: true
 ```
 
@@ -279,13 +249,12 @@ sum(rate(evm_pool_rpc_node_calls_failed{chainID="$chainID"}[5m])) by (nodeName)
 sum(rate(evm_pool_rpc_node_calls_total{chainID="$chainID"}[5m])) by (nodeName)
 ```
 
-Optionally corroborate at the wire level with the chain-client multicall latency histogram
-(`txm_multicall_duration_ms{success="false"}`, beholder-only) if your datasource has it, and with
-per-node latency (beholder histogram from chainlink-framework; `success="true"` means *failed* --
+Corroborate at the wire level with per-node latency (the framework latency instrument; on an OTel
+pipeline it surfaces as `rpc_call_latency_milliseconds_*`, and `success="true"` means *failed* --
 see [the inversion](#the-success-label-inversion-on-rpc_call_latency)):
 
 ```promql
-histogram_quantile(0.95, sum by (le) (rate(rpc_call_latency_bucket{chainID="$chainID", callName=~".*", success="true"}[5m])))
+histogram_quantile(0.95, sum by (le) (rate(rpc_call_latency_milliseconds_bucket{chainID="$chainID", success="true"}[5m])))
 ```
 
 A single `nodeName` failing while peers pass → hand off that node (`chain-evm-oncall`). Every node
@@ -340,52 +309,54 @@ on an EIP-1559 chain; a missing base fee means the estimator has nothing to pric
 
 ### Stage B1 -- TXM broadcast: are reports being sent at all?
 
-The two counters that divide "nothing is being sent" from "sent but not landing":
+The two live counters that divide "nothing is being sent" from "sent but not landing":
 
 ```promql
-sum(rate(txm_num_confirmed_transactions{chainID="$chainID"}[15m]))
-sum(rate(txm_num_broadcasted_transactions{chainID="$chainID"}[15m]))
+sum(rate(tx_manager_num_confirmed_transactions{chainID="$chainID"}[15m]))
+sum(rate(tx_manager_num_broadcasted{chainID="$chainID"}[15m]))
 ```
 
 - Both `> 0` → the node stack is broadcasting **and confirming** reports normally. A persisted
   `report_transmission_gave_up` together with a healthy TXM is a per-report revert or a
   backlog/round-cadence issue, not the EVM stack. Stop here (verify the actual tx on-chain if you
   have a `$txHash`).
-- Broadcasted `> 0`, confirmed `== 0` → reports go out but never land → **B2** (land/drop/revert /
-  nonce).
+- Broadcasted `> 0`, confirmed `== 0` → reports go out but never land → **B2** (stuck/revert).
 - Both `== 0` → nothing is being sent at all → **B2** (stuck/never-created).
 
-`txm_time_until_tx_confirmed` (histogram) is the supporting latency signal; a healthy chain spends
-most of it near the chain's block time, and a value pinned at the histogram ceiling means confirms
-are being delayed, not that everything is fine.
+`tx_manager_num_finalized_transactions` / `tx_manager_num_successful_transactions` are the
+supporting confirmation counters (finalized = past finality horizon; successful = included and
+executed); a widening broadcast→confirmed↔finalized gap with confirms stuck at zero is the "sent
+but not landing" signature. (There is no `_time_until_confirmed` histogram in the live family --
+the V2 `txm_time_until_tx_confirmed` is not emitted -- so latency has to be inferred from how long
+the broadcast counter advances before the confirmed counter follows.)
 
-### Stage B2 -- TXM stuck: killed attempts, nonce gaps, lifecycle failures
+### Stage B2 -- TXM stuck: queue back-up, oldest-tx age, attempt count
 
-When broadcasts aren't confirming, name *why*. The chain-scoped backbone is the lifecycle-failure
-counter (the one TXM metric that reliably carries `chainID`):
-
-```promql
-sum by (stage) (rate(txm_transaction_lifecycle_failure_total{chainID="$chainID"}[15m]))
-```
-
-`stage` values: `create` (couldn't construct the tx -- keystore/wallet/infra),
-`in_flight_subset` / `max_in_flight` (concurrency budget exhausted -- throttling), `broadcast`
-(RPC rejected/dropped the send), `nonce_at` (nonce tracking broken). Pair each with the matching
-corroboration from the note on the decision-graph step.
-
-Then the classic stuck-nonce pair:
+When broadcasts aren't confirming, name *why* from the three framework gauges the deployment
+actually exposes -- there is **no** V2 lifecycle-stage or nonce-gap metric in the live family:
+`txm_pending_tx_queue_utilization` (queue fullness), `tx_manager_tx_oldest_non_terminal_age_seconds`
+(age of the oldest not-yet-terminal tx), and `tx_manager_tx_attempt_count` (how many attempts are
+stacked up, ~retries/bumps):
 
 ```promql
-sum(rate(txm_num_nonce_gaps{chainID="$chainID"}[15m]))
-max(txm_reached_max_attempts{chainID="$chainID"})
-txm_rpc_nonce{chainID="$chainID"}   # per wallet address
+max(txm_pending_tx_queue_utilization{chainID="$chainID"})
+max(tx_manager_tx_oldest_non_terminal_age_seconds{chainID="$chainID"})
+max(tx_manager_tx_attempt_count{chainID="$chainID"})
 ```
 
-A **nonce gap** (or `reached_max_attempts==1`) means one parked out-of-order tx is holding the
-sender's nonce, so every subsequent report (a) can't get its required nonce and (b) keeps bouncing
-off the RPC with a nonce-too-low/known-tx rejection. That is the archetypal
-`report_transmission_gave_up` + zero-confirms combination on EVM, and the fix lives in the EVM
-operation (find/nothing the stuck tx, recover the nonce), not in the commit plugin.
+The **stuck signature** is the combination: queue near `1.0` (or climbing), oldest-non-terminal-age
+far above a healthy block time (climbing → the stuck thing is old, not just momentarily delayed),
+and attempt-count climbing (the TXM keeps re-attempting/bumping the same txs). This is the EVM
+analogue of a `reached_max_attempts` / "parked nonce" outage -- one blocked transaction holds the
+send path open and the backlog up, so `report_transmission_gave_up` fires even while the reader is
+healthy. The fix lives in the EVM operation (identify the stuck tx, recover the sequence), not in
+the commit plugin. On a revert, additionally check `tx_manager_num_tx_reverted_total` rising.
+
+Cross-check the *kind* of backing-up from the log/tx-sender rather than a metric: in this family
+there is no `max_in_flight`-vs-`broadcast` stage breakdown like the unemitted V2
+`txm_transaction_lifecycle_failure_total` would give -- if you need to distinguish "throttling" from
+"RPC rejecting sends," pivot to the RPC pool (`evm_pool_rpc_node_calls_failed`) and the fee layer
+(B0) for the mechanism.
 
 If nothing in B2 fires at all but confirms are still zero, the remaining honest conclusion is an
 RPC confirmation/indexing lag rather than a TXM failure -- say so and verify against the explorer
@@ -399,41 +370,51 @@ rather than inventing a stuck marker.
 Many TXM beholder series carry **no `chainID` attribute** -- see
 [which TXM metrics carry chainID](#which-txm-metrics-actually-carry-a-chainid-label-not-all-do).
 
-| metric | otel_type | key labels | registration |
-|---|---|---|---|
-| `evm_pool_rpc_node_calls_total` | Counter | beholder: `chainID,nodeName,rpcDomain,callName`; promauto: `evmChainID,nodeName` | dual |
-| `evm_pool_rpc_node_calls_success` | Counter | same as above | dual |
-| `evm_pool_rpc_node_calls_failed` | Counter | same as above | dual |
-| `rpc_call_latency` | Histogram | `chainFamily,chainID,rpcDomain,isSendOnly,success,callName` (success inverted) | dual (chainlink-framework) |
-| `evm_log_poller_last_processed_block` | Gauge | `chainFamily,chainID` | dual |
-| `gas_updater_set_gas_price` | Gauge | `chainID,percentile` | dual |
-| `gas_updater_set_tip_cap` | Gauge | `chainID,percentile` | dual |
-| `gas_updater_all_gas_price_percentiles` | Gauge | `chainID,percentile` | dual |
-| `gas_updater_all_tip_cap_percentiles` | Gauge | `chainID,percentile` | dual |
-| `gas_updater_current_base_fee` | Gauge | `chainID` | dual |
-| `block_history_estimator_connectivity_failure_count` | Counter | `chainID,mode` (`legacy`\|`eip1559`) | dual |
-| `gas_price_updater` | Gauge | `chainID` | dual |
-| `base_fee_updater` | Gauge | `chainID` | dual |
-| `max_priority_fee_per_gas_updater` | Gauge | `chainID` | dual |
-| `max_fee_per_gas_updater` | Gauge | `chainID` | dual |
-| `txm_transaction_lifecycle_failure_total` | Counter | `chainID,stage` | both (chainID attached) |
-| `txm_num_broadcasted_transactions` | Counter | **no chainID on beholder**; promauto `chainID` | both |
-| `txm_num_confirmed_transactions` | Counter | **no chainID on beholder**; promauto `chainID` | both |
-| `txm_num_nonce_gaps` | Counter | **no chainID on beholder**; promauto `chainID` | both |
-| `txm_reached_max_attempts` | Gauge | **no chainID on beholder**; promauto `chainID` | both |
-| `txm_time_until_tx_confirmed` | Histogram | **no chainID on beholder**; promauto `chainID` | both |
-| `txm_rpc_nonce` | Gauge | **no chainID on beholder**; promauto `chainID,address` | both |
-| `txm_multicall_duration_ms` | Histogram | `chainID,method,blockTag,success,timedOut` | beholder-only |
-| `ofa_send_tx_status` / `ofa_send_tx_latency` | Counter / Histogram | `chainID,backend,status` | beholder-only (dual-broadcast/MEV only) |
-| `meta_endpoint_status_codes` / `meta_endpoint_latency` | Counter / Histogram | `chainID,feedAddress` | beholder-only (FastLane/Atlas only) |
-| `meta_bids_per_transaction` / `meta_errors` | Histogram / Counter | `chainID,feedAddress,errorType` | beholder-only (FastLane/Atlas only) |
+`otel_type` governs `_total`/`_bucket` suffixing; **status** reflects what was confirmed live (or
+absent) on a `ccip obs up --victoria` devel env while reports were transmitting:
 
-The `ofa_*` and `meta_*` families are only live on deployments that route sends through a
-dual-broadcast/MEV backend (Flashbots/Nova/FastLane Atlas); on a plain NOP commit deployment they
-will legitimately be absent. The commit-plugin's *own* `metrics` (the `ccip_commit_*` /
-`ccip_reader_*` series `commit-plugin-health.md` and `uncommitted-message.md` query) are **not**
-part of this doc -- this doc is the layer underneath, reached by their `REPORT:...-oncall`
-handoffs.
+| metric | otel_type | key labels | status in a CCIP EVM deploy |
+|---|---|---|---|
+| `evm_pool_rpc_node_calls_total` | Counter | `chainID,nodeName,rpcDomain,callName` (beholder) | **live** |
+| `evm_pool_rpc_node_calls_success` | Counter | same | **live** |
+| `evm_pool_rpc_node_calls_failed` | Counter | same | **live** (fires only on failure) |
+| `rpc_call_latency` | Histogram | `chainFamily,chainID,rpcDomain,isSendOnly,success,callName` (success inverted) | **live** -- surfaces as `rpc_call_latency_milliseconds_*` |
+| `evm_log_poller_last_processed_block` | Gauge | `chainFamily,chainID` | **live** |
+| `gas_updater_set_gas_price` | Gauge | `chainID,percentile` (e.g. `"60%"`) | **live** (dest/tx-sending chain) |
+| `gas_updater_all_gas_price_percentiles` | Gauge | `chainID,percentile` | **live** (dest chain) |
+| `gas_updater_current_base_fee` | Gauge | `chainID` | **live** (dest chain) |
+| `gas_updater_set_tip_cap` / `gas_updater_all_tip_cap_percentiles` | Gauge | `chainID,percentile` | conditional -- only EIP-1559; absent on a legacy chain |
+| `block_history_estimator_connectivity_failure_count` | Counter | `chainID,mode` | **live** (fires only on a detected connectivity failure) |
+| `gas_price_updater` / `base_fee_updater` / `max_priority_fee_per_gas_updater` / `max_fee_per_gas_updater` | Gauge | `chainID` | **not emitted** here -- these are the *fee-history* estimator, which the local block-history config does not run |
+| `txm_pending_tx_queue_utilization` | Gauge | `chainID` | **live** |
+| `tx_manager_tx_oldest_non_terminal_age_seconds` | Gauge | `chainID` | **live** |
+| `tx_manager_tx_attempt_count` | Gauge | `chainID` | **live** |
+| `tx_manager_num_broadcasted` | Counter | `chainID` | **live** (`_total` suffix) |
+| `tx_manager_num_confirmed_transactions` | Counter | `chainID` | **live** (`_total` suffix) |
+| `tx_manager_num_successful_transactions` | Counter | `chainID` | **live** (`_total` suffix) |
+| `tx_manager_num_finalized_transactions` | Counter | `chainID` | **live** (`_total` suffix) |
+| `tx_manager_num_tx_reverted` | Counter | `chainID` | **live** (fires only on a revert) |
+| `tx_manager_fwd_tx_count` | Counter | `chainID` | conditional (forwarding enabled) |
+| `tx_manager_num_gas_bumps` / `tx_manager_gas_bump_exceeds_limit` | Counter | `chainID` | conditional (fires only on a bump) |
+| `txm_num_broadcasted_transactions`, `txm_num_confirmed_transactions`, `txm_num_nonce_gaps`, `txm_reached_max_attempts`, `txm_time_until_tx_confirmed`, `txm_rpc_nonce`, `txm_transaction_lifecycle_failure_total` | V2 instruments | (V2 code would omit `chainID` on beholder) | **NOT emitted** -- V2 engine not the active transmit path; do not build on these |
+| `txm_multicall_duration_ms` | Histogram | `chainID,method,blockTag,success,timedOut` | **NOT emitted** here (V2 wrapper path) |
+| `ofa_send_tx_status` / `ofa_send_tx_latency` | Counter / Histogram | `chainID,backend,status` | MEV/dual-broadcast only |
+| `meta_endpoint_status_codes` / `meta_endpoint_latency` | Counter / Histogram | `chainID,feedAddress` | MEV/dual-broadcast only |
+| `meta_bids_per_transaction` / `meta_errors` | Histogram / Counter | `chainID,feedAddress,errorType` | MEV/dual-broadcast only |
+
+Read/interp notes for the table:
+
+- The **live** markers are empirical (local devel env, node 2.61.0, chains 1337/2337). A "heavy"
+  row absent on *your* datasource means it's the **not emitted** class, not a healthy zero -- check
+  the class before reporting.
+- **`gas_updater_*` and the whole TXM family exist only on the destination/tx-sending chain** --
+  a query scoped to a chain the node doesn't send txs on legitimately returns empty.
+- The `ofa_*`/`meta_*` families are only live on deployments that route sends through a
+  dual-broadcast/MEV backend (Flashbots/Nova/FastLane Atlas); on a plain NOP commit deployment they
+  will legitimately be absent.
+- The commit-plugin's *own* metrics (the `ccip_commit_*`/`ccip_reader_*` series
+  `commit-plugin-health.md` and `uncommitted-message.md` query) are **not** part of this doc --
+  this doc is the layer underneath, reached by their `REPORT:...-oncall` handoffs.
 
 ## Output contract
 
