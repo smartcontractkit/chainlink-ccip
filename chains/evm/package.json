@@ -42,10 +42,10 @@
     "@openzeppelin/contracts-5.3.0": "npm:@openzeppelin/contracts@5.3.0"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0",
-    "@changesets/get-github-info": "^0.7.0",
-    "semver": "^7.8.4",
-    "solhint": "^6.2.2",
+    "@changesets/cli": "^3.0.1",
+    "@changesets/get-github-info": "^1.0.0",
+    "semver": "^7.8.5",
+    "solhint": "^6.2.4",
     "solhint-plugin-chainlink-solidity": "github:smartcontractkit/chainlink-solhint-rules#v1.2.1",
     "forge-std": "github:foundry-rs/forge-std#v1.16.1"
   }
