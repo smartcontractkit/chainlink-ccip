@@ -16,23 +16,6 @@ use super::super::interfaces::Public;
 use super::messages::validate_svm2any;
 use super::price_math::{get_validated_token_price, Exponential, Usd18Decimals};
 
-/// SVM2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, sender and tokenAmounts).
-/// Each variable array takes 1 more slot to store its length.
-/// When abi encoded, excluding array contents,
-/// SVM2AnyMessage takes up a fixed number of 13 slots, 32 bytes each.
-/// We assume sender always takes 1 slot.
-/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 15.
-/// The fixed bytes does not cover struct data (this is represented by SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
-pub const SVM_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
-
-/// Each token transfer adds 1 RampTokenAmount
-/// RampTokenAmount has 5 fields, 2 of which are bytes type, 1 Address, 1 uint256 and 1 uint32.
-/// Each bytes type takes 1 slot for length, 1 slot for data and 1 slot for the offset.
-/// address
-/// uint256 amount takes 1 slot.
-/// uint32 destGasAmount takes 1 slot.
-pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
-
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
 
 pub struct Impl;
@@ -185,25 +168,24 @@ fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         FeeQuoterError::InvalidInputsMissingTokenConfig
     );
-    let dest_bytes_overhead = additional_token_configs_for_dest_chain
-        .iter()
-        .map(|config| match config {
-            Some(config) if config.token_transfer_config.dest_bytes_overhead > 0 => {
-                config.token_transfer_config.dest_bytes_overhead
-            }
-            _ => CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        })
-        .sum::<u32>();
+    let token_transfer_bytes_overhead =
+        get_token_transfers_cost(additional_token_configs_for_dest_chain);
 
-    let validated_message =
-        validate_svm2any(message, dest_chain, fee_token_config, &dest_bytes_overhead)?;
-    let extra_args_data_len = validated_message.extra_args_data_len;
+    let validated_message = validate_svm2any(
+        message,
+        dest_chain,
+        fee_token_config,
+        &token_transfer_bytes_overhead,
+    )?;
+    // extra_args_data_length is 0 for EVM/Aptos/TVM. For SUI/SVM it captures the additional bytes from
+    // accounts and per-token constant overhead that the destination chain must process.
+    let extra_args_data_length = validated_message.extra_args_data_len;
     let processed_extra_args = validated_message.processed_extra_args;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
         execution_gas_price,
-        data_availability_gas_price,
+        ..
     } = get_validated_gas_price(dest_chain)?;
 
     let network_fee = network_fee(
@@ -212,50 +194,31 @@ fn fee_for_msg(
         additional_token_configs,
         additional_token_configs_for_dest_chain,
     )?;
+    let premium_fee = network_fee.premium;
+    let token_transfer_gas = network_fee.transfer_gas;
+    let token_transfer_bytes_overhead = network_fee.transfer_bytes_overhead;
 
     let gas_limit = U256::new(processed_extra_args.gas_limit);
 
-    // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
-    // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
-    // This calculation is not exact, the goal is to not lose money on large payloads.
-    // The fixed OCR report calldata overhead gas is accounted for in `dest_gas_overhead`.
-    // It is not included in the calculation below for simplicity.
-    let calldata_length = U256::new(message.data.len() as u128)
-        + U256::new(extra_args_data_len as u128)
-        + network_fee.transfer_bytes_overhead;
-    let mut calldata_gas =
-        calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
-    let calldata_threshold =
-        U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128);
-    if calldata_length > calldata_threshold {
-        let base_calldata_gas = U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
-            * calldata_threshold;
-        let extra_bytes = calldata_length - calldata_threshold;
-        let extra_calldata_gas =
-            extra_bytes * U256::new(dest_chain.config.dest_gas_per_payload_byte_high as u128);
-        calldata_gas = base_calldata_gas + extra_calldata_gas;
-    }
-    let execution_gas = gas_limit
-        + U256::new(dest_chain.config.dest_gas_overhead as u128)
-        + calldata_gas
-        + network_fee.transfer_gas;
+    // Match EVM 1.6 legacy fee calculation: payload bytes are charged at the base per-byte gas rate.
+    let dest_call_data_length = U256::new(message.data.len() as u128)
+        + U256::new(extra_args_data_length as u128)
+        + token_transfer_bytes_overhead;
+    let dest_call_data_cost =
+        dest_call_data_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
 
-    let execution_cost = execution_gas_price
-        * execution_gas
-        * U256::new(dest_chain.config.gas_multiplier_wei_per_eth as u128);
+    // We add the destination chain CCIP overhead, the token transfer gas, the calldata cost and the msg
+    // gas limit to get the total gas the tx costs to execute on the destination chain.
+    let total_dest_chain_gas = U256::new(dest_chain.config.dest_gas_overhead as u128)
+        + token_transfer_gas
+        + dest_call_data_cost
+        + gas_limit;
 
-    let data_availability_cost: Usd18Decimals = data_availability_cost(
-        data_availability_gas_price,
-        message,
-        extra_args_data_len,
-        network_fee.transfer_bytes_overhead,
-        dest_chain,
-    );
+    let execution_cost = execution_gas_price * total_dest_chain_gas * 1u32.e(18);
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
     // At this step, every fee component has been raised to 36 decimals
-    let fee_token_value =
-        (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
+    let fee_token_value = (premium_fee * premium_multiplier) + execution_cost;
 
     // Fee token value is in 36 decimals
     // Fee token price is in 18 decimals USD for 1e18 smallest token denominations.
@@ -273,35 +236,19 @@ fn fee_for_msg(
     ))
 }
 
-fn data_availability_cost(
-    data_availability_gas_price: Usd18Decimals,
-    message: &SVM2AnyMessage,
-    extra_args_data_len: u32,
-    token_transfer_bytes_overhead: U256,
-    dest_chain: &DestChain,
-) -> Usd18Decimals {
-    // Sums up byte lengths of fixed message fields and dynamic message fields.
-    // Fixed message fields do account for the offset and length slot of the dynamic fields.
-    let data_availability_length_bytes = SVM_2_EVM_MESSAGE_FIXED_BYTES
-        + U256::new(message.data.len() as u128)
-        + U256::new(extra_args_data_len as u128)
-        + (U256::new(message.token_amounts.len() as u128)
-            * SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
-        + token_transfer_bytes_overhead;
-
-    // dest_data_availability_overhead_gas is a separate config value for flexibility to be updated
-    // independently of message cost. Its value is determined by CCIP lane implementation, e.g.
-    // the overhead data posted for OCR.
-    let data_availability_gas = data_availability_length_bytes
-        * U256::new(dest_chain.config.dest_gas_per_data_availability_byte as u128)
-        + U256::new(dest_chain.config.dest_data_availability_overhead_gas as u128);
-
-    // data_availability_gas_price is in 18 decimals, dest_data_availability_multiplier_bps is in 4 decimals
-    // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    data_availability_gas_price
-        * data_availability_gas
-        * U256::new(dest_chain.config.dest_data_availability_multiplier_bps as u128)
-        * 1u32.e(14)
+fn get_token_transfers_cost(
+    additional_token_configs_for_dest_chain: &[Option<PerChainPerTokenConfig>],
+) -> u32 {
+    let dest_bytes_overhead = additional_token_configs_for_dest_chain
+        .iter()
+        .map(|config| match config {
+            Some(config) if config.token_transfer_config.dest_bytes_overhead > 0 => {
+                config.token_transfer_config.dest_bytes_overhead
+            }
+            _ => CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+        })
+        .sum::<u32>();
+    dest_bytes_overhead
 }
 
 #[derive(Clone, Default, Debug)]
@@ -375,7 +322,7 @@ fn token_network_fees(
         Usd18Decimals::from_usd_cents(config_for_dest_chain.token_transfer_config.min_fee_usdcents);
     let max_fee =
         Usd18Decimals::from_usd_cents(config_for_dest_chain.token_transfer_config.max_fee_usdcents);
-    let (premium, token_transfer_gas, token_transfer_bytes_overhead) = (
+    let (premium_fee, token_transfer_gas, token_transfer_bytes_overhead) = (
         bps_fee.clamp(min_fee, max_fee),
         U256::new(
             config_for_dest_chain
@@ -391,22 +338,22 @@ fn token_network_fees(
         ),
     );
     Ok(NetworkFee {
-        premium,
+        premium: premium_fee,
         transfer_gas: token_transfer_gas,
         transfer_bytes_overhead: token_transfer_bytes_overhead,
     })
 }
 
 fn default_token_network_fees(dest_chain: &DestChain) -> NetworkFee {
-    let (premium, global_gas, global_overhead) = (
+    let (premium_fee, token_transfer_gas, token_transfer_bytes_overhead) = (
         Usd18Decimals::from_usd_cents(dest_chain.config.default_token_fee_usdcents.into()),
         U256::new(dest_chain.config.default_token_dest_gas_overhead.into()),
         U256::new(CCIP_LOCK_OR_BURN_V1_RET_BYTES.into()),
     );
     NetworkFee {
-        premium,
-        transfer_gas: global_gas,
-        transfer_bytes_overhead: global_overhead,
+        premium: premium_fee,
+        transfer_gas: token_transfer_gas,
+        transfer_bytes_overhead: token_transfer_bytes_overhead,
     }
 }
 
@@ -538,7 +485,7 @@ mod tests {
             .0,
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 48282184443231661
+                amount: 45957271569960255
             }
         );
     }
@@ -561,7 +508,7 @@ mod tests {
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the network fee component of the sum
-                amount: 298071755652939846
+                amount: 295746842779668440
             }
         );
     }
@@ -621,7 +568,7 @@ mod tests {
             .0,
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 52911699750913573,
+                amount: 50165921849671085,
             }
         );
     }
@@ -661,7 +608,7 @@ mod tests {
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
-                amount: 398634738352169990
+                amount: 395425242628876279
             }
         );
     }
@@ -704,7 +651,7 @@ mod tests {
             .0,
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 36654452956230811
+                amount: 33444957232937101
             }
         );
 
@@ -726,7 +673,7 @@ mod tests {
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Slight increase in price
-                amount: 38004452956230811
+                amount: 34794957232937101
             }
         );
     }
@@ -767,7 +714,7 @@ mod tests {
             .0,
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 35758615812975735
+                amount: 32549120089682025
             }
         );
 
@@ -788,7 +735,7 @@ mod tests {
             .0,
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 35758615812975735
+                amount: 32549120089682025
             }
         );
     }
@@ -826,7 +773,7 @@ mod tests {
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
-                amount: 155328258355951652
+                amount: 149465014082591029
             }
         );
     }
@@ -906,39 +853,6 @@ mod tests {
             .amount;
 
         assert!(fee_with_accounts > fee_without_accounts);
-    }
-
-    #[test]
-    fn extra_args_data_len_is_reflected_in_data_availability_cost() {
-        let mut chain = sample_dest_chain();
-        chain.config.dest_gas_per_data_availability_byte = 16;
-        chain.config.dest_data_availability_multiplier_bps = 10_000;
-
-        let data_availability_gas_price = Usd18Decimals::from_usd_cents(2);
-        let message = sample_message();
-        let base_cost = data_availability_cost(
-            data_availability_gas_price.clone(),
-            &message,
-            0,
-            U256::ZERO,
-            &chain,
-        );
-        let cost_with_extra_args = data_availability_cost(
-            data_availability_gas_price.clone(),
-            &message,
-            64,
-            U256::ZERO,
-            &chain,
-        );
-
-        assert_eq!(
-            cost_with_extra_args.0 - base_cost.0,
-            (data_availability_gas_price
-                * U256::new(64 * chain.config.dest_gas_per_data_availability_byte as u128)
-                * U256::new(chain.config.dest_data_availability_multiplier_bps as u128)
-                * 1u32.e(14))
-            .0
-        );
     }
 
     #[test]
