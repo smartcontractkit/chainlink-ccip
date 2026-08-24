@@ -1782,6 +1782,11 @@ export type FeeQuoter = {
       "code": 8038,
       "name": "InvalidSuiReceiverObjectIds",
       "msg": "Invalid Sui receiver object ids"
+    },
+    {
+      "code": 8039,
+      "name": "TokenTransferConfigMustBeEnabled",
+      "msg": "Token transfer fee config must be enabled"
     }
   ]
 };
@@ -3570,6 +3575,11 @@ export const IDL: FeeQuoter = {
       "code": 8038,
       "name": "InvalidSuiReceiverObjectIds",
       "msg": "Invalid Sui receiver object ids"
+    },
+    {
+      "code": 8039,
+      "name": "TokenTransferConfigMustBeEnabled",
+      "msg": "Token transfer fee config must be enabled"
     }
   ]
 };

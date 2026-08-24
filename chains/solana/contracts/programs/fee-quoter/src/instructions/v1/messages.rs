@@ -865,6 +865,14 @@ pub mod tests {
     }
 
     #[test]
+    fn svm_token_transfer_data_overhead_matches_static_payload_size() {
+        assert_eq!(
+            SVM_TOKEN_TRANSFER_DATA_OVERHEAD,
+            (4 + 32) + 32 + 4 + 4 + 32 + (6 * SVM_ACCOUNT_BYTE_SIZE)
+        );
+    }
+
+    #[test]
     fn svm_expanded_payload_counts_towards_max_data_bytes() {
         let mut svm_dest_chain = sample_dest_chain();
         svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();

@@ -247,6 +247,7 @@ fn fee_for_msg(
     let data_availability_cost: Usd18Decimals = data_availability_cost(
         data_availability_gas_price,
         message,
+        extra_args_data_len,
         network_fee.transfer_bytes_overhead,
         dest_chain,
     );
@@ -275,6 +276,7 @@ fn fee_for_msg(
 fn data_availability_cost(
     data_availability_gas_price: Usd18Decimals,
     message: &SVM2AnyMessage,
+    extra_args_data_len: u32,
     token_transfer_bytes_overhead: U256,
     dest_chain: &DestChain,
 ) -> Usd18Decimals {
@@ -282,6 +284,7 @@ fn data_availability_cost(
     // Fixed message fields do account for the offset and length slot of the dynamic fields.
     let data_availability_length_bytes = SVM_2_EVM_MESSAGE_FIXED_BYTES
         + U256::new(message.data.len() as u128)
+        + U256::new(extra_args_data_len as u128)
         + (U256::new(message.token_amounts.len() as u128)
             * SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
         + token_transfer_bytes_overhead;
@@ -903,6 +906,39 @@ mod tests {
             .amount;
 
         assert!(fee_with_accounts > fee_without_accounts);
+    }
+
+    #[test]
+    fn extra_args_data_len_is_reflected_in_data_availability_cost() {
+        let mut chain = sample_dest_chain();
+        chain.config.dest_gas_per_data_availability_byte = 16;
+        chain.config.dest_data_availability_multiplier_bps = 10_000;
+
+        let data_availability_gas_price = Usd18Decimals::from_usd_cents(2);
+        let message = sample_message();
+        let base_cost = data_availability_cost(
+            data_availability_gas_price.clone(),
+            &message,
+            0,
+            U256::ZERO,
+            &chain,
+        );
+        let cost_with_extra_args = data_availability_cost(
+            data_availability_gas_price.clone(),
+            &message,
+            64,
+            U256::ZERO,
+            &chain,
+        );
+
+        assert_eq!(
+            cost_with_extra_args.0 - base_cost.0,
+            (data_availability_gas_price
+                * U256::new(64 * chain.config.dest_gas_per_data_availability_byte as u128)
+                * U256::new(chain.config.dest_data_availability_multiplier_bps as u128)
+                * 1u32.e(14))
+            .0
+        );
     }
 
     #[test]
