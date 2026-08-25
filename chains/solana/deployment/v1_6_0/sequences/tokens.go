@@ -598,6 +598,69 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 }
 
 var _ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
+var _ tokenapi.RemotePoolRemover = (*SolanaAdapter)(nil)
+
+// RemoveRemotePool removes remote pool entries from a Solana 1.6 token pool. The pool address
+// is a program ID shared across mints, so the token mint comes from input.TokenRef and the pool
+// type from input.TokenPoolRef. The remote pool address is a raw 32-byte public key (no padding),
+// so the input address is decoded from base58 directly. The underlying operation reads the
+// existing remote chain config, errors clearly when the target remote pool is not configured,
+// and emits an MCMS batch operation when the pool authority is not the deployer key.
+func (a *SolanaAdapter) RemoveRemotePool() *cldf_ops.Sequence[tokenapi.RemoveRemotePoolSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"RemoveRemotePool",
+		common_utils.Version_1_6_0,
+		"Removes remote pool entries from a Solana 1.6 token pool",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RemoveRemotePoolSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.SolanaChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
+			}
+
+			var op = tokenpoolops.RemoveRemotePoolBurnMint
+			switch input.TokenPoolRef.Type.String() {
+			case common_utils.BurnMintTokenPool.String():
+				op = tokenpoolops.RemoveRemotePoolBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				op = tokenpoolops.RemoveRemotePoolLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
+			}
+
+			tokenPool, err := solana.PublicKeyFromBase58(input.TokenPoolRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s: %w", input.Selector, input.TokenPoolRef.Address, err)
+			}
+
+			tokenMint, err := solana.PublicKeyFromBase58(input.TokenRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token mint address for chain %d: %s: %w", input.Selector, input.TokenRef.Address, err)
+			}
+
+			var result sequences.OnChainOutput
+			for _, remote := range input.RemotePoolsToRemove {
+				remotePool, err := solana.PublicKeyFromBase58(remote.Address)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remote.Selector, remote.Address, err)
+				}
+
+				out, err := operations.ExecuteOperation(b, op, chain, tokenpoolops.RemoveRemotePoolInput{
+					TokenPool:         tokenPool,
+					TokenMint:         tokenMint,
+					RemoteSelector:    remote.Selector,
+					RemotePoolAddress: remotePool.Bytes(),
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to remove remote pool %s for remote chain %d from pool %s on chain %d: %w", remote.Address, remote.Selector, input.TokenPoolRef.Address, input.Selector, err)
+				}
+
+				result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
+			}
+
+			return result, nil
+		},
+	)
+}
 
 // SetTokenPoolAdmins updates the rate limit admin on a Solana 1.6 token pool. Solana pools
 // have no fee admin concept, so a non-nil FeeAdmin is rejected. The pool address is a program
