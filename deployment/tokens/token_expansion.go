@@ -316,14 +316,21 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 			}
 
 			if input.DeployTokenPoolInput != nil {
-				newTokenRef, err := datastore_utils.MergeRefs(
-					tokenRef,
-					input.DeployTokenPoolInput.TokenRef,
-				)
+				// Ensure the token ref is normalized so that datastore address comparisons
+				// work correctly. If we don't normalize the token ref here, then this will
+				// lead to misconfigurations (e.g. the token won't be found in the DS and a
+				// chain implementation may treat that as an error or skip an important set
+				// up step like granting burn/mint roles to the pool).
+				newTokenRef, err := datastore_utils.MergeRefs(tokenRef, input.DeployTokenPoolInput.TokenRef)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge token refs for chain selector %d: %w", selector, err)
 				}
-				tokenRef = &newTokenRef
+				normalizedTokenRef, err := ccipdeploy.TryNormalizeAddressRef(selector, newTokenRef)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref %s for chain selector %d: %w", datastore_utils.SprintRef(*tokenRef), selector, err)
+				}
+				tokenRef = &normalizedTokenRef
+
 				// deploy token pool
 				tmpDatastore = datastore.NewMemoryDataStore()
 				deployTokenPoolInput := *input.DeployTokenPoolInput
