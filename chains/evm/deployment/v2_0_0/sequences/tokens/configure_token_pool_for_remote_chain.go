@@ -438,9 +438,9 @@ func maybeUpdateRateLimiters(
 	}
 
 	if len(args) > 0 {
-		setInboundRateLimiterReport, err := setRateLimiterConfigWithLaneVisibilityRetry(b, chain, chainSelector, tokenPoolAddress, args)
+		setInboundRateLimiterReport, err := setRateLimiterConfigWithLaneVisibilityRetry(b, chain, tokenPoolAddress, args)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to set rate limiter config: %w", err)
 		}
 		return setInboundRateLimiterReport, nil
 	}
@@ -449,46 +449,55 @@ func maybeUpdateRateLimiters(
 }
 
 // setRateLimiterConfigWithLaneVisibilityRetry executes SetRateLimitConfig with a short block-scale
-// backoff. When the lane is being added in the same sequence (this pool just went through the
-// not-supported add-lane path), the applyChainUpdates tx that created the lane may not yet be
-// visible to the RPC node's estimate view when SetRateLimitConfig is prepared, producing a spurious
-// NonExistentChain revert. Retrying over base-block intervals lets the lane-add propagate before the
-// next prepare attempt. This mirrors the framework's OnlyOwner visibility retry ("newly deployed
-// contract / modified state may not be immediately visible to the RPC node").
+// backoff. When the lane is being added in the same sequence (this pool just went through the not-
+// supported add-lane path) the `applyChainUpdates` tx that created the lane may not yet be visible
+// to the RPC node's estimate view when SetRateLimitConfig is prepared, which produces a misleading
+// NonExistentChain revert. Retrying over base-block intervals lets the change propagate before the
+// next prepare attempt.
 func setRateLimiterConfigWithLaneVisibilityRetry(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
-	chainSelector uint64,
 	tokenPoolAddress common.Address,
 	args []token_pool.RateLimitConfigArgs,
 ) (*evm_contract.WriteOutput, error) {
-	type rlIn = evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]
+	type RateLimitArgs = evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]
 
-	retryDelay := 2 * time.Second
-	retryCfg := cldf_ops.RetryConfig[rlIn, evm.Chain]{
+	retryBuffer := 2 * time.Second
+	retryPolicy := cldf_ops.RetryPolicy{MaxAttempts: 5}
+	retryConfig := cldf_ops.RetryConfig[RateLimitArgs, evm.Chain]{
 		Enabled: true,
-		Policy:  cldf_ops.RetryPolicy{MaxAttempts: 4},
-		InputHook: func(attempt uint, _ error, in rlIn, _ evm.Chain) rlIn {
-			time.Sleep(time.Duration(attempt+1) * retryDelay)
+		Policy:  retryPolicy,
+		InputHook: func(attempt uint, _ error, in RateLimitArgs, _ evm.Chain) RateLimitArgs {
+			b.Logger.Infof(
+				"Retrying SetRateLimitConfig for chain %d, attempt %d/%d, waiting %s before next attempt",
+				chain.Selector, attempt+1, retryPolicy.MaxAttempts, retryBuffer,
+			)
+
+			// We avoid time.Sleep since it doesn't respect context cancellation. Instead, we either wait
+			// for the entire backoff duration or for the context to be cancelled, whichever comes first.
+			select {
+			case <-time.After(time.Duration(attempt+1) * retryBuffer):
+			case <-b.GetContext().Done():
+			}
+
 			return in
 		},
 	}
 
-	setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(
-		b,
-		token_pool.SetRateLimitConfig,
-		chain,
+	setRateLimitReport, err := cldf_ops.ExecuteOperation(
+		b, token_pool.SetRateLimitConfig, chain,
 		evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
-			ChainSelector: chainSelector,
+			ChainSelector: chain.Selector,
 			Address:       tokenPoolAddress,
 			Args:          args,
 		},
-		cldf_ops.WithRetryConfig(retryCfg),
+		cldf_ops.WithRetryConfig(retryConfig),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set rate limiters config: %w", err)
 	}
-	return &setInboundRateLimiterReport.Output, nil
+
+	return &setRateLimitReport.Output, nil
 }
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.
