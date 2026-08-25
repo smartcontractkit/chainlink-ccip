@@ -327,7 +327,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				}
 				normalizedTokenRef, err := ccipdeploy.TryNormalizeAddressRef(selector, newTokenRef)
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref %s for chain selector %d: %w", datastore_utils.SprintRef(*tokenRef), selector, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to normalize token ref %s for chain selector %d: %w", datastore_utils.SprintRef(newTokenRef), selector, err)
 				}
 				tokenRef = &normalizedTokenRef
 
