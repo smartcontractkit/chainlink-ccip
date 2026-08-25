@@ -72,7 +72,8 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch'  && github.event.inputs.contract_version == 'local' }}
         run: |
           pushd ../chainlink-ton/contracts
-          nix develop .#contracts -c yarn && yarn build
+          nix develop .#contracts -c yarn 
+          nix develop .#contracts -c yarn build
           popd
           mkdir -p ../contracts && mv ../chainlink-ton/contracts/build/ ../contracts/build
       - name: Build CL Image For Ref
