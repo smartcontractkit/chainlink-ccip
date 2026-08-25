@@ -15,6 +15,8 @@ related:
   - docs/metrics/reader-metrics.md        # data-source (reader + config poller) metrics & gaps
   - devenv/dashboards/commit-plugin.json  # Grafana rendering of this runbook (Guided Debug section)
   - docs/runbooks/chain-identifiers.md    # translating chain ID / chain selector / chain name
+  - docs/runbooks/evm.md                  # chain-family deep dive when the dest chain is EVM (step2c / Scenario 2)
+  - docs/runbooks/solana.md               # chain-family deep dive when the dest chain is Solana (step2c / Scenario 2)
 status: living
 ---
 
@@ -347,6 +349,12 @@ destination-chain lanes sharing a source chain collide into one series per `(cha
 > (`ccip_reader_config_poll_failure_total`) here are rising, that's reader-layer/RPC-failure — not a
 > genuinely quiet lane — and the absent gauges are the symptom, not evidence of health.
 
+When this step fires for an EVM or Solana destination chain, the reader is almost always being fed
+from a degrading **chain-family** layer rather than misbehaving itself — drop into
+[`evm.md`](evm.md) (RPC pool + log poller) or [`solana.md`](solana.md) (log poller) to name which
+one. A wedged EVM log poller or Solana slot poller produces exactly this `read_empty`/`chain_gap`
+profile while the plugin itself looks fine.
+
 ### step3 — is the round producing outcomes at all?
 
 ```promql
@@ -439,7 +447,11 @@ sum(rate(ccip_commit_report_validation_rejected_total{destChainID=~"$destChain",
 
 **B — transmitted, reverted/stuck on-chain.** *(`automatable: false` — outside commit-plugin
 metrics.)* Check chain B's TXM/tx-sender dashboards for the assigned transmitter (nonce gap,
-underpriced gas, wallet balance, revert reason).
+underpriced gas, wallet balance, revert reason). **When chain B is EVM or Solana, run
+[`evm.md`](evm.md) / [`solana.md`](solana.md) to ground this in the chain-family layer's own
+metrics first** — the TXM/fee/log-poller queries there are automatable and will name the nonce
+gap, bump-suppression, drop/reject/revert class, or log-poller wedge that the bare dashboard
+look would have you hunt manually.
 
 **C — actually succeeded, read is lagging.** *(`automatable: false`.)*
 `ccip_commit_offramp_next_seq_num` is sourced from this plugin's own chain-B reader; if that's

@@ -14,6 +14,8 @@ related:
   - docs/metrics/reader-metrics.md         # data-source (reader + config poller) metrics & gaps
   - devenv/dashboards/commit-plugin.json   # Grafana rendering of this runbook (Health section)
   - docs/runbooks/chain-identifiers.md     # translating chain ID / chain selector / chain name
+  - docs/runbooks/evm.md                   # chain-family deep dive when the dest chain is EVM (data_source/report_transmission)
+  - docs/runbooks/solana.md                # chain-family deep dive when the dest chain is Solana (data_source/report_transmission)
 status: living
 ---
 
@@ -68,16 +70,6 @@ carries the source-side equivalent from `sourceChainAttrs()`:
 | `sourceChainFamily` | source chain family |
 | `sourceChainName` | source chain name (this replaces the old `source_network_name`) |
 | `sourceChainSelector` | source CCIP chain selector, as a string |
-
-**The old labels are gone, not aliased.** `chainID`, `chain_id`, `chainFamily`, `chain_family`,
-`source_network_name`, and `dest_network_name` no longer appear on any Beholder-emitted series in
-this file — every query below now filters on `destChainID=~"$destChain"` and, where relevant,
-`sourceChainName=~"$sourceChains"`. If you have an old saved query or alert on this metric family,
-it now silently returns empty, not an error — re-check anything written before this rename before
-trusting a `UNKNOWN`/blank result from it. (The old names do still exist on a separate,
-`promauto`-only direct-scrape path for a handful of metrics in `commit/metrics/legacy_prom.go` —
-that path is unrelated to what this checklist queries and is flagged deprecated in-code; don't
-mix the two.)
 
 Since `destChainName`/`sourceChainName`/`destChainSelector`/`sourceChainSelector` are now
 first-class labels (not just something you compute via [`chain-identifiers.md`](chain-identifiers.md)),
@@ -498,6 +490,16 @@ rule below).
 `report_transmission_gave_up` is `CRIT`. `report_validation_rejected` is split by reason:
 `stale` alone is `INFO`, anything else present is `WARN`, and — being `always_emitted: false` —
 a fully empty result is `OK`, not `UNKNOWN`.
+
+**On a reverting/pre-send give-up, or any `data_source` finding, this checklist can't see too
+far "down" — it answers at the plugin layer.** If `report_transmission_gave_up` fires and
+`report_validation_rejected` doesn't explain it (nothing rejected locally, nothing landing), or if
+the `data_source` group fires at all, drop down into the **chain-family layer** the plugin reads
+and transmits through: [`evm.md`](evm.md) for an EVM `destChain` (RPC pool, log poller, gas, TXM)
+or [`solana.md`](solana.md) for a Solana `destChain` (log poller, block-history fee estimator,
+Txm). Those are the runbooks the `REPORT:chain-b-txm-oncall` / `chain-a-*/chain-b-*-infra-oncall`
+owners of this checklist's `CRIT`s would run next, and they use the chain-family repos' metrics
+rather than the `ccip_commit_*`/`ccip_reader_*` series here.
 
 ## Aggregation rule
 

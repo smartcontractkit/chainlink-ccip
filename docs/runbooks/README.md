@@ -11,6 +11,14 @@ apart.
 | [`uncommitted-message.md`](uncommitted-message.md) | reactive — you have a specific stuck message (source chain, dest chain, onramp seq num) and need to find where it's stuck |
 | [`commit-plugin-health.md`](commit-plugin-health.md) | proactive — no specific incident; is this commit plugin instance healthy right now |
 | [`chain-identifiers.md`](chain-identifiers.md) | reference, not a runbook — translating between chain ID / chain selector / chain name |
+| [`evm.md`](evm.md) | chain-family deep dive — your commit runbook hit a `data_source` or `report_transmission` failure on an **EVM** destination chain and handed off to a txm/infra owner; this is what to look at in the chainlink-evm layer (RPC pool, log poller, gas, TXM) |
+| [`solana.md`](solana.md) | chain-family deep dive — same, but for a **Solana** destination chain (multinode node pool / RPC health, log poller, block-history fee estimator, Txm) |
+
+The last two are not standalone: they're entered from `commit-plugin-health.md` / `uncommitted-message.md`
+when those hand off with `REPORT:...-txm-oncall` / `REPORT:...-infra-oncall` (chain-family-specific
+versions of the commit plugin's own covered paths), and they use the **chain-family** repos'
+metrics (chainlink-evm / chainlink-solana), not the `ccip_commit_*` / `ccip_reader_*` series the
+other docs query.
 
 Both currently cover the **commit plugin / merkle root processor** only, built from the metric
 coverage work in [`docs/metrics/commit-metrics.md`](../metrics/commit-metrics.md) and rendered

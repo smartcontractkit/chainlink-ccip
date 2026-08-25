@@ -95,6 +95,28 @@ var GetAllOutboundImplementations = contract.NewRead(contract.ReadParams[any, []
 	},
 })
 
+var GetOwner = contract.NewRead(contract.ReadParams[any, common.Address, *versioned_verifier_resolver.VersionedVerifierResolver]{
+	Name:         "versioned-verifier-resolver:get-owner",
+	Version:      Version,
+	Description:  "Gets the current owner of the resolver",
+	ContractType: ContractType,
+	NewContract:  versioned_verifier_resolver.NewVersionedVerifierResolver,
+	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, _ any) (common.Address, error) {
+		return resolver.Owner(opts)
+	},
+})
+
+var GetTypeAndVersion = contract.NewRead(contract.ReadParams[any, string, *versioned_verifier_resolver.VersionedVerifierResolver]{
+	Name:         "versioned-verifier-resolver:get-type-and-version",
+	Version:      Version,
+	Description:  "Gets the type and version string of the resolver",
+	ContractType: ContractType,
+	NewContract:  versioned_verifier_resolver.NewVersionedVerifierResolver,
+	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, _ any) (string, error) {
+		return resolver.TypeAndVersion(opts)
+	},
+})
+
 var AcceptOwnership = contract.NewWrite(contract.WriteParams[AcceptOwnershipArgs, *versioned_verifier_resolver.VersionedVerifierResolver]{
 	Name:         "versioned-verifier-resolver:accept-ownership",
 	Version:      Version,
