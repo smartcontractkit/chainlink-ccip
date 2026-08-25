@@ -129,7 +129,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						RemoteChainSelector: input.RemoteChainSelector,
 						FastFinality:        false,
 					},
-				})
+				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs], evm.Chain]())
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get default rate limiter state for remote chain %d: %w", input.RemoteChainSelector, err)
 				}
@@ -228,7 +228,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 				Args:          input.RemoteChainSelector,
-			})
+			}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain]())
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
 			}
@@ -259,7 +259,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args:          input.RemoteChainSelector,
-				})
+				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain]())
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pools: %w", err)
 				}
@@ -409,7 +409,7 @@ func maybeUpdateRateLimiters(
 				RemoteChainSelector: remoteChainSelector,
 				FastFinality:        desiredRL.FastFinality,
 			},
-		})
+		}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs], evm.Chain]())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get rate limiter state: %w", err)
 		}
@@ -467,17 +467,19 @@ func setRateLimiterConfigWithLaneVisibilityRetry(
 	retryConfig := cldf_ops.RetryConfig[RateLimitArgs, evm.Chain]{
 		Enabled: true,
 		Policy:  retryPolicy,
-		InputHook: func(attempt uint, _ error, in RateLimitArgs, _ evm.Chain) RateLimitArgs {
+		InputHook: func(attempt uint, err error, in RateLimitArgs, _ evm.Chain) RateLimitArgs {
+			wait := time.Duration(attempt+1) * retryBuffer
+
 			b.Logger.Infof(
-				"Retrying SetRateLimitConfig for chain %d, attempt %d/%d, waiting %s before next attempt",
-				chain.Selector, attempt+1, retryPolicy.MaxAttempts, retryBuffer,
+				"Retrying SetRateLimitConfig for chain %d, attempt %d/%d, waiting %s, err: %v",
+				chain.Selector, attempt+1, retryPolicy.MaxAttempts, wait, err,
 			)
 
 			// We avoid time.Sleep since it doesn't respect context cancellation. Instead, we either wait
 			// for the entire backoff duration or for the context to be cancelled, whichever comes first.
 			select {
-			case <-time.After(time.Duration(attempt+1) * retryBuffer):
 			case <-b.GetContext().Done():
+			case <-time.After(wait):
 			}
 
 			return in
