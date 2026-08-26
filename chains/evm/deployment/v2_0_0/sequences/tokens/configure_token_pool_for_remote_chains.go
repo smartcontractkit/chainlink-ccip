@@ -115,11 +115,10 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			}
 		}
 
-		ops := make([]mcms_types.BatchOperation, 0)
 		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
-		})
+		}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain]())
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains from pool: %w", err)
 		}
@@ -127,6 +126,8 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		for _, s := range supportedChainsReport.Output {
 			supportedSet[s] = struct{}{}
 		}
+
+		ops := make([]mcms_types.BatchOperation, 0)
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			_, alreadySupported := supportedSet[remoteChainSelector]
 			report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
@@ -144,6 +145,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			}
 			ops = append(ops, report.Output.BatchOps...)
 		}
+
 		return sequences.OnChainOutput{BatchOps: ops}, nil
 	},
 )
