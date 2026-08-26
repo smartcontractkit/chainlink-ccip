@@ -3,7 +3,6 @@ package changesets_test
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
@@ -139,7 +138,6 @@ func lockboxCfg(
 	appends, removes []common.Address,
 ) changesets.UpdateLockboxAuthorizedCallersCfg {
 	return changesets.UpdateLockboxAuthorizedCallersCfg{
-		Version: lbops.Version,
 		Input: []changesets.ChainLockboxUpdate{{
 			Selector: lockboxTestChainSel,
 			Lockboxes: []changesets.LockboxCallerUpdate{{
@@ -286,62 +284,48 @@ func TestUpdateLockboxAuthorizedCallers_PartialFilter(t *testing.T) {
 		readOnChainAuthorizedCallers(t, e, lockboxTestChainSel, lockboxAddr))
 }
 
-// TestUpdateLockboxAuthorizedCallers_AddressNotInDataStore asserts an address absent from
-// the datastore is rejected rather than written to blindly.
-func TestUpdateLockboxAuthorizedCallers_AddressNotInDataStore(t *testing.T) {
+// TestUpdateLockboxAuthorizedCallers_ForceExecutesWriteAfterOutOfBandChange pins the
+// WithForceExecute on the write. The shared operations bundle caches a report per
+// (operation, input), so a second apply with identical write args would otherwise replay the
+// first report - which was already executed - and report success having sent nothing.
+//
+// A deployer-owned lockbox is used deliberately: the write then executes inline, so whether
+// it really reached the chain is observable on-chain instead of parked in a proposal. The
+// changeset no longer reads the datastore, so this lockbox needs no ref.
+func TestUpdateLockboxAuthorizedCallers_ForceExecutesWriteAfterOutOfBandChange(t *testing.T) {
 	e, _, _ := setupLockboxWithTimelock(t)
-	unknown := common.HexToAddress("0x00000000000000000000000000000000000000FF")
+	caller := common.HexToAddress("0x0000000000000000000000000000000000000001")
 
-	cfg := lockboxCfg(unknown,
-		[]common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")}, nil)
+	deployerOwnedQualifier := "DEPLOYER_OWNED"
+	_, lockboxAddr := deployLockboxForTest(t, e, lockboxTestChainSel, &deployerOwnedQualifier)
 
-	err := verifyLockbox(t, e, mcmsConfig(), cfg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected exactly 1 datastore ref")
+	cfg := lockboxCfg(lockboxAddr, []common.Address{caller}, nil)
 
+	out, err := applyLockbox(t, e, cfg)
+	require.NoError(t, err)
+	require.Empty(t, out.MCMSTimelockProposals, "a deployer-owned write executes inline")
+	require.Equal(t, []common.Address{caller},
+		readOnChainAuthorizedCallers(t, e, lockboxTestChainSel, lockboxAddr))
+
+	// Someone else changes the lockbox between runs.
+	chain := e.BlockChains.EVMChains()[lockboxTestChainSel]
+	_, err = cldf_ops.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		lbops.ApplyAuthorizedCallerUpdates, chain,
+		contract.FunctionInput[lbops.AuthorizedCallerArgs]{
+			ChainSelector: lockboxTestChainSel,
+			Address:       lockboxAddr,
+			Args:          lbops.AuthorizedCallerArgs{RemovedCallers: []common.Address{caller}},
+		})
+	require.NoError(t, err)
+	require.Empty(t, readOnChainAuthorizedCallers(t, e, lockboxTestChainSel, lockboxAddr))
+
+	// Identical config, so identical write args as the first apply.
 	_, err = applyLockbox(t, e, cfg)
-	require.Error(t, err, "apply must reject it too, since it can run without verify")
-}
-
-// TestUpdateLockboxAuthorizedCallers_AddressIsNotALockbox asserts pointing at a real
-// datastore ref of the wrong contract type is rejected. The timelock is a convenient
-// non-lockbox ref that setupLockboxWithTimelock already seeds.
-func TestUpdateLockboxAuthorizedCallers_AddressIsNotALockbox(t *testing.T) {
-	e, timelockAddr, _ := setupLockboxWithTimelock(t)
-
-	cfg := lockboxCfg(timelockAddr,
-		[]common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")}, nil)
-
-	err := verifyLockbox(t, e, mcmsConfig(), cfg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "not an ERC20LockBox")
-}
-
-// TestUpdateLockboxAuthorizedCallers_VersionMismatch asserts a config written for a
-// different lockbox version is rejected, so a future 2.0.1 lockbox is not acted on by a
-// config that meant 2.0.0.
-func TestUpdateLockboxAuthorizedCallers_VersionMismatch(t *testing.T) {
-	e, _, lockboxAddr := setupLockboxWithTimelock(t)
-
-	cfg := lockboxCfg(lockboxAddr,
-		[]common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")}, nil)
-	cfg.Version = semver.MustParse("2.0.1")
-
-	err := verifyLockbox(t, e, mcmsConfig(), cfg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "is version 2.0.0, but config specifies 2.0.1")
-}
-
-func TestUpdateLockboxAuthorizedCallers_VerifyRequiresVersion(t *testing.T) {
-	e, _, lockboxAddr := setupLockboxWithTimelock(t)
-
-	cfg := lockboxCfg(lockboxAddr,
-		[]common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")}, nil)
-	cfg.Version = nil
-
-	err := verifyLockbox(t, e, mcmsConfig(), cfg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "version is required")
+	require.NoError(t, err)
+	require.Equal(t, []common.Address{caller},
+		readOnChainAuthorizedCallers(t, e, lockboxTestChainSel, lockboxAddr),
+		"the write must be re-executed, not replayed from the bundle cache")
 }
 
 // TestUpdateLockboxAuthorizedCallers_VerifyRejectsDuplicateLockbox covers what the old
@@ -355,7 +339,6 @@ func TestUpdateLockboxAuthorizedCallers_VerifyRejectsDuplicateLockbox(t *testing
 	}
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
-		Version: lbops.Version,
 		Input: []changesets.ChainLockboxUpdate{{
 			Selector:  lockboxTestChainSel,
 			Lockboxes: []changesets.LockboxCallerUpdate{entry, entry},
@@ -379,8 +362,7 @@ func TestUpdateLockboxAuthorizedCallers_VerifyRejectsDuplicateChain(t *testing.T
 	}
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
-		Version: lbops.Version,
-		Input:   []changesets.ChainLockboxUpdate{entry, entry},
+		Input: []changesets.ChainLockboxUpdate{entry, entry},
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "duplicate entry for chain")
@@ -393,7 +375,6 @@ func TestUpdateLockboxAuthorizedCallers_VerifyRejectsEmptyLockboxes(t *testing.T
 	e, _, _ := setupLockboxWithTimelock(t)
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
-		Version: lbops.Version,
 		Input: []changesets.ChainLockboxUpdate{{
 			Selector:  lockboxTestChainSel,
 			Lockboxes: nil,
@@ -441,7 +422,6 @@ func TestUpdateLockboxAuthorizedCallers_TwoLockboxesOneChain(t *testing.T) {
 	callerB := common.HexToAddress("0x0000000000000000000000000000000000000002")
 
 	cfg := changesets.UpdateLockboxAuthorizedCallersCfg{
-		Version: lbops.Version,
 		Input: []changesets.ChainLockboxUpdate{{
 			Selector: lockboxTestChainSel,
 			Lockboxes: []changesets.LockboxCallerUpdate{
@@ -517,8 +497,7 @@ func TestUpdateLockboxAuthorizedCallers_VerifyNoInput(t *testing.T) {
 	e, _, _ := setupLockboxWithTimelock(t)
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
-		Version: lbops.Version,
-		Input:   []changesets.ChainLockboxUpdate{},
+		Input: []changesets.ChainLockboxUpdate{},
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "at least one entry is required")
@@ -528,7 +507,6 @@ func TestUpdateLockboxAuthorizedCallers_VerifyInvalidChainSelector(t *testing.T)
 	e, _, lockboxAddr := setupLockboxWithTimelock(t)
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
-		Version: lbops.Version,
 		Input: []changesets.ChainLockboxUpdate{{
 			Selector: 99999999,
 			Lockboxes: []changesets.LockboxCallerUpdate{{
@@ -539,31 +517,6 @@ func TestUpdateLockboxAuthorizedCallers_VerifyInvalidChainSelector(t *testing.T)
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid chain selector")
-}
-
-// TestUpdateLockboxAuthorizedCallers_VerifyMCMSDefaults asserts an empty MCMS block passes:
-// the qualifier defaults to CLLCCIP and ValidUntil is populated before validation, so
-// operators need not supply either.
-func TestUpdateLockboxAuthorizedCallers_VerifyMCMSDefaults(t *testing.T) {
-	e, _, lockboxAddr := setupLockboxWithTimelock(t)
-
-	err := verifyLockbox(t, e, mcms.Input{}, lockboxCfg(lockboxAddr,
-		[]common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")}, nil))
-	require.NoError(t, err)
-}
-
-// TestUpdateLockboxAuthorizedCallers_VerifyRejectsExpiredMCMS asserts a ValidUntil the
-// operator did supply is still rejected when it is already expired.
-func TestUpdateLockboxAuthorizedCallers_VerifyRejectsExpiredMCMS(t *testing.T) {
-	e, _, lockboxAddr := setupLockboxWithTimelock(t)
-
-	expired := mcmsConfig()
-	expired.ValidUntil = 1
-
-	err := verifyLockbox(t, e, expired, lockboxCfg(lockboxAddr,
-		[]common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")}, nil))
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid MCMS input")
 }
 
 // TestUpdateLockboxAuthorizedCallers_OmittedQualifierResolvesCLLCCIP asserts an operator

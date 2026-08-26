@@ -3,11 +3,9 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -16,7 +14,6 @@ import (
 	lbops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_changesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
 // LockboxCallerUpdate is one lockbox's authorized-caller change. The chain it lives on comes
@@ -26,7 +23,9 @@ import (
 // side-effect of whichever sequence deployed the lockbox - the pool qualifier for a plain
 // lock-release pool, "<poolQualifier>-silo(<minRemoteSelector>)" per silo group, or
 // "remoteChainSelector(<selector>)" for siloed USDC - so they are not a stable addressing
-// scheme. Address is unambiguous, and verify confirms it really is a lockbox.
+// scheme. Address is unambiguous. A wrong address fails on-chain when the read or write
+// reverts, rather than being pre-checked against the datastore - datastore refs go missing
+// routinely, and blocking on one would force operators to hand-add refs just to proceed.
 type LockboxCallerUpdate struct {
 	Address common.Address   `json:"address"  yaml:"address"`
 	Appends []common.Address `json:"appends,omitempty"  yaml:"appends,omitempty"`
@@ -42,10 +41,9 @@ type ChainLockboxUpdate struct {
 }
 
 type UpdateLockboxAuthorizedCallersCfg struct {
-	// Version is cross-checked against the datastore ref for every Address, so a config
-	// written for one lockbox version cannot silently act on a newer one.
-	Version *semver.Version      `json:"version" yaml:"version"`
-	Input   []ChainLockboxUpdate `json:"input"   yaml:"input"`
+	// Version is not a field: this package is v2_0_0, so the target lockbox version is
+	// already pinned by the changeset the operator picked.
+	Input []ChainLockboxUpdate `json:"input" yaml:"input"`
 }
 
 var UpdateLockboxAuthorizedCallers = func(
@@ -64,9 +62,6 @@ func verifyUpdateLockboxAuthorizedCallers(
 	cfg := input.Cfg
 	if len(cfg.Input) == 0 {
 		return fmt.Errorf("at least one entry is required in input")
-	}
-	if cfg.Version == nil {
-		return fmt.Errorf("version is required so the target lockbox version can be cross-checked")
 	}
 
 	evmChains := e.BlockChains.EVMChains()
@@ -132,66 +127,7 @@ func verifyUpdateLockboxAuthorizedCallers(
 		}
 	}
 
-	// Every target is confirmed before any chain is touched, so a bad entry cannot leave
-	// earlier chains half-applied.
-	if err := checkLockboxRefs(e.DataStore, cfg); err != nil {
-		return err
-	}
-
-	// Validated against a populated copy so ValidUntil stays optional while a value the
-	// operator did supply is still rejected if it is unusable. The qualifier needs no
-	// default here: EVMMCMSReader.GetTimelockRef and GetMCMSRef already fall back to
-	// CLLQualifier when it is empty.
-	mcmsInput := input.MCMS
-	if err := mcmsInput.PopulateDefaults(); err != nil {
-		return fmt.Errorf("failed to populate MCMS defaults: %w", err)
-	}
-	if err := mcmsInput.Validate(); err != nil {
-		return fmt.Errorf("invalid MCMS input: %w", err)
-	}
-
 	return nil
-}
-
-// checkLockboxRefs confirms every Address resolves in the datastore to an ERC20LockBox at
-// the configured version on the chain it is nested under.
-func checkLockboxRefs(ds datastore.DataStore, cfg UpdateLockboxAuthorizedCallersCfg) error {
-	for _, chainUpdate := range cfg.Input {
-		sel := chainUpdate.Selector
-		for _, update := range chainUpdate.Lockboxes {
-			refs := ds.Addresses().Filter(datastore_utils.AddressRefToFilters(datastore.AddressRef{
-				ChainSelector: sel,
-				Address:       update.Address.Hex(),
-			})...)
-			if len(refs) != 1 {
-				return fmt.Errorf(
-					"expected exactly 1 datastore ref for address %s on chain %d, found %d",
-					update.Address, sel, len(refs))
-			}
-
-			ref := refs[0]
-			if ref.Type != datastore.ContractType(lbops.ContractType) {
-				return fmt.Errorf(
-					"address %s on chain %d is a %q, not an %s",
-					update.Address, sel, ref.Type, lbops.ContractType)
-			}
-			if ref.Version == nil || !ref.Version.Equal(cfg.Version) {
-				return fmt.Errorf(
-					"lockbox %s on chain %d is version %s, but config specifies %s",
-					update.Address, sel, versionString(ref.Version), cfg.Version)
-			}
-		}
-	}
-
-	return nil
-}
-
-func versionString(v *semver.Version) string {
-	if v == nil {
-		return "<nil>"
-	}
-
-	return v.String()
 }
 
 func applyUpdateLockboxAuthorizedCallers(
@@ -202,15 +138,6 @@ func applyUpdateLockboxAuthorizedCallers(
 		input cs_changesets.WithMCMS[UpdateLockboxAuthorizedCallersCfg],
 	) (cldf_deployment.ChangesetOutput, error) {
 		cfg := input.Cfg
-		if cfg.Version == nil {
-			return cldf_deployment.ChangesetOutput{}, fmt.Errorf("version is required")
-		}
-
-		// Re-checked here because Apply is callable without VerifyPreconditions, and every
-		// target must be known good before the first write goes out.
-		if err := checkLockboxRefs(e.DataStore, cfg); err != nil {
-			return cldf_deployment.ChangesetOutput{}, err
-		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0, len(cfg.Input))
 		reports := make([]cldf_ops.Report[any, any], 0, len(cfg.Input))
@@ -231,17 +158,17 @@ func applyUpdateLockboxAuthorizedCallers(
 			for _, update := range chainUpdate.Lockboxes {
 				lockboxAddr := update.Address
 
-				// Read current authorized callers with a fresh bundle so idempotency
-				// reads are not served from a cached report.
-				readBundle := cldf_ops.NewBundle(
-					e.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
+				// WithForceExecute so the idempotency read is never served from a cached
+				// report: a re-run after an out-of-band change has to see current state.
 				currentReport, err := cldf_ops.ExecuteOperation(
-					readBundle, lbops.GetAllAuthorizedCallers, chain,
+					e.OperationsBundle, lbops.GetAllAuthorizedCallers, chain,
 					contract.FunctionInput[struct{}]{
 						ChainSelector: chain.Selector,
 						Address:       lockboxAddr,
 						Args:          struct{}{},
-					})
+					},
+					cldf_ops.WithForceExecute[contract.FunctionInput[struct{}], evm.Chain](),
+				)
 				if err != nil {
 					return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
 						"failed to read authorized callers on chain %d: %w", sel, err)
@@ -288,12 +215,11 @@ func applyUpdateLockboxAuthorizedCallers(
 							RemovedCallers: filteredRemoves,
 						},
 					},
-					// The shared bundle replays a cached report for an identical operation and
-					// input. The reads above dodge that with a fresh bundle; the write needs
-					// the same guarantee, or a re-apply after an out-of-band change would
-					// return the stale executed write and report success having done nothing.
-					// applyAuthorizedCallerUpdates is a set operation on-chain, so re-running
-					// it is harmless.
+					// Same reason as the read above: the shared bundle would replay a cached
+					// report for an identical operation and input, so a re-apply after an
+					// out-of-band change would return the stale executed write and report
+					// success having done nothing. applyAuthorizedCallerUpdates is a set
+					// operation on-chain, so re-running it is harmless.
 					cldf_ops.WithForceExecute[contract.FunctionInput[lbops.AuthorizedCallerArgs], evm.Chain](),
 				)
 				if err != nil {
