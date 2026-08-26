@@ -19,7 +19,8 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
-// LockboxCallerUpdate is one chain's authorized-caller change for one lockbox.
+// LockboxCallerUpdate is one lockbox's authorized-caller change. The chain it lives on comes
+// from the enclosing ChainLockboxUpdate.
 //
 // The lockbox is named by Address rather than by datastore qualifier. Qualifiers are a
 // side-effect of whichever sequence deployed the lockbox - the pool qualifier for a plain
@@ -27,17 +28,24 @@ import (
 // "remoteChainSelector(<selector>)" for siloed USDC - so they are not a stable addressing
 // scheme. Address is unambiguous, and verify confirms it really is a lockbox.
 type LockboxCallerUpdate struct {
-	Selector uint64           `json:"selector" yaml:"selector"`
-	Address  common.Address   `json:"address"  yaml:"address"`
-	Appends  []common.Address `json:"appends,omitempty"  yaml:"appends,omitempty"`
-	Removes  []common.Address `json:"removes,omitempty"  yaml:"removes,omitempty"`
+	Address common.Address   `json:"address"  yaml:"address"`
+	Appends []common.Address `json:"appends,omitempty"  yaml:"appends,omitempty"`
+	Removes []common.Address `json:"removes,omitempty"  yaml:"removes,omitempty"`
+}
+
+// ChainLockboxUpdate groups every lockbox update for one chain under that chain's selector.
+// A chain legitimately holds several lockboxes - one per token, per silo group, or per
+// remote chain - and nesting them keeps the selector written once per chain.
+type ChainLockboxUpdate struct {
+	Selector  uint64                `json:"selector"  yaml:"selector"`
+	Lockboxes []LockboxCallerUpdate `json:"lockboxes" yaml:"lockboxes"`
 }
 
 type UpdateLockboxAuthorizedCallersCfg struct {
 	// Version is cross-checked against the datastore ref for every Address, so a config
 	// written for one lockbox version cannot silently act on a newer one.
-	Version *semver.Version       `json:"version" yaml:"version"`
-	Input   []LockboxCallerUpdate `json:"input"   yaml:"input"`
+	Version *semver.Version      `json:"version" yaml:"version"`
+	Input   []ChainLockboxUpdate `json:"input"   yaml:"input"`
 }
 
 var UpdateLockboxAuthorizedCallers = func(
@@ -62,55 +70,64 @@ func verifyUpdateLockboxAuthorizedCallers(
 	}
 
 	evmChains := e.BlockChains.EVMChains()
-	// Keyed on chain AND address, not chain alone: a chain legitimately holds several
-	// lockboxes (one per token, per silo group, or per remote chain), so several entries
-	// may share a selector. Only the same lockbox twice is a mistake.
-	type lockboxKey struct {
-		selector uint64
-		address  common.Address
-	}
-	seen := common_utils.NewSet[lockboxKey]()
+	seenChains := common_utils.NewSet[uint64]()
 
-	for _, update := range cfg.Input {
-		sel := update.Selector
+	for _, chainUpdate := range cfg.Input {
+		sel := chainUpdate.Selector
 		if _, err := chain_selectors.GetSelectorFamily(sel); err != nil {
 			return fmt.Errorf("invalid chain selector %d: %w", sel, err)
 		}
 		if _, ok := evmChains[sel]; !ok {
 			return fmt.Errorf("chain selector %d not found in environment EVM chains", sel)
 		}
-		if update.Address == (common.Address{}) {
-			return fmt.Errorf("zero lockbox address for chain %d", sel)
-		}
-		if seen.Add(lockboxKey{selector: sel, address: update.Address}) {
+		// Each chain appears once and carries all of its lockboxes, so the nesting - and
+		// therefore the single batch operation built per chain in apply - is unambiguous.
+		if seenChains.Add(sel) {
 			return fmt.Errorf(
-				"duplicate entry for lockbox %s on chain %d: merge them into a single entry",
-				update.Address, sel)
+				"duplicate entry for chain %d: merge its lockboxes into a single entry", sel)
+		}
+		if len(chainUpdate.Lockboxes) == 0 {
+			return fmt.Errorf("no lockboxes listed for chain %d", sel)
 		}
 
-		appends := common_utils.NewSet[common.Address]()
-		for _, addr := range update.Appends {
-			if addr == (common.Address{}) {
-				return fmt.Errorf("zero address in appends for chain %d", sel)
-			}
-			if appends.Add(addr) {
-				return fmt.Errorf("duplicate address %s in appends for chain %d", addr, sel)
-			}
-		}
+		// Scoped to the chain: the same lockbox address twice on one chain is a mistake,
+		// but the same address on two chains is a coincidence, not an error.
+		seenLockboxes := common_utils.NewSet[common.Address]()
 
-		removes := common_utils.NewSet[common.Address]()
-		for _, addr := range update.Removes {
-			if addr == (common.Address{}) {
-				return fmt.Errorf("zero address in removes for chain %d", sel)
+		for _, update := range chainUpdate.Lockboxes {
+			if update.Address == (common.Address{}) {
+				return fmt.Errorf("zero lockbox address for chain %d", sel)
 			}
-			if removes.Add(addr) {
-				return fmt.Errorf("duplicate address %s in removes for chain %d", addr, sel)
-			}
-			// An address in both lists never converges: the idempotency filter drops
-			// whichever side matches current on-chain state, so each apply flips it.
-			if appends.Has(addr) {
+			if seenLockboxes.Add(update.Address) {
 				return fmt.Errorf(
-					"address %s is in both appends and removes for chain %d", addr, sel)
+					"duplicate entry for lockbox %s on chain %d: merge them into a single entry",
+					update.Address, sel)
+			}
+
+			appends := common_utils.NewSet[common.Address]()
+			for _, addr := range update.Appends {
+				if addr == (common.Address{}) {
+					return fmt.Errorf("zero address in appends for chain %d", sel)
+				}
+				if appends.Add(addr) {
+					return fmt.Errorf("duplicate address %s in appends for chain %d", addr, sel)
+				}
+			}
+
+			removes := common_utils.NewSet[common.Address]()
+			for _, addr := range update.Removes {
+				if addr == (common.Address{}) {
+					return fmt.Errorf("zero address in removes for chain %d", sel)
+				}
+				if removes.Add(addr) {
+					return fmt.Errorf("duplicate address %s in removes for chain %d", addr, sel)
+				}
+				// An address in both lists never converges: the idempotency filter drops
+				// whichever side matches current on-chain state, so each apply flips it.
+				if appends.Has(addr) {
+					return fmt.Errorf(
+						"address %s is in both appends and removes for chain %d", addr, sel)
+				}
 			}
 		}
 	}
@@ -137,29 +154,32 @@ func verifyUpdateLockboxAuthorizedCallers(
 }
 
 // checkLockboxRefs confirms every Address resolves in the datastore to an ERC20LockBox at
-// the configured version on the configured chain.
+// the configured version on the chain it is nested under.
 func checkLockboxRefs(ds datastore.DataStore, cfg UpdateLockboxAuthorizedCallersCfg) error {
-	for _, update := range cfg.Input {
-		refs := ds.Addresses().Filter(datastore_utils.AddressRefToFilters(datastore.AddressRef{
-			ChainSelector: update.Selector,
-			Address:       update.Address.Hex(),
-		})...)
-		if len(refs) != 1 {
-			return fmt.Errorf(
-				"expected exactly 1 datastore ref for address %s on chain %d, found %d",
-				update.Address, update.Selector, len(refs))
-		}
+	for _, chainUpdate := range cfg.Input {
+		sel := chainUpdate.Selector
+		for _, update := range chainUpdate.Lockboxes {
+			refs := ds.Addresses().Filter(datastore_utils.AddressRefToFilters(datastore.AddressRef{
+				ChainSelector: sel,
+				Address:       update.Address.Hex(),
+			})...)
+			if len(refs) != 1 {
+				return fmt.Errorf(
+					"expected exactly 1 datastore ref for address %s on chain %d, found %d",
+					update.Address, sel, len(refs))
+			}
 
-		ref := refs[0]
-		if ref.Type != datastore.ContractType(lbops.ContractType) {
-			return fmt.Errorf(
-				"address %s on chain %d is a %q, not an %s",
-				update.Address, update.Selector, ref.Type, lbops.ContractType)
-		}
-		if ref.Version == nil || !ref.Version.Equal(cfg.Version) {
-			return fmt.Errorf(
-				"lockbox %s on chain %d is version %s, but config specifies %s",
-				update.Address, update.Selector, versionString(ref.Version), cfg.Version)
+			ref := refs[0]
+			if ref.Type != datastore.ContractType(lbops.ContractType) {
+				return fmt.Errorf(
+					"address %s on chain %d is a %q, not an %s",
+					update.Address, sel, ref.Type, lbops.ContractType)
+			}
+			if ref.Version == nil || !ref.Version.Equal(cfg.Version) {
+				return fmt.Errorf(
+					"lockbox %s on chain %d is version %s, but config specifies %s",
+					update.Address, sel, versionString(ref.Version), cfg.Version)
+			}
 		}
 	}
 
@@ -198,89 +218,98 @@ func applyUpdateLockboxAuthorizedCallers(
 
 		// Input order is the operator's order, so batch operation order - and therefore the
 		// MCMS proposal's merkle root - is reproducible for a given config.
-		for _, update := range cfg.Input {
-			sel := update.Selector
+		for _, chainUpdate := range cfg.Input {
+			sel := chainUpdate.Selector
 			chain, ok := evmChains[sel]
 			if !ok {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
 					"chain selector %d not found in environment EVM chains", sel)
 			}
-			lockboxAddr := update.Address
 
-			// Read current authorized callers with a fresh bundle so idempotency
-			// reads are not served from a cached report.
-			readBundle := cldf_ops.NewBundle(
-				e.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
-			currentReport, err := cldf_ops.ExecuteOperation(
-				readBundle, lbops.GetAllAuthorizedCallers, chain,
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chain.Selector,
-					Address:       lockboxAddr,
-					Args:          struct{}{},
-				})
-			if err != nil {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
-					"failed to read authorized callers on chain %d: %w", sel, err)
-			}
+			writes := make([]contract.WriteOutput, 0, len(chainUpdate.Lockboxes))
 
-			currentSet := common_utils.NewSet[common.Address]()
-			for _, c := range currentReport.Output {
-				currentSet.Add(c)
-			}
+			for _, update := range chainUpdate.Lockboxes {
+				lockboxAddr := update.Address
 
-			filteredAppends := make([]common.Address, 0, len(update.Appends))
-			for _, a := range update.Appends {
-				if !currentSet.Has(a) {
-					filteredAppends = append(filteredAppends, a)
+				// Read current authorized callers with a fresh bundle so idempotency
+				// reads are not served from a cached report.
+				readBundle := cldf_ops.NewBundle(
+					e.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
+				currentReport, err := cldf_ops.ExecuteOperation(
+					readBundle, lbops.GetAllAuthorizedCallers, chain,
+					contract.FunctionInput[struct{}]{
+						ChainSelector: chain.Selector,
+						Address:       lockboxAddr,
+						Args:          struct{}{},
+					})
+				if err != nil {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
+						"failed to read authorized callers on chain %d: %w", sel, err)
 				}
-			}
 
-			filteredRemoves := make([]common.Address, 0, len(update.Removes))
-			for _, r := range update.Removes {
-				if currentSet.Has(r) {
-					filteredRemoves = append(filteredRemoves, r)
+				currentSet := common_utils.NewSet[common.Address]()
+				for _, c := range currentReport.Output {
+					currentSet.Add(c)
 				}
-			}
 
-			if len(filteredAppends) == 0 && len(filteredRemoves) == 0 {
+				filteredAppends := make([]common.Address, 0, len(update.Appends))
+				for _, a := range update.Appends {
+					if !currentSet.Has(a) {
+						filteredAppends = append(filteredAppends, a)
+					}
+				}
+
+				filteredRemoves := make([]common.Address, 0, len(update.Removes))
+				for _, r := range update.Removes {
+					if currentSet.Has(r) {
+						filteredRemoves = append(filteredRemoves, r)
+					}
+				}
+
+				if len(filteredAppends) == 0 && len(filteredRemoves) == 0 {
+					e.Logger.Infof(
+						"No-op: authorized caller updates already applied on lockbox %s on chain %d, skipping",
+						lockboxAddr, sel)
+
+					continue
+				}
+
 				e.Logger.Infof(
-					"No-op: authorized caller updates already applied on lockbox %s on chain %d, skipping",
-					lockboxAddr, sel)
+					"Applying authorized caller updates on lockbox %s on chain %d: +%d -%d callers",
+					lockboxAddr, sel, len(filteredAppends), len(filteredRemoves))
 
-				continue
-			}
-
-			e.Logger.Infof(
-				"Applying authorized caller updates on lockbox %s on chain %d: +%d -%d callers",
-				lockboxAddr, sel, len(filteredAppends), len(filteredRemoves))
-
-			report, err := cldf_ops.ExecuteOperation(
-				e.OperationsBundle, lbops.ApplyAuthorizedCallerUpdates, chain,
-				contract.FunctionInput[lbops.AuthorizedCallerArgs]{
-					ChainSelector: chain.Selector,
-					Address:       lockboxAddr,
-					Args: lbops.AuthorizedCallerArgs{
-						AddedCallers:   filteredAppends,
-						RemovedCallers: filteredRemoves,
+				report, err := cldf_ops.ExecuteOperation(
+					e.OperationsBundle, lbops.ApplyAuthorizedCallerUpdates, chain,
+					contract.FunctionInput[lbops.AuthorizedCallerArgs]{
+						ChainSelector: chain.Selector,
+						Address:       lockboxAddr,
+						Args: lbops.AuthorizedCallerArgs{
+							AddedCallers:   filteredAppends,
+							RemovedCallers: filteredRemoves,
+						},
 					},
-				},
-				// The shared bundle replays a cached report for an identical operation and
-				// input. The reads above dodge that with a fresh bundle; the write needs
-				// the same guarantee, or a re-apply after an out-of-band change would
-				// return the stale executed write and report success having done nothing.
-				// applyAuthorizedCallerUpdates is a set operation on-chain, so re-running
-				// it is harmless.
-				cldf_ops.WithForceExecute[contract.FunctionInput[lbops.AuthorizedCallerArgs], evm.Chain](),
-			)
-			if err != nil {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
-					"failed to apply authorized caller updates on chain %d: %w", sel, err)
+					// The shared bundle replays a cached report for an identical operation and
+					// input. The reads above dodge that with a fresh bundle; the write needs
+					// the same guarantee, or a re-apply after an out-of-band change would
+					// return the stale executed write and report success having done nothing.
+					// applyAuthorizedCallerUpdates is a set operation on-chain, so re-running
+					// it is harmless.
+					cldf_ops.WithForceExecute[contract.FunctionInput[lbops.AuthorizedCallerArgs], evm.Chain](),
+				)
+				if err != nil {
+					return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
+						"failed to apply authorized caller updates on chain %d: %w", sel, err)
+				}
+
+				reports = append(reports, report.ToGenericReport())
+				writes = append(writes, report.Output)
 			}
 
-			reports = append(reports, report.ToGenericReport())
-
-			batch, err := contract.NewBatchOperationFromWrites(
-				[]contract.WriteOutput{report.Output})
+			// One batch operation per chain, built from that chain's writes: MCMS executes a
+			// batch operation atomically, so a chain whose lockboxes are updated together
+			// cannot be left half-applied. NewBatchOperationFromWrites rejects writes that
+			// span chains, which is exactly why it is called once per chain here.
+			batch, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf(
 					"failed to create batch from writes on chain %d: %w", sel, err)
@@ -288,12 +317,13 @@ func applyUpdateLockboxAuthorizedCallers(
 			batchOps = append(batchOps, batch)
 		}
 
-		// SingleBatchOpPerChain, not BatchOps: a chain can have several lockboxes updated
-		// in one run, and MCMS expects all operations for a chain in one batch operation so
-		// they execute atomically rather than as separately-executable units.
+		// BatchOps, not SingleBatchOpPerChain: the per-chain merge is structural now, since
+		// batchOps already holds at most one batch operation per chain. Empty batches - a
+		// chain whose updates were all filtered as no-ops, or whose writes executed
+		// directly - are dropped by WithBatchOps.
 		return cs_changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
-			WithSingleBatchOpPerChain(batchOps).
+			WithBatchOps(batchOps).
 			Build(input.MCMS)
 	}
 }

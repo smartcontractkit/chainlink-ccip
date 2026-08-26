@@ -133,18 +133,20 @@ func mcmsConfig() mcms.Input {
 	return in
 }
 
-// lockboxCfg builds a single-entry config at the lockbox's real version.
+// lockboxCfg builds a single-chain, single-lockbox config at the lockbox's real version.
 func lockboxCfg(
 	lockboxAddr common.Address,
 	appends, removes []common.Address,
 ) changesets.UpdateLockboxAuthorizedCallersCfg {
 	return changesets.UpdateLockboxAuthorizedCallersCfg{
 		Version: lbops.Version,
-		Input: []changesets.LockboxCallerUpdate{{
+		Input: []changesets.ChainLockboxUpdate{{
 			Selector: lockboxTestChainSel,
-			Address:  lockboxAddr,
-			Appends:  appends,
-			Removes:  removes,
+			Lockboxes: []changesets.LockboxCallerUpdate{{
+				Address: lockboxAddr,
+				Appends: appends,
+				Removes: removes,
+			}},
 		}},
 	}
 }
@@ -343,27 +345,68 @@ func TestUpdateLockboxAuthorizedCallers_VerifyRequiresVersion(t *testing.T) {
 }
 
 // TestUpdateLockboxAuthorizedCallers_VerifyRejectsDuplicateLockbox covers what the old
-// map-keyed config made structurally impossible: the same lockbox listed twice.
+// map-keyed config made structurally impossible: the same lockbox listed twice under one
+// chain, which the nested shape still permits structurally.
 func TestUpdateLockboxAuthorizedCallers_VerifyRejectsDuplicateLockbox(t *testing.T) {
 	e, _, lockboxAddr := setupLockboxWithTimelock(t)
 	entry := changesets.LockboxCallerUpdate{
-		Selector: lockboxTestChainSel,
-		Address:  lockboxAddr,
-		Appends:  []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")},
+		Address: lockboxAddr,
+		Appends: []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")},
 	}
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
 		Version: lbops.Version,
-		Input:   []changesets.LockboxCallerUpdate{entry, entry},
+		Input: []changesets.ChainLockboxUpdate{{
+			Selector:  lockboxTestChainSel,
+			Lockboxes: []changesets.LockboxCallerUpdate{entry, entry},
+		}},
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "duplicate entry for lockbox")
 }
 
+// TestUpdateLockboxAuthorizedCallers_VerifyRejectsDuplicateChain asserts one selector listed
+// twice is rejected. Nesting makes a chain's lockboxes its own list, so a repeated selector
+// would build two batch operations for that chain and its updates would stop being atomic.
+func TestUpdateLockboxAuthorizedCallers_VerifyRejectsDuplicateChain(t *testing.T) {
+	e, _, lockboxAddr := setupLockboxWithTimelock(t)
+	entry := changesets.ChainLockboxUpdate{
+		Selector: lockboxTestChainSel,
+		Lockboxes: []changesets.LockboxCallerUpdate{{
+			Address: lockboxAddr,
+			Appends: []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")},
+		}},
+	}
+
+	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
+		Version: lbops.Version,
+		Input:   []changesets.ChainLockboxUpdate{entry, entry},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "duplicate entry for chain")
+}
+
+// TestUpdateLockboxAuthorizedCallers_VerifyRejectsEmptyLockboxes asserts a chain entry with
+// an empty lockbox list is rejected. It is what a half-written config looks like, and
+// accepting it would silently do nothing for that chain.
+func TestUpdateLockboxAuthorizedCallers_VerifyRejectsEmptyLockboxes(t *testing.T) {
+	e, _, _ := setupLockboxWithTimelock(t)
+
+	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
+		Version: lbops.Version,
+		Input: []changesets.ChainLockboxUpdate{{
+			Selector:  lockboxTestChainSel,
+			Lockboxes: nil,
+		}},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no lockboxes listed for chain")
+}
+
 // TestUpdateLockboxAuthorizedCallers_TwoLockboxesOneChain covers the layout that exists in
-// CCV prod_testnet, where ethereum-sepolia holds two lockboxes. Two entries sharing a
-// selector must be accepted, and their writes must be merged into a single batch operation
-// so the chain's updates execute atomically.
+// CCV prod_testnet, where ethereum-sepolia holds two lockboxes: one chain entry carrying two
+// lockboxes. Their writes must end up in a single batch operation so the chain's updates
+// execute atomically.
 func TestUpdateLockboxAuthorizedCallers_TwoLockboxesOneChain(t *testing.T) {
 	e, timelockAddr, firstLockbox := setupLockboxWithTimelock(t)
 
@@ -399,10 +442,13 @@ func TestUpdateLockboxAuthorizedCallers_TwoLockboxesOneChain(t *testing.T) {
 
 	cfg := changesets.UpdateLockboxAuthorizedCallersCfg{
 		Version: lbops.Version,
-		Input: []changesets.LockboxCallerUpdate{
-			{Selector: lockboxTestChainSel, Address: firstLockbox, Appends: []common.Address{callerA}},
-			{Selector: lockboxTestChainSel, Address: secondLockbox, Appends: []common.Address{callerB}},
-		},
+		Input: []changesets.ChainLockboxUpdate{{
+			Selector: lockboxTestChainSel,
+			Lockboxes: []changesets.LockboxCallerUpdate{
+				{Address: firstLockbox, Appends: []common.Address{callerA}},
+				{Address: secondLockbox, Appends: []common.Address{callerB}},
+			},
+		}},
 	}
 
 	require.NoError(t, verifyLockbox(t, e, mcmsConfig(), cfg), "two lockboxes on one chain must be allowed")
@@ -472,7 +518,7 @@ func TestUpdateLockboxAuthorizedCallers_VerifyNoInput(t *testing.T) {
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
 		Version: lbops.Version,
-		Input:   []changesets.LockboxCallerUpdate{},
+		Input:   []changesets.ChainLockboxUpdate{},
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "at least one entry is required")
@@ -483,10 +529,12 @@ func TestUpdateLockboxAuthorizedCallers_VerifyInvalidChainSelector(t *testing.T)
 
 	err := verifyLockbox(t, e, mcmsConfig(), changesets.UpdateLockboxAuthorizedCallersCfg{
 		Version: lbops.Version,
-		Input: []changesets.LockboxCallerUpdate{{
+		Input: []changesets.ChainLockboxUpdate{{
 			Selector: 99999999,
-			Address:  lockboxAddr,
-			Appends:  []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")},
+			Lockboxes: []changesets.LockboxCallerUpdate{{
+				Address: lockboxAddr,
+				Appends: []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000001")},
+			}},
 		}},
 	})
 	require.Error(t, err)
