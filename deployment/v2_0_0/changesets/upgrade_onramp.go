@@ -555,6 +555,143 @@ func UpgradeOnrampPhase3Rollback(
 	return cldf.CreateChangeSet(apply, validate)
 }
 
+// UpgradeOnrampPhase2Rollback undoes the Phase 2 staging by pointing the
+// TestRouter back at the legacy OnRamp for the selected ProdRouter-class lanes.
+//
+// Phase 2 repoints the TestRouter at the new OnRamp so the replacement can be
+// smoke tested. When the new OnRamp cannot deliver traffic — for example when
+// its CommitteeVerifier is misconfigured — the TestRouter has no working ramp
+// and the lanes on it stop. This changeset restores a working ramp without
+// undoing Phase 1.
+//
+// It takes the same input as Phase 2 and, like UpgradeOnrampPhase3Rollback, it
+// is a traffic-only rollback:
+//   - original ProdRouter lanes: TestRouter -> legacy OnRamp
+//
+// It does NOT:
+//   - touch the production Router;
+//   - touch TestRouter-class lanes, whose production path is the TestRouter;
+//   - rewrite the new OnRamp's dest-chain configs (their Router field keeps
+//     pointing at the TestRouter, so Phase 2 can be re-applied later);
+//   - change remote OffRamp source-OnRamp allowlists;
+//   - change datastore refs or verifier jobs.
+//
+// Pre-flight (both fail closed):
+//  1. The TestRouter must currently route every selected lane through the new
+//     OnRamp. This rejects lanes that Phase 2 never staged, and lanes that
+//     Phase 3 has already promoted to the production Router.
+//  2. The legacy OnRamp must still be allowlisted on every destination OffRamp.
+//
+// Therefore this rollback MUST NOT be used after UpgradeOnrampCleanup has
+// removed legacy from the remote OffRamps.
+//
+// NOTE: the TestRouter is often owned by the deployer key rather than the
+// timelock. In that case the router write is signed and sent while this
+// changeset applies, and the output carries no MCMS proposal.
+func UpgradeOnrampPhase2Rollback(
+	onrampUpgraderRegistry *adapters.OnRampUpgraderRegistry,
+	chainFamilyRegistry *adapters.ChainFamilyRegistry,
+	mcmsReaderRegistry *changesetscore.MCMSReaderRegistry,
+) cldf.ChangeSetV2[UpgradeOnrampConfig] {
+	validate := func(e cldf.Environment, cfg UpgradeOnrampConfig) error {
+		if err := validateUpgradeOnrampConfig(cfg); err != nil {
+			return fmt.Errorf("invalid UpgradeOnrampConfig: %w", err)
+		}
+		return nil
+	}
+
+	apply := func(e cldf.Environment, cfg UpgradeOnrampConfig) (cldf.ChangesetOutput, error) {
+		family, upgrader, err := initUpgradeOnrampChangesets(onrampUpgraderRegistry, &cfg)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+
+		localAdapter, ok := chainFamilyRegistry.GetChainFamily(family)
+		if !ok {
+			return cldf.ChangesetOutput{}, fmt.Errorf("no chain family adapter for family %q", family)
+		}
+
+		// Classification comes from the legacy OnRamp, whose dest configs keep
+		// each destination's original production router. A lane that Phase 2
+		// staged therefore still classifies as ProdRouter class.
+		laneClass, err := upgrader.ClassifyDestChains(e, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("classify dest chains: %w", err)
+		}
+
+		scopedDestSelectors := scopeDestSelectors(laneClass.ProdRouterDests, cfg.DestSelectorsInScope)
+		if len(scopedDestSelectors) == 0 {
+			return cldf.ChangesetOutput{}, fmt.Errorf("none of the requested destination selectors is a ProdRouter-class lane of this OnRamp")
+		}
+
+		// The legacy ref is both our rollback target and our proof that the
+		// upgrade has not been cleaned up.
+		legacyRef, err := upgrader.LegacyOnRampRef(e, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve legacy OnRamp: %w", err)
+		}
+
+		legacyOnRamp, err := wireEncodeOnRampRef(localAdapter, legacyRef, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("encode legacy OnRamp: %w", err)
+		}
+
+		newOnRamp, err := localAdapter.GetOnRampAddress(e.DataStore, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve new OnRamp: %w", err)
+		}
+
+		// Fail closed unless Phase 2 is currently active on the TestRouter for
+		// every selected lane. Passing no prod selectors makes the production
+		// Router check a no-op.
+		if err := upgrader.VerifyPromotedToRouters(e, cfg.ChainSelector, nil, scopedDestSelectors); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("pre-flight Phase 2 state check: %w (Phase 2 must be active on the TestRouter and Phase 3 must not have run for these lanes)", err)
+		}
+
+		// The rollback is only safe while remote destinations still accept
+		// messages that legacy emits.
+		//
+		// Allow only the known Phase 1 pair [legacy,new], and require legacy to
+		// actually be present.
+		for _, remoteSel := range scopedDestSelectors {
+			if err := verifyOffRampSourceOnRamps(e, chainFamilyRegistry, remoteSel, cfg.ChainSelector, [][]byte{legacyOnRamp, newOnRamp}, nil, [][]byte{legacyOnRamp}); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf(
+					"pre-flight legacy OffRamp allowlist check for destination %d: %w",
+					remoteSel,
+					err,
+				)
+			}
+		}
+
+		// Use a fresh reporter for the rollback writes.
+		e.OperationsBundle = operations.NewBundle(func() context.Context { return context.Background() }, e.Logger, operations.NewMemoryReporter())
+
+		// The scoped lanes are ProdRouter class, but they are passed as the test
+		// selectors because the TestRouter is what Phase 2 repointed and what
+		// this rollback must restore. No production Router write is produced.
+		rollbackOps, err := upgrader.RollbackToLegacyRouters(e, cfg.ChainSelector, nil, scopedDestSelectors)
+		if err != nil {
+			return cldf.ChangesetOutput{},
+				fmt.Errorf("rollback TestRouter to legacy OnRamp: %w", err)
+		}
+
+		// A deployer-owned TestRouter executes the write during apply, which
+		// leaves no MCMS transaction to propose.
+		if len(rollbackOps) == 0 {
+			e.Logger.Infow("TestRouter rollback to the legacy OnRamp produced no MCMS transaction; the router write already executed with the deployer key",
+				"chain", cfg.ChainSelector, "destChains", scopedDestSelectors)
+
+			return cldf.ChangesetOutput{}, nil
+		}
+
+		return changesetscore.NewOutputBuilder(e, mcmsReaderRegistry).
+			WithBatchOps(rollbackOps).
+			Build(cfg.MCMS)
+	}
+
+	return cldf.CreateChangeSet(apply, validate)
+}
+
 // Filter the destSelectors to only those in scope. Return an error if none are in scope.
 func scopeDestSelectors(destSelectors []uint64, scope []uint64) []uint64 {
 	scoped := make([]uint64, 0)

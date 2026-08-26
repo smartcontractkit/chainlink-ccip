@@ -1637,3 +1637,239 @@ func TestUpgradeOnrampCleanup(t *testing.T) {
 		require.ErrorContains(t, err, "boom")
 	})
 }
+
+func TestUpgradeOnrampPhase2Rollback(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		rollbackOp := fakeBatchOp(chainA, "0xdeadbeeb")
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		// Phase 2 must be active on the TestRouter. No prod selectors are passed,
+		// so the prod Router is never checked and never written.
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return(nil).Once()
+		upgrader.EXPECT().RollbackToLegacyRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return([]mcms_types.BatchOperation{rollbackOp}, nil).Once()
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		// Pre-flight: the remote OffRamp whitelists both legacy and new OnRamps.
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr), paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase2Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, timelockAddr, prop.TimelockAddresses[mcms_types.ChainSelector(chainA)])
+	})
+
+	t.Run("SuccessWithBypassMCMS", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		rollbackOp := fakeBatchOp(chainA, "0xdeadbeeb")
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return(nil).Once()
+		upgrader.EXPECT().RollbackToLegacyRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return([]mcms_types.BatchOperation{rollbackOp}, nil).Once()
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr), paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase2Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		mcmsInput := validMCMSInput()
+		mcmsInput.TimelockAction = mcms_types.TimelockActionBypass
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 mcmsInput,
+		})
+		require.NoError(t, err)
+
+		require.Len(t, out.MCMSTimelockProposals, 1)
+		prop := out.MCMSTimelockProposals[0]
+		require.Len(t, prop.Operations, 1)
+		assert.Equal(t, mcms_types.TimelockActionBypass, prop.Action)
+		assert.NotZero(t, prop.ValidUntil)
+	})
+
+	t.Run("NoProposalWhenTestRouterIsDeployerOwned", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return(nil).Once()
+		// A deployer-owned TestRouter executes the write during apply, so there
+		// is no MCMS transaction left to propose.
+		upgrader.EXPECT().RollbackToLegacyRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return(nil, nil).Once()
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(oldOnRampAddr), paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase2Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		out, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, out.MCMSTimelockProposals)
+	})
+
+	t.Run("FailWhenScopeHasNoProdRouterDest", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		// A TestRouter-class lane is production traffic on the TestRouter and
+		// Phase 2 never staged it, so a rollback must refuse rather than no-op.
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{TestRouterDests: []uint64{chainB}}, nil).Once()
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+
+		cs := changesets.UpgradeOnrampPhase2Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		_, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.ErrorContains(t, err, "is a ProdRouter-class lane")
+	})
+
+	t.Run("FailWhenPhase2IsNotActive", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		// The TestRouter does not route this lane through the new OnRamp.
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return(errors.New("boom")).Once()
+		// RollbackToLegacyRouters must NOT be called.
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+
+		cs := changesets.UpgradeOnrampPhase2Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		_, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.ErrorContains(t, err, "pre-flight Phase 2 state check")
+		require.ErrorContains(t, err, "boom")
+	})
+
+	t.Run("FailWhenLegacyIsNotAllowedOnDest", func(t *testing.T) {
+		e := newTestEnv(t)
+		seedOnRamp(t, &e, newOnRampAddr)
+
+		upgrader := mocks.NewMockOnRampUpgrader(t)
+		upgrader.EXPECT().ClassifyDestChains(mock.Anything, chainA).
+			Return(adapters.LaneClass{ProdRouterDests: []uint64{chainB}}, nil).Once()
+		upgrader.EXPECT().LegacyOnRampRef(mock.Anything, chainA).
+			Return(legacyOnRampRef(), nil).Once()
+		upgrader.EXPECT().VerifyPromotedToRouters(mock.Anything, chainA, []uint64(nil), []uint64{chainB}).
+			Return(nil).Once()
+		// RollbackToLegacyRouters must NOT be called: cleanup already removed legacy.
+
+		familyReg, lane := newLaneMocks(t)
+		lane.family.EXPECT().GetOnRampAddress(mock.Anything, chainA).
+			RunAndReturn(onRampAddressFromDS).Maybe()
+		lane.reader.EXPECT().GetOffRampSourceOnRamps(mock.Anything, chainB, chainA).
+			Return([][]byte{paddedAddrBytes(newOnRampAddr)}, nil).Once()
+
+		cs := changesets.UpgradeOnrampPhase2Rollback(
+			mockUpgraderRegistry(upgrader),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+		_, err := cs.Apply(e, changesets.UpgradeOnrampConfig{
+			ChainSelector:        chainA,
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.ErrorContains(t, err, "pre-flight legacy OffRamp allowlist check")
+		require.ErrorContains(t, err, "does not whitelist expected onramp")
+	})
+
+	t.Run("FailOnInvalidConfig", func(t *testing.T) {
+		e := newTestEnv(t)
+		familyReg, _ := newLaneMocks(t)
+		cs := changesets.UpgradeOnrampPhase2Rollback(
+			mockUpgraderRegistry(mocks.NewMockOnRampUpgrader(t)),
+			familyReg,
+			mockMCMSReaderRegistry(t),
+		)
+
+		err := cs.VerifyPreconditions(e, changesets.UpgradeOnrampConfig{
+			DestSelectorsInScope: []uint64{chainB},
+			MCMS:                 validMCMSInput(),
+		})
+		require.ErrorContains(t, err, "chain selector is required")
+
+		err = cs.VerifyPreconditions(e, changesets.UpgradeOnrampConfig{
+			ChainSelector: chainA,
+			MCMS:          validMCMSInput(),
+		})
+		require.ErrorContains(t, err, "at least one dest selector must be in scope")
+	})
+}
