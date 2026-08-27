@@ -514,12 +514,16 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 					PoolType:                           ru.remotePoolRef.Type.String(),
 					RemoteChains: map[uint64]RemoteChainConfig[[]byte, string]{
 						selector: {
-							// Pad to match on-chain storage format (32-byte left-padded). The address
-							// comparisons in `ConfigureTokenPoolForRemoteChain()` compare against on-
-							// chain bytes without padding, so a 20-byte input would mismatch and fire
-							// a remove+re-add instead of addRemotePool
+							// The remote TOKEN is left-padded to 32 bytes to match the forward-path convention (see
+							// convertRemoteChainConfig). However, The remote POOL is intentionally NOT padded here.
+							// Each counterpart adapter normalizes the RemotePool to its own expected on-chain form.
+							// For example, the EVM code left-pads pool addresses to 32-bytes for `addRemotePool( )`
+							// whereas Solana passes raw 20-byte EVM addresses to `AppendRemotePoolAddresses( )`. As
+							// a result, it'd be incorrect to pad the pool here since it would leak *32-byte-padded*
+							// addresses into Solana's append and break EVM > Solana transfers with an error such as
+							// `InvalidSourcePoolAddress`.
 							RemoteToken: common.LeftPadBytes(migratedTokenBytes, 32),
-							RemotePool:  common.LeftPadBytes(migratedPoolBytes, 32),
+							RemotePool:  migratedPoolBytes,
 						},
 					},
 				}

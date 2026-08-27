@@ -15,6 +15,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -370,6 +372,9 @@ func discoverLanesToMigrate(
 	symbolOf tokenSymbolLookup,
 	cfg MigrateChainLanesToV2Config,
 ) ([]v2changesets.CrossFamilyLanePair, error) {
+	if e.Logger == nil {
+		e.Logger = logger.Nop()
+	}
 	d := &laneDiscoverer{
 		env:             e,
 		resolvers:       resolvers,
@@ -433,6 +438,10 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 	if !isEVMChain(chainSel) {
 		return nil, nil
 	}
+	if deprecatedChain(chainSel) {
+		d.env.Logger.Warnf("skipping deprecated chain %d", chainSel)
+		return nil, nil
+	}
 
 	resolver, ok := d.resolvers.GetLaneVersionResolver(chainSel)
 	if !ok {
@@ -446,15 +455,19 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 		return nil, fmt.Errorf("failed to derive lane versions for chain %d: %w", chainSel, err)
 	}
 
-	// Keep only EVM remotes that are connected, not blocklisted, not already on 2.0, and whose
-	// source lane version we can migrate (i.e. has a registered config importer). Lanes with an
-	// unknown or unsupported version are skipped — we never migrate a lane without a resolver.
+	// Keep only EVM remotes that are connected, not blocklisted, not already on 2.0, not
+	// deprecated, and whose source lane version we can migrate (i.e. has a registered config
+	// importer). Lanes with an unknown or unsupported version are skipped — we never migrate a
+	// lane without a resolver.
 	candidateVersions := make(map[uint64]*semver.Version, len(laneVersions))
 	for remote, version := range laneVersions {
 		switch {
 		case isExcluded(d.excludedRemotes, remote):
 			continue
 		case !isEVMChain(remote):
+			continue
+		case deprecatedChain(remote):
+			d.env.Logger.Warnf("skipping deprecated remote chain %d on chain %d", remote, chainSel)
 			continue
 		case version != nil && version.Major() >= v2MajorVersion:
 			continue
@@ -481,6 +494,9 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 
 // reverseDirectionCarriesExcludedToken checks the remote-to-local direction before a directional
 // candidate is promoted to a bidirectional lane. chainCandidates already checked chainSel-to-remote.
+// A reverse chain that cannot be resolved (dead RPC, or missing from the environment) is treated as
+// excluded — its lane is held back from this batch rather than migrating it unverified or aborting
+// discovery entirely.
 func (d *laneDiscoverer) reverseDirectionCarriesExcludedToken(chainSel, remote uint64) (bool, error) {
 	if len(d.excludedSymbols) == 0 {
 		return false, nil
@@ -488,14 +504,17 @@ func (d *laneDiscoverer) reverseDirectionCarriesExcludedToken(chainSel, remote u
 
 	resolver, ok := d.resolvers.GetLaneVersionResolver(remote)
 	if !ok {
-		return false, fmt.Errorf("no lane version resolver registered for reverse chain %d", remote)
+		d.env.Logger.Warnf("no lane version resolver for reverse lane %d->%d; holding lane back", remote, chainSel)
+		return true, nil
 	}
 	if !resolver.IsSupportedChain(d.env, remote) {
-		return false, fmt.Errorf("reverse chain %d is not supported by its lane version resolver", remote)
+		d.env.Logger.Warnf("reverse lane %d->%d is not supported by its lane version resolver; holding lane back", remote, chainSel)
+		return true, nil
 	}
 	laneVersions, _, err := resolver.DeriveLaneVersionsForChain(d.env, remote)
 	if err != nil {
-		return false, fmt.Errorf("failed to derive lane versions for reverse chain %d: %w", remote, err)
+		d.env.Logger.Warnf("failed to derive lane versions for reverse lane %d->%d: %v; holding lane back", remote, chainSel, err)
+		return true, nil
 	}
 	version, connected := laneVersions[chainSel]
 	if !connected {
@@ -684,6 +703,13 @@ func isExcluded(set map[uint64]struct{}, sel uint64) bool {
 func isEVMChain(sel uint64) bool {
 	family, err := chainsel.GetSelectorFamily(sel)
 	return err == nil && family == chainsel.FamilyEVM
+}
+
+// deprecatedChain reports whether the chain selector is marked deprecated in chain-selectors.
+// Unknown selectors are treated as not deprecated.
+func deprecatedChain(sel uint64) bool {
+	deprecated, err := chainsel.IsDeprecated(sel)
+	return err == nil && deprecated
 }
 
 // canonicalLaneKey returns an order-independent key for a bidirectional lane so that discovering
