@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	onrampops_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -133,14 +134,7 @@ func verifyAllContractsPresent(e deployment.Environment, chainSelector uint64, s
 		}
 	}
 	for _, ref := range singleRefContracts {
-		// OnRamp may have a legacy-qualified duplicate in the datastore after an
-		// upgrade; always resolve the canonical (empty-qualifier) ref.
-		var err error
-		if ref.Type == datastore.ContractType(onrampops.ContractType) {
-			_, err = datastore_utils.FindAndFormatCanonicalRef(e.DataStore, ref, chainSelector, evm_datastore_utils.ToEVMAddress)
-		} else {
-			_, err = datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, evm_datastore_utils.ToEVMAddress)
-		}
+		_, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, evm_datastore_utils.ToEVMAddress)
 		if err != nil {
 			missing = append(missing, fmt.Sprintf("%s@%s", ref.Type, ref.Version))
 		}
@@ -185,11 +179,17 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 			return fmt.Errorf("error fetching onRamp version for chain %d and remote chain %d: %w", chainSelector, remoteChainSelector, err)
 		}
 
-		if !onRampVersion.Equal(onrampops_v160.Version) {
+		if !onRampVersion.Equal(onrampops_v160.Version) && !onRampVersion.Equal(onrampops_v150.Version) {
 			return fmt.Errorf(
-				"precondition failed for chain %d and remote chain %d: expected onRamp version on Router to be %s, but got version %s. ",
-				chainSelector, remoteChainSelector, onrampops_v160.Version.String(), onRampVersion.String(),
+				"precondition failed for chain %d and remote chain %d: expected onRamp version on Router to be %s or %s, but got version %s. ",
+				chainSelector, remoteChainSelector, onrampops_v150.Version.String(), onrampops_v160.Version.String(), onRampVersion.String(),
 			)
+		}
+
+		// Only 1.6+ onRamps expose a FeeQuoter in their dynamic config; 1.5 onRamps
+		// use a PriceRegistry instead and share no fee quoter relationship to verify.
+		if !onRampVersion.Equal(onrampops_v160.Version) {
+			continue
 		}
 
 		// get the fee quoter from onRamp
@@ -290,9 +290,8 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				}
 			}
 			tempDS := ds.Seal()
-			// fetch onRamp and offRamp from the existing addresses (canonical onRamp to
-			// ignore any legacy-qualified duplicate)
-			onRampAddr, err := datastore_utils.FindAndFormatCanonicalRef(
+			// fetch onRamp and offRamp from the existing addresses
+			onRampAddr, err := datastore_utils.FindAndFormatRef(
 				tempDS,
 				datastore.AddressRef{
 					ChainSelector: input.ChainSelector,

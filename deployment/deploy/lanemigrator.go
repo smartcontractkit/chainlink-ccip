@@ -129,8 +129,8 @@ func laneMigrateApply(migratorReg *LaneMigratorRegistry, mcmsRegistry *changeset
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
-			// get the ramp address refs (canonical ref to ignore any legacy-qualified duplicate)
-			onRampRef, err := datastore_utils.FindAndFormatCanonicalRef(e.DataStore, datastore.AddressRef{
+			// get the ramp address refs
+			onRampRef, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
 				ChainSelector: chainSel,
 				Type:          "OnRamp",
 				Version:       perChainConfig.RampVersion,
