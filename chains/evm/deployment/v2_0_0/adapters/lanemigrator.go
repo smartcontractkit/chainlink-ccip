@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	onrampops_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	onrampops_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
@@ -178,11 +179,17 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 			return fmt.Errorf("error fetching onRamp version for chain %d and remote chain %d: %w", chainSelector, remoteChainSelector, err)
 		}
 
-		if !onRampVersion.Equal(onrampops_v160.Version) {
+		if !onRampVersion.Equal(onrampops_v160.Version) && !onRampVersion.Equal(onrampops_v150.Version) {
 			return fmt.Errorf(
-				"precondition failed for chain %d and remote chain %d: expected onRamp version on Router to be %s, but got version %s. ",
-				chainSelector, remoteChainSelector, onrampops_v160.Version.String(), onRampVersion.String(),
+				"precondition failed for chain %d and remote chain %d: expected onRamp version on Router to be %s or %s, but got version %s.",
+				chainSelector, remoteChainSelector, onrampops_v150.Version.String(), onrampops_v160.Version.String(), onRampVersion.String(),
 			)
+		}
+
+		// Only 1.6+ onRamps expose a FeeQuoter in their dynamic config; 1.5 onRamps
+		// use a PriceRegistry instead and share no fee quoter relationship to verify.
+		if !onRampVersion.Equal(onrampops_v160.Version) {
+			continue
 		}
 
 		// get the fee quoter from onRamp

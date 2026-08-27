@@ -30,6 +30,8 @@ type fakeLaneVersionResolver struct {
 	supported map[uint64]bool
 	lanes     map[uint64]map[uint64]*semver.Version
 	err       error
+	// errs returns a per-chain derivation error; checked before err.
+	errs map[uint64]error
 }
 
 func (f *fakeLaneVersionResolver) IsSupportedChain(_ cldf.Environment, sel uint64) bool {
@@ -37,6 +39,9 @@ func (f *fakeLaneVersionResolver) IsSupportedChain(_ cldf.Environment, sel uint6
 }
 
 func (f *fakeLaneVersionResolver) DeriveLaneVersionsForChain(_ cldf.Environment, sel uint64) (map[uint64]*semver.Version, []*semver.Version, error) {
+	if perChainErr, ok := f.errs[sel]; ok {
+		return nil, nil, perChainErr
+	}
 	if f.err != nil {
 		return nil, nil, f.err
 	}
@@ -336,6 +341,57 @@ func TestDiscoverLanesToMigrate_ErrorsWhenChainUnsupported(t *testing.T) {
 	assert.Contains(t, err.Error(), "not supported")
 }
 
+func TestDiscoverLanesToMigrate_SkipsDeprecatedRemotes(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	remoteLive := chainsel.TEST_90000002.Selector
+	remoteDeprecated := chainsel.CORN_MAINNET.Selector
+
+	require.True(t, deprecatedChain(remoteDeprecated))
+	require.False(t, deprecatedChain(remoteLive))
+
+	resolver := &fakeLaneVersionResolver{
+		supported: map[uint64]bool{chainA: true},
+		lanes: map[uint64]map[uint64]*semver.Version{
+			chainA: {
+				remoteLive:       semver.MustParse("1.6.0"),
+				remoteDeprecated: semver.MustParse("1.6.0"),
+			},
+		},
+	}
+
+	lanes, err := discoverLanesToMigrate(
+		cldf.Environment{},
+		registryWithResolver(t, resolver),
+		supportedFQRegistry(t),
+		nil,
+		MigrateChainLanesToV2Config{
+			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, lanes, 1)
+	assert.Equal(t, remoteLive, lanes[0].ChainB)
+	for _, lane := range lanes {
+		assert.NotEqual(t, remoteDeprecated, lane.ChainB, "deprecated remote must not be migrated")
+	}
+}
+
+func TestDiscoverLanesToMigrate_SkipsDeprecatedLocalChain(t *testing.T) {
+	deprecated := chainsel.CORN_MAINNET.Selector
+
+	lanes, err := discoverLanesToMigrate(
+		cldf.Environment{},
+		adapters.NewDeployChainContractsRegistry(),
+		supportedFQRegistry(t),
+		nil,
+		MigrateChainLanesToV2Config{
+			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{ChainSelectors: []uint64{deprecated}},
+		},
+	)
+	require.NoError(t, err)
+	require.Empty(t, lanes)
+}
+
 func TestDiscoverLanesToMigrate_ExcludesNonEVMRemotes(t *testing.T) {
 	chainA := chainsel.TEST_90000001.Selector
 	remoteEVM := chainsel.TEST_90000002.Selector
@@ -461,6 +517,39 @@ func TestDiscoverLanesToMigrate_SkipsLaneWithExcludedTokenOnlyInReverseDirection
 		registryWithResolver(t, resolver),
 		fqRegistryWithImporter(t, version, importer),
 		symbolLookupFrom(map[common.Address]string{usdc: "USDC", other: "WETH"}),
+		MigrateChainLanesToV2Config{
+			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+				ChainSelectors:               []uint64{chainA},
+				ExcludeLanesWithTokenSymbols: []string{"USDC"},
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Empty(t, lanes)
+}
+
+func TestDiscoverLanesToMigrate_SkipsReverseCheckWhenResolverErrors(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	chainB := chainsel.TEST_90000002.Selector
+	version := semver.MustParse("1.6.0")
+
+	// chainA -> chainB is a valid candidate, but resolving chainB's own lanes (reverse direction)
+	// fails — e.g. chainB is deprecated with dead RPCs. Discovery must skip, not abort.
+	resolver := &fakeLaneVersionResolver{
+		supported: map[uint64]bool{chainA: true, chainB: true},
+		lanes: map[uint64]map[uint64]*semver.Version{
+			chainA: {chainB: version},
+		},
+		errs: map[uint64]error{
+			chainB: errors.New("EVM chain with selector 9043146809313071210 not found in environment"),
+		},
+	}
+
+	lanes, err := discoverLanesToMigrate(
+		cldf.Environment{},
+		registryWithResolver(t, resolver),
+		fqRegistryWithImporter(t, version, &fakeConfigImporter{tokensPerRemote: map[uint64][]common.Address{chainB: {}}}),
+		symbolLookupFrom(map[common.Address]string{}),
 		MigrateChainLanesToV2Config{
 			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
 				ChainSelectors:               []uint64{chainA},
