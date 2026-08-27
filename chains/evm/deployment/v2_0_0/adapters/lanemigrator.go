@@ -181,7 +181,7 @@ func verifyExistingLaneVersion(e deployment.Environment, evmChain evm.Chain, cha
 
 		if !onRampVersion.Equal(onrampops_v160.Version) && !onRampVersion.Equal(onrampops_v150.Version) {
 			return fmt.Errorf(
-				"precondition failed for chain %d and remote chain %d: expected onRamp version on Router to be %s or %s, but got version %s. ",
+				"precondition failed for chain %d and remote chain %d: expected onRamp version on Router to be %s or %s, but got version %s.",
 				chainSelector, remoteChainSelector, onrampops_v150.Version.String(), onrampops_v160.Version.String(), onRampVersion.String(),
 			)
 		}

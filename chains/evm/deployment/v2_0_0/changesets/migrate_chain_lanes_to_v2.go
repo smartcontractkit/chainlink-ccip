@@ -504,16 +504,16 @@ func (d *laneDiscoverer) reverseDirectionCarriesExcludedToken(chainSel, remote u
 
 	resolver, ok := d.resolvers.GetLaneVersionResolver(remote)
 	if !ok {
-		d.env.Logger.Warnf("no lane version resolver for reverse chain %d; holding lane back", remote)
+		d.env.Logger.Warnf("no lane version resolver for reverse lane %d->%d; holding lane back", remote, chainSel)
 		return true, nil
 	}
 	if !resolver.IsSupportedChain(d.env, remote) {
-		d.env.Logger.Warnf("reverse chain %d is not supported by its lane version resolver; holding lane back", remote)
+		d.env.Logger.Warnf("reverse lane %d->%d is not supported by its lane version resolver; holding lane back", remote, chainSel)
 		return true, nil
 	}
 	laneVersions, _, err := resolver.DeriveLaneVersionsForChain(d.env, remote)
 	if err != nil {
-		d.env.Logger.Warnf("failed to derive lane versions for reverse chain %d: %v; holding lane back", remote, err)
+		d.env.Logger.Warnf("failed to derive lane versions for reverse lane %d->%d: %v; holding lane back", remote, chainSel, err)
 		return true, nil
 	}
 	version, connected := laneVersions[chainSel]
