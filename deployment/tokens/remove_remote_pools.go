@@ -11,6 +11,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -21,10 +22,12 @@ type RemoveRemotePoolsInput struct {
 	MCMS  mcms.Input                 `yaml:"mcms,omitempty" json:"mcms"`
 }
 
-// RemoveRemotePoolsPerPool groups remote pool removals for a single token pool.
+// RemoveRemotePoolsPerPool groups remote pool removals for a single token pool. The pool is
+// referenced by an AddressRef so operators can identify it by qualifier, by address, or by any
+// other unique combination of ref fields.
 type RemoveRemotePoolsPerPool struct {
 	ChainSelector       uint64               `yaml:"selector" json:"selector,string"`
-	Address             string               `yaml:"address" json:"address"`
+	Pool                datastore.AddressRef `yaml:"pool" json:"pool"`
 	RemotePoolsToRemove []RemotePoolToRemove `yaml:"remotePoolsToRemove" json:"remotePoolsToRemove"`
 }
 
@@ -43,7 +46,7 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 
 		type poolKey struct {
 			selector uint64
-			address  string
+			ref      string
 		}
 
 		seenPools := make(map[poolKey]struct{})
@@ -52,12 +55,12 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 				return fmt.Errorf("invalid chain selector %d: %w", pool.ChainSelector, err)
 			}
 
-			if pool.Address == "" {
-				return fmt.Errorf("pool entry on chain selector %d has an empty address", pool.ChainSelector)
+			if datastore_utils.IsAddressRefEmpty(pool.Pool) {
+				return fmt.Errorf("pool entry on chain selector %d has an empty pool ref", pool.ChainSelector)
 			}
 
 			if len(pool.RemotePoolsToRemove) == 0 {
-				return fmt.Errorf("pool entry %s on chain selector %d has no remote pools to remove", pool.Address, pool.ChainSelector)
+				return fmt.Errorf("pool entry %s on chain selector %d has no remote pools to remove", datastore_utils.SprintRef(pool.Pool), pool.ChainSelector)
 			}
 
 			seenRemotes := make(map[uint64]struct{})
@@ -70,8 +73,8 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 					return fmt.Errorf("invalid remote chain selector %d: %w", remote.Selector, err)
 				}
 
-				if remote.Address == "" {
-					return fmt.Errorf("remote pool entry for chain selector %d has an empty address", remote.Selector)
+				if datastore_utils.IsAddressRefEmpty(remote.Remote) {
+					return fmt.Errorf("remote pool entry for chain selector %d has an empty remote ref", remote.Selector)
 				}
 
 				if _, dup := seenRemotes[remote.Selector]; dup {
@@ -81,9 +84,9 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 				seenRemotes[remote.Selector] = struct{}{}
 			}
 
-			key := poolKey{selector: pool.ChainSelector, address: pool.Address}
+			key := poolKey{selector: pool.ChainSelector, ref: datastore_utils.SprintRef(pool.Pool)}
 			if _, dup := seenPools[key]; dup {
-				return fmt.Errorf("duplicate pool entry for chain selector %d and address %s", pool.ChainSelector, pool.Address)
+				return fmt.Errorf("duplicate pool entry for chain selector %d and ref %s", pool.ChainSelector, datastore_utils.SprintRef(pool.Pool))
 			}
 
 			seenPools[key] = struct{}{}
@@ -101,11 +104,12 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 
 		for _, pool := range cfg.Pools {
 			selector := pool.ChainSelector
-			poolRef := datastore.AddressRef{ChainSelector: selector, Address: pool.Address}
+			poolRef := pool.Pool
+			poolRef.ChainSelector = selector
 
 			adapter, family, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, selector, poolRef, datastore.AddressRef{})
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve pool %s on chain selector %d: %w", pool.Address, selector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.Pool), selector, err)
 			}
 
 			remover, ok := adapter.(RemotePoolRemover)
@@ -116,14 +120,14 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 				)
 			}
 
-			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, remover.RemoveRemotePool(), e.BlockChains, RemoveRemotePoolSequenceInput{
+			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, remover.RemoveRemotePools(), e.BlockChains, RemoveRemotePoolsSequenceInput{
 				Selector:            selector,
 				TokenPoolRef:        fullPoolRef,
 				TokenRef:            fullTokenRef,
 				RemotePoolsToRemove: pool.RemotePoolsToRemove,
 			})
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to remove remote pools from pool %s on chain selector %d: %w", pool.Address, selector, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to remove remote pools from pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.Pool), selector, err)
 			}
 
 			batchOps = append(batchOps, report.Output.BatchOps...)

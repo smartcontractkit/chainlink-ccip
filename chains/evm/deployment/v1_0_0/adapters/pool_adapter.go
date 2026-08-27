@@ -28,6 +28,7 @@ var (
 	_ tokensapi.RateLimitReaderAdapter = &EVMPoolAdapter{}
 	_ tokensapi.TokenRefResolver       = &EVMPoolAdapter{}
 	_ tokensapi.TokenAdapter           = &EVMPoolAdapter{}
+	_ tokensapi.RemotePoolRemover      = &EVMPoolAdapter{}
 )
 
 // PoolOps abstracts the version-specific token pool contract calls.
@@ -45,6 +46,12 @@ type PoolOps interface {
 	// state already matches.
 	SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
+	// RemoveRemotePools removes the given remote pool entries from the pool. Implementations
+	// read the current on-chain remote pools for each remote chain and return a clear error when
+	// a requested remote pool is not currently configured, rather than emitting a no-op
+	// transaction. Remote pool addresses are stored left-padded to 32 bytes on-chain, so
+	// implementations must pad the input address the same way before matching and removal.
+	RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error)
 	Version() *semver.Version
 }
 
@@ -235,6 +242,44 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 			writes, err := a.Ops.SetAdmins(b, chain, poolAddr, rateLimitAdmin, feeAdmin)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set admins on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
+			}
+			if len(writes) == 0 {
+				return sequences.OnChainOutput{}, nil
+			}
+
+			var result sequences.OnChainOutput
+			batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			result.BatchOps = append(result.BatchOps, batchOp)
+			return result, nil
+		},
+	)
+}
+
+// RemoveRemotePools removes remote pool entries from an EVM token pool. Version-specific
+// contract calls live in PoolOps.RemoveRemotePools, which reads the current on-chain remote
+// pools for each remote chain and returns a clear error when a requested remote pool is not
+// currently configured. No-op (zero BatchOps) when there are no writes.
+func (a *EVMPoolAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokensapi.RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-pool-adapter:remove-remote-pools",
+		a.Ops.Version(),
+		"Removes remote pool entries from an EVM token pool",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.RemoveRemotePoolsSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.EVMChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
+			}
+			if !common.IsHexAddress(input.TokenPoolRef.Address) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for chain %d: %s", input.Selector, input.TokenPoolRef.Address)
+			}
+			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
+
+			writes, err := a.Ops.RemoveRemotePools(b, chain, poolAddr, input.RemotePoolsToRemove)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove remote pools from pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
 			}
 			if len(writes) == 0 {
 				return sequences.OnChainOutput{}, nil

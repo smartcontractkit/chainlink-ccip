@@ -32,15 +32,15 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 	require.NoError(t, err)
 
 	cs := tokensapi.RemoveRemotePools()
-	poolAddr := "0x1111111111111111111111111111111111111111"
-	remoteAddr := "0x2222222222222222222222222222222222222222"
+	poolRef := datastore.AddressRef{Address: "0x1111111111111111111111111111111111111111"}
+	remoteRef := datastore.AddressRef{Address: "0x2222222222222222222222222222222222222222"}
 
 	singlePoolInput := func(remote tokensapi.RemotePoolToRemove) tokensapi.RemoveRemotePoolsInput {
 		return tokensapi.RemoveRemotePoolsInput{
 			MCMS: mcms.Input{},
 			Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 				ChainSelector:       sel,
-				Address:             poolAddr,
+				Pool:                poolRef,
 				RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{remote},
 			}},
 		}
@@ -57,15 +57,15 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 			errors: []string{"at least one pool entry"},
 		},
 		{
-			name: "rejects_empty_pool_address",
+			name: "rejects_empty_pool_ref",
 			input: tokensapi.RemoveRemotePoolsInput{
 				MCMS: mcms.Input{},
 				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 					ChainSelector:       sel,
-					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Address: remoteAddr}},
+					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Remote: remoteRef}},
 				}},
 			},
-			errors: []string{"empty address"},
+			errors: []string{"empty pool ref"},
 		},
 		{
 			name: "rejects_no_remote_pools",
@@ -73,20 +73,20 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 				MCMS: mcms.Input{},
 				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 					ChainSelector: sel,
-					Address:       poolAddr,
+					Pool:          poolRef,
 				}},
 			},
 			errors: []string{"no remote pools to remove"},
 		},
 		{
 			name:   "rejects_remote_equal_to_local_chain",
-			input:  singlePoolInput(tokensapi.RemotePoolToRemove{Selector: sel, Address: remoteAddr}),
+			input:  singlePoolInput(tokensapi.RemotePoolToRemove{Selector: sel, Remote: remoteRef}),
 			errors: []string{"must not equal the pool's own chain selector"},
 		},
 		{
-			name:   "rejects_empty_remote_address",
+			name:   "rejects_empty_remote_ref",
 			input:  singlePoolInput(tokensapi.RemotePoolToRemove{Selector: dst}),
-			errors: []string{"empty address"},
+			errors: []string{"empty remote ref"},
 		},
 		{
 			name: "rejects_duplicate_remote_selectors",
@@ -94,10 +94,10 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 				MCMS: mcms.Input{},
 				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 					ChainSelector: sel,
-					Address:       poolAddr,
+					Pool:          poolRef,
 					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{
-						{Selector: dst, Address: remoteAddr},
-						{Selector: dst, Address: remoteAddr},
+						{Selector: dst, Remote: remoteRef},
+						{Selector: dst, Remote: remoteRef},
 					},
 				}},
 			},
@@ -108,8 +108,8 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 			input: tokensapi.RemoveRemotePoolsInput{
 				MCMS: mcms.Input{},
 				Pools: []tokensapi.RemoveRemotePoolsPerPool{
-					{ChainSelector: sel, Address: poolAddr, RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Address: remoteAddr}}},
-					{ChainSelector: sel, Address: poolAddr, RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Address: remoteAddr}}},
+					{ChainSelector: sel, Pool: poolRef, RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Remote: remoteRef}}},
+					{ChainSelector: sel, Pool: poolRef, RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Remote: remoteRef}}},
 				},
 			},
 			errors: []string{"duplicate pool entry"},
@@ -143,10 +143,10 @@ func TestRemoveRemotePools_V2(t *testing.T) {
 		MCMS: mcms.Input{},
 		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 			ChainSelector: tc.selA,
-			Address:       tc.poolA.Hex(),
+			Pool:          datastore.AddressRef{Address: tc.poolA.Hex()},
 			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
 				Selector: tc.selB,
-				Address:  tc.poolB.Hex(),
+				Remote:   datastore.AddressRef{Address: tc.poolB.Hex()},
 			}},
 		}},
 	}
@@ -184,10 +184,10 @@ func testRemoveRemotePoolsPreV2(t *testing.T, version *semver.Version) {
 		MCMS: mcms.Input{},
 		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 			ChainSelector: pair.selA,
-			Address:       pair.oldPoolAddrA.Hex(),
+			Pool:          datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
 			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
 				Selector: pair.selB,
-				Address:  pair.oldPoolAddrB.Hex(),
+				Remote:   datastore.AddressRef{Address: pair.oldPoolAddrB.Hex()},
 			}},
 		}},
 	}
@@ -316,10 +316,10 @@ func TestRemoveRemotePools_PartialRemoval(t *testing.T) {
 		MCMS: mcms.Input{},
 		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 			ChainSelector: env.selA,
-			Address:       env.poolA.Hex(),
+			Pool:          datastore.AddressRef{Address: env.poolA.Hex()},
 			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
 				Selector: env.selB,
-				Address:  env.poolB.Hex(),
+				Remote:   datastore.AddressRef{Address: env.poolB.Hex()},
 			}},
 		}},
 	}
@@ -341,10 +341,10 @@ func TestRemoveRemotePools_PartialRemoval(t *testing.T) {
 		MCMS: mcms.Input{},
 		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 			ChainSelector: env.selA,
-			Address:       env.poolA.Hex(),
+			Pool:          datastore.AddressRef{Address: env.poolA.Hex()},
 			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
 				Selector: env.selC,
-				Address:  "0x000000000000000000000000000000000000dEaD",
+				Remote:   datastore.AddressRef{Address: "0x000000000000000000000000000000000000dEaD"},
 			}},
 		}},
 	}

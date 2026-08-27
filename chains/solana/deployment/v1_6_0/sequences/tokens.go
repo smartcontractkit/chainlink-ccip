@@ -600,18 +600,20 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 var _ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
 var _ tokenapi.RemotePoolRemover = (*SolanaAdapter)(nil)
 
-// RemoveRemotePool removes remote pool entries from a Solana 1.6 token pool. The pool address
+// RemoveRemotePools removes remote pool entries from a Solana 1.6 token pool. The pool address
 // is a program ID shared across mints, so the token mint comes from input.TokenRef and the pool
-// type from input.TokenPoolRef. The remote pool address is a raw 32-byte public key (no padding),
-// so the input address is decoded from base58 directly. The underlying operation reads the
-// existing remote chain config, errors clearly when the target remote pool is not configured,
-// and emits an MCMS batch operation when the pool authority is not the deployer key.
-func (a *SolanaAdapter) RemoveRemotePool() *cldf_ops.Sequence[tokenapi.RemoveRemotePoolSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+// type from input.TokenPoolRef. The remote pool address is a raw 32-byte public key (no padding
+// is needed: Solana public keys are always exactly 32 bytes, unlike EVM addresses which are
+// stored left-padded to 32 bytes on-chain), so the input address is decoded from base58
+// directly. The underlying operation reads the existing remote chain config, errors clearly
+// when the target remote pool is not configured, and emits an MCMS batch operation when the
+// pool authority is not the deployer key.
+func (a *SolanaAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokenapi.RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
-		"RemoveRemotePool",
+		"RemoveRemotePools",
 		common_utils.Version_1_6_0,
 		"Removes remote pool entries from a Solana 1.6 token pool",
-		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RemoveRemotePoolSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RemoveRemotePoolsSequenceInput) (sequences.OnChainOutput, error) {
 			chain, ok := chains.SolanaChains()[input.Selector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
@@ -639,9 +641,9 @@ func (a *SolanaAdapter) RemoveRemotePool() *cldf_ops.Sequence[tokenapi.RemoveRem
 
 			var result sequences.OnChainOutput
 			for _, remote := range input.RemotePoolsToRemove {
-				remotePool, err := solana.PublicKeyFromBase58(remote.Address)
+				remotePool, err := solana.PublicKeyFromBase58(remote.Remote.Address)
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remote.Selector, remote.Address, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remote.Selector, remote.Remote.Address, err)
 				}
 
 				out, err := operations.ExecuteOperation(b, op, chain, tokenpoolops.RemoveRemotePoolInput{
@@ -651,7 +653,7 @@ func (a *SolanaAdapter) RemoveRemotePool() *cldf_ops.Sequence[tokenapi.RemoveRem
 					RemotePoolAddress: remotePool.Bytes(),
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to remove remote pool %s for remote chain %d from pool %s on chain %d: %w", remote.Address, remote.Selector, input.TokenPoolRef.Address, input.Selector, err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to remove remote pool %s for remote chain %d from pool %s on chain %d: %w", remote.Remote.Address, remote.Selector, input.TokenPoolRef.Address, input.Selector, err)
 				}
 
 				result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
