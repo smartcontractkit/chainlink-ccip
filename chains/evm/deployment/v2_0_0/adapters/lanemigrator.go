@@ -133,7 +133,14 @@ func verifyAllContractsPresent(e deployment.Environment, chainSelector uint64, s
 		}
 	}
 	for _, ref := range singleRefContracts {
-		_, err := datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, evm_datastore_utils.ToEVMAddress)
+		// OnRamp may have a legacy-qualified duplicate in the datastore after an
+		// upgrade; always resolve the canonical (empty-qualifier) ref.
+		var err error
+		if ref.Type == datastore.ContractType(onrampops.ContractType) {
+			_, err = datastore_utils.FindAndFormatCanonicalRef(e.DataStore, ref, chainSelector, evm_datastore_utils.ToEVMAddress)
+		} else {
+			_, err = datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, evm_datastore_utils.ToEVMAddress)
+		}
 		if err != nil {
 			missing = append(missing, fmt.Sprintf("%s@%s", ref.Type, ref.Version))
 		}
@@ -283,8 +290,9 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				}
 			}
 			tempDS := ds.Seal()
-			// fetch onRamp and offRamp from the existing addresses
-			onRampAddr, err := datastore_utils.FindAndFormatRef(
+			// fetch onRamp and offRamp from the existing addresses (canonical onRamp to
+			// ignore any legacy-qualified duplicate)
+			onRampAddr, err := datastore_utils.FindAndFormatCanonicalRef(
 				tempDS,
 				datastore.AddressRef{
 					ChainSelector: input.ChainSelector,
