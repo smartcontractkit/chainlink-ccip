@@ -38,12 +38,21 @@ import (
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 )
 
 const (
 	DefaultTxGasLimit       uint32 = 200_000
 	DefaultMaxDataBytes     uint32 = 32_000
 	DefaultTokenFeeUSDCents uint16 = 0
+
+	usdcLockOrBurnMechanismInvalid     uint8 = 0
+	usdcLockOrBurnMechanismCCTPV1      uint8 = 1
+	usdcLockOrBurnMechanismCCTPV2      uint8 = 2
+	usdcLockOrBurnMechanismLockRelease uint8 = 3
+	usdcLockOrBurnMechanismCCV         uint8 = 4
+
+	usdcMechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
 )
 
 type LaneMigrator struct{}
@@ -451,6 +460,11 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				return sequences.OnChainOutput{}, fmt.Errorf("error applying destChainConfig update to fee quoter: %w", err)
 			}
 			writes = append(writes, fqDestChainUpdateRep.Output)
+			usdcProxyWrites, err := updateUSDCTokenPoolProxyMechanismsToCCTPV2WithCCV(b, c, tempDS, input.ChainSelector, input.RemoteChainSelectors)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, usdcProxyWrites...)
 			batchOp, err := contract.NewBatchOperationFromWrites(writes)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
@@ -459,4 +473,93 @@ func (r *LaneMigrator) UpdateVersionWithRouter() *cldf_ops.Sequence[deploy.RampU
 				BatchOps: []mcms_types.BatchOperation{batchOp},
 			}, nil
 		})
+}
+
+// updateUSDCTokenPoolProxyMechanismsToCCTPV2WithCCV is a no-op for non-USDC
+// lanes, unset USDC lanes, lock-release lanes, and lanes already using CCV.
+func updateUSDCTokenPoolProxyMechanismsToCCTPV2WithCCV(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	ds datastore.DataStore,
+	chainSelector uint64,
+	remoteChainSelectors []uint64,
+) ([]contract.WriteOutput, error) {
+	proxyRefs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(usdc_token_pool_proxy.ContractType)),
+		datastore.AddressRefByVersion(usdc_token_pool_proxy.Version),
+	)
+	switch len(proxyRefs) {
+	case 0:
+		return nil, nil
+	case 1:
+	default:
+		return nil, fmt.Errorf("expected at most one USDCTokenPoolProxy v%s on chain %d, found %d", usdc_token_pool_proxy.Version, chainSelector, len(proxyRefs))
+	}
+
+	proxyAddr, err := evm_datastore_utils.ToEVMAddress(proxyRefs[0])
+	if err != nil {
+		return nil, fmt.Errorf("error formatting USDCTokenPoolProxy address ref: %w", err)
+	}
+
+	toUpdateSelectors := make([]uint64, 0, len(remoteChainSelectors))
+	toUpdateMechanisms := make([]uint8, 0, len(remoteChainSelectors))
+	for _, remoteChainSelector := range remoteChainSelectors {
+		currentMechanismReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetLockOrBurnMechanism, chain, contract.FunctionInput[uint64]{
+			ChainSelector: chainSelector,
+			Address:       proxyAddr,
+			Args:          remoteChainSelector,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get USDCTokenPoolProxy lock or burn mechanism for chain %d remote chain %d: %w", chainSelector, remoteChainSelector, err)
+		}
+
+		shouldUpdate, err := shouldUpdateUSDCLockOrBurnMechanismToCCTPV2WithCCV(currentMechanismReport.Output)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate USDCTokenPoolProxy lock or burn mechanism for chain %d remote chain %d: %w", chainSelector, remoteChainSelector, err)
+		}
+		if !shouldUpdate {
+			continue
+		}
+
+		toUpdateSelectors = append(toUpdateSelectors, remoteChainSelector)
+		toUpdateMechanisms = append(toUpdateMechanisms, usdcLockOrBurnMechanismCCV)
+	}
+	if len(toUpdateSelectors) == 0 {
+		return nil, nil
+	}
+	poolsReport, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.GetPools, chain, contract.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       proxyAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get USDCTokenPoolProxy pool addresses for chain %d: %w", chainSelector, err)
+	}
+	if poolsReport.Output.CctpV2PoolWithCCV == (common.Address{}) {
+		return nil, fmt.Errorf("cannot update USDCTokenPoolProxy lock or burn mechanisms to %s on chain %d: CCTP_V2_WITH_CCV pool is not set", usdcMechanismCCTPV2WithCCV, chainSelector)
+	}
+
+	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
+		ChainSelector: chainSelector,
+		Address:       proxyAddr,
+		Args: usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs{
+			RemoteChainSelectors: toUpdateSelectors,
+			Mechanisms:           toUpdateMechanisms,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update USDCTokenPoolProxy lock or burn mechanisms to %s: %w", usdcMechanismCCTPV2WithCCV, err)
+	}
+	return []contract.WriteOutput{report.Output}, nil
+}
+
+func shouldUpdateUSDCLockOrBurnMechanismToCCTPV2WithCCV(current uint8) (bool, error) {
+	switch current {
+	case usdcLockOrBurnMechanismCCTPV1, usdcLockOrBurnMechanismCCTPV2:
+		return true, nil
+	case usdcLockOrBurnMechanismInvalid, usdcLockOrBurnMechanismLockRelease, usdcLockOrBurnMechanismCCV:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected mechanism %d", current)
+	}
 }
