@@ -250,8 +250,10 @@ fn parse_and_validate_svm_extra_args(
                     args.accounts.len(),
                     FeeQuoterError::InvalidExtraArgsAccounts
                 );
+                let has_writable_bits_beyond_accounts = (args.accounts.len()..u64::BITS as usize)
+                    .any(|bit| args.account_is_writable_bitmap & (1u64 << bit) != 0);
                 require!(
-                    args.account_is_writable_bitmap >> args.accounts.len() == 0,
+                    !has_writable_bits_beyond_accounts,
                     FeeQuoterError::InvalidExtraArgsWritabilityBitmap
                 );
                 args
@@ -863,6 +865,14 @@ pub mod tests {
     }
 
     #[test]
+    fn svm_token_transfer_data_overhead_matches_static_payload_size() {
+        assert_eq!(
+            SVM_TOKEN_TRANSFER_DATA_OVERHEAD,
+            (4 + 32) + 32 + 4 + 4 + 32 + (6 * SVM_ACCOUNT_BYTE_SIZE)
+        );
+    }
+
+    #[test]
     fn svm_expanded_payload_counts_towards_max_data_bytes() {
         let mut svm_dest_chain = sample_dest_chain();
         svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
@@ -905,6 +915,57 @@ pub mod tests {
             )
             .unwrap_err(),
             FeeQuoterError::MessageTooLarge.into()
+        );
+    }
+
+    #[test]
+    fn svm_writable_bitmap_allows_all_bits_for_max_accounts() {
+        let mut svm_dest_chain = sample_dest_chain();
+        svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+
+        let args = SVMExtraArgsV1 {
+            accounts: vec![[1; 32]; SVM_EXTRA_ARGS_MAX_ACCOUNTS],
+            account_is_writable_bitmap: u64::MAX,
+            ..Default::default()
+        };
+
+        process_extra_args(
+            &svm_dest_chain.config,
+            &args.serialize_with_tag(),
+            &MessageInfo {
+                number_of_tokens: 0,
+                contains_receiver: true,
+                data_len: 0,
+            },
+            &0,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn svm_writable_bitmap_rejects_bits_beyond_accounts() {
+        let mut svm_dest_chain = sample_dest_chain();
+        svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+
+        let args = SVMExtraArgsV1 {
+            accounts: vec![[1; 32]; SVM_EXTRA_ARGS_MAX_ACCOUNTS - 1],
+            account_is_writable_bitmap: u64::MAX,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            process_extra_args(
+                &svm_dest_chain.config,
+                &args.serialize_with_tag(),
+                &MessageInfo {
+                    number_of_tokens: 0,
+                    contains_receiver: true,
+                    data_len: 0,
+                },
+                &0,
+            )
+            .unwrap_err(),
+            FeeQuoterError::InvalidExtraArgsWritabilityBitmap.into()
         );
     }
 
