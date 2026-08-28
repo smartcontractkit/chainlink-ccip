@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	seq2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	cctpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/cctp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -45,14 +46,6 @@ const (
 	DefaultTxGasLimit       uint32 = 200_000
 	DefaultMaxDataBytes     uint32 = 32_000
 	DefaultTokenFeeUSDCents uint16 = 0
-
-	usdcLockOrBurnMechanismInvalid     uint8 = 0
-	usdcLockOrBurnMechanismCCTPV1      uint8 = 1
-	usdcLockOrBurnMechanismCCTPV2      uint8 = 2
-	usdcLockOrBurnMechanismLockRelease uint8 = 3
-	usdcLockOrBurnMechanismCCV         uint8 = 4
-
-	usdcMechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
 )
 
 type LaneMigrator struct{}
@@ -523,7 +516,7 @@ func updateUSDCTokenPoolProxyMechanismsToCCTPV2WithCCV(
 		}
 
 		toUpdateSelectors = append(toUpdateSelectors, remoteChainSelector)
-		toUpdateMechanisms = append(toUpdateMechanisms, usdcLockOrBurnMechanismCCV)
+		toUpdateMechanisms = append(toUpdateMechanisms, cctpseq.LockOrBurnMechanismCCV)
 	}
 	if len(toUpdateSelectors) == 0 {
 		return nil, nil
@@ -536,7 +529,7 @@ func updateUSDCTokenPoolProxyMechanismsToCCTPV2WithCCV(
 		return nil, fmt.Errorf("failed to get USDCTokenPoolProxy pool addresses for chain %d: %w", chainSelector, err)
 	}
 	if poolsReport.Output.CctpV2PoolWithCCV == (common.Address{}) {
-		return nil, fmt.Errorf("cannot update USDCTokenPoolProxy lock or burn mechanisms to %s on chain %d: CCTP_V2_WITH_CCV pool is not set", usdcMechanismCCTPV2WithCCV, chainSelector)
+		return nil, fmt.Errorf("cannot update USDCTokenPoolProxy lock or burn mechanisms to %s on chain %d: CCTP_V2_WITH_CCV pool is not set", cctpseq.MechanismCCTPV2WithCCV, chainSelector)
 	}
 
 	report, err := cldf_ops.ExecuteOperation(b, usdc_token_pool_proxy.UpdateLockOrBurnMechanisms, chain, contract.FunctionInput[usdc_token_pool_proxy.UpdateLockOrBurnMechanismsArgs]{
@@ -548,16 +541,16 @@ func updateUSDCTokenPoolProxyMechanismsToCCTPV2WithCCV(
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update USDCTokenPoolProxy lock or burn mechanisms to %s: %w", usdcMechanismCCTPV2WithCCV, err)
+		return nil, fmt.Errorf("failed to update USDCTokenPoolProxy lock or burn mechanisms to %s: %w", cctpseq.MechanismCCTPV2WithCCV, err)
 	}
 	return []contract.WriteOutput{report.Output}, nil
 }
 
 func shouldUpdateUSDCLockOrBurnMechanismToCCTPV2WithCCV(current uint8) (bool, error) {
 	switch current {
-	case usdcLockOrBurnMechanismCCTPV1, usdcLockOrBurnMechanismCCTPV2:
+	case cctpseq.LockOrBurnMechanismCCTPV1, cctpseq.LockOrBurnMechanismCCTPV2:
 		return true, nil
-	case usdcLockOrBurnMechanismInvalid, usdcLockOrBurnMechanismLockRelease, usdcLockOrBurnMechanismCCV:
+	case cctpseq.LockOrBurnMechanismInvalid, cctpseq.LockOrBurnMechanismLockRelease, cctpseq.LockOrBurnMechanismCCV:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected mechanism %d", current)

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	cctpseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/cctp"
 )
 
 func TestShouldUpdateUSDCLockOrBurnMechanismToCCTPV2WithCCV(t *testing.T) {
@@ -15,27 +17,27 @@ func TestShouldUpdateUSDCLockOrBurnMechanismToCCTPV2WithCCV(t *testing.T) {
 	}{
 		{
 			name:       "skips invalid mechanism",
-			current:    usdcLockOrBurnMechanismInvalid,
+			current:    cctpseq.LockOrBurnMechanismInvalid,
 			wantUpdate: false,
 		},
 		{
 			name:       "updates cctp v1",
-			current:    usdcLockOrBurnMechanismCCTPV1,
+			current:    cctpseq.LockOrBurnMechanismCCTPV1,
 			wantUpdate: true,
 		},
 		{
 			name:       "updates cctp v2",
-			current:    usdcLockOrBurnMechanismCCTPV2,
+			current:    cctpseq.LockOrBurnMechanismCCTPV2,
 			wantUpdate: true,
 		},
 		{
 			name:       "skips lock release",
-			current:    usdcLockOrBurnMechanismLockRelease,
+			current:    cctpseq.LockOrBurnMechanismLockRelease,
 			wantUpdate: false,
 		},
 		{
 			name:       "skips ccv",
-			current:    usdcLockOrBurnMechanismCCV,
+			current:    cctpseq.LockOrBurnMechanismCCV,
 			wantUpdate: false,
 		},
 		{
