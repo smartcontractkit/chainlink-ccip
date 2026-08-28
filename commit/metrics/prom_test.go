@@ -325,20 +325,22 @@ func Test_MerkleRoots(t *testing.T) {
 	}
 
 	outTcs := []struct {
-		name             string
-		outcome          merkleroot.Outcome
-		state            string
-		expectedRoots    int
-		expectedMessages int
+		name                  string
+		outcome               merkleroot.Outcome
+		state                 string
+		expectedRoots         int
+		expectedMessages      int
+		expectedRMNSignatures int
 	}{
 		{
 			name: "empty/missing structs should not report anything",
 			outcome: merkleroot.Outcome{
 				RootsToReport: nil,
 			},
-			state:            "state",
-			expectedRoots:    0,
-			expectedMessages: 0,
+			state:                 "state",
+			expectedRoots:         0,
+			expectedMessages:      0,
+			expectedRMNSignatures: 0,
 		},
 		{
 			name: "data is properly reported",
@@ -357,10 +359,12 @@ func Test_MerkleRoots(t *testing.T) {
 						MerkleRoot:    rand.RandomBytes32(),
 					},
 				},
+				RMNReportSignatures: make([]cciptypes.RMNECDSASignature, 5),
 			},
-			state:            "state",
-			expectedRoots:    2,
-			expectedMessages: 6,
+			state:                 "state",
+			expectedRoots:         2,
+			expectedMessages:      6,
+			expectedRMNSignatures: 5,
 		},
 	}
 
@@ -380,6 +384,12 @@ func Test_MerkleRoots(t *testing.T) {
 				)),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
+			rmns := int(testutil.ToFloat64(
+				reporter.processorOutputCounter.WithLabelValues(
+					"evm", chainID, processor, plugincommon.OutcomeMethod, "rmnSignatures",
+				)),
+			)
+			require.Equal(t, tc.expectedRMNSignatures, rmns)
 		})
 	}
 	bhClient.Close()
