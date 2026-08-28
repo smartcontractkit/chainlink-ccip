@@ -18,6 +18,9 @@ pub const GENERIC_EXTRA_ARGS_V2_TAG: u32 = 0x181dcf10;
 /// bytes4(keccak256("CCIP SVMExtraArgsV1"));
 pub const SVM_EXTRA_ARGS_V1_TAG: u32 = 0x1f3b3aba;
 
+// Extra args tag for chains that use the Sui VM.
+pub const SUI_EXTRA_ARGS_V1_TAG: u32 = 0x21ea4ca9;
+
 /// The maximum number of accounts that can be passed in SVMExtraArgs.
 pub const SVM_EXTRA_ARGS_MAX_ACCOUNTS: usize = 64;
 
@@ -61,10 +64,30 @@ impl SVMExtraArgsV1 {
         buffer.append(&mut data);
         buffer
     }
+
     pub fn default_config(cfg: &DestChainConfig) -> SVMExtraArgsV1 {
         SVMExtraArgsV1 {
             compute_units: cfg.default_tx_gas_limit,
             ..Default::default()
         }
+    }
+}
+
+// Extra Args of message when SVM -> SUI
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
+pub struct SuiExtraArgsV1 {
+    pub gas_limit: u128,                    // message gas limit
+    pub allow_out_of_order_execution: bool, // user configurable OOO execution that must match with the DestChainConfig.EnforceOutOfOrderExecution
+    pub token_receiver: [u8; 32],           // cannot be 0-address if tokens are sent in message
+    pub receiver_object_ids: Vec<[u8; 32]>, // list of object ids for messaging on remote SUI chain
+}
+
+impl SuiExtraArgsV1 {
+    pub fn serialize_with_tag(&self) -> Vec<u8> {
+        let mut buffer = SUI_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+        let mut data = self.try_to_vec().unwrap();
+
+        buffer.append(&mut data);
+        buffer
     }
 }
