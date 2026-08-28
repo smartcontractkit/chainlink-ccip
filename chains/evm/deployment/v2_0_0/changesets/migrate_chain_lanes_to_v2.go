@@ -178,6 +178,10 @@ func MigrateChainLanesToV2(
 			return deployment.ChangesetOutput{}, err
 		}
 
+		// TODO: Wire the USDC CCTP_V2_WITH_CCV mechanism switch into this prod-router
+		// migration path once MigrateChainLanesToV2 supports the same targeted prod-lane
+		// workflow as LaneMigrateToNewVersionChangeset.
+
 		// Lane migrations to the TestRouter also get a TESTTR test token wired behind it.
 		if cfg.TestRouter == nil || !*cfg.TestRouter {
 			return laneOut, nil
