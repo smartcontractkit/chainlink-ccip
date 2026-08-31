@@ -36,10 +36,16 @@ import (
 )
 
 const (
-	mechanismCCTPV1        = "CCTP_V1"
-	mechanismCCTPV2        = "CCTP_V2"
-	mechanismLockRelease   = "LOCK_RELEASE"
-	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
+	MechanismCCTPV1        = "CCTP_V1"
+	MechanismCCTPV2        = "CCTP_V2"
+	MechanismLockRelease   = "LOCK_RELEASE"
+	MechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
+
+	LockOrBurnMechanismInvalid     uint8 = 0
+	LockOrBurnMechanismCCTPV1      uint8 = 1
+	LockOrBurnMechanismCCTPV2      uint8 = 2
+	LockOrBurnMechanismLockRelease uint8 = 3
+	LockOrBurnMechanismCCV         uint8 = 4
 )
 
 var v162 = semver.MustParse("1.6.2")
@@ -73,7 +79,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		lockReleaseSelectors := make([]uint64, 0)
 		for sel, cfg := range input.RemoteChains {
-			if cfg.LockOrBurnMechanism == mechanismLockRelease {
+			if cfg.LockOrBurnMechanism == MechanismLockRelease {
 				lockReleaseSelectors = append(lockReleaseSelectors, sel)
 			}
 		}
@@ -237,7 +243,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Configure remote chains on CCTP V1 token pool (1.6.1 sequence).
 		cctpV1TokenPoolAddress := common.HexToAddress(refs.CCTPV1TokenPool.Address)
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
-			if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+			if remoteChain.LockOrBurnMechanism != MechanismCCTPV1 {
 				continue
 			}
 			if refs.CCTPV1TokenPool.Address == "" {
@@ -267,7 +273,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// would be wasted state.
 		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
-			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == mechanismLockRelease {
+			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == MechanismLockRelease {
 				continue
 			}
 			if !isEVMRemote(remoteChainSelector) {
@@ -519,7 +525,7 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanesInput, cctpVerifierAddress common.Address) []versioned_verifier_resolver.OutboundImplementationArgs {
 	out := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		if remoteChain.LockOrBurnMechanism == mechanismLockRelease {
+		if remoteChain.LockOrBurnMechanism == MechanismLockRelease {
 			continue
 		}
 		if !isEVMRemote(remoteChainSelector) {
@@ -654,7 +660,7 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
 			continue
 		}
-		if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+		if remoteChain.LockOrBurnMechanism != MechanismCCTPV1 {
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV1AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
@@ -921,19 +927,19 @@ func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 
 func convertMechanismToUint8(mechanism string) (uint8, error) {
 	switch mechanism {
-	case mechanismCCTPV1:
-		return 1, nil
-	case mechanismCCTPV2:
-		return 2, nil
-	case mechanismLockRelease:
-		return 3, nil
-	case mechanismCCTPV2WithCCV:
-		return 4, nil
+	case MechanismCCTPV1:
+		return LockOrBurnMechanismCCTPV1, nil
+	case MechanismCCTPV2:
+		return LockOrBurnMechanismCCTPV2, nil
+	case MechanismLockRelease:
+		return LockOrBurnMechanismLockRelease, nil
+	case MechanismCCTPV2WithCCV:
+		return LockOrBurnMechanismCCV, nil
 	default:
-		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", mechanismCCTPV1, mechanismCCTPV2, mechanismLockRelease, mechanismCCTPV2WithCCV, mechanism)
+		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", MechanismCCTPV1, MechanismCCTPV2, MechanismLockRelease, MechanismCCTPV2WithCCV, mechanism)
 	}
 }
 
 func isV2Mechanism(mechanism string) bool {
-	return mechanism == mechanismCCTPV2 || mechanism == mechanismCCTPV2WithCCV
+	return mechanism == MechanismCCTPV2 || mechanism == MechanismCCTPV2WithCCV
 }

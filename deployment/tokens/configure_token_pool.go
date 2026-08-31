@@ -32,7 +32,7 @@ type ConfigureTokenPoolInput struct {
 // ConfigureTokenPoolPerChain groups pool updates for a single chain.
 type ConfigureTokenPoolPerChain struct {
 	// ChainSelector identifies the chain on which the pools live.
-	ChainSelector uint64 `yaml:"selector" json:"selector,string"`
+	ChainSelector uint64 `yaml:"selector" json:"selector"`
 	// Pools lists the pool configuration updates on this chain.
 	Pools []PoolConfigUpdate `yaml:"pools" json:"pools"`
 }
@@ -58,7 +58,7 @@ type PoolConfigUpdate struct {
 // RemoteConfigUpdate describes partial per-lane configuration for one remote chain.
 type RemoteConfigUpdate struct {
 	// RemoteChainSelector identifies the remote chain of the lane.
-	RemoteChainSelector uint64 `yaml:"selector" json:"selector,string"`
+	RemoteChainSelector uint64 `yaml:"selector" json:"selector"`
 	// TokenTransferFeeConfig, if set, is merged with the current on-chain fee config
 	// (user-set fields win; unset fields keep their on-chain values).
 	TokenTransferFeeConfig *PartialTokenTransferFeeConfig `yaml:"tokenTransferFeeConfig,omitempty" json:"tokenTransferFeeConfig,omitempty"`

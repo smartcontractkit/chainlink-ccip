@@ -1241,6 +1241,61 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 				require.Zero(t, preInboundEVM.Capacity.Cmp(postInboundEVM.Capacity), "EVM inbound capacity should be unchanged after OutboundOnly apply on Solana")
 				require.Zero(t, preInboundEVM.Rate.Cmp(postInboundEVM.Rate), "EVM inbound rate should be unchanged after OutboundOnly apply on Solana")
 			})
+
+			// RemoveRemotePools removes the EVM remote pool entry from the Solana LockRelease pool
+			// and verifies the on-chain remote chain config no longer lists it. This exercises the
+			// cross-family path where the remote pool is an EVM address (stored raw, not padded).
+			t.Run("RemoveRemotePools", func(t *testing.T) {
+				chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
+				require.NoError(t, err)
+
+				// The Solana pool is referenced by its config PDA (not the program ID), which is
+				// what the adapter needs to derive the token mint.
+				solPoolPDA, _ := tokens.TokenPoolConfigAddress(solTokenMint, solPoolProgramID)
+
+				// Sanity: the Solana pool currently lists the EVM pool as a remote.
+				var preCfg lockrelease_token_pool.ChainConfig
+				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &preCfg))
+				require.NotEmpty(t, preCfg.Base.Remote.PoolAddresses, "Solana pool should have a remote pool for EVM before removal")
+
+				// Remove the EVM remote pool from the Solana pool.
+				out, err := tokensapi.RemoveRemotePools().Apply(*env, tokensapi.RemoveRemotePoolsInput{
+					MCMS: NewDefaultInputForMCMS("Scenario 5 RemoveRemotePools"),
+					Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+						ChainSelector: solChainSel,
+						Pool:          datastore.AddressRef{Address: solPoolPDA.String()},
+						RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
+							Selector: evmChainSel,
+							Remote:   datastore.AddressRef{Address: evmPoolAddr.Hex()},
+						}},
+					}},
+				})
+				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+				// The EVM remote pool must no longer be listed on the Solana pool.
+				var postCfg lockrelease_token_pool.ChainConfig
+				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &postCfg))
+				require.Empty(t, postCfg.Base.Remote.PoolAddresses, "Solana pool should have no remote pool for EVM after removal")
+
+				// Refresh the operations bundle so the second apply re-reads on-chain state instead
+				// of returning the cached result of the first (identical) apply.
+				env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
+
+				// Removing an already-removed pool must error clearly.
+				_, err = tokensapi.RemoveRemotePools().Apply(*env, tokensapi.RemoveRemotePoolsInput{
+					MCMS: NewDefaultInputForMCMS("Scenario 5 RemoveRemotePools idempotency"),
+					Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+						ChainSelector: solChainSel,
+						Pool:          datastore.AddressRef{Address: solPoolPDA.String()},
+						RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
+							Selector: evmChainSel,
+							Remote:   datastore.AddressRef{Address: evmPoolAddr.Hex()},
+						}},
+					}},
+				})
+				require.ErrorContains(t, err, "is not configured")
+			})
 		})
 
 		// Test address ref inference

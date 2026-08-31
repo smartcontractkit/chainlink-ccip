@@ -9,6 +9,7 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
@@ -16,6 +17,7 @@ import (
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -598,6 +600,86 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 }
 
 var _ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
+var _ tokenapi.RemotePoolRemover = (*SolanaAdapter)(nil)
+
+// RemoveRemotePools removes remote pool entries from a Solana 1.6 token pool. The pool address
+// is a program ID shared across mints, so the token mint comes from input.TokenRef and the pool
+// type from input.TokenPoolRef. The remote pool address is converted to the raw bytes the pool
+// stores on-chain via the remote chain family's AddressNormalizer: a Solana remote is a 32-byte
+// public key, while an EVM remote is stored as its raw 20-byte address (not padded — see
+// ConfigureTokensForTransfers). The underlying operation reads the existing remote chain
+// config, errors clearly when the target remote pool is not configured, and emits an MCMS batch
+// operation when the pool authority is not the deployer key.
+func (a *SolanaAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokenapi.RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"RemoveRemotePools",
+		common_utils.Version_1_6_0,
+		"Removes remote pool entries from a Solana 1.6 token pool",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RemoveRemotePoolsSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.SolanaChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
+			}
+
+			var op = tokenpoolops.RemoveRemotePoolBurnMint
+			switch input.TokenPoolRef.Type.String() {
+			case common_utils.BurnMintTokenPool.String():
+				op = tokenpoolops.RemoveRemotePoolBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				op = tokenpoolops.RemoveRemotePoolLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
+			}
+
+			tokenPool, err := solana.PublicKeyFromBase58(input.TokenPoolRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s: %w", input.Selector, input.TokenPoolRef.Address, err)
+			}
+
+			tokenMint, err := solana.PublicKeyFromBase58(input.TokenRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token mint address for chain %d: %s: %w", input.Selector, input.TokenRef.Address, err)
+			}
+
+			var result sequences.OnChainOutput
+			for _, remote := range input.RemotePoolsToRemove {
+				remotePoolBytes, err := remotePoolAddressToBytes(remote.Selector, remote.Remote.Address)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remote.Selector, remote.Remote.Address, err)
+				}
+
+				out, err := operations.ExecuteOperation(b, op, chain, tokenpoolops.RemoveRemotePoolInput{
+					TokenPool:         tokenPool,
+					TokenMint:         tokenMint,
+					RemoteSelector:    remote.Selector,
+					RemotePoolAddress: remotePoolBytes,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to remove remote pool %s for remote chain %d from pool %s on chain %d: %w", remote.Remote.Address, remote.Selector, input.TokenPoolRef.Address, input.Selector, err)
+				}
+
+				result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
+			}
+
+			return result, nil
+		},
+	)
+}
+
+// remotePoolAddressToBytes converts a remote pool address to the raw bytes a Solana pool stores
+// on-chain for the given remote chain family, using the family's registered AddressNormalizer.
+// Solana remotes are 32-byte public keys; EVM remotes are stored as their raw 20-byte address.
+func remotePoolAddressToBytes(remoteSelector uint64, address string) ([]byte, error) {
+	family, err := chain_selectors.GetSelectorFamily(remoteSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
+	}
+	normalizer, ok := deployapi.GetAddressNormalizerRegistry().GetAddressNormalizer(family)
+	if !ok {
+		return nil, fmt.Errorf("no address normalizer registered for chain family %q of remote chain selector %d", family, remoteSelector)
+	}
+	return normalizer.StringToBytes(address)
+}
 
 // SetTokenPoolAdmins updates the rate limit admin on a Solana 1.6 token pool. Solana pools
 // have no fee admin concept, so a non-nil FeeAdmin is rejected. The pool address is a program
