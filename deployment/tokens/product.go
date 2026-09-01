@@ -67,6 +67,31 @@ type TokenAdminRoleAdapter interface {
 	GrantTokenAdminRole() *cldf_ops.Sequence[GrantTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
+// RemotePoolRemover is an optional interface for adapters that support removing remote pool
+// entries from a token pool. Implementations must read the current on-chain remote pools and
+// return a clear error when a requested remote pool is not currently configured, rather than
+// emitting a no-op transaction.
+type RemotePoolRemover interface {
+	RemoveRemotePools() *cldf_ops.Sequence[RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// RemoveRemotePoolsSequenceInput defines the input for removing remote pool entries from a
+// token pool. Each entry in RemotePoolsToRemove names one remote pool to remove.
+type RemoveRemotePoolsSequenceInput struct {
+	Selector            uint64               `json:"selector" yaml:"selector"`
+	TokenPoolRef        datastore.AddressRef `json:"tokenPoolRef" yaml:"tokenPoolRef"`
+	TokenRef            datastore.AddressRef `json:"tokenRef" yaml:"tokenRef"`
+	RemotePoolsToRemove []RemotePoolToRemove `json:"remotePoolsToRemove" yaml:"remotePoolsToRemove"`
+}
+
+// RemotePoolToRemove identifies a single remote pool entry to remove from a token pool. The
+// remote pool is referenced by an AddressRef so operators can identify it by qualifier, by
+// address, or by any other unique combination of ref fields.
+type RemotePoolToRemove struct {
+	Selector uint64               `json:"selector" yaml:"selector"`
+	Remote   datastore.AddressRef `json:"remote" yaml:"remote"`
+}
+
 // TokenRefResolver is an optional interface that can be implemented by TokenAdapters. It acts as a form of middleware that allows token
 // and pool references to be resolved in a particular way before they are passed into the adapter logic. For example, a ref resolver can
 // reconstruct refs from onchain data, normalize addresses, apply transformations on the raw input ref, etc.
