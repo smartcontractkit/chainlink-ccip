@@ -331,8 +331,17 @@ func newTestTokenPerChainConfig(e deployment.Environment, sel uint64, remotes ma
 			Decimals: testTokenDecimals,
 			Type:     deployment.ContractType(burn_mint_erc20_with_drip.ContractType),
 		}
-	} else if e.Logger != nil {
-		e.Logger.Infof("reusing existing %s token at %s on chain with selector %d", testTokenSymbol, existing[0].Address, sel)
+	} else {
+		// TESTTR is already recorded on this chain: the changeset that first touched it in this
+		// batch deployed it and emitted its TokenAdminRegistry registration + token admin
+		// handover ops. Those ops are pending in the same MCMS root — re-emitting them would
+		// revert AlreadyRegistered at execution time and, because MCMS ops must run in per-chain
+		// nonce order, block every later operation for this chain. Only the new lane's pool
+		// remote configuration still needs to run.
+		perChain.TokenTransferConfig.SkipTokenAdminRegistrySetup = true
+		if e.Logger != nil {
+			e.Logger.Infof("reusing existing %s token at %s on chain with selector %d; skipping already-emitted registry setup ops", testTokenSymbol, existing[0].Address, sel)
+		}
 	}
 	return perChain, nil
 }
