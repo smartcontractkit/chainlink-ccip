@@ -605,7 +605,7 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	// 1. Fresh deploy via TokenExpansion (no reconcile opts).
 	type reconcileOpts struct {
 		routerRef     *datastore.AddressRef
-		feeAggregator string
+		feeAdmin string
 	}
 	expansion := func(opts reconcileOpts, deploy bool) tokens.TokenExpansionInputPerChain {
 		in := tokens.TokenExpansionInputPerChain{
@@ -615,7 +615,7 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 				PoolType:           string(burn_mint_token_pool.ContractType),
 				TokenPoolQualifier: symbol,
 				RouterRef:          opts.routerRef,
-				FeeAggregator:      opts.feeAggregator,
+				FeeAdmin:      opts.feeAdmin,
 				// On reconcile runs (no DeployTokenInput), TokenExpansion still
 				// needs a TokenRef to merge against. Point at the v1.0.0
 				// burn-mint-drip token deployed on the first run.
@@ -679,30 +679,30 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	require.Equal(t, common.Address{}, cfg.FeeAdmin, "fresh deploy should leave feeAdmin unset")
 
 	// 2. Reconcile RouterRef → TestRouter. FeeAdmin should stay at its zero
-	//    value because we didn't supply a FeeAggregator.
+	//    value because we didn't supply a FeeAdmin.
 	testRouterRef := &datastore.AddressRef{Type: datastore.ContractType(router.TestRouterContractType)}
 	apply(t, reconcileOpts{routerRef: testRouterRef}, false, "reconcile RouterRef=TestRouter")
 
 	cfg = readDynamicConfig(t)
 	require.Equal(t, testRouter, cfg.Router, "router should flip to TestRouter")
-	require.Equal(t, common.Address{}, cfg.FeeAdmin, "feeAdmin should remain unchanged when FeeAggregator not provided")
+	require.Equal(t, common.Address{}, cfg.FeeAdmin, "feeAdmin should remain unchanged when FeeAdmin not provided")
 
-	// 3. Reconcile FeeAggregator without RouterRef. Router must stay on
+	// 3. Reconcile FeeAdmin without RouterRef. Router must stay on
 	//    TestRouter (proves fields reconcile independently), feeAdmin flips.
-	feeAggAddr := common.HexToAddress("0x000000000000000000000000000000000000fEEE")
-	apply(t, reconcileOpts{feeAggregator: feeAggAddr.Hex()}, false, "reconcile FeeAggregator only")
+	feeAdminAddr := common.HexToAddress("0x000000000000000000000000000000000000fEEE")
+	apply(t, reconcileOpts{feeAdmin: feeAdminAddr.Hex()}, false, "reconcile FeeAdmin only")
 
 	cfg = readDynamicConfig(t)
-	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter when only FeeAggregator is reconciled")
-	require.Equal(t, feeAggAddr, cfg.FeeAdmin, "feeAdmin should be set to provided FeeAggregator")
+	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter when only FeeAdmin is reconciled")
+	require.Equal(t, feeAdminAddr, cfg.FeeAdmin, "feeAdmin should be set to provided FeeAdmin")
 
 	// 4. Idempotent re-run with both fields. ConfigureTokenPool detects no
 	//    diff and skips the setDynamicConfig write; on-chain state unchanged.
-	apply(t, reconcileOpts{routerRef: testRouterRef, feeAggregator: feeAggAddr.Hex()}, false, "idempotent reconcile")
+	apply(t, reconcileOpts{routerRef: testRouterRef, feeAdmin: feeAdminAddr.Hex()}, false, "idempotent reconcile")
 
 	cfg = readDynamicConfig(t)
 	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter after idempotent reconcile")
-	require.Equal(t, feeAggAddr, cfg.FeeAdmin, "feeAdmin should remain set after idempotent reconcile")
+	require.Equal(t, feeAdminAddr, cfg.FeeAdmin, "feeAdmin should remain set after idempotent reconcile")
 }
 
 // TestTokenExpansion_FreshDeployWithRouterRef covers the fresh-deploy
