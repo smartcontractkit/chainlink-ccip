@@ -248,7 +248,7 @@ var DeployLombardChain = cldf_ops.NewSequence(
 			TokenPoolAddress: lombardTokenPoolAddress,
 			RouterAddress:    routerAddress,
 			RateLimitAdmin:   common.HexToAddress(input.RateLimitAdmin),
-			FeeAggregator:    feeAggregatorAddress,
+			FeeAdmin:         feeAggregatorAddress,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool: %w", err)
