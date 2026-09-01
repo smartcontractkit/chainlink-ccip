@@ -40,6 +40,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
   error ChainAlreadyMigrated(uint64 remoteChainSelector);
   error LockBoxCannotBeShared(uint64 chainSelectorA, uint64 chainSelectorB, address lockBox);
   error InsufficientLiquidity(uint256 availableLiquidity, uint256 requestedAmount);
+  error LockedUSDCBelowExcluded(uint256 lockedUSDC, uint256 excludedTokens);
+  error MigrationGracePeriodActive(uint256 activeAt);
 
   /// @notice The address of the circle-controlled wallet which will execute a CCTP lane migration
   address internal s_circleUSDCMigrator;
@@ -54,6 +56,16 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
   /// @notice The chains that have been migrated to CCTP.
   EnumerableSet.UintSet internal s_migratedChains;
+
+  /// @notice Timestamp after which the migration guard becomes active for the proposed lane.
+  /// @dev Set to block.timestamp + MIGRATION_PROPOSAL_GRACE_PERIOD when a migration is proposed.
+  /// The grace period gives the owner time to pause the lane before in-flight messages start reverting.
+  uint256 internal s_migrationActiveAt;
+
+  /// @notice Minimum time between proposing a migration and the guard blocking releases on the proposed lane.
+  /// @dev Finality windows across supported chains can be 5 to 15 minutes. One hour provides enough margin
+  /// for already-committed messages to arrive and for the owner to pause the lane without a race.
+  uint256 public constant MIGRATION_PROPOSAL_GRACE_PERIOD = 1 hours;
 
   /// @dev The authorized callers are set as empty since the USDCTokenPoolProxy is the only authorized caller,
   /// but cannot be deployed until after this contract. The allowed callers will be set after deployment.
@@ -119,8 +131,10 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
 
     uint64 remoteChainSelector = releaseOrMintIn.remoteChainSelector;
     uint256 excludedTokens = s_tokensExcludedFromBurn[remoteChainSelector];
+    bool migrationGuardActive = remoteChainSelector == s_proposedUSDCMigrationChain
+      && block.timestamp >= s_migrationActiveAt;
     if (
-      excludedTokens != 0 || remoteChainSelector == s_proposedUSDCMigrationChain
+      excludedTokens != 0 || migrationGuardActive
         || s_migratedChains.contains(remoteChainSelector)
     ) {
       // Circle's migration procedure requires a lane-level supply lock once migration is proposed/completed.
@@ -207,6 +221,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     if (s_migratedChains.contains(remoteChainSelector)) revert ChainAlreadyMigrated(remoteChainSelector);
     delete s_lockedUSDCToBurn;
     s_proposedUSDCMigrationChain = remoteChainSelector;
+    s_migrationActiveAt = block.timestamp + MIGRATION_PROPOSAL_GRACE_PERIOD;
 
     emit CCTPMigrationProposed(remoteChainSelector);
   }
@@ -223,6 +238,7 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // re-excluded if the proposal is re-proposed in the future
     delete s_tokensExcludedFromBurn[currentProposalChainSelector];
     delete s_lockedUSDCToBurn;
+    delete s_migrationActiveAt;
 
     emit CCTPMigrationCancelled(currentProposalChainSelector);
   }
@@ -260,6 +276,8 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     // Selector 0 is reserved as the "no proposal pending" sentinel in state.
     if (remoteChainSelector == 0) revert InvalidChainSelector();
     if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
+    uint256 excluded = s_tokensExcludedFromBurn[remoteChainSelector];
+    if (lockedUSDCToBurn < excluded) revert LockedUSDCBelowExcluded(lockedUSDCToBurn, excluded);
     s_lockedUSDCToBurn = lockedUSDCToBurn;
 
     emit LockedUSDCToBurnSet(remoteChainSelector, lockedUSDCToBurn);
@@ -316,8 +334,17 @@ contract SiloedUSDCTokenPool is SiloedLockReleaseTokenPool, AuthorizedCallers {
     if (burnChainSelector == 0) revert NoMigrationProposalPending();
 
     ILockBox lockBox = getLockBox(burnChainSelector);
-    // Burnable tokens is the owner-set locked snapshot minus the amount excluded from burn.
-    uint256 tokensToBurn = s_lockedUSDCToBurn - s_tokensExcludedFromBurn[burnChainSelector];
+    uint256 excluded = s_tokensExcludedFromBurn[burnChainSelector];
+    uint256 snapshot = s_lockedUSDCToBurn;
+    // The lockbox balance is the authoritative source for how much USDC can actually be withdrawn.
+    // If excluded in-flight messages were delivered before this call, both the lockbox balance and
+    // the excluded counter were decremented together, so using the lockbox balance here correctly
+    // avoids attempting to withdraw tokens that have already been released.
+    // The snapshot acts as an upper bound to prevent burning USDC that was deposited directly to
+    // the lockbox without going through the bridge.
+    uint256 lockboxBalance = IERC20(address(i_token)).balanceOf(address(lockBox));
+    uint256 burnableFromLockbox = lockboxBalance < snapshot ? lockboxBalance : snapshot;
+    uint256 tokensToBurn = burnableFromLockbox - excluded;
 
     // Apply migration state updates before external calls to preserve CEI.
     delete s_proposedUSDCMigrationChain;
