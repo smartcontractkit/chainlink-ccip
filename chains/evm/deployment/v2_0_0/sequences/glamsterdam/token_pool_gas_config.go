@@ -12,9 +12,9 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 )
 
 // ApplyTokenPoolTokenTransferFeeConfigUpdates mirrors
@@ -91,6 +91,11 @@ var UpdateTokenPoolGasConfig = cldf_ops.NewSequence(
 					"failed to read TokenPool(%s) transfer fee config for src %d, dst %d: %w",
 					lane.PoolAddress, lane.ChainSelector, input.TargetChainSelector, err,
 				)
+			}
+
+			if !cur.Output.IsEnabled {
+				output.Report.AddLine(fmt.Sprintf("chain %d: pool %s has no config for target chain %d, skipping", lane.ChainSelector, lane.PoolAddress, input.TargetChainSelector))
+				return nil
 			}
 
 			result := glamsterdamutils.Resolve(spec, cur.Output.DestGasOverhead)

@@ -2,16 +2,17 @@ package adapters
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences/glamsterdam"
 	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 )
 
 // getAllConfiguredTokensInput is the input to getAllConfiguredTokens.
@@ -104,8 +106,8 @@ func (a *GlamsterdamGasAdapter) ReadDestGasFields(
 	}
 
 	return map[string]uint32{
-		v1_6_1_adapters.FeeQuoterDestGasOverhead.Name:              result.Output.DestGasOverhead,
-		v1_6_1_adapters.FeeQuoterDefaultTokenDestGasOverhead.Name:  result.Output.DefaultTokenDestGasOverhead,
+		v1_6_1_adapters.FeeQuoterDestGasOverhead.Name:             result.Output.DestGasOverhead,
+		v1_6_1_adapters.FeeQuoterDefaultTokenDestGasOverhead.Name: result.Output.DefaultTokenDestGasOverhead,
 	}, nil
 }
 
@@ -202,7 +204,8 @@ func (a *GlamsterdamGasAdapter) ReadImmutableSanityFields(
 	}, nil
 }
 
-// DiscoverCandidateTokens returns all tokens known to TokenAdminRegistry on the chain.
+// DiscoverCandidateTokens returns only USDC tokens known to TokenAdminRegistry on the chain.
+// For v1.6.1, only USDC tokens have special gas config overrides.
 func (a *GlamsterdamGasAdapter) DiscoverCandidateTokens(
 	b cldf_ops.Bundle,
 	chains cldf_chain.BlockChains,
@@ -233,13 +236,30 @@ func (a *GlamsterdamGasAdapter) DiscoverCandidateTokens(
 		return nil, fmt.Errorf("failed to read configured tokens: %w", err)
 	}
 
-	// Convert common.Address to []byte
-	var tokens [][]byte
+	// Filter to only USDC tokens
+	// For v1.6.1, only USDC tokens have special gas config overrides
+	var usdcTokens [][]byte
 	for _, addr := range result.Output {
-		tokens = append(tokens, addr.Bytes())
+		// Query token symbol to identify USDC tokens
+		tokenContract, err := erc20.NewERC20(addr, chain.Client)
+		if err != nil {
+			// If we can't bind the contract, skip it (might not be a standard ERC20)
+			continue
+		}
+
+		symbol, err := tokenContract.Symbol(&bind.CallOpts{})
+		if err != nil {
+			// If we can't read the symbol, skip it (might not be a standard ERC20)
+			continue
+		}
+
+		// Only include tokens that contain "USDC" in their symbol
+		if strings.Contains(symbol, "USDC") {
+			usdcTokens = append(usdcTokens, addr.Bytes())
+		}
 	}
 
-	return tokens, nil
+	return usdcTokens, nil
 }
 
 // ReadTokenGasField reads a token's gas field from FeeQuoter.TokenTransferFeeConfig.
