@@ -20,6 +20,8 @@ type ConstructorArgs struct {
 	RMNProxy common.Address
 	// Router is the router contract.
 	Router common.Address
+	// BurnAddress is the burn address for BurnToAddressMintTokenPool. Optional for other pool types.
+	BurnAddress common.Address
 }
 
 // AdvancedPoolHooksConfig contains optional configuration for AdvancedPoolHooks.

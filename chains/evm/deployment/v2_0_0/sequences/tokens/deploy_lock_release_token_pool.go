@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 )
 
 var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
@@ -29,17 +30,10 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid input: %w", err)
 		}
 
-		lockBoxDeployReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
-			Args: erc20_lock_box.ConstructorArgs{
-				Token: input.ConstructorArgs.Token,
-			},
-			Qualifier: &input.TokenSymbol,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 lock box to %s: %w", chain, err)
-		}
+		typeAndVersion := deployment.NewTypeAndVersion(
+			deployment.ContractType(input.TokenPoolType),
+			*input.TokenPoolVersion,
+		)
 
 		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
 			ChainSelector:  input.ChainSel,
@@ -56,30 +50,156 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy advanced pool hooks to %s: %w", chain, err)
 		}
 
-		typeAndVersion := deployment.NewTypeAndVersion(
-			deployment.ContractType(input.TokenPoolType),
-			*input.TokenPoolVersion,
-		)
-		tpDeployReport, err := cldf_ops.ExecuteOperation(b, lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[lock_release_token_pool.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
-			TypeAndVersion: typeAndVersion,
-			Args: lock_release_token_pool.ConstructorArgs{
-				Token:              input.ConstructorArgs.Token,
-				LocalTokenDecimals: input.ConstructorArgs.Decimals,
-				AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
-				RmnProxy:           input.ConstructorArgs.RMNProxy,
-				Router:             input.ConstructorArgs.Router,
-				LockBox:            common.HexToAddress(lockBoxDeployReport.Output.Address),
-			},
-			Qualifier: &input.TokenSymbol,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy %s to %s: %w", typeAndVersion, chain, err)
+		// Check if this is a siloed pool type
+		isSiloedPool := input.TokenPoolType == datastore.ContractType(siloed_lock_release_token_pool.ContractType)
+
+		var tpDeployReport *datastore.AddressRef
+		var addresses []datastore.AddressRef
+		var batchOps []mcms_types.BatchOperation
+
+		if isSiloedPool {
+			// Validate lock box groups for siloed pool
+			if err := input.ValidateLockBoxGroups(); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid lock box groups: %w", err)
+			}
+
+			// Deploy siloed pool without lockboxes (they'll be configured later)
+			siloedPoolReport, err := cldf_ops.ExecuteOperation(b, siloed_lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[siloed_lock_release_token_pool.ConstructorArgs]{
+				ChainSelector:  input.ChainSel,
+				TypeAndVersion: typeAndVersion,
+				Args: siloed_lock_release_token_pool.ConstructorArgs{
+					Token:              input.ConstructorArgs.Token,
+					LocalTokenDecimals: input.ConstructorArgs.Decimals,
+					AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
+					RmnProxy:           input.ConstructorArgs.RMNProxy,
+					Router:             input.ConstructorArgs.Router,
+				},
+				Qualifier: &input.TokenSymbol,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy %s to %s: %w", typeAndVersion, chain, err)
+			}
+			tpDeployReport = &siloedPoolReport.Output
+
+			// Deploy one lockbox per group and configure them on the pool
+			lockBoxConfigs := make([]siloed_lock_release_token_pool.LockBoxConfig, 0)
+			poolAddr := common.HexToAddress(tpDeployReport.Address)
+
+			for groupIdx, group := range input.LockBoxGroups {
+				// Deploy lockbox for this group
+				lbQualifier := fmt.Sprintf("group-%d", groupIdx)
+				lockBoxDeployReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
+					ChainSelector:  input.ChainSel,
+					TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
+					Args: erc20_lock_box.ConstructorArgs{
+						Token: input.ConstructorArgs.Token,
+					},
+					Qualifier: &lbQualifier,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 lock box for group %d to %s: %w", groupIdx, chain, err)
+				}
+
+				lockBoxAddr := common.HexToAddress(lockBoxDeployReport.Output.Address)
+				addresses = append(addresses, lockBoxDeployReport.Output)
+
+				// Authorize pool on this lockbox
+				authorizeReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
+					ChainSelector: input.ChainSel,
+					Address:       lockBoxAddr,
+					Args: erc20_lock_box.AuthorizedCallerArgs{
+						AddedCallers: []common.Address{poolAddr},
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize pool on lock box for group %d on %s: %w", groupIdx, chain, err)
+				}
+				batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{authorizeReport.Output})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+				}
+				batchOps = append(batchOps, batchOp)
+
+				// Map all remote chains in this group to this lockbox
+				for _, remoteChainSel := range group {
+					lockBoxConfigs = append(lockBoxConfigs, siloed_lock_release_token_pool.LockBoxConfig{
+						RemoteChainSelector: remoteChainSel,
+						LockBox:             lockBoxAddr,
+					})
+				}
+			}
+
+			// Configure all lockboxes on the pool
+			configLBReport, err := cldf_ops.ExecuteOperation(b, siloed_lock_release_token_pool.ConfigureLockBoxes, chain, evm_contract.FunctionInput[[]siloed_lock_release_token_pool.LockBoxConfig]{
+				ChainSelector: input.ChainSel,
+				Address:       poolAddr,
+				Args:          lockBoxConfigs,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure lock boxes on siloed pool on %s: %w", chain, err)
+			}
+			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{configLBReport.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			batchOps = append(batchOps, batchOp)
+
+		} else {
+			// Standard lock release pool deployment
+			lockBoxDeployReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.Deploy, chain, evm_contract.DeployInput[erc20_lock_box.ConstructorArgs]{
+				ChainSelector:  input.ChainSel,
+				TypeAndVersion: deployment.NewTypeAndVersion(erc20_lock_box.ContractType, *erc20_lock_box.Version),
+				Args: erc20_lock_box.ConstructorArgs{
+					Token: input.ConstructorArgs.Token,
+				},
+				Qualifier: &input.TokenSymbol,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ERC20 lock box to %s: %w", chain, err)
+			}
+
+			standardPoolReport, err := cldf_ops.ExecuteOperation(b, lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[lock_release_token_pool.ConstructorArgs]{
+				ChainSelector:  input.ChainSel,
+				TypeAndVersion: typeAndVersion,
+				Args: lock_release_token_pool.ConstructorArgs{
+					Token:              input.ConstructorArgs.Token,
+					LocalTokenDecimals: input.ConstructorArgs.Decimals,
+					AdvancedPoolHooks:  common.HexToAddress(hooksDeployReport.Output.Address),
+					RmnProxy:           input.ConstructorArgs.RMNProxy,
+					Router:             input.ConstructorArgs.Router,
+					LockBox:            common.HexToAddress(lockBoxDeployReport.Output.Address),
+				},
+				Qualifier: &input.TokenSymbol,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy %s to %s: %w", typeAndVersion, chain, err)
+			}
+			tpDeployReport = &standardPoolReport.Output
+			addresses = append(addresses, lockBoxDeployReport.Output)
+
+			// Add lock release token pool to the authorized callers of the lock box.
+			applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
+				ChainSelector: input.ChainSel,
+				Address:       common.HexToAddress(lockBoxDeployReport.Output.Address),
+				Args: erc20_lock_box.AuthorizedCallerArgs{
+					AddedCallers: []common.Address{
+						common.HexToAddress(standardPoolReport.Output.Address),
+					},
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to lock box on %s: %w", chain, err)
+			}
+			batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			batchOps = append(batchOps, batchOp)
 		}
 
 		configureReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPool, chain, ConfigureTokenPoolInput{
 			ChainSelector:                    input.ChainSel,
-			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Output.Address),
+			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Address),
 			RateLimitAdmin:                   input.RateLimitAdmin,
 			AdvancedPoolHooks:                common.HexToAddress(hooksDeployReport.Output.Address),
 			RouterAddress:                    input.ConstructorArgs.Router,
@@ -87,12 +207,12 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 			FeeAdmin:                    input.FeeAdmin,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Address, chain, err)
 		}
 
 		// Add the newly deployed token pool as an authorized caller on the hooks.
 		{
-			poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
+			poolAddr := common.HexToAddress(tpDeployReport.Address)
 			hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
 
 			getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[struct{}]{
@@ -119,36 +239,13 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
 				}
-				configureReport.Output.BatchOps = append(configureReport.Output.BatchOps, []mcms_types.BatchOperation{batchOp}...)
+				batchOps = append(batchOps, batchOp)
 			}
 		}
 
-		// Add lock release token pool to the authorized callers of the lock box.
-		applyAuthorizedCallerUpdatesReport, err := cldf_ops.ExecuteOperation(b, erc20_lock_box.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[erc20_lock_box.AuthorizedCallerArgs]{
-			ChainSelector: input.ChainSel,
-			Address:       common.HexToAddress(lockBoxDeployReport.Output.Address),
-			Args: erc20_lock_box.AuthorizedCallerArgs{
-				AddedCallers: []common.Address{
-					common.HexToAddress(tpDeployReport.Output.Address),
-				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply authorized caller updates to lock box on %s: %w", chain, err)
-		}
-		batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{applyAuthorizedCallerUpdatesReport.Output})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
-		}
-		configureReport.Output.BatchOps = append(configureReport.Output.BatchOps, []mcms_types.BatchOperation{batchOp}...)
-
 		return sequences.OnChainOutput{
-			Addresses: []datastore.AddressRef{
-				tpDeployReport.Output,
-				hooksDeployReport.Output,
-				lockBoxDeployReport.Output,
-			},
-			BatchOps: configureReport.Output.BatchOps,
+			Addresses: append([]datastore.AddressRef{*tpDeployReport, hooksDeployReport.Output}, addresses...),
+			BatchOps:  append(batchOps, configureReport.Output.BatchOps...),
 		}, nil
 	},
 )
