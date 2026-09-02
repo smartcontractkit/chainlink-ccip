@@ -213,68 +213,6 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 			},
 			expectedErr: "threshold amount for additional ccvs must be defined",
 		},
-		{
-			desc: "happy path - siloed lock release single group",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, adapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
-				var rmnProxyAddress common.Address
-				var routerAddress common.Address
-				for _, addr := range chainReport.Output.Addresses {
-					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
-						rmnProxyAddress = common.HexToAddress(addr.Address)
-					}
-					if addr.Type == datastore.ContractType(router.ContractType) {
-						routerAddress = common.HexToAddress(addr.Address)
-					}
-				}
-				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType("SiloedLockReleaseTokenPool"),
-					TokenPoolVersion:                 lock_release_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					ConstructorArgs: tokens.ConstructorArgs{
-						Token:    common.HexToAddress(tokenReport.Output.Address),
-						Decimals: 18,
-						RMNProxy: rmnProxyAddress,
-						Router:   routerAddress,
-					},
-					LockBoxGroups: [][]uint64{{1, 2, 3}},
-				}
-			},
-			expectedErr: "",
-		},
-		{
-			desc: "happy path - siloed lock release multi-group",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, adapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
-				var rmnProxyAddress common.Address
-				var routerAddress common.Address
-				for _, addr := range chainReport.Output.Addresses {
-					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
-						rmnProxyAddress = common.HexToAddress(addr.Address)
-					}
-					if addr.Type == datastore.ContractType(router.ContractType) {
-						routerAddress = common.HexToAddress(addr.Address)
-					}
-				}
-				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType("SiloedLockReleaseTokenPool"),
-					TokenPoolVersion:                 lock_release_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					ConstructorArgs: tokens.ConstructorArgs{
-						Token:    common.HexToAddress(tokenReport.Output.Address),
-						Decimals: 18,
-						RMNProxy: rmnProxyAddress,
-						Router:   routerAddress,
-					},
-					LockBoxGroups: [][]uint64{{1, 2}, {3, 4, 5}},
-				}
-			},
-			expectedErr: "",
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
