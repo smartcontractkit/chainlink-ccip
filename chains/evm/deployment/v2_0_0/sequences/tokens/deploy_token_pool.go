@@ -108,11 +108,11 @@ var DeployTokenPool = cldf_ops.NewSequence(
 					configureInput.RateLimitAdmin = common.HexToAddress(input.RateLimitAdmin)
 				}
 			}
-			if input.FeeAggregator != "" {
-				if !common.IsHexAddress(input.FeeAggregator) {
-					return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAggregator address '%s'", input.FeeAggregator)
+			if input.FeeAdmin != "" {
+				if !common.IsHexAddress(input.FeeAdmin) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAdmin address '%s'", input.FeeAdmin)
 				} else {
-					configureInput.FeeAggregator = common.HexToAddress(input.FeeAggregator)
+					configureInput.FeeAdmin = common.HexToAddress(input.FeeAdmin)
 				}
 			}
 			if input.RouterRef != nil {
@@ -185,12 +185,12 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				rateLimitAdmin = common.HexToAddress(input.RateLimitAdmin)
 			}
 		}
-		var feeAggregator common.Address
-		if input.FeeAggregator != "" {
-			if !common.IsHexAddress(input.FeeAggregator) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAggregator address '%s'", input.FeeAggregator)
+		var feeAdmin common.Address
+		if input.FeeAdmin != "" {
+			if !common.IsHexAddress(input.FeeAdmin) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAdmin address '%s'", input.FeeAdmin)
 			} else {
-				feeAggregator = common.HexToAddress(input.FeeAggregator)
+				feeAdmin = common.HexToAddress(input.FeeAdmin)
 			}
 		}
 		thresholdCCV := big.NewInt(0)
@@ -210,7 +210,7 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			ChainSel:                         chain.Selector,
 			TokenSymbol:                      poolQualifier,
 			RateLimitAdmin:                   rateLimitAdmin,
-			FeeAggregator:                    feeAggregator,
+			FeeAdmin:                    feeAdmin,
 			ThresholdAmountForAdditionalCCVs: thresholdCCV,
 			ConstructorArgs: ConstructorArgs{
 				Token:    tokenAddress,

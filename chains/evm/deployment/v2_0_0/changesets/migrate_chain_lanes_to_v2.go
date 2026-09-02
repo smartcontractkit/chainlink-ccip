@@ -77,6 +77,11 @@ type MigrateChainLanesToV2Input struct {
 	// TestRouter migrates the lanes onto the TestRouter instead of the production Router, and
 	// configures a TESTTR test token behind the TestRouter on every migrated chain.
 	TestRouter *bool `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	// MaxLanesPerChunk caps how many lanes are configured per underlying apply, bounding each
+	// chain's per-timelock-batch gas below restrictive per-tx caps (e.g. Linea's 2^24). Each
+	// chunk emits its own MCMS proposal, so multi-chunk runs require merge-proposals: true and
+	// an explicit mcms.validUntil in the pipeline input. 0 (default) keeps a single chunk.
+	MaxLanesPerChunk int `json:"maxLanesPerChunk,omitempty" yaml:"maxLanesPerChunk,omitempty"`
 }
 
 // MigrateChainLanesToV2Config is the full changeset config: the durable-pipeline payload plus the
@@ -159,21 +164,7 @@ func MigrateChainLanesToV2(
 		e.Logger.Infow("migrate_chain_lanes_to_v2: migrating lanes to CCIP 2.0",
 			"count", len(lanes), "lanes", laneDescriptions)
 
-		resolvedCfg := v2changesets.ConfigureChainsForLanesFromTopologyConfig{
-			Topology: cfg.Topology,
-			BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
-				Lanes:      lanes,
-				MCMS:       cfg.MCMS,
-				TestRouter: cfg.TestRouter,
-				// A migration's whole purpose is to swap each lane's pre-2.0 OnRamp for the CCIP 2.0
-				// OnRamp on the (prod) router, so it must be allowed to overwrite the existing mapping.
-				AllowOnrampOverride: true,
-			},
-		}
-		if err := underlying.VerifyPreconditions(e, resolvedCfg); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("resolved lane config failed preconditions: %w", err)
-		}
-		laneOut, err := underlying.Apply(e, resolvedCfg)
+		laneOut, err := applyLanesInChunks(e, underlying, cfg, lanes)
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
@@ -199,24 +190,69 @@ func MigrateChainLanesToV2(
 		if err != nil {
 			return deployment.ChangesetOutput{}, err
 		}
-		return mergeTestTokenOutput(e, laneOut, tokenOut)
+		return mergeOutputs(e, laneOut, tokenOut)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
 }
 
-func mergeTestTokenOutput(e deployment.Environment, laneOut, tokenOut deployment.ChangesetOutput) (deployment.ChangesetOutput, error) {
-	merged := laneOut
-	if err := deployment.MergeChangesetOutput(e, &merged, tokenOut); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge test token output: %w", err)
+// applyLanesInChunks runs the underlying lane changeset once per chunk of at most
+// cfg.MaxLanesPerChunk lanes (a single chunk when unset) and merges the outputs. Each chunk
+// yields its own proposal; the pipeline's merge-proposals step folds them into one.
+func applyLanesInChunks(
+	e deployment.Environment,
+	underlying deployment.ChangeSetV2[v2changesets.ConfigureChainsForLanesFromTopologyConfig],
+	cfg MigrateChainLanesToV2Config,
+	lanes []v2changesets.CrossFamilyLanePair,
+) (deployment.ChangesetOutput, error) {
+	chunkSize := cfg.MaxLanesPerChunk
+	if chunkSize <= 0 {
+		chunkSize = len(lanes)
+	}
+	var out deployment.ChangesetOutput
+	for start := 0; start < len(lanes); start += chunkSize {
+		resolvedCfg := v2changesets.ConfigureChainsForLanesFromTopologyConfig{
+			Topology: cfg.Topology,
+			BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
+				Lanes:      lanes[start:min(start+chunkSize, len(lanes))],
+				MCMS:       cfg.MCMS,
+				TestRouter: cfg.TestRouter,
+				// A migration's whole purpose is to swap each lane's pre-2.0 OnRamp for the CCIP 2.0
+				// OnRamp on the (prod) router, so it must be allowed to overwrite the existing mapping.
+				AllowOnrampOverride: true,
+			},
+		}
+		if err := underlying.VerifyPreconditions(e, resolvedCfg); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("resolved lane config failed preconditions: %w", err)
+		}
+		chunkOut, err := underlying.Apply(e, resolvedCfg)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+		if start == 0 {
+			out = chunkOut
+			continue
+		}
+		out, err = mergeOutputs(e, out, chunkOut)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+	}
+	return out, nil
+}
+
+func mergeOutputs(e deployment.Environment, base, extra deployment.ChangesetOutput) (deployment.ChangesetOutput, error) {
+	merged := base
+	if err := deployment.MergeChangesetOutput(e, &merged, extra); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output: %w", err)
 	}
 	// MergeChangesetOutput does not carry the DataStore.
 	switch {
 	case merged.DataStore == nil:
-		merged.DataStore = tokenOut.DataStore
-	case tokenOut.DataStore != nil:
-		if err := merged.DataStore.Merge(tokenOut.DataStore.Seal()); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge test token datastore: %w", err)
+		merged.DataStore = extra.DataStore
+	case extra.DataStore != nil:
+		if err := merged.DataStore.Merge(extra.DataStore.Seal()); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
 		}
 	}
 	return merged, nil
@@ -331,8 +367,17 @@ func newTestTokenPerChainConfig(e deployment.Environment, sel uint64, remotes ma
 			Decimals: testTokenDecimals,
 			Type:     deployment.ContractType(burn_mint_erc20_with_drip.ContractType),
 		}
-	} else if e.Logger != nil {
-		e.Logger.Infof("reusing existing %s token at %s on chain with selector %d", testTokenSymbol, existing[0].Address, sel)
+	} else {
+		// TESTTR is already recorded on this chain: the changeset that first touched it in this
+		// batch deployed it and emitted its TokenAdminRegistry registration + token admin
+		// handover ops. Those ops are pending in the same MCMS root — re-emitting them would
+		// revert AlreadyRegistered at execution time and, because MCMS ops must run in per-chain
+		// nonce order, block every later operation for this chain. Only the new lane's pool
+		// remote configuration still needs to run.
+		perChain.TokenTransferConfig.SkipTokenAdminRegistrySetup = true
+		if e.Logger != nil {
+			e.Logger.Infof("reusing existing %s token at %s on chain with selector %d; skipping already-emitted registry setup ops", testTokenSymbol, existing[0].Address, sel)
+		}
 	}
 	return perChain, nil
 }

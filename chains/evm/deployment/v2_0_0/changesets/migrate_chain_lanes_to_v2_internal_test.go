@@ -2,13 +2,18 @@ package changesets
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/mcms"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -615,6 +620,135 @@ func TestBuildTestTokenExpansionInput_ReusesExistingToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, in.TokenExpansionInputPerChain[chainA].DeployTokenInput, "existing TESTTR token must be reused, not redeployed")
 	assert.NotNil(t, in.TokenExpansionInputPerChain[chainB].DeployTokenInput, "chain without TESTTR must deploy a fresh token")
+}
+
+// TestBuildTestTokenExpansionInput_SharedChainDoesNotReemitRegistrySetup reproduces the
+// production failure from PR 18490 (12 of 35 chains affected): within one merged batch, two
+// migrate_chain_lanes_to_v2 changesets share a lane partner (chainShared here, e.g. sonic,
+// which lanes with bob, core, linea and mode). The first-touching changeset deploys TESTTR on
+// the shared chain and emits its TokenAdminRegistry registration (proposeAdministrator +
+// acceptAdminRole + setPool). The durable pipeline persists each changeset's output datastore,
+// so when the second changeset re-encounters the shared chain the token ref is already
+// recorded but the on-chain registry is still empty (nothing has executed yet). Re-emitting
+// the registration produced a second identical proposeAdministrator that reverts
+// AlreadyRegistered at execution time and — because MCMS ops must run in per-chain nonce
+// order — blocks every later operation for that chain in the root.
+func TestBuildTestTokenExpansionInput_SharedChainDoesNotReemitRegistrySetup(t *testing.T) {
+	chainFirst := chainsel.TEST_90000001.Selector  // first changeset's selected chain
+	chainSecond := chainsel.TEST_90000002.Selector // later changeset's selected chain
+	chainShared := chainsel.TEST_90000003.Selector // lane partner shared by both changesets
+
+	// Run 1: the first-touching changeset — both chains are fresh, so both get the full test
+	// token setup including the registry registration.
+	in1, err := buildTestTokenExpansionInput(cldf.Environment{}, MigrateChainLanesToV2Config{}, []v2changesets.CrossFamilyLanePair{
+		{ChainA: chainFirst, ChainB: chainShared},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, in1.TokenExpansionInputPerChain[chainShared].TokenTransferConfig)
+	assert.False(t, in1.TokenExpansionInputPerChain[chainShared].TokenTransferConfig.SkipTokenAdminRegistrySetup,
+		"the first-touching changeset must emit the registration ops")
+	assert.Contains(t, in1.TokenExpansionInputPerChain[chainShared].TokenTransferConfig.RemoteChains, chainFirst)
+
+	// The durable pipeline persists each changeset's output datastore, so by the time the second
+	// changeset runs, the shared chain's TESTTR token ref is already recorded.
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: chainShared,
+		Type:          datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+		Version:       burn_mint_erc20_with_drip.Version,
+		Qualifier:     testTokenSymbol,
+		Address:       "0x000000000000000000000000000000000000babe",
+	}))
+
+	// Run 2: the later changeset re-encounters the shared chain through its own lane.
+	in2, err := buildTestTokenExpansionInput(cldf.Environment{DataStore: ds.Seal()}, MigrateChainLanesToV2Config{}, []v2changesets.CrossFamilyLanePair{
+		{ChainA: chainSecond, ChainB: chainShared},
+	})
+	require.NoError(t, err)
+
+	// The re-encountering run must skip the registry setup for the shared chain (run 1's
+	// proposal already emitted it — a second identical proposeAdministrator reverts
+	// AlreadyRegistered at execution), while still wiring run 2's new lane remote into the
+	// shared chain's pool.
+	sharedCfg := in2.TokenExpansionInputPerChain[chainShared]
+	require.NotNil(t, sharedCfg.TokenTransferConfig)
+	assert.True(t, sharedCfg.TokenTransferConfig.SkipTokenAdminRegistrySetup,
+		"the re-encountering changeset must skip the already-emitted registry setup ops")
+	assert.Contains(t, sharedCfg.TokenTransferConfig.RemoteChains, chainSecond,
+		"run 2's new lane remote must still be configured on the shared chain's pool")
+
+	// The second changeset's own selected chain is fresh: it still gets the full setup,
+	// registration included.
+	assert.NotNil(t, in2.TokenExpansionInputPerChain[chainSecond].TokenTransferConfig)
+	assert.False(t, in2.TokenExpansionInputPerChain[chainSecond].TokenTransferConfig.SkipTokenAdminRegistrySetup)
+}
+
+// TestApplyLanesInChunks_ChunkedOutputMatchesUnchunked proves chunking changes only the
+// packaging, not the work: the chunked run must apply the identical config and lane list
+// (behavioral), and its proposals' concatenated operations must be identical to the single
+// unchunked proposal's (structural) — so after merge-proposals the executed transactions are
+// unchanged.
+func TestApplyLanesInChunks_ChunkedOutputMatchesUnchunked(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	chainB := chainsel.TEST_90000002.Selector
+	chainC := chainsel.TEST_90000003.Selector
+	lanes := []v2changesets.CrossFamilyLanePair{
+		{ChainA: chainA, ChainB: chainB},
+		{ChainA: chainA, ChainB: chainC},
+		{ChainA: chainB, ChainB: chainC},
+	}
+
+	// Stub underlying changeset: one proposal per Apply whose batch ops encode the exact lanes
+	// given, so output equality proves no lane is dropped, reordered, or duplicated.
+	var gotConfigs []v2changesets.ConfigureChainsForLanesFromTopologyConfig
+	stub := cldf.CreateChangeSet(
+		func(_ cldf.Environment, cfg v2changesets.ConfigureChainsForLanesFromTopologyConfig) (cldf.ChangesetOutput, error) {
+			gotConfigs = append(gotConfigs, cfg)
+			ops := make([]mcms_types.BatchOperation, 0, len(cfg.Lanes))
+			for _, lane := range cfg.Lanes {
+				ops = append(ops, mcms_types.BatchOperation{
+					ChainSelector: mcms_types.ChainSelector(lane.ChainA),
+					Transactions:  []mcms_types.Transaction{{Data: fmt.Appendf(nil, "%d->%d", lane.ChainA, lane.ChainB)}},
+				})
+			}
+			return cldf.ChangesetOutput{MCMSTimelockProposals: []mcms.TimelockProposal{{Operations: ops}}}, nil
+		},
+		func(cldf.Environment, v2changesets.ConfigureChainsForLanesFromTopologyConfig) error { return nil },
+	)
+
+	env := cldf.Environment{Logger: logger.Nop()}
+	topology := &offchain.EnvironmentTopology{}
+	baseCfg := MigrateChainLanesToV2Config{Topology: topology}
+
+	unchunked, err := applyLanesInChunks(env, stub, baseCfg, lanes)
+	require.NoError(t, err)
+	require.Len(t, gotConfigs, 1)
+	require.Len(t, unchunked.MCMSTimelockProposals, 1)
+
+	gotConfigs = nil
+	chunkedCfg := baseCfg
+	chunkedCfg.MaxLanesPerChunk = 2
+	chunked, err := applyLanesInChunks(env, stub, chunkedCfg, lanes)
+	require.NoError(t, err)
+	require.Len(t, gotConfigs, 2, "3 lanes at 2 per chunk -> 2 applies")
+
+	// Behavioral: chunks carry the identical config apart from the lane subset, and the subsets
+	// reassemble the original lane list exactly.
+	var appliedLanes []v2changesets.CrossFamilyLanePair
+	for _, cfg := range gotConfigs {
+		assert.Same(t, topology, cfg.Topology)
+		assert.True(t, cfg.AllowOnrampOverride)
+		appliedLanes = append(appliedLanes, cfg.Lanes...)
+	}
+	assert.Equal(t, lanes, appliedLanes)
+
+	// Structural: chunked proposals' operations, concatenated, equal the unchunked proposal's.
+	require.Len(t, chunked.MCMSTimelockProposals, 2)
+	var chunkedOps []mcms_types.BatchOperation
+	for _, p := range chunked.MCMSTimelockProposals {
+		chunkedOps = append(chunkedOps, p.Operations...)
+	}
+	assert.Equal(t, unchunked.MCMSTimelockProposals[0].Operations, chunkedOps)
 }
 
 func TestDiscoverLanesToMigrate_SkipsVersionWithoutConfigImporter(t *testing.T) {
