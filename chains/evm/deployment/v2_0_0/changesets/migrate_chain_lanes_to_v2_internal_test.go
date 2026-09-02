@@ -2,13 +2,18 @@ package changesets
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/mcms"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -676,6 +681,74 @@ func TestBuildTestTokenExpansionInput_SharedChainDoesNotReemitRegistrySetup(t *t
 	// registration included.
 	assert.NotNil(t, in2.TokenExpansionInputPerChain[chainSecond].TokenTransferConfig)
 	assert.False(t, in2.TokenExpansionInputPerChain[chainSecond].TokenTransferConfig.SkipTokenAdminRegistrySetup)
+}
+
+// TestApplyLanesInChunks_ChunkedOutputMatchesUnchunked proves chunking changes only the
+// packaging, not the work: the chunked run must apply the identical config and lane list
+// (behavioral), and its proposals' concatenated operations must be identical to the single
+// unchunked proposal's (structural) — so after merge-proposals the executed transactions are
+// unchanged.
+func TestApplyLanesInChunks_ChunkedOutputMatchesUnchunked(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	chainB := chainsel.TEST_90000002.Selector
+	chainC := chainsel.TEST_90000003.Selector
+	lanes := []v2changesets.CrossFamilyLanePair{
+		{ChainA: chainA, ChainB: chainB},
+		{ChainA: chainA, ChainB: chainC},
+		{ChainA: chainB, ChainB: chainC},
+	}
+
+	// Stub underlying changeset: one proposal per Apply whose batch ops encode the exact lanes
+	// given, so output equality proves no lane is dropped, reordered, or duplicated.
+	var gotConfigs []v2changesets.ConfigureChainsForLanesFromTopologyConfig
+	stub := cldf.CreateChangeSet(
+		func(_ cldf.Environment, cfg v2changesets.ConfigureChainsForLanesFromTopologyConfig) (cldf.ChangesetOutput, error) {
+			gotConfigs = append(gotConfigs, cfg)
+			ops := make([]mcms_types.BatchOperation, 0, len(cfg.Lanes))
+			for _, lane := range cfg.Lanes {
+				ops = append(ops, mcms_types.BatchOperation{
+					ChainSelector: mcms_types.ChainSelector(lane.ChainA),
+					Transactions:  []mcms_types.Transaction{{Data: fmt.Appendf(nil, "%d->%d", lane.ChainA, lane.ChainB)}},
+				})
+			}
+			return cldf.ChangesetOutput{MCMSTimelockProposals: []mcms.TimelockProposal{{Operations: ops}}}, nil
+		},
+		func(cldf.Environment, v2changesets.ConfigureChainsForLanesFromTopologyConfig) error { return nil },
+	)
+
+	env := cldf.Environment{Logger: logger.Nop()}
+	topology := &offchain.EnvironmentTopology{}
+	baseCfg := MigrateChainLanesToV2Config{Topology: topology}
+
+	unchunked, err := applyLanesInChunks(env, stub, baseCfg, lanes)
+	require.NoError(t, err)
+	require.Len(t, gotConfigs, 1)
+	require.Len(t, unchunked.MCMSTimelockProposals, 1)
+
+	gotConfigs = nil
+	chunkedCfg := baseCfg
+	chunkedCfg.MaxLanesPerChunk = 2
+	chunked, err := applyLanesInChunks(env, stub, chunkedCfg, lanes)
+	require.NoError(t, err)
+	require.Len(t, gotConfigs, 2, "3 lanes at 2 per chunk -> 2 applies")
+
+	// Behavioral: chunks carry the identical config apart from the lane subset, and the subsets
+	// reassemble the original lane list exactly.
+	var appliedLanes []v2changesets.CrossFamilyLanePair
+	for _, cfg := range gotConfigs {
+		assert.Same(t, topology, cfg.Topology)
+		assert.True(t, cfg.AllowOnrampOverride)
+		appliedLanes = append(appliedLanes, cfg.Lanes...)
+	}
+	assert.Equal(t, lanes, appliedLanes)
+
+	// Structural: chunked proposals' operations, concatenated, equal the unchunked proposal's.
+	require.Len(t, chunked.MCMSTimelockProposals, 2)
+	var chunkedOps []mcms_types.BatchOperation
+	for _, p := range chunked.MCMSTimelockProposals {
+		chunkedOps = append(chunkedOps, p.Operations...)
+	}
+	assert.Equal(t, unchunked.MCMSTimelockProposals[0].Operations, chunkedOps)
 }
 
 func TestDiscoverLanesToMigrate_SkipsVersionWithoutConfigImporter(t *testing.T) {
