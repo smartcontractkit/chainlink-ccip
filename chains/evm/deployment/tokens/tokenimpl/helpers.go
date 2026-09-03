@@ -43,23 +43,31 @@ func getRetryConfig[T any](b cldf_ops.Bundle, chain evm.Chain, token string) cld
 }
 
 func revokeDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
-	role, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GetDefaultAdminRole, chain, contract.FunctionInput[struct{}]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args:          struct{}{},
-	})
+	role, err := cldf_ops.ExecuteOperation(
+		b, burn_mint_erc20.GetDefaultAdminRole, chain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          struct{}{},
+		},
+		cldf_ops.WithRetryConfig(getRetryConfig[struct{}](b, chain, token.Hex())),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get default admin role: %w", err)
 	}
 
-	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.RevokeAdminRole, chain, contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args: burn_mint_erc20.RoleAssignment{
-			Role: role.Output,
-			To:   user,
+	report, err := cldf_ops.ExecuteOperation(
+		b, burn_mint_erc20.RevokeAdminRole, chain,
+		contract.FunctionInput[burn_mint_erc20.RoleAssignment]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args: burn_mint_erc20.RoleAssignment{
+				Role: role.Output,
+				To:   user,
+			},
 		},
-	})
+		cldf_ops.WithRetryConfig(getRetryConfig[burn_mint_erc20.RoleAssignment](b, chain, token.Hex())),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to revoke default admin role: %w", err)
 	}
@@ -167,6 +175,9 @@ func setCCIPAdminBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, ccipAd
 	return []contract.WriteOutput{report.Output}, nil
 }
 
+// NOTE: transferTokensERC20 is intentionally NOT retried. Transfer moves value and is not idempotent
+// by value - a retry after an unclear outcome *risks transferring twice*. The retry path is reserved
+// for idempotent role-assignment writes and reads.
 func transferTokensERC20(b cldf_ops.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
 	report, err := cldf_ops.ExecuteOperation(
 		b, erc20.Transfer, chain, contract.FunctionInput[erc20.TransferArgs]{
