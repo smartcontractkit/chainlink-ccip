@@ -204,19 +204,30 @@ var DeployTokenPool = cldf_ops.NewSequence(
 
 		// Build the pool deployment input
 		tokenPoolType := datastore.ContractType(input.PoolType)
+
+		// Parse BurnAddress if provided
+		var burnAddr common.Address
+		if input.BurnAddress != "" {
+			if !common.IsHexAddress(input.BurnAddress) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid BurnAddress '%s'", input.BurnAddress)
+			}
+			burnAddr = common.HexToAddress(input.BurnAddress)
+		}
+
 		internalInput := DeployTokenPoolInput{
 			TokenPoolVersion:                 input.TokenPoolVersion,
 			TokenPoolType:                    tokenPoolType,
 			ChainSel:                         chain.Selector,
 			TokenSymbol:                      poolQualifier,
 			RateLimitAdmin:                   rateLimitAdmin,
-			FeeAdmin:                    feeAdmin,
+			FeeAdmin:                         feeAdmin,
 			ThresholdAmountForAdditionalCCVs: thresholdCCV,
 			ConstructorArgs: ConstructorArgs{
-				Token:    tokenAddress,
-				Decimals: tokenDecimals,
-				RMNProxy: rmnProxyAddr,
-				Router:   routerAddr,
+				Token:       tokenAddress,
+				Decimals:    tokenDecimals,
+				RMNProxy:    rmnProxyAddr,
+				Router:      routerAddr,
+				BurnAddress: burnAddr,
 			},
 			AdvancedPoolHooksConfig: AdvancedPoolHooksConfig{
 				Allowlist: allowlist,
