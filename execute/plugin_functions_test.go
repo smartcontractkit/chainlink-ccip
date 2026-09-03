@@ -16,6 +16,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 )
 
@@ -1059,7 +1060,7 @@ func Test_computeConsensusObservation(t *testing.T) {
 			}
 
 			lggr := logger.Test(t)
-			got, err := computeConsensusObservation(lggr, ao, 1, tt.args.F)
+			got, err := computeConsensusObservation(lggr, ao, 1, tt.args.F, metrics.Noop{})
 			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}
@@ -1828,7 +1829,7 @@ func Test_computeMessageHashesConsensus(t *testing.T) {
 					OracleID:    commontypes.OracleID(i),
 				}
 			}
-			obs := computeMessageHashesConsensus(logger.Test(t), observations, tc.fChain)
+			obs := computeMessageHashesConsensus(logger.Test(t), observations, tc.fChain, metrics.Noop{})
 			assert.Equal(t, tc.expectedHashes, obs)
 		})
 	}
@@ -1987,7 +1988,7 @@ func Test_computeCommitObservationsConsensus(t *testing.T) {
 					OracleID:    commontypes.OracleID(i),
 				}
 			}
-			obs := computeCommitObservationsConsensus(logger.Test(t), observations, tc.fChain)
+			obs := computeCommitObservationsConsensus(logger.Test(t), observations, tc.fChain, metrics.Noop{})
 			assert.Equal(t, tc.exp, obs)
 		})
 	}
@@ -2074,7 +2075,7 @@ func Test_computeMessageObservationsConsensus(t *testing.T) {
 					OracleID:    commontypes.OracleID(i),
 				}
 			}
-			obs := computeMessageObservationsConsensus(logger.Test(t), observations, tc.fChain)
+			obs := computeMessageObservationsConsensus(logger.Test(t), observations, tc.fChain, metrics.Noop{})
 			assert.Equal(t, tc.exp, obs)
 		})
 	}

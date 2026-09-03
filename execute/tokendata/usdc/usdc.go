@@ -248,6 +248,7 @@ func (u *USDCTokenDataObserver) attestationToTokenData(
 ) exectypes.TokenData {
 	status, ok := attestations[reader.NewMessageTokenID(seqNr, tokenIndex)]
 	if !ok {
+		PromUSDCAttestationFetchCounter.WithLabelValues(usdcOutcomeDataMissing).Inc()
 		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
 	}
 	if status.Error != nil {

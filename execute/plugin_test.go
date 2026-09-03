@@ -225,6 +225,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 			snRangeSetPairs := getSeqNrRangesBySource(chainReports)
 			ccipReaderMock := tc.mockReaderFunc(t, snRangeSetPairs)
 			p := &Plugin{
+				observer:   metrics.Noop{},
 				lggr:       logger.Test(t),
 				ccipReader: ccipReaderMock,
 			}
@@ -975,6 +976,7 @@ func TestPlugin_Close(t *testing.T) {
 	// Set up expectation for Close() method
 	mockReader.On("Close").Return(nil)
 	p := &Plugin{
+		observer:          metrics.Noop{},
 		lggr:              lggr,
 		tokenDataObserver: &observer.NoopTokenDataObserver{},
 		ccipReader:        mockReader}
@@ -983,7 +985,7 @@ func TestPlugin_Close(t *testing.T) {
 }
 
 func TestPlugin_Query(t *testing.T) {
-	p := &Plugin{}
+	p := &Plugin{observer: metrics.Noop{}}
 	q, err := p.Query(t.Context(), ocr3types.OutcomeContext{})
 	require.NoError(t, err)
 	require.Equal(t, types.Query{}, q)
@@ -992,6 +994,7 @@ func TestPlugin_Query(t *testing.T) {
 func TestPlugin_ObservationQuorum(t *testing.T) {
 	ctx := t.Context()
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		reportingCfg: ocr3types.ReportingPluginConfig{F: 1},
 	}
 	got, err := p.ObservationQuorum(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
@@ -1005,7 +1008,7 @@ func TestPlugin_ObservationQuorum(t *testing.T) {
 
 func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 	ctx := t.Context()
-	p := &Plugin{ocrTypeCodec: ocrTypeCodec}
+	p := &Plugin{ocrTypeCodec: ocrTypeCodec, observer: metrics.Noop{}}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte("not a valid observation"),
 	})
@@ -1016,6 +1019,7 @@ func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 	ctx := t.Context()
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		ocrTypeCodec: ocrTypeCodec,
 	}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -1034,6 +1038,7 @@ func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 	defer mockHomeChain.AssertExpectations(t)
 
 	p := &Plugin{
+		observer:  metrics.Noop{},
 		homeChain: mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
 			0: {},
@@ -1076,6 +1081,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 	defer mockHomeChain.AssertExpectations(t)
 
 	p := &Plugin{
+		observer:  metrics.Noop{},
 		homeChain: mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
 			0: {},
@@ -1115,6 +1121,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
 
 	p := &Plugin{
+		observer:  metrics.Noop{},
 		lggr:      lggr,
 		homeChain: mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
@@ -1153,6 +1160,7 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 	mockDiscoveryProcessor.EXPECT().ValidateObservation(dt.Outcome{}, dt.Query{}, mock.Anything).Return(nil)
 
 	p := &Plugin{
+		observer:  metrics.Noop{},
 		lggr:      lggr,
 		homeChain: mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
@@ -1184,6 +1192,7 @@ func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
 	p := &Plugin{
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
+		observer:     metrics.Noop{},
 	}
 	_, err := p.Observation(t.Context(), ocr3types.OutcomeContext{
 		PreviousOutcome: []byte("not a valid observation"),
@@ -1274,6 +1283,7 @@ func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 	}
 
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
 	}
@@ -1293,6 +1303,7 @@ func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 	ctx := t.Context()
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
 	}
@@ -1314,6 +1325,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 		2: 2,
 	}
 	p := &Plugin{
+		observer: metrics.Noop{},
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			F: 1,
 		},
@@ -1342,6 +1354,7 @@ func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 	}
 
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
 	}
@@ -1372,6 +1385,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 	}
 
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
 	}
@@ -1417,6 +1431,7 @@ func TestPlugin_Reports_MultipleReports(t *testing.T) {
 
 	// Create plugin instance with necessary mocks
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         lggr,
 		reportCodec:  mockReportCodec,
 		ocrTypeCodec: ocrTypeCodec,
@@ -1484,6 +1499,7 @@ func TestPlugin_Reports_MultipleReports(t *testing.T) {
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
 	ctx := t.Context()
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
 	}
@@ -1501,6 +1517,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	chainSupport := plugincommon_mock.NewMockChainSupport(t)
 	chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		reportCodec:  codec,
 		lggr:         logger.Test(t),
 		ocrTypeCodec: ocrTypeCodec,
@@ -1535,6 +1552,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
 
 	p := &Plugin{
+		observer:        metrics.Noop{},
 		reportCodec:     codec,
 		lggr:            logger.Test(t),
 		chainSupport:    cs,
@@ -1562,6 +1580,7 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 		Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
 
 	p := &Plugin{
+		observer:        metrics.Noop{},
 		lggr:            logger.Test(t),
 		reportCodec:     codec,
 		chainSupport:    cs,
@@ -1807,6 +1826,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				Return(mapset.NewSet[cciptypes.ChainSelector](0), nil).Maybe()
 
 			p := &Plugin{
+				observer:        metrics.Noop{},
 				lggr:            lggr,
 				reportCodec:     codec,
 				homeChain:       homeChain,
@@ -1845,7 +1865,8 @@ func TestPlugin_ShouldTransmitAcceptReport_NilReport(t *testing.T) {
 	lggr := logger.Test(t)
 
 	p := &Plugin{
-		lggr: lggr,
+		observer: metrics.Noop{},
+		lggr:     lggr,
 	}
 
 	shouldTransmit, err := p.ShouldTransmitAcceptedReport(t.Context(), 1, ocr3types.ReportWithInfo[[]byte]{})
@@ -1860,6 +1881,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_DecodeFailure(t *testing.T) {
 	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 
 	p := &Plugin{
+		observer:    metrics.Noop{},
 		lggr:        lggr,
 		reportCodec: codec,
 	}
@@ -1886,6 +1908,7 @@ func TestPlugin_ShouldTransmitAcceptReport_SupportsDestChainCheckFails(t *testin
 	chainSupport.EXPECT().SupportsDestChain(oracleID).Return(false, errors.New("test error"))
 
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         lggr,
 		chainSupport: chainSupport,
 		reportingCfg: ocr3types.ReportingPluginConfig{
@@ -1916,6 +1939,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DontSupportDestChain(t *testing.T) {
 	chainSupport.EXPECT().SupportsDestChain(oracleID).Return(false, nil)
 
 	p := &Plugin{
+		observer:     metrics.Noop{},
 		lggr:         lggr,
 		chainSupport: chainSupport,
 		reportingCfg: ocr3types.ReportingPluginConfig{
@@ -1958,6 +1982,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_MismatchingConfigDigests(t *testing
 	}, nil)
 
 	p := &Plugin{
+		observer:  metrics.Noop{},
 		lggr:      lggr,
 		homeChain: homeChainMock,
 		chainSupport: plugincommon.NewChainSupport(
@@ -2023,6 +2048,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 		).Return(nil, nil)
 
 	p := &Plugin{
+		observer:  metrics.Noop{},
 		lggr:      lggr,
 		homeChain: homeChainMock,
 		chainSupport: plugincommon.NewChainSupport(
@@ -2092,6 +2118,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Failure_AlreadyExecuted(t *testing.T)
 		}, nil)
 
 	p := &Plugin{
+		observer:  metrics.Noop{},
 		lggr:      lggr,
 		homeChain: homeChainMock,
 		chainSupport: plugincommon.NewChainSupport(
@@ -2368,7 +2395,7 @@ func Test_checkAlreadyExecuted_DisjointRanges(t *testing.T) {
 			nil,
 		)
 
-	p := &Plugin{ccipReader: ccipReader}
+	p := &Plugin{ccipReader: ccipReader, observer: metrics.Noop{}}
 	err := p.checkAlreadyExecuted(context.Background(), logger.Test(t), reports)
 	require.NoError(t, err)
 }

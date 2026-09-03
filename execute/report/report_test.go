@@ -441,7 +441,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			}
 
 			test := func(readyMessages map[int]struct{}) {
-				_, err := buildSingleChainReportHelper(lggr, tt.args.report, readyMessages)
+				_, err := buildSingleChainReportHelper(lggr, NoopMetrics{}, tt.args.report, readyMessages)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
 			}

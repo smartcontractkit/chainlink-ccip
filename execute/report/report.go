@@ -23,6 +23,7 @@ import (
 // Before calling this function all messages should have been checked and processed by the checkMessage function.
 func buildSingleChainReportHelper(
 	lggr logger.Logger,
+	metrics Metrics,
 	report exectypes.CommitData,
 	readyMessages map[int]struct{},
 ) (ccipocr3.ExecutePluginReportSingleChain, error) {
@@ -42,6 +43,7 @@ func buildSingleChainReportHelper(
 
 	numMsg := len(report.Messages)
 	if len(report.MessageTokenData) != numMsg {
+		metrics.TrackReportBuildError(report.SourceChain, buildErrorTokenDataLengthMismatch)
 		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.MessageTokenData), numMsg)
 	}
@@ -54,6 +56,9 @@ func buildSingleChainReportHelper(
 
 	tree, err := ConstructMerkleTree(report, lggr)
 	if err != nil {
+		// Covers the malformed-report rejections in roots.go (count/range/hash mismatch,
+		// seq outside range, wrong source chain, empty hash) — all construction failures.
+		metrics.TrackReportBuildError(report.SourceChain, buildErrorMerkleTreeConstruction)
 		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
 	}
@@ -62,6 +67,7 @@ func buildSingleChainReportHelper(
 	hash := tree.Root()
 	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
 		actualStr := "0x" + hex.EncodeToString(hash[:])
+		metrics.TrackReportBuildError(report.SourceChain, buildErrorMerkleRootMismatch)
 		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
@@ -92,6 +98,7 @@ func buildSingleChainReportHelper(
 		"toExecute", toExecute)
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
+		metrics.TrackReportBuildError(report.SourceChain, buildErrorProveFailed)
 		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
 	}
@@ -362,6 +369,9 @@ func (b *execReportBuilder) checkMessage(
 			return execReport, Error, err
 		}
 		if status != None {
+			if status != Error && status != ReadyToExecute {
+				b.metrics.TrackMessageSkipped(execReport.SourceChain, string(status))
+			}
 			return execReport, status, nil
 		}
 	}
@@ -434,6 +444,7 @@ func (b *execReportBuilder) verifyReport(
 ) (bool, validationMetadata, error) {
 	err := verifyReportNonceContinuity(b.addressCodec, execReport)
 	if err != nil {
+		b.metrics.TrackReportRejected(execReport.SourceChainSelector, rejectReasonSkippedNonce)
 		b.lggr.Infow("invalid report, skipped nonce detected",
 			"err", err,
 			"sourceChain", execReport.SourceChainSelector)
@@ -450,6 +461,7 @@ func (b *execReportBuilder) verifyReport(
 		},
 	)
 	if err != nil {
+		b.metrics.TrackReportBuildError(execReport.SourceChainSelector, buildErrorEncodeFailed)
 		b.lggr.Errorw("unable to encode report", "err", err, "report", execReport)
 		return false, validationMetadata{}, fmt.Errorf("unable to encode report: %w", err)
 	}
@@ -457,6 +469,7 @@ func (b *execReportBuilder) verifyReport(
 	accumulated := b.accumulated[len(b.accumulated)-1]
 	maxSizeBytes := int(b.maxReportSizeBytes - accumulated.encodedSizeBytes)
 	if len(encoded) > maxSizeBytes {
+		b.metrics.TrackReportRejected(execReport.SourceChainSelector, rejectReasonSizeLimit)
 		b.lggr.Infow("invalid report, report size exceeds limit", "size", len(encoded), "maxSize", maxSizeBytes)
 		return false, validationMetadata{}, nil
 	}
@@ -474,6 +487,7 @@ func (b *execReportBuilder) verifyReport(
 
 	maxGas := b.maxGas - accumulated.gas
 	if totalGas > maxGas {
+		b.metrics.TrackReportRejected(execReport.SourceChainSelector, rejectReasonGasLimit)
 		b.lggr.Infow("invalid report, report estimated gas usage exceeds limit", "gas", totalGas, "maxGas", maxGas)
 		return false, validationMetadata{}, nil
 	}
@@ -534,7 +548,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	// with fewer messages until we find a valid report.
 	if b.maxMessages == 0 {
 		allMessagesReport, err :=
-			buildSingleChainReportHelper(b.lggr, commitData, readyMessages)
+			buildSingleChainReportHelper(b.lggr, b.metrics, commitData, readyMessages)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
@@ -563,7 +577,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		msgs[i] = struct{}{}
 
-		candidateReport, err := buildSingleChainReportHelper(b.lggr, commitData, msgs)
+		candidateReport, err := buildSingleChainReportHelper(b.lggr, b.metrics, commitData, msgs)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},

@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/metricsutil"
 )
 
 var (
@@ -108,10 +109,11 @@ var (
 )
 
 type PromReporter struct {
-	lggr        logger.Logger
-	bhClient    beholder.Client
-	chainFamily string
-	chainID     string
+	lggr          logger.Logger
+	bhClient      beholder.Client
+	chainSelector cciptypes.ChainSelector
+	chainFamily   string
+	chainID       string
 
 	// Prometheus reporters
 	latencyHistogram          *prometheus.HistogramVec
@@ -134,6 +136,26 @@ type PromReporter struct {
 
 	configDigestMismatch   *prometheus.GaugeVec
 	bhConfigDigestMismatch metric.Int64Gauge
+
+	// Beholder-only metrics (no prometheus equivalent): mainnet NOP nodes aren't scraped by our
+	// prometheus, only ingested via beholder, so anything meant to give us visibility into NOP-run
+	// nodes should be defined here rather than as a promauto metric. Same pattern as
+	// commit/metrics/prom.go; design rationale for every metric lives in docs/metrics/execute-metrics.md.
+	bhPluginHeartbeat                metric.Int64Counter
+	bhCurrentState                   metric.Int64Gauge
+	bhPhaseErrors                    metric.Int64Counter
+	bhOldestPendingCommitAge         metric.Int64Gauge
+	bhLastExecutedSeqNum             metric.Int64Gauge
+	bhConsensusDropped               metric.Int64Counter
+	bhMessageConsensusConflicts      metric.Int64Counter
+	bhReportValidationRejected       metric.Int64Counter
+	bhPendingReports                 metric.Int64Gauge
+	bhMessagesSkipped                metric.Int64Counter
+	bhReportBuildErrors              metric.Int64Counter
+	bhMessageReadErrors              metric.Int64Counter
+	bhNonceReadErrors                metric.Int64Counter
+	bhCommitReportCacheRefreshErrors metric.Int64Counter
+	bhCommitReportCacheRefreshAge    metric.Int64Gauge
 }
 
 func NewPromReporter(
@@ -181,11 +203,73 @@ func NewPromReporter(
 		return nil, fmt.Errorf("failed to register ccip_exec_config_digest_mismatch gauge: %w", err)
 	}
 
+	pluginHeartbeat, err := bhClient.Meter.Int64Counter("ccip_exec_plugin_heartbeat")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_plugin_heartbeat counter: %w", err)
+	}
+	currentState, err := bhClient.Meter.Int64Gauge("ccip_exec_current_state")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_current_state gauge: %w", err)
+	}
+	phaseErrors, err := bhClient.Meter.Int64Counter("ccip_exec_phase_errors")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_phase_errors counter: %w", err)
+	}
+	oldestPendingCommitAge, err := bhClient.Meter.Int64Gauge("ccip_exec_oldest_pending_commit_age_seconds")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_oldest_pending_commit_age_seconds gauge: %w", err)
+	}
+	lastExecutedSeqNum, err := bhClient.Meter.Int64Gauge("ccip_exec_last_executed_seq_num")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_last_executed_seq_num gauge: %w", err)
+	}
+	consensusDropped, err := bhClient.Meter.Int64Counter("ccip_exec_consensus_dropped")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_consensus_dropped counter: %w", err)
+	}
+	messageConsensusConflicts, err := bhClient.Meter.Int64Counter("ccip_exec_message_consensus_conflicts")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_message_consensus_conflicts counter: %w", err)
+	}
+	reportValidationRejected, err := bhClient.Meter.Int64Counter("ccip_exec_report_validation_rejected")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_report_validation_rejected counter: %w", err)
+	}
+	pendingReports, err := bhClient.Meter.Int64Gauge("ccip_exec_pending_reports")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_pending_reports gauge: %w", err)
+	}
+	messagesSkipped, err := bhClient.Meter.Int64Counter("ccip_exec_messages_skipped")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_messages_skipped counter: %w", err)
+	}
+	reportBuildErrors, err := bhClient.Meter.Int64Counter("ccip_exec_report_build_errors")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_report_build_errors counter: %w", err)
+	}
+	messageReadErrors, err := bhClient.Meter.Int64Counter("ccip_exec_message_read_errors")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_message_read_errors counter: %w", err)
+	}
+	nonceReadErrors, err := bhClient.Meter.Int64Counter("ccip_exec_nonce_read_errors")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_nonce_read_errors counter: %w", err)
+	}
+	commitReportCacheRefreshErrors, err := bhClient.Meter.Int64Counter("ccip_exec_commit_report_cache_refresh_errors")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_commit_report_cache_refresh_errors counter: %w", err)
+	}
+	commitReportCacheRefreshAge, err := bhClient.Meter.Int64Gauge("ccip_exec_commit_report_cache_last_refresh_age_seconds")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register ccip_exec_commit_report_cache_last_refresh_age_seconds gauge: %w", err)
+	}
+
 	return &PromReporter{
-		lggr:        lggr,
-		chainFamily: chainFamily,
-		bhClient:    bhClient,
-		chainID:     chainID,
+		lggr:          lggr,
+		chainSelector: selector,
+		chainFamily:   chainFamily,
+		bhClient:      bhClient,
+		chainID:       chainID,
 
 		latencyHistogram:          PromExecLatencyHistogram,
 		execErrors:                PromExecErrors,
@@ -206,6 +290,22 @@ func NewPromReporter(
 		bhExecLatestRound:           execLatestRoundID,
 		bhLooppProviderSupported:    looppProviderSupported,
 		bhConfigDigestMismatch:      configDigestMismatch,
+
+		bhPluginHeartbeat:                pluginHeartbeat,
+		bhCurrentState:                   currentState,
+		bhPhaseErrors:                    phaseErrors,
+		bhOldestPendingCommitAge:         oldestPendingCommitAge,
+		bhLastExecutedSeqNum:             lastExecutedSeqNum,
+		bhConsensusDropped:               consensusDropped,
+		bhMessageConsensusConflicts:      messageConsensusConflicts,
+		bhReportValidationRejected:       reportValidationRejected,
+		bhPendingReports:                 pendingReports,
+		bhMessagesSkipped:                messagesSkipped,
+		bhReportBuildErrors:              reportBuildErrors,
+		bhMessageReadErrors:              messageReadErrors,
+		bhNonceReadErrors:                nonceReadErrors,
+		bhCommitReportCacheRefreshErrors: commitReportCacheRefreshErrors,
+		bhCommitReportCacheRefreshAge:    commitReportCacheRefreshAge,
 	}, nil
 }
 
@@ -222,11 +322,34 @@ func (p *PromReporter) TrackObservation(obs exectypes.Observation, state exectyp
 func (p *PromReporter) TrackOutcome(outcome exectypes.Outcome, state exectypes.PluginState, round uint64) {
 	p.trackOutputStats(&outcome, state, plugincommon.OutcomeMethod)
 
+	// Per-lane derived gauges: age of the oldest pending commit report and the highest
+	// sequence number exec believes is executed. Both are computed from data already carried
+	// by the outcome's commit reports; see docs/metrics/execute-metrics.md.
+	oldestAgeByChain := make(map[cciptypes.ChainSelector]float64)
+	lastExecutedByChain := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 	for _, cr := range outcome.CommitReports {
 		sourceChainSelector := cr.SourceChain
 		maxSeqNr := pickHighestSeqNrInMessages(cr.Messages)
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.OutcomeMethod)
 		p.trackLatestRoundID(round, sourceChainSelector, plugincommon.OutcomeMethod)
+
+		if !cr.Timestamp.IsZero() {
+			age := time.Since(cr.Timestamp).Seconds()
+			if existing, ok := oldestAgeByChain[sourceChainSelector]; !ok || age < existing {
+				oldestAgeByChain[sourceChainSelector] = age
+			}
+		}
+		for _, seqNum := range cr.ExecutedMessages {
+			if seqNum > lastExecutedByChain[sourceChainSelector] {
+				lastExecutedByChain[sourceChainSelector] = seqNum
+			}
+		}
+	}
+	for sourceChainSelector, age := range oldestAgeByChain {
+		p.TrackOldestPendingCommitAge(sourceChainSelector, age)
+	}
+	for sourceChainSelector, seqNum := range lastExecutedByChain {
+		p.TrackLastExecutedSeqNum(sourceChainSelector, seqNum)
 	}
 }
 
@@ -423,4 +546,157 @@ func (p *PromReporter) TrackConfigDigestMismatch(mismatch bool) {
 		attribute.String("chain_family", p.chainFamily),
 		attribute.String("chain_id", p.chainID),
 	))
+}
+
+// TrackPluginHeartbeat is documented on Reporter.
+func (p *PromReporter) TrackPluginHeartbeat(phase string) {
+	attrs := append(
+		metricsutil.DestChainAttrs(p.chainSelector),
+		attribute.String("phase", phase),
+	)
+	p.bhPluginHeartbeat.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackCurrentState is documented on Reporter.
+func (p *PromReporter) TrackCurrentState(state exectypes.PluginState) {
+	attrs := append(
+		metricsutil.DestChainAttrs(p.chainSelector),
+		attribute.String("state", string(state)),
+	)
+	p.bhCurrentState.Record(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackPhaseError is documented on Reporter.
+func (p *PromReporter) TrackPhaseError(phase, reason string) {
+	attrs := append(
+		metricsutil.DestChainAttrs(p.chainSelector),
+		attribute.String("phase", phase),
+		attribute.String("reason", reason),
+	)
+	p.bhPhaseErrors.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackOldestPendingCommitAge is documented on Reporter.
+func (p *PromReporter) TrackOldestPendingCommitAge(sourceChain cciptypes.ChainSelector, ageSeconds float64) {
+	attrs := append(
+		metricsutil.SourceChainAttrs(sourceChain),
+		metricsutil.DestChainAttrs(p.chainSelector)...)
+	p.bhOldestPendingCommitAge.Record(context.Background(), int64(ageSeconds), metric.WithAttributes(attrs...))
+}
+
+// TrackLastExecutedSeqNum is documented on Reporter.
+func (p *PromReporter) TrackLastExecutedSeqNum(sourceChain cciptypes.ChainSelector, seqNum cciptypes.SeqNum) {
+	attrs := append(
+		metricsutil.SourceChainAttrs(sourceChain),
+		metricsutil.DestChainAttrs(p.chainSelector)...)
+	p.bhLastExecutedSeqNum.Record(context.Background(), int64(seqNum), metric.WithAttributes(attrs...))
+}
+
+// TrackConsensusDropped is documented on Reporter.
+func (p *PromReporter) TrackConsensusDropped(
+	objectName string, key string, reason string, sourceChain cciptypes.ChainSelector,
+) {
+	attrs := append(
+		metricsutil.DestChainAttrs(p.chainSelector),
+		attribute.String("objectName", objectName),
+		attribute.String("key", key),
+		attribute.String("reason", reason))
+	if sourceChain != 0 {
+		attrs = append(attrs, metricsutil.SourceChainAttrs(sourceChain)...)
+	}
+	p.bhConsensusDropped.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackMessageConsensusConflict is documented on Reporter.
+func (p *PromReporter) TrackMessageConsensusConflict(sourceChain cciptypes.ChainSelector, kind string) {
+	attrs := append(
+		metricsutil.SourceChainAttrs(sourceChain),
+		metricsutil.DestChainAttrs(p.chainSelector)...)
+	attrs = append(attrs, attribute.String("kind", kind))
+	p.bhMessageConsensusConflicts.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackReportValidationRejected is documented on Reporter.
+func (p *PromReporter) TrackReportValidationRejected(phase, reason string) {
+	attrs := append(
+		metricsutil.DestChainAttrs(p.chainSelector),
+		attribute.String("phase", phase),
+		attribute.String("reason", reason),
+	)
+	p.bhReportValidationRejected.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackReportRejected satisfies report.Metrics: build-path rejections (verifyReport's
+// skipped_nonce/size_limit/gas_limit) ride the same ccip_exec_report_validation_rejected
+// family as the accept/transmit rejections, with phase="build".
+func (p *PromReporter) TrackReportRejected(sourceChain cciptypes.ChainSelector, reason string) {
+	attrs := append(
+		metricsutil.DestChainAttrs(p.chainSelector),
+		attribute.String("phase", "build"),
+		attribute.String("reason", reason))
+	if sourceChain != 0 {
+		attrs = append(attrs, metricsutil.SourceChainAttrs(sourceChain)...)
+	}
+	p.bhReportValidationRejected.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackPendingReports is documented on Reporter.
+func (p *PromReporter) TrackPendingReports(sourceChain cciptypes.ChainSelector, pending int) {
+	attrs := append(
+		metricsutil.SourceChainAttrs(sourceChain),
+		metricsutil.DestChainAttrs(p.chainSelector)...)
+	p.bhPendingReports.Record(context.Background(), int64(pending), metric.WithAttributes(attrs...))
+}
+
+// TrackMessageReadError is documented on Reporter.
+func (p *PromReporter) TrackMessageReadError(sourceChain cciptypes.ChainSelector, reason string) {
+	attrs := append(
+		metricsutil.SourceChainAttrs(sourceChain),
+		metricsutil.DestChainAttrs(p.chainSelector)...)
+	attrs = append(attrs, attribute.String("reason", reason))
+	p.bhMessageReadErrors.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackNonceReadError is documented on Reporter.
+func (p *PromReporter) TrackNonceReadError() {
+	p.bhNonceReadErrors.Add(
+		context.Background(),
+		1,
+		metric.WithAttributes(metricsutil.DestChainAttrs(p.chainSelector)...))
+}
+
+// TrackMessageSkipped is documented on Reporter.
+func (p *PromReporter) TrackMessageSkipped(sourceChain cciptypes.ChainSelector, reason string) {
+	attrs := append(
+		metricsutil.SourceChainAttrs(sourceChain),
+		metricsutil.DestChainAttrs(p.chainSelector)...)
+	attrs = append(attrs, attribute.String("reason", reason))
+	p.bhMessagesSkipped.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackReportBuildError is documented on Reporter.
+func (p *PromReporter) TrackReportBuildError(sourceChain cciptypes.ChainSelector, reason string) {
+	attrs := append(
+		metricsutil.DestChainAttrs(p.chainSelector),
+		attribute.String("reason", reason))
+	if sourceChain != 0 {
+		attrs = append(attrs, metricsutil.SourceChainAttrs(sourceChain)...)
+	}
+	p.bhReportBuildErrors.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+}
+
+// TrackCommitReportCacheRefreshError is documented on Reporter.
+func (p *PromReporter) TrackCommitReportCacheRefreshError() {
+	p.bhCommitReportCacheRefreshErrors.Add(
+		context.Background(),
+		1,
+		metric.WithAttributes(metricsutil.DestChainAttrs(p.chainSelector)...))
+}
+
+// TrackCommitReportCacheRefreshAge is documented on Reporter.
+func (p *PromReporter) TrackCommitReportCacheRefreshAge(ageSeconds float64) {
+	p.bhCommitReportCacheRefreshAge.Record(
+		context.Background(),
+		int64(ageSeconds),
+		metric.WithAttributes(metricsutil.DestChainAttrs(p.chainSelector)...))
 }

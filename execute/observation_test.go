@@ -706,6 +706,7 @@ func Test_getMessagesObservation(t *testing.T) {
 				inflightMessageCache: inflightCache,
 				tokenDataObserver:    &tokenDataObserver,
 				homeChain:            homeChain,
+				observer:             execmetrics.Noop{},
 				offchainCfg: pluginconfig.ExecuteOffchainConfig{
 					BatchGasLimit: uint64(batchGasLimit),
 				},

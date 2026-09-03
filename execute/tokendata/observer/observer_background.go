@@ -19,6 +19,7 @@ import (
 type backgroundObserver struct {
 	lggr              logger.Logger
 	observer          TokenDataObserver
+	observerName      string
 	numWorkers        int
 	cachedTokenData   *inMemTokenDataCache
 	msgQueue          *msgQueue
@@ -65,6 +66,13 @@ func NewBackgroundObserver(
 	return o
 }
 
+func (o *backgroundObserver) metricLabel() string {
+	if o.observerName != "" {
+		return o.observerName
+	}
+	return "unknown"
+}
+
 // Observe fetches token data for the given messages that are already present in memory.
 // If token data are not in memory, it enqueues the messages for background processing.
 // Meaning that at least two calls to Observe are needed to get token data for a message.
@@ -73,6 +81,10 @@ func (o *backgroundObserver) Observe(
 	_ context.Context,
 	observations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
+	label := o.metricLabel()
+	PromBackgroundQueueDepthGauge.WithLabelValues(label).Set(float64(o.msgQueue.size()))
+	PromBackgroundCacheSizeGauge.WithLabelValues(label).Set(float64(o.cachedTokenData.size()))
+
 	o.lggr.Debug("Observe called",
 		"observations", observations,
 		"cachedTokenData", o.cachedTokenData.size(),
@@ -193,21 +205,25 @@ func (o *backgroundObserver) worker(id int) {
 
 			if err != nil {
 				lggr.Errorw("message observation failed", "err", err)
+				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "observe_error").Inc()
 				continue
 			}
 
 			if _, chainExists := tokenData[msg.Header.SourceChainSelector]; !chainExists {
 				lggr.Errorw("underlying observer did not return token data for the chain")
+				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "missing_chain").Inc()
 				continue
 			}
 
 			if _, seqExists := tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber]; !seqExists {
 				lggr.Errorw("underlying observer did not return token data for the sequence number")
+				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "missing_seq").Inc()
 				continue
 			}
 
 			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].SupportedAreReady() {
 				lggr.Infow("token data not ready by the underlying observer")
+				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "not_ready").Inc()
 				continue
 			}
 
