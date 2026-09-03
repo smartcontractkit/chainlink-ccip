@@ -191,6 +191,22 @@ func TestWithdrawFeeTokensEVM_V1_6_0(t *testing.T) {
 				"chain %d token %d: fee aggregator should have received the full balance", f.selector, i)
 		}
 	}
+
+	// The deployed 1.6.0 OnRamp rejects a zero fee aggregator in setDynamicConfig, so the adapter's
+	// zero-address guard cannot fire on this version -- the invariant is enforced on-chain. (The 2.0
+	// Proxy and OnRamp do NOT validate it, which is where that guard earns its keep.) If a future
+	// 1.6.x drops this validation, this test fails and the 1.6 guard becomes load-bearing.
+	t.Run("OnRamp itself refuses a zero fee aggregator", func(t *testing.T) {
+		_, err := fees.SetFeeAggregator().Apply(*env, fees.SetFeeAggregatorInput{
+			Version: cciputils.Version_1_6_0,
+			MCMS:    mcms.Input{},
+			Args: []fees.FeeAggregatorForChain{
+				{ChainSelector: selA, FeeAggregator: (common.Address{}).Hex()},
+			},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "InvalidConfig")
+	})
 }
 
 func TestWithdrawFeeTokens_ValidationErrors(t *testing.T) {

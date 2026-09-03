@@ -174,6 +174,25 @@ func (a *FeeAggregatorAdapter) WithdrawFeeTokens(e cldf.Environment) *operations
 			}
 			onRampAddr := common.HexToAddress(onRampRef.Address)
 
+			// Check the OnRamp we are about to sweep rather than the default one: input.Contracts
+			// may name a different OnRamp, and its fee aggregator can differ. Withdrawing while it
+			// is unset reverts on-chain with ZeroAddressNotAllowed, which is harder to act on.
+			cfgReport, err := operations.ExecuteOperation(
+				b, onrampops.GetDynamicConfig, evmChain,
+				contract.FunctionInput[struct{}]{
+					ChainSelector: evmChain.Selector,
+					Address:       onRampAddr,
+				},
+			)
+			if err != nil {
+				return result, fmt.Errorf("failed to read OnRamp dynamic config at %s on chain %d: %w",
+					onRampAddr.Hex(), input.ChainSelector, err)
+			}
+			if cfgReport.Output.FeeAggregator == (common.Address{}) {
+				return result, fmt.Errorf("fee aggregator is not set on OnRamp at %s (chain %d); set it before withdrawing fee tokens",
+					onRampAddr.Hex(), input.ChainSelector)
+			}
+
 			// withdrawFeeTokens takes the whole token list in one call, so a chain with many fee
 			// tokens still costs a single transaction.
 			writeReport, err := operations.ExecuteOperation(

@@ -288,6 +288,10 @@ func (a *FeeAggregatorAdapter) WithdrawFeeTokens(e cldf.Environment) *operations
 				return result, err
 			}
 
+			if err := verifyFeeAggregatorsAreSet(e, input.ChainSelector, refs); err != nil {
+				return result, err
+			}
+
 			for _, ref := range refs {
 				writes, err := withdrawFeeTokensOnContract(b, evmChain, ref, feeTokens)
 				if err != nil {
@@ -307,6 +311,77 @@ func (a *FeeAggregatorAdapter) WithdrawFeeTokens(e cldf.Environment) *operations
 			return result, nil
 		},
 	)
+}
+
+// feeAggregatorOnContract reads the fee aggregator currently configured on a single 2.0 contract.
+// Each type stores it differently: Proxy exposes it directly, OnRamp and Executor keep it in their
+// dynamic config.
+func feeAggregatorOnContract(e cldf.Environment, chain cldf_evm.Chain, ref datastore.AddressRef) (common.Address, error) {
+	addr := common.HexToAddress(ref.Address)
+	opts := &bind.CallOpts{Context: e.GetContext()}
+
+	switch ref.Type {
+	case datastore.ContractType(proxyops.ContractType):
+		proxy, err := proxyops.NewProxyContract(addr, chain.Client)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to instantiate Proxy at %s: %w", addr.Hex(), err)
+		}
+		feeAgg, err := proxy.GetFeeAggregator(opts)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to read fee aggregator from Proxy at %s: %w", addr.Hex(), err)
+		}
+		return feeAgg, nil
+
+	case datastore.ContractType(onrampops.ContractType):
+		onRamp, err := onrampops.NewOnRampContract(addr, chain.Client)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to instantiate OnRamp at %s: %w", addr.Hex(), err)
+		}
+		dynamicCfg, err := onRamp.GetDynamicConfig(opts)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to read OnRamp dynamic config at %s: %w", addr.Hex(), err)
+		}
+		return dynamicCfg.FeeAggregator, nil
+
+	case datastore.ContractType(executorops.ContractType):
+		executor, err := executorops.NewExecutorContract(addr, chain.Client)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to instantiate Executor at %s: %w", addr.Hex(), err)
+		}
+		dynamicCfg, err := executor.GetDynamicConfig(opts)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to read Executor dynamic config at %s: %w", addr.Hex(), err)
+		}
+		return dynamicCfg.FeeAggregator, nil
+
+	default:
+		// Kept in step with withdrawFeeTokensOnContract: a type we cannot sweep is also a type
+		// whose fee aggregator we have no accessor for.
+		return common.Address{}, fmt.Errorf("no fee aggregator accessor for contract type %q", ref.Type)
+	}
+}
+
+// verifyFeeAggregatorsAreSet fails the withdrawal before any transaction is built if a target
+// contract has no fee aggregator. Withdrawing to the zero address reverts on-chain with
+// ZeroAddressNotAllowed, which is far harder to act on than this message.
+func verifyFeeAggregatorsAreSet(e cldf.Environment, chainSelector uint64, refs []datastore.AddressRef) error {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return fmt.Errorf("EVM chain with selector %d not defined", chainSelector)
+	}
+
+	for _, ref := range refs {
+		feeAgg, err := feeAggregatorOnContract(e, chain, ref)
+		if err != nil {
+			return fmt.Errorf("chain %d: %w", chainSelector, err)
+		}
+		if feeAgg == (common.Address{}) {
+			return fmt.Errorf("fee aggregator is not set on %s at %s (chain %d); set it before withdrawing fee tokens",
+				ref.Type, ref.Address, chainSelector)
+		}
+	}
+
+	return nil
 }
 
 func withdrawFeeTokensOnContract(
