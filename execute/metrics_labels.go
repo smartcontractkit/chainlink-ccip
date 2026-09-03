@@ -15,7 +15,7 @@ const (
 	phaseErrConfigDigestCheck        = "config_digest_check"
 	phaseErrCommitReportCacheRefresh = "commit_report_cache_refresh"
 	phaseErrHashesValidation         = "hashes_validation"
-	phaseErrTokenDataValidation      = "token_data_validation"
+	phaseErrAttachedDataValidation   = "token_data_validation"
 
 	// objectName values for ccip_exec_consensus_dropped{objectName, ...}.
 	consensusObjectFChain           = "fChain"

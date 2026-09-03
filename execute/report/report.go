@@ -43,7 +43,7 @@ func buildSingleChainReportHelper(
 
 	numMsg := len(report.Messages)
 	if len(report.MessageTokenData) != numMsg {
-		metrics.TrackReportBuildError(report.SourceChain, buildErrorTokenDataLengthMismatch)
+		metrics.TrackReportBuildError(report.SourceChain, buildErrorAttachedDataLengthMismatch)
 		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.MessageTokenData), numMsg)
 	}

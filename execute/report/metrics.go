@@ -44,10 +44,10 @@ const (
 // Build-error reasons for TrackReportBuildError. Named constants so the label values are a
 // fixed enum.
 const (
-	buildErrorTokenDataLengthMismatch = "token_data_length_mismatch"
-	buildErrorMerkleTreeConstruction  = "merkle_tree_construction"
-	buildErrorMerkleRootMismatch      = "merkle_root_mismatch"
-	buildErrorProveFailed             = "prove_failed"
-	buildErrorEncodeFailed            = "encode_failed"
-	buildErrorEmptyReport             = "empty_report"
+	buildErrorAttachedDataLengthMismatch = "token_data_length_mismatch"
+	buildErrorMerkleTreeConstruction     = "merkle_tree_construction"
+	buildErrorMerkleRootMismatch         = "merkle_root_mismatch"
+	buildErrorProveFailed                = "prove_failed"
+	buildErrorEncodeFailed               = "encode_failed"
+	buildErrorEmptyReport                = "empty_report"
 )

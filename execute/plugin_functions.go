@@ -533,6 +533,59 @@ func prepareValidatorsForComputeMessageObservationsConsensus(
 	return validators
 }
 
+// trackConsensusDrop reports a chain-keyed consensus drop; the key is the chain
+// selector's decimal form.
+func trackConsensusDrop(
+	metricsReporter metrics.Reporter,
+	objectName string,
+	sourceChain cciptypes.ChainSelector,
+	reason string,
+) {
+	metricsReporter.TrackConsensusDropped(
+		objectName, fmt.Sprintf("%d", sourceChain), reason, sourceChain)
+}
+
+// consensusExecutedMessages selects the executed messages of a root that reached f+1
+// votes, tracking the drops.
+func consensusExecutedMessages(
+	lggr logger.Logger,
+	mr merkleRootData,
+	votes map[cciptypes.SeqNum]int,
+	f int,
+	metricsReporter metrics.Reporter,
+) []cciptypes.SeqNum {
+	executedMessages := make([]cciptypes.SeqNum, 0)
+	for seqNum, count := range votes {
+		if consensus.LtFPlusOne(f, count) {
+			trackConsensusDrop(metricsReporter,
+				consensusObjectExecutedMessages, mr.SourceChain, consensusReasonInsufficientAgreement)
+			lggr.Debugw("skipping executed msg, less than f+1 votes", "mr", mr, "votes", count, "seqNum", seqNum)
+			continue
+		}
+		executedMessages = append(executedMessages, seqNum)
+	}
+	slices.Sort(executedMessages)
+	return executedMessages
+}
+
+// reportRootSplits reports a consensus split when two or more distinct roots shared the
+// same merkle root hash but had conflicting metadata (OnRampAddress/timestamp/range); each
+// cleared the f+1 threshold and the filter above kept only the first. Once per root hash.
+func reportRootSplits(
+	validRoots []merkleRootData,
+	seenCount map[cciptypes.Bytes32]int,
+	metricsReporter metrics.Reporter,
+) {
+	splitReported := make(map[cciptypes.Bytes32]bool, len(seenCount))
+	for _, mr := range validRoots {
+		if seenCount[mr.MerkleRoot] > 1 && !splitReported[mr.MerkleRoot] {
+			splitReported[mr.MerkleRoot] = true
+			trackConsensusDrop(metricsReporter,
+				consensusObjectMerkleRoot, mr.SourceChain, consensusReasonSplit)
+		}
+	}
+}
+
 // computeCommitObservationsConsensus come to consensus over observations of CommitData.
 // Selects a merkle root and the relevant data if it has at least f+1 observations.
 // If a merkle root is agreed twice but with different relevant data (e.g. OnRampAddress) then we don't have consensus.
@@ -553,7 +606,8 @@ func computeCommitObservationsConsensus(
 		} else if consensus.GteFPlusOne(f, votes) {
 			validRoots = append(validRoots, mr)
 		} else {
-			metricsReporter.TrackConsensusDropped(consensusObjectMerkleRoot, fmt.Sprintf("%d", mr.SourceChain), consensusReasonInsufficientAgreement, mr.SourceChain)
+			trackConsensusDrop(metricsReporter,
+				consensusObjectMerkleRoot, mr.SourceChain, consensusReasonInsufficientAgreement)
 			lggr.Debugw("merkle root with less than f+1 votes was found, skipping it", "mr", mr, "votes", votes)
 		}
 	}
@@ -563,17 +617,7 @@ func computeCommitObservationsConsensus(
 		seenCount[mr.MerkleRoot]++
 	}
 	validRoots = slicelib.Filter(validRoots, func(mr merkleRootData) bool { return seenCount[mr.MerkleRoot] == 1 })
-	// Two or more distinct roots with the same merkle root hash but conflicting metadata
-	// (OnRampAddress/timestamp/range) each cleared the f+1 threshold and were silently
-	// dropped by the filter above — a consensus split, treated as an integrity signal.
-	// Report once per conflicting root hash.
-	splitReported := make(map[cciptypes.Bytes32]bool, len(seenCount))
-	for _, mr := range validRoots {
-		if seenCount[mr.MerkleRoot] > 1 && !splitReported[mr.MerkleRoot] {
-			splitReported[mr.MerkleRoot] = true
-			metricsReporter.TrackConsensusDropped(consensusObjectMerkleRoot, fmt.Sprintf("%d", mr.SourceChain), consensusReasonSplit, mr.SourceChain)
-		}
-	}
+	reportRootSplits(validRoots, seenCount, metricsReporter)
 
 	result := make(exectypes.CommitObservations)
 	for _, mr := range validRoots {
@@ -583,23 +627,15 @@ func computeCommitObservationsConsensus(
 			continue
 		}
 
-		executedMessages := make([]cciptypes.SeqNum, 0)
-		for seqNum, count := range executedMsgVotes[mr] {
-			if consensus.LtFPlusOne(f, count) {
-				metricsReporter.TrackConsensusDropped(consensusObjectExecutedMessages, fmt.Sprintf("%d", mr.SourceChain), consensusReasonInsufficientAgreement, mr.SourceChain)
-				lggr.Debugw("skipping executed msg, less than f+1 votes", "mr", mr, "votes", count, "seqNum", seqNum)
-				continue
-			}
-			executedMessages = append(executedMessages, seqNum)
-		}
-		slices.Sort(executedMessages)
+		executedMessages := consensusExecutedMessages(lggr, mr, executedMsgVotes[mr], f, metricsReporter)
 
 		if _, ok := result[mr.SourceChain]; !ok {
 			result[mr.SourceChain] = make([]exectypes.CommitData, 0)
 		}
 		onRampAddress, err := base64.StdEncoding.DecodeString(mr.OnRampAddressBase64)
 		if err != nil {
-			metricsReporter.TrackConsensusDropped(consensusObjectOnRampAddress, fmt.Sprintf("%d", mr.SourceChain), consensusReasonDecodeError, mr.SourceChain)
+			trackConsensusDrop(metricsReporter,
+				consensusObjectOnRampAddress, mr.SourceChain, consensusReasonDecodeError)
 			lggr.Errorw("error decoding base64 encoded onRampAddress", "err", err, "addr", mr.OnRampAddressBase64)
 			continue
 		}
@@ -946,9 +982,9 @@ func getConsensusFChain(
 
 	// consensus on the fChain map uses the role DON F value (all nodes can observe the home chain)
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(f))
-	fChain, dropReasons := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
+	fChain, dropReasons := consensus.GetConsensusMap(lggr, consensusObjectFChain, observedFChains, donThresh)
 	for chain, reason := range dropReasons {
-		metricsReporter.TrackConsensusDropped(consensusObjectFChain, fmt.Sprintf("%d", chain), reason.String(), chain)
+		trackConsensusDrop(metricsReporter, consensusObjectFChain, chain, reason.String())
 	}
 
 	return fChain

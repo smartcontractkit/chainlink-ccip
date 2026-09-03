@@ -166,102 +166,9 @@ func NewPromReporter(
 		return nil, fmt.Errorf("chainFamily and chainID not found for selector %d", selector)
 	}
 
-	latencyHistogram, err := bhClient.Meter.Int64Histogram("ccip_exec_latency")
+	instruments, err := registerBeholderExecInstruments(bhClient.Meter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_latency histogram: %w", err)
-	}
-	processorLatencyHistogram, err := bhClient.Meter.Int64Histogram("ccip_exec_processor_latency")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_processor_latency histogram: %w", err)
-	}
-	execErrors, err := bhClient.Meter.Int64Counter("ccip_exec_errors")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_errors counter: %w", err)
-	}
-	outputDetailsCounter, err := bhClient.Meter.Int64Counter("ccip_exec_output_sizes")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_output_sizes counter: %w", err)
-	}
-	sequenceNumbers, err := bhClient.Meter.Int64Gauge("ccip_exec_max_sequence_number")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_max_sequence_number gauge: %w", err)
-	}
-	processorErrors, err := bhClient.Meter.Int64Counter("ccip_exec_processor_errors")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_processor_errors counter: %w", err)
-	}
-	execLatestRoundID, err := bhClient.Meter.Int64Gauge("ccip_exec_latest_round_id")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_latest_round_id gauge: %w", err)
-	}
-	looppProviderSupported, err := bhClient.Meter.Int64Gauge("ccip_exec_loopp_ccip_provider_supported")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_loopp_ccip_provider_supported gauge: %w", err)
-	}
-	configDigestMismatch, err := bhClient.Meter.Int64Gauge("ccip_exec_config_digest_mismatch")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_config_digest_mismatch gauge: %w", err)
-	}
-
-	pluginHeartbeat, err := bhClient.Meter.Int64Counter("ccip_exec_plugin_heartbeat")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_plugin_heartbeat counter: %w", err)
-	}
-	currentState, err := bhClient.Meter.Int64Gauge("ccip_exec_current_state")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_current_state gauge: %w", err)
-	}
-	phaseErrors, err := bhClient.Meter.Int64Counter("ccip_exec_phase_errors")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_phase_errors counter: %w", err)
-	}
-	oldestPendingCommitAge, err := bhClient.Meter.Int64Gauge("ccip_exec_oldest_pending_commit_age_seconds")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_oldest_pending_commit_age_seconds gauge: %w", err)
-	}
-	lastExecutedSeqNum, err := bhClient.Meter.Int64Gauge("ccip_exec_last_executed_seq_num")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_last_executed_seq_num gauge: %w", err)
-	}
-	consensusDropped, err := bhClient.Meter.Int64Counter("ccip_exec_consensus_dropped")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_consensus_dropped counter: %w", err)
-	}
-	messageConsensusConflicts, err := bhClient.Meter.Int64Counter("ccip_exec_message_consensus_conflicts")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_message_consensus_conflicts counter: %w", err)
-	}
-	reportValidationRejected, err := bhClient.Meter.Int64Counter("ccip_exec_report_validation_rejected")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_report_validation_rejected counter: %w", err)
-	}
-	pendingReports, err := bhClient.Meter.Int64Gauge("ccip_exec_pending_reports")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_pending_reports gauge: %w", err)
-	}
-	messagesSkipped, err := bhClient.Meter.Int64Counter("ccip_exec_messages_skipped")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_messages_skipped counter: %w", err)
-	}
-	reportBuildErrors, err := bhClient.Meter.Int64Counter("ccip_exec_report_build_errors")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_report_build_errors counter: %w", err)
-	}
-	messageReadErrors, err := bhClient.Meter.Int64Counter("ccip_exec_message_read_errors")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_message_read_errors counter: %w", err)
-	}
-	nonceReadErrors, err := bhClient.Meter.Int64Counter("ccip_exec_nonce_read_errors")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_nonce_read_errors counter: %w", err)
-	}
-	commitReportCacheRefreshErrors, err := bhClient.Meter.Int64Counter("ccip_exec_commit_report_cache_refresh_errors")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_commit_report_cache_refresh_errors counter: %w", err)
-	}
-	commitReportCacheRefreshAge, err := bhClient.Meter.Int64Gauge("ccip_exec_commit_report_cache_last_refresh_age_seconds")
-	if err != nil {
-		return nil, fmt.Errorf("failed to register ccip_exec_commit_report_cache_last_refresh_age_seconds gauge: %w", err)
+		return nil, err
 	}
 
 	return &PromReporter{
@@ -281,31 +188,170 @@ func NewPromReporter(
 		looppProviderSupported:    promLooppCCIPProviderSupported,
 		configDigestMismatch:      promExecConfigDigestMismatch,
 
-		bhLatencyHistogram:          latencyHistogram,
-		bhProcessorLatencyHistogram: processorLatencyHistogram,
-		bhExecErrors:                execErrors,
-		bhOutputDetailsCounter:      outputDetailsCounter,
-		bhSequenceNumbers:           sequenceNumbers,
-		beholderProcessorErrors:     processorErrors,
-		bhExecLatestRound:           execLatestRoundID,
-		bhLooppProviderSupported:    looppProviderSupported,
-		bhConfigDigestMismatch:      configDigestMismatch,
+		bhLatencyHistogram:          instruments.latencyHistogram,
+		bhProcessorLatencyHistogram: instruments.processorLatencyHistogram,
+		bhExecErrors:                instruments.execErrors,
+		bhOutputDetailsCounter:      instruments.outputDetailsCounter,
+		bhSequenceNumbers:           instruments.sequenceNumbers,
+		beholderProcessorErrors:     instruments.processorErrors,
+		bhExecLatestRound:           instruments.latestRoundID,
+		bhLooppProviderSupported:    instruments.looppProviderSupported,
+		bhConfigDigestMismatch:      instruments.configDigestMismatch,
 
-		bhPluginHeartbeat:                pluginHeartbeat,
-		bhCurrentState:                   currentState,
-		bhPhaseErrors:                    phaseErrors,
-		bhOldestPendingCommitAge:         oldestPendingCommitAge,
-		bhLastExecutedSeqNum:             lastExecutedSeqNum,
-		bhConsensusDropped:               consensusDropped,
-		bhMessageConsensusConflicts:      messageConsensusConflicts,
-		bhReportValidationRejected:       reportValidationRejected,
-		bhPendingReports:                 pendingReports,
-		bhMessagesSkipped:                messagesSkipped,
-		bhReportBuildErrors:              reportBuildErrors,
-		bhMessageReadErrors:              messageReadErrors,
-		bhNonceReadErrors:                nonceReadErrors,
-		bhCommitReportCacheRefreshErrors: commitReportCacheRefreshErrors,
-		bhCommitReportCacheRefreshAge:    commitReportCacheRefreshAge,
+		bhPluginHeartbeat:                instruments.pluginHeartbeat,
+		bhCurrentState:                   instruments.currentState,
+		bhPhaseErrors:                    instruments.phaseErrors,
+		bhOldestPendingCommitAge:         instruments.oldestPendingCommitAge,
+		bhLastExecutedSeqNum:             instruments.lastExecutedSeqNum,
+		bhConsensusDropped:               instruments.consensusDropped,
+		bhMessageConsensusConflicts:      instruments.messageConsensusConflicts,
+		bhReportValidationRejected:       instruments.reportValidationRejected,
+		bhPendingReports:                 instruments.pendingReports,
+		bhMessagesSkipped:                instruments.messagesSkipped,
+		bhReportBuildErrors:              instruments.reportBuildErrors,
+		bhMessageReadErrors:              instruments.messageReadErrors,
+		bhNonceReadErrors:                instruments.nonceReadErrors,
+		bhCommitReportCacheRefreshErrors: instruments.commitReportCacheRefreshErrors,
+		bhCommitReportCacheRefreshAge:    instruments.commitReportCacheRefreshAge,
+	}, nil
+}
+
+// beholderExecInstruments holds every beholder instrument the execute reporter records to.
+// They are registered together in registerBeholderExecInstruments so that NewPromReporter
+// stays under the lint complexity limit and instrument names live in one table.
+type beholderExecInstruments struct {
+	latencyHistogram          metric.Int64Histogram
+	processorLatencyHistogram metric.Int64Histogram
+
+	execErrors                     metric.Int64Counter
+	outputDetailsCounter           metric.Int64Counter
+	processorErrors                metric.Int64Counter
+	pluginHeartbeat                metric.Int64Counter
+	phaseErrors                    metric.Int64Counter
+	consensusDropped               metric.Int64Counter
+	messageConsensusConflicts      metric.Int64Counter
+	reportValidationRejected       metric.Int64Counter
+	messagesSkipped                metric.Int64Counter
+	reportBuildErrors              metric.Int64Counter
+	messageReadErrors              metric.Int64Counter
+	nonceReadErrors                metric.Int64Counter
+	commitReportCacheRefreshErrors metric.Int64Counter
+
+	sequenceNumbers             metric.Int64Gauge
+	latestRoundID               metric.Int64Gauge
+	looppProviderSupported      metric.Int64Gauge
+	configDigestMismatch        metric.Int64Gauge
+	currentState                metric.Int64Gauge
+	oldestPendingCommitAge      metric.Int64Gauge
+	lastExecutedSeqNum          metric.Int64Gauge
+	pendingReports              metric.Int64Gauge
+	commitReportCacheRefreshAge metric.Int64Gauge
+}
+
+// registerBeholderInstruments registers instruments of one kind by name, failing fast on
+// the first registration error.
+func registerBeholderInstruments[T any](
+	register func(name string) (T, error), names ...string,
+) ([]T, error) {
+	instruments := make([]T, 0, len(names))
+	for _, name := range names {
+		inst, err := register(name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to register %s: %w", name, err)
+		}
+		instruments = append(instruments, inst)
+	}
+	return instruments, nil
+}
+
+func registerBeholderExecInstruments(meter metric.Meter) (*beholderExecInstruments, error) {
+	counters, err := registerBeholderInstruments(
+		func(name string) (metric.Int64Counter, error) { return meter.Int64Counter(name) },
+		"ccip_exec_errors",
+		"ccip_exec_output_sizes",
+		"ccip_exec_processor_errors",
+		"ccip_exec_plugin_heartbeat",
+		"ccip_exec_phase_errors",
+		"ccip_exec_consensus_dropped",
+		"ccip_exec_message_consensus_conflicts",
+		"ccip_exec_report_validation_rejected",
+		"ccip_exec_messages_skipped",
+		"ccip_exec_report_build_errors",
+		"ccip_exec_message_read_errors",
+		"ccip_exec_nonce_read_errors",
+		"ccip_exec_commit_report_cache_refresh_errors",
+	)
+	if err != nil {
+		return nil, err
+	}
+	gauges, err := registerBeholderInstruments(
+		func(name string) (metric.Int64Gauge, error) { return meter.Int64Gauge(name) },
+		"ccip_exec_max_sequence_number",
+		"ccip_exec_latest_round_id",
+		"ccip_exec_loopp_ccip_provider_supported",
+		"ccip_exec_config_digest_mismatch",
+		"ccip_exec_current_state",
+		"ccip_exec_oldest_pending_commit_age_seconds",
+		"ccip_exec_last_executed_seq_num",
+		"ccip_exec_pending_reports",
+		"ccip_exec_commit_report_cache_last_refresh_age_seconds",
+	)
+	if err != nil {
+		return nil, err
+	}
+	histograms, err := registerBeholderInstruments(
+		func(name string) (metric.Int64Histogram, error) { return meter.Int64Histogram(name) },
+		"ccip_exec_latency",
+		"ccip_exec_processor_latency",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ci, gi, hi := 0, 0, 0
+	nextCounter := func() metric.Int64Counter {
+		inst := counters[ci]
+		ci++
+		return inst
+	}
+	nextGauge := func() metric.Int64Gauge {
+		inst := gauges[gi]
+		gi++
+		return inst
+	}
+	nextHistogram := func() metric.Int64Histogram {
+		inst := histograms[hi]
+		hi++
+		return inst
+	}
+
+	return &beholderExecInstruments{
+		latencyHistogram:          nextHistogram(),
+		processorLatencyHistogram: nextHistogram(),
+
+		execErrors:                     nextCounter(),
+		outputDetailsCounter:           nextCounter(),
+		processorErrors:                nextCounter(),
+		pluginHeartbeat:                nextCounter(),
+		phaseErrors:                    nextCounter(),
+		consensusDropped:               nextCounter(),
+		messageConsensusConflicts:      nextCounter(),
+		reportValidationRejected:       nextCounter(),
+		messagesSkipped:                nextCounter(),
+		reportBuildErrors:              nextCounter(),
+		messageReadErrors:              nextCounter(),
+		nonceReadErrors:                nextCounter(),
+		commitReportCacheRefreshErrors: nextCounter(),
+
+		sequenceNumbers:             nextGauge(),
+		latestRoundID:               nextGauge(),
+		looppProviderSupported:      nextGauge(),
+		configDigestMismatch:        nextGauge(),
+		currentState:                nextGauge(),
+		oldestPendingCommitAge:      nextGauge(),
+		lastExecutedSeqNum:          nextGauge(),
+		pendingReports:              nextGauge(),
+		commitReportCacheRefreshAge: nextGauge(),
 	}, nil
 }
 

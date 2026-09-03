@@ -157,7 +157,7 @@ func (p *Plugin) getMessagesOutcome(
 		return exectypes.Outcome{}
 	}
 	if err := validateTokenDataObservations(observation.Messages, observation.TokenData); err != nil {
-		p.metricsReporter.TrackPhaseError(plugincommon.OutcomeMethod, phaseErrTokenDataValidation)
+		p.metricsReporter.TrackPhaseError(plugincommon.OutcomeMethod, phaseErrAttachedDataValidation)
 		lggr.Errorw("validate token data observations: %w", err)
 		return exectypes.Outcome{}
 	}
