@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -79,14 +80,45 @@ func grantDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, toke
 }
 
 func grantMintAndBurnRolesBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
-	report, err := cldf_ops.ExecuteOperation(b, burn_mint_erc20.GrantMintAndBurnRoles, chain, contract.FunctionInput[common.Address]{
-		ChainSelector: chain.Selector,
-		Address:       token,
-		Args:          pool,
-	})
+	type GrantRoleArgs = contract.FunctionInput[common.Address]
+
+	retryBuffer := 2 * time.Second
+	retryPolicy := cldf_ops.RetryPolicy{MaxAttempts: 5}
+	retryConfig := cldf_ops.RetryConfig[GrantRoleArgs, evm.Chain]{
+		Enabled: true,
+		Policy:  retryPolicy,
+		InputHook: func(attempt uint, err error, in GrantRoleArgs, _ evm.Chain) GrantRoleArgs {
+			wait := time.Duration(attempt+1) * retryBuffer
+
+			b.Logger.Infof(
+				"Retrying GrantMintAndBurnRoles for token %s on chain %d, attempt %d/%d, waiting %s, err: %v",
+				token.Hex(), chain.Selector, attempt+1, retryPolicy.MaxAttempts, wait, err,
+			)
+
+			// We avoid time.Sleep since it doesn't respect context cancellation. Instead, we either wait
+			// for the entire backoff duration or for the context to be cancelled, whichever comes first.
+			select {
+			case <-b.GetContext().Done():
+			case <-time.After(wait):
+			}
+
+			return in
+		},
+	}
+
+	report, err := cldf_ops.ExecuteOperation(
+		b, burn_mint_erc20.GrantMintAndBurnRoles, chain,
+		contract.FunctionInput[common.Address]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          pool,
+		},
+		cldf_ops.WithRetryConfig(retryConfig),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant mint and burn roles: %w", err)
 	}
+
 	return []contract.WriteOutput{report.Output}, nil
 }
 
