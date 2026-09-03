@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -340,6 +341,7 @@ func setupSolanaFeeToken(
 	billingSigner solana.PublicKey,
 	feeAggregator solana.PublicKey,
 	amount uint64,
+	createAggATA bool,
 ) solanaFeeToken {
 	t.Helper()
 
@@ -362,17 +364,26 @@ func setupSolanaFeeToken(
 	accumIx, accumATA, err := soltokens.CreateAssociatedTokenAccount(
 		solana.TokenProgramID, mint, billingSigner, chain.DeployerKey.PublicKey())
 	require.NoError(t, err)
-	aggIx, aggATA, err := soltokens.CreateAssociatedTokenAccount(
-		solana.TokenProgramID, mint, feeAggregator, chain.DeployerKey.PublicKey())
+	ixs := []solana.Instruction{accumIx}
+
+	aggATA, _, err := soltokens.FindAssociatedTokenAddress(solana.TokenProgramID, mint, feeAggregator)
 	require.NoError(t, err)
-	require.NoError(t, chain.Confirm([]solana.Instruction{accumIx, aggIx}))
+	if createAggATA {
+		aggIx, _, err := soltokens.CreateAssociatedTokenAccount(
+			solana.TokenProgramID, mint, feeAggregator, chain.DeployerKey.PublicKey())
+		require.NoError(t, err)
+		ixs = append(ixs, aggIx)
+	}
+	require.NoError(t, chain.Confirm(ixs))
 
 	mintToIx, err := soltokens.MintTo(amount, solana.TokenProgramID, mint, accumATA, chain.DeployerKey.PublicKey())
 	require.NoError(t, err)
 	require.NoError(t, chain.Confirm([]solana.Instruction{mintToIx}))
 
 	require.Equal(t, amount, solTokenBalance(t, chain, accumATA), "billing accumulator should be funded")
-	require.Equal(t, uint64(0), solTokenBalance(t, chain, aggATA), "fee aggregator should start empty")
+	if createAggATA {
+		require.Equal(t, uint64(0), solTokenBalance(t, chain, aggATA), "fee aggregator should start empty")
+	}
 
 	return solanaFeeToken{mint: mint, accumATA: accumATA, aggATA: aggATA}
 }
@@ -439,8 +450,8 @@ func TestWithdrawFeeTokensSolana_V1_6_0(t *testing.T) {
 	)
 
 	// Two fee tokens, so the sequence has to iterate rather than handle a single mint.
-	tokenA := setupSolanaFeeToken(t, solChain, billingSigner, feeAggregator.PublicKey(), accumulated)
-	tokenB := setupSolanaFeeToken(t, solChain, billingSigner, feeAggregator.PublicKey(), accumulated)
+	tokenA := setupSolanaFeeToken(t, solChain, billingSigner, feeAggregator.PublicKey(), accumulated, true)
+	tokenB := setupSolanaFeeToken(t, solChain, billingSigner, feeAggregator.PublicKey(), accumulated, true)
 
 	t.Run("partial withdrawal honours the per-token amount", func(t *testing.T) {
 		_, err := fees.WithdrawFeeTokens().Apply(*env, fees.WithdrawFeeTokensInput{
@@ -488,6 +499,34 @@ func TestWithdrawFeeTokensSolana_V1_6_0(t *testing.T) {
 			require.Equal(t, accumulated, solTokenBalance(t, solChain, tok.aggATA),
 				"%s: fee aggregator should hold everything that accrued", name)
 		}
+	})
+
+	// The router will not create the recipient account, and ATA creation is permissionless, so the
+	// sequence creates it with the deployer key rather than making the operator do it beforehand.
+	t.Run("creates the fee aggregator ATA when it is missing", func(t *testing.T) {
+		tok := setupSolanaFeeToken(t, solChain, billingSigner, feeAggregator.PublicKey(), accumulated, false)
+
+		_, err := solChain.Client.GetAccountInfoWithOpts(t.Context(), tok.aggATA, &rpc.GetAccountInfoOpts{
+			Commitment: cldf_solana.SolDefaultCommitment,
+		})
+		require.ErrorIs(t, err, rpc.ErrNotFound, "fee aggregator ATA should not exist yet")
+
+		_, err = fees.WithdrawFeeTokens().Apply(*env, fees.WithdrawFeeTokensInput{
+			Version: cciputils.Version_1_6_0,
+			MCMS:    mcms.Input{},
+			Args: []fees.WithdrawFeeTokensForChain{
+				{
+					ChainSelector: solSel,
+					FeeTokens:     []fees.FeeTokenWithdrawal{{Token: tok.mint.String()}},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(0), solTokenBalance(t, solChain, tok.accumATA),
+			"accumulator should be swept")
+		require.Equal(t, accumulated, solTokenBalance(t, solChain, tok.aggATA),
+			"fee aggregator ATA should have been created and funded")
 	})
 
 	t.Run("unknown mint fails before any transaction is sent", func(t *testing.T) {
