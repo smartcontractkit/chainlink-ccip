@@ -27,6 +27,10 @@ type feeAggregatorAdapterID string
 type FeeAggregatorAdapter interface {
 	SetFeeAggregator(e cldf.Environment) *cldf_ops.Sequence[FeeAggregatorForChain, sequences.OnChainOutput, cldf_chain.BlockChains]
 	GetFeeAggregator(e cldf.Environment, chainSelector uint64) (string, error)
+
+	// WithdrawFeeTokens sweeps accumulated fee token balances to the fee aggregator. The input
+	// carries one or more fee tokens for a single chain; the sequence handles each in turn.
+	WithdrawFeeTokens(e cldf.Environment) *cldf_ops.Sequence[WithdrawFeeTokensForChain, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // FeeAggregatorAdapterRegistry maintains a registry of FeeAggregatorAdapters for different chain families and versions.

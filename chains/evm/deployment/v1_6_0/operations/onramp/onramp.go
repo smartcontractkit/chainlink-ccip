@@ -120,6 +120,10 @@ func (c *OnRampContract) SetDynamicConfig(opts *bind.TransactOpts, args DynamicC
 	return c.contract.Transact(opts, "setDynamicConfig", args)
 }
 
+func (c *OnRampContract) WithdrawFeeTokens(opts *bind.TransactOpts, args []common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "withdrawFeeTokens", args)
+}
+
 type AllowlistConfigArgs struct {
 	DestChainSelector         uint64
 	AllowlistEnabled          bool
@@ -276,5 +280,23 @@ var SetDynamicConfig = contract.NewWrite(contract.WriteParams[DynamicConfig, *On
 		args DynamicConfig,
 	) (*types.Transaction, error) {
 		return c.SetDynamicConfig(opts, args)
+	},
+})
+
+var WithdrawFeeTokens = contract.NewWrite(contract.WriteParams[[]common.Address, *OnRampContract]{
+	Name:            "onramp:withdraw-fee-tokens",
+	Version:         Version,
+	Description:     "Calls withdrawFeeTokens on the contract",
+	ContractType:    ContractType,
+	ContractABI:     OnRampABI,
+	NewContract:     NewOnRampContract,
+	IsAllowedCaller: contract.AllCallersAllowed[*OnRampContract, []common.Address],
+	Validate:        func([]common.Address) error { return nil },
+	CallContract: func(
+		c *OnRampContract,
+		opts *bind.TransactOpts,
+		args []common.Address,
+	) (*types.Transaction, error) {
+		return c.WithdrawFeeTokens(opts, args)
 	},
 })
