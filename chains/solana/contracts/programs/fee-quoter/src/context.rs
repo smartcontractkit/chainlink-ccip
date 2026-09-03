@@ -176,7 +176,7 @@ pub struct AddBillingTokenConfig<'info> {
     pub fee_token_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = authority,
         associated_token::mint = fee_token_mint,
         associated_token::authority = fee_billing_signer,
