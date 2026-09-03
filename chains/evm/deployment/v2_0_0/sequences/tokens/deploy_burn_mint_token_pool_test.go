@@ -214,6 +214,38 @@ func TestDeployTokenPool(t *testing.T) {
 			},
 			expectedErr: "threshold amount for additional ccvs must be defined",
 		},
+		{
+			desc: "happy path - burn to address mint",
+			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
+				var rmnProxyAddress common.Address
+				var routerAddress common.Address
+				for _, addr := range chainReport.Output.Addresses {
+					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
+						rmnProxyAddress = common.HexToAddress(addr.Address)
+					}
+					if addr.Type == datastore.ContractType(router.ContractType) {
+						routerAddress = common.HexToAddress(addr.Address)
+					}
+				}
+				return tokens.DeployTokenPoolInput{
+					ChainSel:                         chainReport.Input.ChainSelector,
+					TokenPoolType:                    datastore.ContractType("BurnToAddressMintTokenPool"),
+					TokenPoolVersion:                 burn_mint_token_pool.Version,
+					TokenSymbol:                      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:                   common.HexToAddress("0x01"),
+					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+					FeeAdmin:                    common.HexToAddress("0x03"),
+					ConstructorArgs: tokens.ConstructorArgs{
+						Token:       common.HexToAddress(tokenReport.Output.Address),
+						Decimals:    18,
+						RMNProxy:    rmnProxyAddress,
+						Router:      routerAddress,
+						BurnAddress: common.HexToAddress("0x0000000000000000000000000000000000000001"),
+					},
+				}
+			},
+			expectedErr: "",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {

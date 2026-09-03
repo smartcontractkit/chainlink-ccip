@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 type ConstructorArgs struct {
@@ -20,6 +22,8 @@ type ConstructorArgs struct {
 	RMNProxy common.Address
 	// Router is the router contract.
 	Router common.Address
+	// BurnAddress is the burn address for BurnToAddressMintTokenPool. Optional for other pool types.
+	BurnAddress common.Address
 }
 
 // AdvancedPoolHooksConfig contains optional configuration for AdvancedPoolHooks.
@@ -121,6 +125,13 @@ func (c DeployTokenPoolInput) Validate(chain evm.Chain) error {
 		return errors.New("threshold amount for additional ccvs must be defined")
 	}
 	// Fee aggregator can be zero address; it's optional
+
+	// Validate BurnAddress for BurnToAddressMintTokenPool
+	if c.TokenPoolType == datastore.ContractType(cciputils.BurnToAddressMintTokenPool) {
+		if c.ConstructorArgs.BurnAddress == (common.Address{}) {
+			return errors.New("burn address must be defined for BurnToAddressMintTokenPool")
+		}
+	}
 
 	return nil
 }

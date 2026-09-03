@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_to_address_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_with_from_mint_token_pool"
 )
 
@@ -101,6 +102,21 @@ var DeployBurnMintTokenPool = cldf_ops.NewSequence(
 					AdvancedPoolHooks:  constructorArgs.AdvancedPoolHooks,
 					RmnProxy:           constructorArgs.RMNProxy,
 					Router:             constructorArgs.Router,
+				},
+				Qualifier: &input.TokenSymbol,
+			})
+			tpDeployReport, err = &report.Output, deployErr
+		case burn_to_address_mint_token_pool.ContractType:
+			report, deployErr := cldf_ops.ExecuteOperation(b, burn_to_address_mint_token_pool.Deploy, chain, evm_contract.DeployInput[burn_to_address_mint_token_pool.ConstructorArgs]{
+				ChainSelector:  input.ChainSel,
+				TypeAndVersion: typeAndVersion,
+				Args: burn_to_address_mint_token_pool.ConstructorArgs{
+					Token:              constructorArgs.Token,
+					LocalTokenDecimals: constructorArgs.LocalTokenDecimals,
+					AdvancedPoolHooks:  constructorArgs.AdvancedPoolHooks,
+					RmnProxy:           constructorArgs.RMNProxy,
+					Router:             constructorArgs.Router,
+					BurnAddress:        input.ConstructorArgs.BurnAddress,
 				},
 				Qualifier: &input.TokenSymbol,
 			})
