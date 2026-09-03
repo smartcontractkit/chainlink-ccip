@@ -52,7 +52,7 @@ func (p *Plugin) Observation(
 
 	// Unconditional liveness signal — must run before any decode, state check, or early
 	// return so a wedged pipeline is distinguishable from a stale-but-valid gauge.
-	p.observer.TrackPluginHeartbeat(plugincommon.ObservationMethod)
+	p.metricsReporter.TrackPluginHeartbeat(plugincommon.ObservationMethod)
 
 	var err error
 	var previousOutcome exectypes.Outcome
@@ -71,14 +71,14 @@ func (p *Plugin) Observation(
 	if configDigestErr != nil {
 		// The ccip_exec_config_digest_mismatch gauge is intentionally left untouched here:
 		// a frozen 0 must stay ambiguous with "check broken" is signalled by this counter.
-		p.observer.TrackPhaseError(plugincommon.ObservationMethod, "config_digest_check")
+		p.metricsReporter.TrackPhaseError(plugincommon.ObservationMethod, phaseErrConfigDigestCheck)
 		lggr.Errorw("failed to check for config digest mismatch",
 			"err", configDigestErr,
 			"homeChainConfigDigest", p.reportingCfg.ConfigDigest,
 			"pluginType", consts.PluginTypeExecute,
 		)
 	} else {
-		p.observer.TrackConfigDigestMismatch(!configMatch)
+		p.metricsReporter.TrackConfigDigestMismatch(!configMatch)
 	}
 
 	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
@@ -109,7 +109,7 @@ func (p *Plugin) Observation(
 		tStart := time.Now()
 		discoveryObs, err = p.discovery.Observation(ctx, dt.Outcome{}, dt.Query{})
 		if err != nil {
-			p.observer.TrackPhaseError(plugincommon.ObservationMethod, "discovery")
+			p.metricsReporter.TrackPhaseError(plugincommon.ObservationMethod, phaseErrDiscovery)
 			lggr.Errorw("failed to discover contracts", "err", err)
 		}
 		lggr.Debugw("finished exec discovery observation",
@@ -140,7 +140,7 @@ func (p *Plugin) Observation(
 		// Phase 2: Gather messages from the source chains and build the execution report.
 		observation, err = p.getMessagesObservation(ctx, lggr, previousOutcome, observation)
 		if err != nil {
-			p.observer.TrackPhaseError(plugincommon.ObservationMethod, "get_messages")
+			p.metricsReporter.TrackPhaseError(plugincommon.ObservationMethod, phaseErrGetMessages)
 			lggr.Errorw("failed to getMessagesObservation", "err", err)
 			return nil, nil
 		}
@@ -148,14 +148,14 @@ func (p *Plugin) Observation(
 		// Phase 3: observe nonce for each unique source/sender pair.
 		observation, err = p.getFilterObservation(ctx, lggr, previousOutcome, observation)
 		if err != nil {
-			p.observer.TrackPhaseError(plugincommon.ObservationMethod, "get_filter")
+			p.metricsReporter.TrackPhaseError(plugincommon.ObservationMethod, phaseErrGetFilter)
 			lggr.Errorw("failed to getFilterObservation", "err", err)
 			return nil, nil
 		}
 	default:
 		return nil, fmt.Errorf("get observation: unknown state")
 	}
-	p.observer.TrackObservation(
+	p.metricsReporter.TrackObservation(
 		observation, state, outctx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
 	numCommitReports := 0
 	for _, reports := range observation.CommitReports {
@@ -234,8 +234,8 @@ func (p *Plugin) getCommitReportsObservation(
 		// Log error but proceed. If RefreshCache fails, GetReportsToQueryFromTimestamp
 		// will likely use a less optimal (wider) window based on its internal state or defaults,
 		// which is safer than halting observation entirely.
-		p.observer.TrackCommitReportCacheRefreshError()
-		p.observer.TrackPhaseError(plugincommon.ObservationMethod, "commit_report_cache_refresh")
+		p.metricsReporter.TrackCommitReportCacheRefreshError()
+		p.metricsReporter.TrackPhaseError(plugincommon.ObservationMethod, phaseErrCommitReportCacheRefresh)
 		lggr.Errorw("failed to refresh commit report cache, proceeding with potentially wider query window", "err", err)
 	} else {
 		p.lastCommitReportCacheRefresh = time.Now()
@@ -243,7 +243,7 @@ func (p *Plugin) getCommitReportsObservation(
 	if !p.lastCommitReportCacheRefresh.IsZero() {
 		// Emitted every round regardless of this round's refresh outcome, so a cache that
 		// stops refreshing successfully shows a growing age rather than a stale value.
-		p.observer.TrackCommitReportCacheRefreshAge(time.Since(p.lastCommitReportCacheRefresh).Seconds())
+		p.metricsReporter.TrackCommitReportCacheRefreshAge(time.Since(p.lastCommitReportCacheRefresh).Seconds())
 	}
 
 	// Get curse information from the destination chain.
@@ -252,7 +252,7 @@ func (p *Plugin) getCommitReportsObservation(
 		// If we can't get curse info, we can't proceed.
 		// But we still need to return discovery data.
 		// The error is logged by getCurseInfo.
-		p.observer.TrackPhaseError(plugincommon.ObservationMethod, "curse_read")
+		p.metricsReporter.TrackPhaseError(plugincommon.ObservationMethod, phaseErrCurseRead)
 		return observation, nil
 	}
 	if ci.GlobalCurse || ci.CursedDestination {
@@ -335,12 +335,12 @@ func (p *Plugin) readMessagesForReport(
 ) ([]cciptypes.Message, error) {
 	msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
 	if err != nil {
-		p.observer.TrackMessageReadError(srcChain, "rpc")
+		p.metricsReporter.TrackMessageReadError(srcChain, "rpc")
 		return nil, err
 	}
 
 	if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
-		p.observer.TrackMessageReadError(srcChain, "range_mismatch")
+		p.metricsReporter.TrackMessageReadError(srcChain, "range_mismatch")
 		lggr.Errorw("missing messages in range",
 			logutil.FieldSourceChain, srcChain,
 			logutil.FieldSeqNumRange, report.SequenceNumberRange,
@@ -474,11 +474,11 @@ func (p *Plugin) getMessagesObservation(
 			// If a message is inflight or already executed, don't include it fully in the observation
 			// because its already been transmitted in a previous report or executed onchain.
 			if p.inflightMessageCache.IsInflight(srcChain, msg.Header.MessageID) {
-				p.observer.TrackMessageSkipped(srcChain, "already_inflight")
+				p.metricsReporter.TrackMessageSkipped(srcChain, skipReasonAlreadyInflight)
 				continue
 			}
 			if slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber) {
-				p.observer.TrackMessageSkipped(srcChain, "already_executed")
+				p.metricsReporter.TrackMessageSkipped(srcChain, skipReasonAlreadyExecuted)
 				continue
 			}
 
@@ -579,8 +579,8 @@ func (p *Plugin) getFilterObservation(
 		// Downstream this cascades into every ordered message skipping with
 		// missing_nonces_for_chain (counted by ccip_exec_messages_skipped); this counter
 		// captures the root cause one state earlier.
-		p.observer.TrackNonceReadError()
-		p.observer.TrackPhaseError(plugincommon.ObservationMethod, "nonce_read")
+		p.metricsReporter.TrackNonceReadError()
+		p.metricsReporter.TrackPhaseError(plugincommon.ObservationMethod, phaseErrNonceRead)
 		lggr.Errorw("unable to get nonces", "err", err)
 	} else {
 		// Note: it is technically possible to check for curses at this point. If a curse

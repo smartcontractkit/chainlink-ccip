@@ -137,13 +137,13 @@ func (c *LBTCAttestationClient) fetchBatch(
 			attestations[inputMessageHash] = tokendata.ErrorAttestationStatus(err)
 		}
 		// absorb api error to each token data status
-		PromLBTCBatchFetchCounter.WithLabelValues(lbtcOutcomeHTTPError).Inc()
+		trackBatchFetch(lbtcOutcomeHTTPError)
 		return attestations, nil
 	}
 	var attestationResp AttestationResponse
 	err = json.Unmarshal(respRaw, &attestationResp)
 	if err != nil {
-		PromLBTCBatchFetchCounter.WithLabelValues(lbtcOutcomeParseError).Inc()
+		trackBatchFetch(lbtcOutcomeParseErr)
 		return nil, fmt.Errorf("failed to unmarshal attestation response: %w", err)
 	}
 	outcome := lbtcOutcomeOK
@@ -155,7 +155,7 @@ func (c *LBTCAttestationClient) fetchBatch(
 			)
 		}
 	}
-	PromLBTCBatchFetchCounter.WithLabelValues(outcome).Inc()
+	trackBatchFetch(outcome)
 	for _, attestation := range attestationResp.Attestations {
 		attestations[attestation.MessageHash] = attestationToAttestationStatus(attestation)
 	}

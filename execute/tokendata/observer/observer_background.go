@@ -82,8 +82,8 @@ func (o *backgroundObserver) Observe(
 	observations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
 	label := o.metricLabel()
-	PromBackgroundQueueDepthGauge.WithLabelValues(label).Set(float64(o.msgQueue.size()))
-	PromBackgroundCacheSizeGauge.WithLabelValues(label).Set(float64(o.cachedTokenData.size()))
+	trackBackgroundQueueDepth(label, o.msgQueue.size())
+	trackBackgroundCacheSize(label, o.cachedTokenData.size())
 
 	o.lggr.Debug("Observe called",
 		"observations", observations,
@@ -205,25 +205,25 @@ func (o *backgroundObserver) worker(id int) {
 
 			if err != nil {
 				lggr.Errorw("message observation failed", "err", err)
-				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "observe_error").Inc()
+				trackBackgroundObserveFailure(o.metricLabel(), "observe_error")
 				continue
 			}
 
 			if _, chainExists := tokenData[msg.Header.SourceChainSelector]; !chainExists {
 				lggr.Errorw("underlying observer did not return token data for the chain")
-				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "missing_chain").Inc()
+				trackBackgroundObserveFailure(o.metricLabel(), "missing_chain")
 				continue
 			}
 
 			if _, seqExists := tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber]; !seqExists {
 				lggr.Errorw("underlying observer did not return token data for the sequence number")
-				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "missing_seq").Inc()
+				trackBackgroundObserveFailure(o.metricLabel(), "missing_seq")
 				continue
 			}
 
 			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].SupportedAreReady() {
 				lggr.Infow("token data not ready by the underlying observer")
-				PromBackgroundObserveFailureCounter.WithLabelValues(o.metricLabel(), "not_ready").Inc()
+				trackBackgroundObserveFailure(o.metricLabel(), "not_ready")
 				continue
 			}
 

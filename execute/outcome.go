@@ -44,7 +44,7 @@ func (p *Plugin) Outcome(
 
 	// Unconditional liveness signal — must run before any decode, state check, or early
 	// return so a wedged pipeline is distinguishable from a stale-but-valid gauge.
-	p.observer.TrackPluginHeartbeat(plugincommon.OutcomeMethod)
+	p.metricsReporter.TrackPluginHeartbeat(plugincommon.OutcomeMethod)
 
 	previousOutcome, err := p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
 	if err != nil {
@@ -52,7 +52,7 @@ func (p *Plugin) Outcome(
 	}
 
 	state := previousOutcome.State.Next()
-	p.observer.TrackCurrentState(state)
+	p.metricsReporter.TrackCurrentState(state)
 	lggr = logger.With(lggr, "execPluginState", state)
 	lggr.Debugw("Execute plugin performing outcome",
 		"outctx", outctx,
@@ -78,14 +78,14 @@ func (p *Plugin) Outcome(
 		discoveryAos := slicelib.Map(decodedAos, mapper)
 		_, err = p.discovery.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryAos)
 		if err != nil {
-			p.observer.TrackPhaseError(plugincommon.OutcomeMethod, "discovery")
+			p.metricsReporter.TrackPhaseError(plugincommon.OutcomeMethod, phaseErrDiscovery)
 			lggr.Errorw("discovery processor outcome errored", "err", err)
 		} else {
 			p.contractsInitialized = true
 		}
 	}
 
-	observation, err := computeConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, p.observer)
+	observation, err := computeConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, p.metricsReporter)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -100,7 +100,7 @@ func (p *Plugin) Outcome(
 		outcome, err = p.getFilterOutcome(ctx, lggr, observation, previousOutcome)
 		if err != nil {
 			// We want to have an empty previousOutcome in the next round. To achieve this we don't return an error.
-			p.observer.TrackPhaseError(plugincommon.OutcomeMethod, "filter")
+			p.metricsReporter.TrackPhaseError(plugincommon.OutcomeMethod, phaseErrFilter)
 			lggr.Errorw("get filter outcome", "err", err)
 			return nil, nil
 		}
@@ -117,7 +117,7 @@ func (p *Plugin) Outcome(
 		}
 		return nil, nil
 	}
-	p.observer.TrackOutcome(outcome,
+	p.metricsReporter.TrackOutcome(outcome,
 		state, outctx.Round) //nolint:staticcheck // we rely on Round for OTI metrics compatibility
 	lggr.Infow(GeneratedOutcome,
 		"outcomeWithoutMsgData", outcome.ToLogFormat(),
@@ -152,12 +152,12 @@ func (p *Plugin) getMessagesOutcome(
 
 	// First ensure that all observed messages has hashes and token data.
 	if err := validateHashesExist(observation.Messages, observation.Hashes); err != nil {
-		p.observer.TrackPhaseError(plugincommon.OutcomeMethod, "hashes_validation")
+		p.metricsReporter.TrackPhaseError(plugincommon.OutcomeMethod, phaseErrHashesValidation)
 		lggr.Errorw("validate hashes exist", "err", err)
 		return exectypes.Outcome{}
 	}
 	if err := validateTokenDataObservations(observation.Messages, observation.TokenData); err != nil {
-		p.observer.TrackPhaseError(plugincommon.OutcomeMethod, "token_data_validation")
+		p.metricsReporter.TrackPhaseError(plugincommon.OutcomeMethod, phaseErrTokenDataValidation)
 		lggr.Errorw("validate token data observations: %w", err)
 		return exectypes.Outcome{}
 	}
@@ -212,7 +212,7 @@ func (p *Plugin) getFilterOutcome(
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
 		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
-		report.WithMetrics(p.observer),
+		report.WithMetrics(p.metricsReporter),
 	)
 
 	execReports, selectedCommitReports, err := selectReports(
@@ -220,7 +220,7 @@ func (p *Plugin) getFilterOutcome(
 		lggr,
 		commitReports,
 		builder,
-		p.observer)
+		p.metricsReporter)
 	if err != nil {
 		return exectypes.Outcome{}, fmt.Errorf("unable to select report: %w", err)
 	}

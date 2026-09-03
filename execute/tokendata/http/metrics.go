@@ -1,27 +1,33 @@
 package http
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"context"
+
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/metricsutil"
 )
 
 var (
-	PromTokendataHTTPRequestCounter = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ccip_exec_tokendata_http_request",
-			Help: "Count of tokendata attestation HTTP requests by API and outcome",
-		},
-		[]string{"api", "outcome"},
-	)
-
-	PromTokendataHTTPCooldownActiveGauge = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "ccip_exec_tokendata_http_cooldown_active",
-			Help: "Whether the tokendata attestation HTTP client is in a rate-limit cooldown period",
-		},
-		[]string{"api"},
-	)
+	httpRequestCounter  = metricsutil.NewLazyCounter("ccip_exec_tokendata_http_request")
+	cooldownActiveGauge = metricsutil.NewLazyGauge("ccip_exec_tokendata_http_cooldown_active")
 )
+
+// trackRequest counts one attestation-API request outcome for the given API.
+func trackRequest(ctx context.Context, api, outcome string) {
+	httpRequestCounter.Add(ctx, 1,
+		attribute.String("api", api),
+		attribute.String("outcome", outcome))
+}
+
+// trackCooldownActive reports whether the client is in a rate-limit cooldown period.
+func trackCooldownActive(ctx context.Context, api string, active bool) {
+	var val int64
+	if active {
+		val = 1
+	}
+	cooldownActiveGauge.Record(ctx, val, attribute.String("api", api))
+}
 
 const (
 	outcomeOK          = "ok"

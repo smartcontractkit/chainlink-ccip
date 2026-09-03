@@ -1,23 +1,23 @@
 package usdc
 
 import (
+	"context"
 	"errors"
 	nethttp "net/http"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/http"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/metricsutil"
 )
 
-var PromUSDCAttestationFetchCounter = promauto.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "ccip_exec_tokendata_usdc_attestation_fetch",
-		Help: "Count of USDC attestation fetches by outcome",
-	},
-	[]string{"outcome"},
-)
+var attestationFetchCounter = metricsutil.NewLazyCounter("ccip_exec_tokendata_usdc_attestation_fetch")
+
+// trackAttestationFetch counts one USDC attestation fetch by outcome.
+func trackAttestationFetch(outcome string) {
+	attestationFetchCounter.Add(context.Background(), 1, attribute.String("outcome", outcome))
+}
 
 const (
 	usdcOutcomeOK          = "ok"

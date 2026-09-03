@@ -130,7 +130,7 @@ func (s *USDCAttestationClient) fetchSingleMessage(
 	body, status, err := s.client.Get(ctx, fmt.Sprintf("%s/%s/%s", apiVersion, attestationPath, messageHash.String()))
 	if err != nil {
 		s.lggr.Errorw("CCTP Attestation: Failed to fetch attestation from the API", "err", err)
-		PromUSDCAttestationFetchCounter.WithLabelValues(attestationFetchOutcome(err, status)).Inc()
+		trackAttestationFetch(attestationFetchOutcome(err, status))
 		return tokendata.ErrorAttestationStatus(err)
 	}
 	response, err := attestationFromResponse(body)
@@ -140,11 +140,11 @@ func (s *USDCAttestationClient) fetchSingleMessage(
 		if errors.Is(err, tokendata.ErrNotReady) {
 			outcome = usdcOutcomeNotReady
 		}
-		PromUSDCAttestationFetchCounter.WithLabelValues(outcome).Inc()
+		trackAttestationFetch(outcome)
 		return tokendata.ErrorAttestationStatus(err)
 	}
 
-	PromUSDCAttestationFetchCounter.WithLabelValues(usdcOutcomeOK).Inc()
+	trackAttestationFetch(usdcOutcomeOK)
 	s.lggr.Debugw("CCTP Attestation: Attestation received", "message", message, "response", response)
 	return tokendata.SuccessAttestationStatus(messageHash[:], message, response)
 }

@@ -64,13 +64,13 @@ type Plugin struct {
 	destChain    cciptypes.ChainSelector
 
 	// providers
-	ccipReader   readerpkg.CCIPReader
-	reportCodec  cciptypes.ExecutePluginCodec
-	msgHasher    cciptypes.MessageHasher
-	homeChain    reader.HomeChain
-	discovery    ContractDiscoveryInterface
-	chainSupport plugincommon.ChainSupport
-	observer     metrics.Reporter
+	ccipReader      readerpkg.CCIPReader
+	reportCodec     cciptypes.ExecutePluginCodec
+	msgHasher       cciptypes.MessageHasher
+	homeChain       reader.HomeChain
+	discovery       ContractDiscoveryInterface
+	chainSupport    plugincommon.ChainSupport
+	metricsReporter metrics.Reporter
 
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver observer.TokenDataObserver
@@ -147,7 +147,7 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
-		observer: metricsReporter,
+		metricsReporter: metricsReporter,
 		commitRootsCache: cache.NewCommitRootsCache(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
@@ -504,7 +504,7 @@ func selectReports(
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
 	builder report.ExecReportBuilder,
-	observer metrics.Reporter,
+	metricsReporter metrics.Reporter,
 ) ([]cciptypes.ExecutePluginReport, [][]exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
@@ -537,7 +537,7 @@ func selectReports(
 		}
 	}
 	for sourceChain, pending := range pendingByChain {
-		observer.TrackPendingReports(sourceChain, pending)
+		metricsReporter.TrackPendingReports(sourceChain, pending)
 	}
 
 	execReports, selectedReports, err := builder.Build()
@@ -705,20 +705,20 @@ func (p *Plugin) validateReport(
 ) (decodedReport cciptypes.ExecutePluginReport, err error) {
 	// Just a safety check, should never happen.
 	if r.Report == nil {
-		p.observer.TrackReportValidationRejected(phase, rejectReasonNilReport)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonNilReport)
 		lggr.Warn("skipping nil report")
 		return cciptypes.ExecutePluginReport{}, plugincommon.NewErrInvalidReport("nil report")
 	}
 
 	decodedReport, err = p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
-		p.observer.TrackReportValidationRejected(phase, rejectReasonDecodeReport)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonDecodeReport)
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrValidatingReport(fmt.Errorf("decode exec plugin report: %w", err))
 	}
 
 	if len(decodedReport.ChainReports) == 0 {
-		p.observer.TrackReportValidationRejected(phase, rejectReasonEmptyReport)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonEmptyReport)
 		lggr.Infow("skipping empty report")
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrInvalidReport("empty report")
@@ -727,13 +727,13 @@ func (p *Plugin) validateReport(
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
 	if err != nil {
-		p.observer.TrackReportValidationRejected(phase, rejectReasonDestSupportCheckError)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonDestSupportCheckError)
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrValidatingReport(fmt.Errorf("supports dest chain: %w", err))
 	}
 
 	if !supports {
-		p.observer.TrackReportValidationRejected(phase, rejectReasonDestNotSupported)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonDestNotSupported)
 		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
 			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
 			"assigned as readers of the destination chain, or if " +
@@ -743,11 +743,11 @@ func (p *Plugin) validateReport(
 	}
 	if err := p.checkConfigDigest(ctx); err != nil {
 		if errors.Is(err, errOffRampConfigMismatch) {
-			p.observer.TrackReportValidationRejected(phase, rejectReasonConfigDigestMismatch)
+			p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonConfigDigestMismatch)
 			return cciptypes.ExecutePluginReport{},
 				plugincommon.NewErrInvalidReport(err.Error())
 		}
-		p.observer.TrackReportValidationRejected(phase, rejectReasonConfigDigestCheckError)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonConfigDigestCheckError)
 		return cciptypes.ExecutePluginReport{},
 			plugincommon.NewErrValidatingReport(err)
 	}
@@ -760,12 +760,12 @@ func (p *Plugin) validateReport(
 		// been executed, so we don't want to re-execute them.
 		// This gives the exec plugin a chance to remedy the situation
 		// by selecting a different set of messages.
-		p.observer.TrackReportValidationRejected(phase, rejectReasonAlreadyExecuted)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonAlreadyExecuted)
 		return decodedReport, plugincommon.NewErrInvalidReport(err.Error())
 	}
 	if err != nil {
 		// TODO: should we return true here if we couldn't check for already executed messages?
-		p.observer.TrackReportValidationRejected(phase, rejectReasonValidationError)
+		p.metricsReporter.TrackReportValidationRejected(phase, rejectReasonValidationError)
 		err := fmt.Errorf("checking for already executed messages failed: %w", err)
 		return decodedReport, plugincommon.NewErrValidatingReport(err)
 	}
@@ -880,7 +880,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, fmt.Errorf("checking if destination chain is supported: %w", err)
 	}
 	if !supportsDest {
-		p.observer.TrackReportValidationRejected(logutil.PhaseShouldAccept, rejectReasonDestNotSupported)
+		p.metricsReporter.TrackReportValidationRejected(logutil.PhaseShouldAccept, rejectReasonDestNotSupported)
 		lggr.Errorw("dest chain not supported by this oracle, can't run report acceptance procedures, " +
 			"transmission schedule is wrong - check CCIPHome chainConfigs and ensure that the right oracles are " +
 			"assigned as readers of the destination chain, or if " +
@@ -906,7 +906,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		})
 	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, sourceChains)
 	if err != nil {
-		p.observer.TrackReportValidationRejected(logutil.PhaseShouldAccept, rejectReasonCursedCheckError)
+		p.metricsReporter.TrackReportValidationRejected(logutil.PhaseShouldAccept, rejectReasonCursedCheckError)
 		lggr.Errorw(
 			"report not accepted due to curse checking error",
 			"err", err,
@@ -915,7 +915,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 	if isCursed {
 		// Detailed logging is already done by IsReportCursed.
-		p.observer.TrackReportValidationRejected(logutil.PhaseShouldAccept, rejectReasonCursed)
+		p.metricsReporter.TrackReportValidationRejected(logutil.PhaseShouldAccept, rejectReasonCursed)
 		return false, nil
 	}
 

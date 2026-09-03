@@ -172,10 +172,6 @@ func (h *httpClient) Post(
 	return response, httpStatus, err
 }
 
-func (h *httpClient) trackRequest(outcome string) {
-	PromTokendataHTTPRequestCounter.WithLabelValues(h.apiLabel, outcome).Inc()
-}
-
 func (h *httpClient) callAPI(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -189,7 +185,7 @@ func (h *httpClient) callAPI(
 			"Rate limited by API, dropping all requests",
 			"coolDownDuration", duration,
 		)
-		h.trackRequest(outcomeRateLimited)
+		trackRequest(ctx, h.apiLabel, outcomeRateLimited)
 		return nil, http.StatusTooManyRequests, tokendata.ErrRateLimit
 	}
 
@@ -198,7 +194,7 @@ func (h *httpClient) callAPI(
 		// context is Done.
 		if waitErr := h.rate.Wait(ctx); waitErr != nil {
 			lggr.Warnw("Self rate-limited, sending too many requests to the API")
-			h.trackRequest(outcomeRateLimited)
+			trackRequest(ctx, h.apiLabel, outcomeRateLimited)
 			return nil, http.StatusTooManyRequests, tokendata.ErrRateLimit
 		}
 	}
@@ -210,21 +206,21 @@ func (h *httpClient) callAPI(
 
 	req, err := http.NewRequestWithContext(timeoutCtx, method, url.String(), body)
 	if err != nil {
-		h.trackRequest(outcomeHTTPError)
+		trackRequest(ctx, h.apiLabel, outcomeHTTPError)
 		return nil, http.StatusBadRequest, err
 	}
 	req.Header.Add("accept", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if ctx.Err() != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			h.trackRequest(outcomeTimeout)
+			trackRequest(ctx, h.apiLabel, outcomeTimeout)
 			return nil, http.StatusRequestTimeout, tokendata.ErrTimeout
 		} else if errors.Is(err, tokendata.ErrTimeout) {
-			h.trackRequest(outcomeTimeout)
+			trackRequest(ctx, h.apiLabel, outcomeTimeout)
 			return nil, http.StatusRequestTimeout, tokendata.ErrTimeout
 		}
 		// On error, res is nil in most cases, do not read res.StatusCode, return BadRequest
-		h.trackRequest(outcomeHTTPError)
+		trackRequest(ctx, h.apiLabel, outcomeHTTPError)
 		return nil, http.StatusBadRequest, err
 	}
 
@@ -235,24 +231,24 @@ func (h *httpClient) callAPI(
 	// Explicitly signal if the API is being rate limited
 	if res.StatusCode == http.StatusTooManyRequests {
 		h.setCoolDownPeriod(lggr, res.Header)
-		h.trackRequest(outcomeRateLimited)
+		trackRequest(ctx, h.apiLabel, outcomeRateLimited)
 		return nil, status, tokendata.ErrRateLimit
 	}
 	if res.StatusCode == http.StatusNotFound {
-		h.trackRequest(outcomeNotReady404)
+		trackRequest(ctx, h.apiLabel, outcomeNotReady404)
 		return nil, status, tokendata.ErrNotReady
 	}
 	if res.StatusCode != http.StatusOK {
-		h.trackRequest(outcomeUnknown)
+		trackRequest(ctx, h.apiLabel, outcomeUnknown)
 		return nil, status, tokendata.ErrUnknownResponse
 	}
 
 	payloadBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		h.trackRequest(outcomeParseError)
+		trackRequest(ctx, h.apiLabel, outcomeParseError)
 		return payloadBytes, status, err
 	}
-	h.trackRequest(outcomeOK)
+	trackRequest(ctx, h.apiLabel, outcomeOK)
 	return payloadBytes, status, err
 }
 
@@ -279,7 +275,7 @@ func (h *httpClient) setCoolDownPeriod(lggr logger.Logger, headers http.Header) 
 	h.coolDownMu.Lock()
 	defer h.coolDownMu.Unlock()
 	h.coolDownUntil = time.Now().Add(coolDownDuration)
-	PromTokendataHTTPCooldownActiveGauge.WithLabelValues(h.apiLabel).Set(1)
+	trackCooldownActive(context.Background(), h.apiLabel, true)
 }
 
 func (h *httpClient) inCoolDownPeriod() (bool, time.Duration) {
@@ -287,9 +283,9 @@ func (h *httpClient) inCoolDownPeriod() (bool, time.Duration) {
 	defer h.coolDownMu.RUnlock()
 	inCoolDown := time.Now().Before(h.coolDownUntil)
 	if inCoolDown {
-		PromTokendataHTTPCooldownActiveGauge.WithLabelValues(h.apiLabel).Set(1)
+		trackCooldownActive(context.Background(), h.apiLabel, true)
 	} else {
-		PromTokendataHTTPCooldownActiveGauge.WithLabelValues(h.apiLabel).Set(0)
+		trackCooldownActive(context.Background(), h.apiLabel, false)
 	}
 	return inCoolDown, time.Until(h.coolDownUntil)
 }

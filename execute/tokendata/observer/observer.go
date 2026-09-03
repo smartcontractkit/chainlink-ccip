@@ -187,14 +187,14 @@ func (c *compositeTokenDataObserver) Observe(
 		tokenData, err := ob.Observe(ctx, msgObservations)
 		if err != nil {
 			c.lggr.Error("Error while observing token data", "error", err)
-			PromObserverErrorCounter.WithLabelValues(observerName, "observe").Inc()
+			trackObserverError(observerName, "observe")
 			continue
 		}
 		merged, err = merge(c.lggr, tokenDataObservations, tokenData)
 		if err != nil {
 			c.lggr.Error("Error while merging token data",
 				"error", err)
-			PromObserverErrorCounter.WithLabelValues(observerName, "merge").Inc()
+			trackObserverError(observerName, "merge")
 			merged = tokenDataObservations
 		}
 	}

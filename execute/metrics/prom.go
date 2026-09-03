@@ -626,13 +626,18 @@ func (p *PromReporter) TrackReportValidationRejected(phase, reason string) {
 	p.bhReportValidationRejected.Add(context.Background(), 1, metric.WithAttributes(attrs...))
 }
 
+// reportPhaseBuild is the phase label value for ccip_exec_report_validation_rejected
+// rejections raised in the report builder (verifyReport), as opposed to the
+// should_accept/should_transmit OCR phases.
+const reportPhaseBuild = "build"
+
 // TrackReportRejected satisfies report.Metrics: build-path rejections (verifyReport's
 // skipped_nonce/size_limit/gas_limit) ride the same ccip_exec_report_validation_rejected
 // family as the accept/transmit rejections, with phase="build".
 func (p *PromReporter) TrackReportRejected(sourceChain cciptypes.ChainSelector, reason string) {
 	attrs := append(
 		metricsutil.DestChainAttrs(p.chainSelector),
-		attribute.String("phase", "build"),
+		attribute.String("phase", reportPhaseBuild),
 		attribute.String("reason", reason))
 	if sourceChain != 0 {
 		attrs = append(attrs, metricsutil.SourceChainAttrs(sourceChain)...)

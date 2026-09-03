@@ -420,7 +420,7 @@ func computeMessageObservationsConsensus(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-	observer metrics.Reporter,
+	metricsReporter metrics.Reporter,
 ) exectypes.MessageObservations {
 	validators := prepareValidatorsForComputeMessageObservationsConsensus(lggr, aos, fChain)
 
@@ -447,7 +447,7 @@ func computeMessageObservationsConsensus(
 		for seqNum, msgsWithConsensus := range seqNumToMsgs {
 			switch len(msgsWithConsensus) {
 			case 0:
-				observer.TrackMessageConsensusConflict(chain, "none")
+				metricsReporter.TrackMessageConsensusConflict(chain, conflictKindNone)
 				lggr.Debugw("no message reached consensus for sequence number, skipping it",
 					"chain", chain, "seqNum", seqNum)
 			case 1:
@@ -470,7 +470,7 @@ func computeMessageObservationsConsensus(
 				}
 
 				if msg == nil {
-					observer.TrackMessageConsensusConflict(chain, "multi_message")
+					metricsReporter.TrackMessageConsensusConflict(chain, conflictKindMultiMessage)
 					lggr.Errorw("more than one message reached consensus for a sequence number, skipping it. "+
 						"Compare the diff between the message fields to debug what is causing the issue",
 						"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
@@ -484,7 +484,7 @@ func computeMessageObservationsConsensus(
 				}
 
 			default:
-				observer.TrackMessageConsensusConflict(chain, "over_two")
+				metricsReporter.TrackMessageConsensusConflict(chain, conflictKindOverTwo)
 				lggr.Errorw("more than than 2 message reached consensus for a sequence number, "+
 					"skipping it. Compare the diff between the message fields to debug what is causing the issue",
 					"chain", chain, "seqNum", seqNum, "msgs", msgsWithConsensus)
@@ -541,7 +541,7 @@ func computeCommitObservationsConsensus(
 	lggr logger.Logger,
 	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-	observer metrics.Reporter,
+	metricsReporter metrics.Reporter,
 ) exectypes.CommitObservations {
 	merkleRootsVotes, executedMsgVotes := aggregateMerkleRootObservations(observations)
 
@@ -553,7 +553,7 @@ func computeCommitObservationsConsensus(
 		} else if consensus.GteFPlusOne(f, votes) {
 			validRoots = append(validRoots, mr)
 		} else {
-			observer.TrackConsensusDropped("merkle_root", fmt.Sprintf("%d", mr.SourceChain), "insufficient_agreement", mr.SourceChain)
+			metricsReporter.TrackConsensusDropped(consensusObjectMerkleRoot, fmt.Sprintf("%d", mr.SourceChain), consensusReasonInsufficientAgreement, mr.SourceChain)
 			lggr.Debugw("merkle root with less than f+1 votes was found, skipping it", "mr", mr, "votes", votes)
 		}
 	}
@@ -571,7 +571,7 @@ func computeCommitObservationsConsensus(
 	for _, mr := range validRoots {
 		if seenCount[mr.MerkleRoot] > 1 && !splitReported[mr.MerkleRoot] {
 			splitReported[mr.MerkleRoot] = true
-			observer.TrackConsensusDropped("merkle_root", fmt.Sprintf("%d", mr.SourceChain), "split", mr.SourceChain)
+			metricsReporter.TrackConsensusDropped(consensusObjectMerkleRoot, fmt.Sprintf("%d", mr.SourceChain), consensusReasonSplit, mr.SourceChain)
 		}
 	}
 
@@ -586,7 +586,7 @@ func computeCommitObservationsConsensus(
 		executedMessages := make([]cciptypes.SeqNum, 0)
 		for seqNum, count := range executedMsgVotes[mr] {
 			if consensus.LtFPlusOne(f, count) {
-				observer.TrackConsensusDropped("executed_messages", fmt.Sprintf("%d", mr.SourceChain), "insufficient_agreement", mr.SourceChain)
+				metricsReporter.TrackConsensusDropped(consensusObjectExecutedMessages, fmt.Sprintf("%d", mr.SourceChain), consensusReasonInsufficientAgreement, mr.SourceChain)
 				lggr.Debugw("skipping executed msg, less than f+1 votes", "mr", mr, "votes", count, "seqNum", seqNum)
 				continue
 			}
@@ -599,7 +599,7 @@ func computeCommitObservationsConsensus(
 		}
 		onRampAddress, err := base64.StdEncoding.DecodeString(mr.OnRampAddressBase64)
 		if err != nil {
-			observer.TrackConsensusDropped("onramp_address", fmt.Sprintf("%d", mr.SourceChain), "decode_error", mr.SourceChain)
+			metricsReporter.TrackConsensusDropped(consensusObjectOnRampAddress, fmt.Sprintf("%d", mr.SourceChain), consensusReasonDecodeError, mr.SourceChain)
 			lggr.Errorw("error decoding base64 encoded onRampAddress", "err", err, "addr", mr.OnRampAddressBase64)
 			continue
 		}
@@ -684,7 +684,7 @@ func computeMessageHashesConsensus(
 	lggr logger.Logger,
 	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-	observer metrics.Reporter,
+	metricsReporter metrics.Reporter,
 ) exectypes.MessageHashes {
 	lggr = logger.With(lggr, "function", "computeMessageHashesConsensus", "fChain", fChain)
 
@@ -726,7 +726,7 @@ func computeMessageHashesConsensus(
 			results[chainSeqNum.chain][chainSeqNum.seqNum] = hash
 
 			if hashExists {
-				observer.TrackMessageConsensusConflict(chainSeqNum.chain, "hash")
+				metricsReporter.TrackMessageConsensusConflict(chainSeqNum.chain, conflictKindHash)
 				lggr.Errorw("more than one hash reached consensus for a message, message skipped",
 					"chain", chainSeqNum.chain, "seqNum", chainSeqNum.seqNum, "hash1", existingHash, "hash2", hash)
 				delete(results[chainSeqNum.chain], chainSeqNum.seqNum)
@@ -899,9 +899,9 @@ func computeConsensusObservation(
 	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	destChain cciptypes.ChainSelector,
 	f int,
-	observer metrics.Reporter,
+	metricsReporter metrics.Reporter,
 ) (exectypes.Observation, error) {
-	fChain := getConsensusFChain(lggr, observations, f, observer)
+	fChain := getConsensusFChain(lggr, observations, f, metricsReporter)
 
 	destFChain, ok := fChain[destChain]
 	if !ok {
@@ -909,12 +909,12 @@ func computeConsensusObservation(
 	}
 
 	consensusObservation := exectypes.NewObservation(
-		computeCommitObservationsConsensus(lggr, observations, fChain, observer),
-		computeMessageObservationsConsensus(lggr, observations, fChain, observer),
+		computeCommitObservationsConsensus(lggr, observations, fChain, metricsReporter),
+		computeMessageObservationsConsensus(lggr, observations, fChain, metricsReporter),
 		computeTokenDataObservationsConsensus(lggr, observations, fChain),
 		computeNoncesConsensus(lggr, observations, destFChain),
 		dt.Observation{},
-		computeMessageHashesConsensus(lggr, observations, fChain, observer),
+		computeMessageHashesConsensus(lggr, observations, fChain, metricsReporter),
 	)
 
 	lggr.Debugw("computeConsensusObservation has finished computing the consensus observation",
@@ -935,7 +935,7 @@ func getConsensusFChain(
 	lggr logger.Logger,
 	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	f int,
-	observer metrics.Reporter,
+	metricsReporter metrics.Reporter,
 ) map[cciptypes.ChainSelector]int {
 	observedFChains := make(map[cciptypes.ChainSelector][]int)
 	for _, ao := range observations {
@@ -948,7 +948,7 @@ func getConsensusFChain(
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(f))
 	fChain, dropReasons := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
 	for chain, reason := range dropReasons {
-		observer.TrackConsensusDropped("fChain", fmt.Sprintf("%d", chain), reason.String(), chain)
+		metricsReporter.TrackConsensusDropped(consensusObjectFChain, fmt.Sprintf("%d", chain), reason.String(), chain)
 	}
 
 	return fChain
