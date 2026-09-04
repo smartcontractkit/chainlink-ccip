@@ -1068,7 +1068,7 @@ func TestCurseAdapterConcurrentAccess(t *testing.T) {
 
 	adapter := adaptersv2_1_0.NewCurseAdapter()
 
-	// Phase 1: concurrent Initialize for all selectors — the original race site.
+	// Phase 1: concurrent Initialize for all selectors
 	var wg sync.WaitGroup
 	for _, sel := range selectors {
 		wg.Add(1)
