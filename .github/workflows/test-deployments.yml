@@ -58,6 +58,10 @@ jobs:
         id: run-tests
         continue-on-error: true
         run: gotestsum --junitfile=test-results.xml --format=github-actions -- ./...
+      - name: Race-detector tests (concurrency-sensitive)
+        id: run-race-tests
+        continue-on-error: true
+        run: gotestsum --junitfile=race-results.xml --format=github-actions -- -race -run 'TestCurseAdapterConcurrentAccess' ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:

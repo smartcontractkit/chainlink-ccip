@@ -2,6 +2,7 @@ package deployment_test
 
 import (
 	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -1023,4 +1024,82 @@ func TestFastCurseGlobalCurseOnChain(t *testing.T) {
 	isCursed, err = curseAdapter.IsSubjectCursedOnChain(*env, chain1, adv2_1_0.SelectorToSubject(chain3))
 	require.NoError(t, err)
 	require.False(t, isCursed, "subject on chain3 should not be cursed on rmn in chain1")
+}
+
+// TestCurseAdapterConcurrentAccess exercises a single shared CurseAdapter instance
+// under concurrent Initialize and Is* calls from many goroutines.
+// Run with -race to detect unsynchronized map access.
+func TestCurseAdapterConcurrentAccess(t *testing.T) {
+	selectors := []uint64{
+		chainsel.TEST_90000015.Selector,
+		chainsel.TEST_90000016.Selector,
+		chainsel.TEST_90000017.Selector,
+	}
+
+	env, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, selectors),
+	)
+	require.NoError(t, err)
+
+	bundle := env.OperationsBundle
+	ds := datastore.NewMemoryDataStore()
+
+	for _, sel := range selectors {
+		evmChain := env.BlockChains.EVMChains()[sel]
+		_, rmnProxy := deployRMN2_1WithProxy(t, bundle, evmChain, ds)
+
+		deployRouterOp, err := cldf_ops.ExecuteOperation(bundle, routerops1_2.Deploy, evmChain, contract.DeployInput[routerops1_2.ConstructorArgs]{
+			ChainSelector:  evmChain.Selector,
+			TypeAndVersion: deployment.NewTypeAndVersion(routerops1_2.ContractType, *semver.MustParse("1.2.0")),
+			Args: routerops1_2.ConstructorArgs{
+				WrappedNative: utils.RandomAddress(),
+				RMNProxy:      rmnProxy,
+			},
+		})
+		require.NoError(t, err)
+		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+			Type:          datastore.ContractType(routerops1_2.ContractType),
+			Version:       semver.MustParse("1.2.0"),
+			ChainSelector: sel,
+			Address:       deployRouterOp.Output.Address,
+		}))
+	}
+	env.DataStore = ds.Seal()
+
+	adapter := adaptersv2_1_0.NewCurseAdapter()
+
+	// Phase 1: concurrent Initialize for all selectors — the original race site.
+	var wg sync.WaitGroup
+	for _, sel := range selectors {
+		wg.Add(1)
+		go func(s uint64) {
+			defer wg.Done()
+			_ = adapter.Initialize(*env, s)
+		}(sel)
+	}
+	wg.Wait()
+
+	for _, sel := range selectors {
+		enabled, err := adapter.IsCurseEnabledForChain(*env, sel)
+		require.NoError(t, err)
+		require.True(t, enabled, "adapter should be initialized for selector %d", sel)
+	}
+
+	// Phase 2: hammer Is* methods concurrently — exercises RWMutex-protected cache
+	// reads alongside RPC calls through the shared ethclient.
+	const goroutinesPerSelector = 20
+	for _, sel := range selectors {
+		for i := 0; i < goroutinesPerSelector; i++ {
+			wg.Add(2)
+			go func(s uint64) {
+				defer wg.Done()
+				_, _ = adapter.IsCurseEnabledForChain(*env, s)
+			}(sel)
+			go func(s uint64) {
+				defer wg.Done()
+				_, _ = adapter.IsSubjectCursedOnChain(*env, s, fastcurse.GlobalCurseSubject())
+			}(sel)
+		}
+	}
+	wg.Wait()
 }
