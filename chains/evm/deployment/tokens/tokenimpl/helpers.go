@@ -99,6 +99,7 @@ func hasDefaultAdminRoleBurnMintERC20(b cldf_ops.Bundle, chain evm.Chain, token,
 				To:   user,
 			},
 		},
+		cldf_ops.WithForceExecute[contract.FunctionInput[burn_mint_erc20.RoleAssignment], evm.Chain](),
 		cldf_ops.WithRetryConfig(getRetryConfig[burn_mint_erc20.RoleAssignment](b, chain, token.Hex())),
 	)
 	if err != nil {
