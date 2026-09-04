@@ -1,7 +1,6 @@
 package tokenimpl
 
 import (
-	"context"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -50,7 +49,7 @@ type Token interface {
 	// HasAdminRole checks whether user has the default-admin or contract-specific
 	// admin role. Returns an error for token types whose Capabilities.SupportsAdminRole
 	// is false; callers should consult that flag first.
-	HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error)
+	HasAdminRole(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) (bool, error)
 
 	// GrantAdminRole grants the default-admin or contract-specific
 	// admin role to user. Returns an error for token types whose

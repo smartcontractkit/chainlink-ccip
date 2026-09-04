@@ -500,13 +500,26 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				// it is being migrated to in this changeset. If they differ, or it has no current pool then it's
 				// getting a new pool and we leave it alone. If they are the same, then it keeps its current pool
 				// and should be told about the new pool.
-				if _, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
+				if peerCfg, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
 					targetBytes, err := ru.remoteNormalizer.StringToBytes(ru.remotePoolRef.Address)
 					if err != nil {
 						return nil, nil, nil, fmt.Errorf("failed to convert remote pool ref to bytes for chain selector %d: %w", ru.remoteSelector, err)
 					}
+
+					// A peer that's being replaced this batch gets a brand-new pool that isn't live yet so reverse
+					// propagation into it would prematurely activate it and break its own migration - instead, its
+					// forward config wires the web instead.
 					activeBytes := activePoolsSnapshot[ru.remoteSelector]
 					if len(activeBytes) == 0 || !bytes.Equal(activeBytes, targetBytes) {
+						continue
+					}
+
+					// If the peer is configured to connect to the migrating chain (selector), then its own forward
+					// config in this batch already adds this migration's pool as an additional remote, so reverse-
+					// propagation would add it a second time and revert with PoolAlreadyAdded. For these cases, we
+					// need to skip reverse propagation into that peer.
+					_, peerConnectsToMigratingChain := peerCfg.RemoteChains[selector]
+					if peerConnectsToMigratingChain {
 						continue
 					}
 				}
