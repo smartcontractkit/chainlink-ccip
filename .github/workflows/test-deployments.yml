@@ -58,10 +58,6 @@ jobs:
         id: run-tests
         continue-on-error: true
         run: gotestsum --junitfile=test-results.xml --format=github-actions -- ./...
-      - name: Race-detector tests (concurrency-sensitive)
-        id: run-race-tests
-        continue-on-error: true
-        run: gotestsum --junitfile=race-results.xml --format=github-actions -- -race -run 'TestCurseAdapterConcurrentAccess' ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
@@ -70,6 +66,46 @@ jobs:
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
           trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+
+  test-evm-deployments-race:
+      needs: [detect_deployments_changes]
+      if: ${{ needs.detect_deployments_changes.outputs.run_evm_deployment == 'true' }}
+      runs-on: ubuntu-latest
+      defaults:
+        run:
+          working-directory: chains/evm/deployment
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Set up Go
+          uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+          with:
+            go-version-file: go.mod
+
+        - name: Install gotestsum
+          run: go install gotest.tools/gotestsum@latest
+
+        - name: Run race-detector tests
+          id: run-race-tests
+          continue-on-error: true
+          run: |
+            gotestsum \
+              --junitfile=race-results.xml \
+              --format=github-actions \
+              -- -race -run '^TestCurseAdapterConcurrentAccess$' ./...
+
+        - name: Analyze and upload race test results
+          if: ${{ always() }}
+          uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+          with:
+            junit-file-path: chains/evm/deployment/race-results.xml
+            trunk-org-slug: chainlink
+            trunk-previous-step-outcome: ${{ steps.run-race-tests.outcome }}
+            trunk-token: ${{ secrets.TRUNK_API_KEY }}
+            trunk-variant: race
+            artifact-name: evm_deployment_race_test_logs
+            trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
 
   test-solana-deployments:
     needs: [detect_deployments_changes]
