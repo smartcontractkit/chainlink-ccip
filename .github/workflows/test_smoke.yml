@@ -109,16 +109,18 @@ jobs:
           cache-dependency-path: |
             devenv/go.sum
       - name: Download Go dependencies
+        env:
+          TON_REF: ${{ inputs.ton_ref }}
         run: |
           export GOPRIVATE=github.com/smartcontractkit/*
-          if [ -n "${{ inputs.ton_ref }}" ]; then
+          if [ -n "$TON_REF" ]; then
             # Clear any stale shallow VCS cache restored by setup-go to avoid
             # "fatal: shallow file has changed since we read it" races. Retry max 3 times
             rm -rf "$(go env GOMODCACHE)/cache/vcs" || true
             for i in 1 2 3; do
-              go get github.com/smartcontractkit/chainlink-ton/devenv@${{ inputs.ton_ref }} \
-                && go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }} \
-                && go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }} \
+              go get "github.com/smartcontractkit/chainlink-ton/devenv@${TON_REF}" \
+                && go get "github.com/smartcontractkit/chainlink-ton/deployment@${TON_REF}" \
+                && go get "github.com/smartcontractkit/chainlink-ton@${TON_REF}" \
                 && break
               echo "retry $i - unshallow race on chainlink-ton, sleeping 5s"
               sleep 5
