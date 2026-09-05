@@ -92,22 +92,12 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 				}
 			}
 			for remoteChainSelector := range chainCfg.RemoteChains {
-				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
-				if err != nil {
-					return err
-				}
 				remoteChainCfg, ok := cfg.Chains[remoteChainSelector]
 				if !ok {
 					return fmt.Errorf("remote chain selector %d not found in chains", remoteChainSelector)
 				}
-				if _, ok := remoteChainCfg.RemoteChains[chainSel]; !ok {
+				if _, ok = remoteChainCfg.RemoteChains[chainSel]; !ok {
 					return fmt.Errorf("chain %d has remote %d but chain %d does not define a remote chain config for %d (each remote must point back to the current chain)", chainSel, remoteChainSelector, remoteChainSelector, chainSel)
-				}
-				if family == chain_selectors.FamilySolana || remoteFamily == chain_selectors.FamilySolana {
-					mechanism := chainCfg.RemoteChains[remoteChainSelector].LockOrBurnMechanism
-					if mechanism != "CCTP_V1" {
-						return fmt.Errorf("solana lanes only support CCTP_V1, got %q for chain %d -> %d", mechanism, chainSel, remoteChainSelector)
-					}
 				}
 			}
 		}
