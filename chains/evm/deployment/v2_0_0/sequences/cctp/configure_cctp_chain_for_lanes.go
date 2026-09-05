@@ -268,15 +268,9 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Proactively configure the CCTP-through-CCV pool for all CCTP-capable remotes.
 		// This excludes lock-release lanes, but includes V1/V2 remotes so the CCV pool
 		// is ready before proxy routing is switched to CCTP_V2_WITH_CCV.
-		// Non-EVM remotes (e.g. Solana) are excluded: CCIP 2.0 does not support them, so
-		// CCTP_V2_WITH_CCV will never be enabled for them and preconfiguring the CCV pool
-		// would be wasted state.
 		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
 			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == MechanismLockRelease {
-				continue
-			}
-			if !isEVMRemote(remoteChainSelector) {
 				continue
 			}
 			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
@@ -528,25 +522,12 @@ func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanes
 		if remoteChain.LockOrBurnMechanism == MechanismLockRelease {
 			continue
 		}
-		if !isEVMRemote(remoteChainSelector) {
-			continue
-		}
 		out = append(out, versioned_verifier_resolver.OutboundImplementationArgs{
 			DestChainSelector: remoteChainSelector,
 			Verifier:          cctpVerifierAddress,
 		})
 	}
 	return out
-}
-
-// isEVMRemote reports whether a remote chain selector belongs to the EVM family.
-// Selectors that fail to resolve are treated as non-EVM (skipped by callers).
-func isEVMRemote(remoteChainSelector uint64) bool {
-	family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
-	if err != nil {
-		return false
-	}
-	return family == chain_selectors.FamilyEVM
 }
 
 // buildUSDCTokenPoolProxyMechanismArgs builds remote chain selectors and lock/burn mechanisms for the USDCTokenPoolProxy.
@@ -572,10 +553,6 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
 		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
-			continue
-		}
-		if !isEVMRemote(remoteChainSelector) {
-			// Non-EVM remotes (e.g. Solana) are not supported by CCIP 2.0 yet, so we don't configure it yet.
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
