@@ -18,8 +18,7 @@ gas_price = 1_000_000_000 # 1 gwei
 block_timestamp = 1785456000 # Thu Jul 30 2026
 block_number = 23_500_000
 deny = 'warnings'
-# License should be removed once WETH in the chainlink NPM package has a license identifier.
-ignored_error_codes = ["too-many-warnings", "code-size", "license"]
+ignored_error_codes = ["too-many-warnings", "code-size"]
 
 # This profile should be used for testing CCIP locally and in CI.
 [profile.ccip]
