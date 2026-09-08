@@ -207,7 +207,7 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 					adminAdapter, ok := adapter.(TokenPoolAdminAdapter)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf(
-							"adapter for chain selector %d (family %s, version %s) does not support admin role updates",
+							"adapter for chain selector %d (family %s, version %s) does not support router or admin role updates",
 							selector, family, fullPoolRef.Version,
 						)
 					}

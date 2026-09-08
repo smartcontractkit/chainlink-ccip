@@ -200,16 +200,16 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 	)
 }
 
-// SetTokenPoolAdmins updates the admin roles on an EVM token pool. Version-specific
-// capability lives in PoolOps.SetAdmins: pre-2.0 pools support only the rate limit
-// admin (a non-nil FeeAdmin is rejected there), while v2.0+ pools set both admins in
-// a single SetDynamicConfig write. No-op (zero BatchOps) when the desired values
-// already match on-chain state.
+// SetTokenPoolAdmins updates the router, rate limit admin, and fee admin on an EVM token pool.
+// Nil fields are left unchanged. Pre-2.0 pools only support the router (via setRouter) and the
+// rate limit admin (a non-nil FeeAdmin is rejected there), while v2.0+ pools set router and
+// both admins in a single SetDynamicConfig write. No-op (zero BatchOps) when the desired
+// values already match on-chain state.
 func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-pool-adapter:set-token-pool-admins",
 		a.Ops.Version(),
-		"Updates the admin roles on an EVM token pool; no-op when the values already match",
+		"Updates the router and admin roles on an EVM token pool; no-op when the values already match",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
 			chain, ok := chains.EVMChains()[input.Selector]
 			if !ok {

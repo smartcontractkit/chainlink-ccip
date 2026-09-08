@@ -36,14 +36,15 @@ type TokenFeeAdapter interface {
 }
 
 // TokenPoolAdminAdapter is an optional interface for adapters that support updating a token
-// pool's admin roles. Implementations must read the current on-chain values and emit no
-// writes when the desired values already match (idempotent apply).
+// pool's admin roles and router. These are bundled because v2.0+ EVM pools write router and
+// both admins in a single SetDynamicConfig call. Implementations must read the current
+// on-chain values and emit no writes when the desired values already match (idempotent apply).
 type TokenPoolAdminAdapter interface {
 	SetTokenPoolAdmins() *cldf_ops.Sequence[SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
-// SetTokenPoolAdminsSequenceInput defines the input for updating a token pool's admin roles.
-// Nil fields are left unchanged on-chain.
+// SetTokenPoolAdminsSequenceInput defines the input for updating a token pool's admin roles
+// and router. Nil fields are left unchanged on-chain.
 type SetTokenPoolAdminsSequenceInput struct {
 	// Selector is the chain selector for the chain on which the pool lives.
 	Selector uint64 `json:"selector" yaml:"selector"`
