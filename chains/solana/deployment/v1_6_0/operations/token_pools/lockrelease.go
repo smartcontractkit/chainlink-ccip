@@ -562,22 +562,33 @@ var SetRouterLockRelease = operations.NewOperation(
 	func(b operations.Bundle, chain cldf_solana.Chain, input SetPoolRouterInput) (sequences.OnChainOutput, error) {
 		lockrelease_token_pool.SetProgramID(input.Program)
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
-		var chainConfig test_token_pool.State
-		err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
-		if err != nil && !errors.Is(err, rpc.ErrNotFound) {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to read lock release token pool config for token mint %s: %w", input.TokenMint.String(), err)
+
+		// set_router has no "pool not yet initialized" case: the pool state must exist, so any
+		// read error (including rpc.ErrNotFound) is fatal.
+		var poolState lockrelease_token_pool.State
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &poolState); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to read lock release token pool config for token mint %s (is the pool initialized?): %w", input.TokenMint.String(), err)
 		}
-		if err == nil && chainConfig.Config.Router == input.NewRouter {
+		if poolState.Config.Router == input.NewRouter {
 			b.Logger.Info("Router already matches the desired value for lock release token pool with token mint:", input.TokenMint.String())
 			return sequences.OnChainOutput{}, nil
 		}
-		authority := chainConfig.Config.Owner
+
+		// set_router runs under the AdminUpdateTokenPool context, which requires the signer to be
+		// BOTH the pool owner AND the program upgrade authority (allowed_admin_modify_token_pool in
+		// the program's context.rs). Fail here instead of emitting a tx/proposal that cannot execute.
+		upgradeAuthority, err := utils.GetUpgradeAuthority(chain.Client, input.Program)
 		if err != nil {
-			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
-			}
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for lock release token pool: %w", err)
 		}
+		if poolState.Config.Owner != upgradeAuthority {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"cannot set router on lock release token pool for token mint %s: set_router requires the pool owner (%s) to also be the program upgrade authority (%s)",
+				input.TokenMint.String(), poolState.Config.Owner.String(), upgradeAuthority.String(),
+			)
+		}
+		authority := upgradeAuthority
+
 		programData, err := utils.GetSolProgramData(chain.Client, input.Program)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data for lock release token pool: %w", err)
