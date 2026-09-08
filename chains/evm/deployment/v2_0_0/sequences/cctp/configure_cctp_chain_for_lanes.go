@@ -512,10 +512,9 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 }
 
 // buildVerifierResolverOutboundArgs builds outbound implementation args for the CCTPVerifierResolver.
-// Includes every CCTP-capable EVM remote (V1, V2, V2_WITH_CCV) and excludes lock-release lanes, matching the
+// Includes every CCTP-capable remote (V1, V2, V2_WITH_CCV) and excludes lock-release lanes, matching the
 // set of chains preconfigured on the CCTP-through-CCV pool. This keeps CCTPThroughCCVTokenPool.getTokenTransferFeeConfig
 // from reverting on V1 remotes before proxy routing is switched to CCTP_V2_WITH_CCV.
-// Non-EVM remotes (e.g. Solana) are skipped: CCIP 2.0 does not support them, so the CCV pool will never be used for them.
 func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanesInput, cctpVerifierAddress common.Address) []versioned_verifier_resolver.OutboundImplementationArgs {
 	out := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
