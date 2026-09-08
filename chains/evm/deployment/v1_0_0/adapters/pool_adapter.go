@@ -220,15 +220,13 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 			}
 			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
 
+			// Router is validated (format + non-zero) by the changeset before it reaches the adapter.
 			var router *common.Address
 			if input.Router != nil {
 				if !common.IsHexAddress(*input.Router) {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid router address for chain %d: %s", input.Selector, *input.Router)
 				}
 				addr := common.HexToAddress(*input.Router)
-				if addr == (common.Address{}) {
-					return sequences.OnChainOutput{}, fmt.Errorf("router address for chain %d must not be zero", input.Selector)
-				}
 				router = &addr
 			}
 			var rateLimitAdmin *common.Address

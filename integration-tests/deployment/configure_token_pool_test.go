@@ -13,6 +13,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evm_testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	tokenpoolV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
@@ -465,6 +466,24 @@ func TestConfigureTokenPool_Router(t *testing.T) {
 	require.NoError(t, err)
 	after := CurrentBlockEVM(t, tc.env, tc.selA)
 	require.Equal(t, before, after, "no-op router update must not send a transaction")
+
+	// Datastore lookup: a Type-only ref resolves to the chain's production Router and
+	// repoints the pool back to it.
+	prodRouter, err := datastore_utils.FindAndFormatRef(tc.env.DataStore, datastore.AddressRef{
+		Type:    datastore.ContractType(evmrouterops.ContractType),
+		Version: evmrouterops.Version,
+	}, tc.selA, datastore_utils.FullRef)
+	require.NoError(t, err)
+	require.NotEqual(t, common.HexToAddress(newRouter), common.HexToAddress(prodRouter.Address))
+
+	input.Chains[0].Pools[0].RouterRef = &datastore.AddressRef{Type: datastore.ContractType(evmrouterops.ContractType), Version: evmrouterops.Version}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	postCfg, err = pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(prodRouter.Address), postCfg.Router, "Type-only routerRef must resolve to the production Router")
 
 	// A zero router is rejected up front by VerifyPreconditions, before anything executes.
 	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{

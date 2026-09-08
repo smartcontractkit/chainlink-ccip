@@ -196,7 +196,7 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 
 				var router *string
 				if pool.RouterRef != nil {
-					resolved, err := resolveRouterRef(e, selector, *pool.RouterRef)
+					resolved, err := resolveRouterRef(e.DataStore, selector, *pool.RouterRef)
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.TokenPoolRef), selector, err)
 					}
@@ -246,28 +246,29 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 	}
 }
 
-// resolveRouterRef resolves a RouterRef to a family-specific address string for the given
-// chain. An explicit address is normalized in place; otherwise the ref is looked up in the
-// datastore (by type/qualifier/version) before normalization.
-func resolveRouterRef(e cldf.Environment, selector uint64, routerRef datastore.AddressRef) (string, error) {
-	full := routerRef
-	if full.Address == "" {
-		resolved, err := datastore_utils.FindAndFormatRef(e.DataStore, routerRef, selector, datastore_utils.FullRef)
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve router ref %s on chain selector %d: %w", datastore_utils.SprintRef(routerRef), selector, err)
-		}
-		full = resolved
+// routerContractType is the datastore Type used for the production router on every family.
+const routerContractType = datastore.ContractType("Router")
+
+// resolveRouterRef resolves a RouterRef to a normalized, non-zero, family-specific address
+// string for the given chain. Semantics match EVMTokenBase.ResolveRouterAddress (used by the
+// deploy-token-pool sequences under the same `routerRef` YAML field):
+//   - an explicit Address is normalized and used directly, with no datastore lookup;
+//   - otherwise the ref is looked up in the datastore for this chain, with Type defaulting to
+//     the production Router contract type when unset.
+func resolveRouterRef(ds datastore.DataStore, selector uint64, routerRef datastore.AddressRef) (string, error) {
+	if routerRef.Address != "" {
+		return normalizeRouterAddress(selector, routerRef.Address)
 	}
 
-	normalized, err := deploy.TryNormalizeAddressRef(selector, full)
+	filter := routerRef.Clone()
+	if filter.Type == "" {
+		filter.Type = routerContractType
+	}
+	found, err := datastore_utils.FindAndFormatRef(ds, filter, selector, datastore_utils.FullRef)
 	if err != nil {
-		return "", fmt.Errorf("failed to normalize router ref %s on chain selector %d: %w", datastore_utils.SprintRef(routerRef), selector, err)
+		return "", fmt.Errorf("failed to resolve router ref %s on chain selector %d: %w", datastore_utils.SprintRef(filter), selector, err)
 	}
-	if normalized.Address == "" {
-		return "", fmt.Errorf("router ref %s on chain selector %d resolved to an empty address", datastore_utils.SprintRef(routerRef), selector)
-	}
-
-	return normalized.Address, nil
+	return normalizeRouterAddress(selector, found.Address)
 }
 
 // normalizeRouterAddress canonicalizes an explicit router address for the given chain using

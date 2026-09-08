@@ -727,10 +727,6 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid router address for chain %d: %s: %w", input.Selector, *input.Router, err)
 				}
-				if newRouter.IsZero() {
-					return sequences.OnChainOutput{}, fmt.Errorf("router address for chain %d must not be zero", input.Selector)
-				}
-
 				poolInput := tokenpoolops.SetPoolRouterInput{
 					Program:   tokenPool,
 					TokenMint: tokenMint,
