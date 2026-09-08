@@ -54,9 +54,14 @@ type PoolConfigUpdate struct {
 	FeeAdmin *string `yaml:"feeAdmin,omitempty" json:"feeAdmin,omitempty"`
 	// RouterRef, if set, selects the router the pool is wired to. An explicit non-zero Address
 	// bypasses the datastore. Otherwise the ref is resolved in the datastore for this chain,
-	// with Type defaulting to the production Router contract type when unset (set Type to the
-	// TestRouter contract type to target the test router). Same semantics as
-	// TokenExpansionInputPerChain.RouterRef.
+	// with Type defaulting to the production Router contract type when unset (on EVM, set Type
+	// to the TestRouter contract type to target the test router; Solana has no TestRouter).
+	// Same semantics as TokenExpansionInputPerChain.RouterRef. Like TokenPoolRef, a datastore
+	// lookup that finds no match is reported at apply time, not by VerifyPreconditions.
+	//
+	// Solana: set_router requires the pool owner to also be the token pool program's upgrade
+	// authority, and only persists on programs >= solana-v1.6.2 (earlier releases accept the
+	// instruction without writing the state); the adapter fails clearly in both cases.
 	RouterRef *datastore.AddressRef `yaml:"routerRef,omitempty" json:"routerRef,omitempty"`
 	// Remotes lists per-lane configuration updates.
 	Remotes []RemoteConfigUpdate `yaml:"remotes,omitempty" json:"remotes,omitempty"`
@@ -194,15 +199,6 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 					reports = append(reports, report.ExecutionReports...)
 				}
 
-				var router *string
-				if pool.RouterRef != nil {
-					resolved, err := resolveRouterRef(e.DataStore, selector, *pool.RouterRef)
-					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.TokenPoolRef), selector, err)
-					}
-					router = &resolved
-				}
-
 				if pool.RouterRef != nil || pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
 					adminAdapter, ok := adapter.(TokenPoolAdminAdapter)
 					if !ok {
@@ -210,6 +206,14 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 							"adapter for chain selector %d (family %s, version %s) does not support router or admin role updates",
 							selector, family, fullPoolRef.Version,
 						)
+					}
+					var router *string
+					if pool.RouterRef != nil {
+						resolved, err := resolveRouterRef(e.DataStore, selector, *pool.RouterRef)
+						if err != nil {
+							return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.TokenPoolRef), selector, err)
+						}
+						router = &resolved
 					}
 					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
 						Selector:       selector,
@@ -271,19 +275,14 @@ func resolveRouterRef(ds datastore.DataStore, selector uint64, routerRef datasto
 	return normalizeRouterAddress(selector, found.Address)
 }
 
-// normalizeRouterAddress canonicalizes an explicit router address for the given chain using
-// the family AddressNormalizer and rejects the zero address. Token pools on every supported
-// family reject a zero router on-chain, so this fails fast instead of producing a doomed
-// transaction or proposal.
+// normalizeRouterAddress canonicalizes a router address (explicit or datastore-resolved) for the
+// given chain using the family AddressNormalizer and rejects the zero address. Token pools on
+// every supported family reject a zero router on-chain, so this fails fast instead of producing
+// a doomed transaction or proposal.
 func normalizeRouterAddress(selector uint64, address string) (string, error) {
-	normalized, err := deploy.TryNormalizeAddressRef(selector, datastore.AddressRef{Address: address})
-	if err != nil {
-		return "", fmt.Errorf("router address %s on chain selector %d is unnormalizable: %w", address, selector, err)
-	}
-	if normalized.Address == "" {
+	if address == "" {
 		return "", fmt.Errorf("router address on chain selector %d must not be empty", selector)
 	}
-
 	family, err := chain_selectors.GetSelectorFamily(selector)
 	if err != nil {
 		return "", fmt.Errorf("invalid chain selector %d: %w", selector, err)
@@ -291,9 +290,13 @@ func normalizeRouterAddress(selector uint64, address string) (string, error) {
 	normalizer, ok := deploy.GetAddressNormalizerRegistry().GetAddressNormalizer(family)
 	if !ok {
 		// No normalizer registered for this family; the adapter is responsible for validation.
-		return normalized.Address, nil
+		return address, nil
 	}
-	raw, err := normalizer.StringToBytes(normalized.Address)
+	normalized, err := normalizer.NormalizeAddress(address)
+	if err != nil {
+		return "", fmt.Errorf("router address %s on chain selector %d is unnormalizable: %w", address, selector, err)
+	}
+	raw, err := normalizer.StringToBytes(normalized)
 	if err != nil {
 		return "", fmt.Errorf("router address %s on chain selector %d is unnormalizable: %w", address, selector, err)
 	}
@@ -307,5 +310,5 @@ func normalizeRouterAddress(selector uint64, address string) (string, error) {
 	if allZero {
 		return "", fmt.Errorf("router address for chain selector %d must not be zero", selector)
 	}
-	return normalized.Address, nil
+	return normalized, nil
 }

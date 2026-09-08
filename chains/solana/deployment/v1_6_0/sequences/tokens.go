@@ -686,6 +686,12 @@ func remotePoolAddressToBytes(remoteSelector uint64, address string) ([]byte, er
 // is a program ID shared across mints, so the token mint comes from input.TokenRef and the
 // pool type from input.TokenPoolRef. The underlying operations perform the read-compare no-op
 // check and emit MCMS batch operations when the pool authority is not the deployer key.
+//
+// Router updates have two extra constraints enforced by the set_router op: the pool owner must
+// also be the token pool program's upgrade authority (the on-chain AdminUpdateTokenPool context
+// requires a single signer holding both roles), and the deployed program must be
+// >= solana-v1.6.2, since earlier releases accept set_router without persisting the new value.
+// Both cases return a descriptive error instead of a doomed transaction or proposal.
 func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenPoolAdmins",

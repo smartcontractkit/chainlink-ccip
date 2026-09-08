@@ -204,17 +204,6 @@ var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *tok
 	},
 })
 
-var GetRouter = contract.NewRead(contract.ReadParams[struct{}, common.Address, *token_pool.TokenPool]{
-	Name:         "token-pool:get-router",
-	Version:      Version,
-	Description:  "Calls getRouter on the TokenPool 1.5.1 contract",
-	ContractType: ContractType,
-	NewContract:  token_pool.NewTokenPool,
-	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args struct{}) (common.Address, error) {
-		return tp.GetRouter(opts)
-	},
-})
-
 var SetRouter = contract.NewWrite(contract.WriteParams[common.Address, *token_pool.TokenPool]{
 	Name:            "token-pool:set-router",
 	Version:         Version,
