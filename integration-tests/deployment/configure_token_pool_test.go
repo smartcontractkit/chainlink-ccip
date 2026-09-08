@@ -106,6 +106,22 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			errors: []string{"empty routerRef"},
 		},
 		{
+			name: "rejects_malformed_router_ref_address",
+			input: singlePoolInput(tokensapi.PoolConfigUpdate{
+				TokenPoolRef: poolRef,
+				RouterRef:    &datastore.AddressRef{Address: "not-an-address"},
+			}),
+			errors: []string{"routerRef", "unnormalizable"},
+		},
+		{
+			name: "rejects_zero_router_ref_address",
+			input: singlePoolInput(tokensapi.PoolConfigUpdate{
+				TokenPoolRef: poolRef,
+				RouterRef:    &datastore.AddressRef{Address: "0x0000000000000000000000000000000000000000"},
+			}),
+			errors: []string{"router address", "must not be zero"},
+		},
+		{
 			name:   "rejects_empty_pool_update",
 			input:  singlePoolInput(tokensapi.PoolConfigUpdate{TokenPoolRef: poolRef}),
 			errors: []string{"no fields to update"},
@@ -450,14 +466,12 @@ func TestConfigureTokenPool_Router(t *testing.T) {
 	after := CurrentBlockEVM(t, tc.env, tc.selA)
 	require.Equal(t, before, after, "no-op router update must not send a transaction")
 
-	// A zero router is rejected by the EVM SetTokenPoolAdmins sequence at apply time.
+	// A zero router is rejected up front by VerifyPreconditions, before anything executes.
 	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
 		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
 		RouterRef:    &datastore.AddressRef{Address: "0x0000000000000000000000000000000000000000"},
 	}
-	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
-	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
-	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	err = tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input)
 	require.ErrorContains(t, err, "must not be zero")
 }
 
