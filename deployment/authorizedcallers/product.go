@@ -33,6 +33,13 @@ type AuthorizedCallersAdapter interface {
 	// ApplyAuthorizedCallerUpdates returns the sequence that calls
 	// applyAuthorizedCallerUpdates on the target contract.
 	ApplyAuthorizedCallerUpdates() *cldf_ops.Sequence[ApplyInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+
+	// NormalizeCaller returns the canonical form of a caller for the adapter's chain
+	// family, so that two spellings of the same address compare equal. Only the adapter
+	// knows its family's address encoding, so normalization cannot live in the
+	// family-agnostic changeset. Returns an error when the caller is not a valid
+	// address for the family.
+	NormalizeCaller(c Caller) (Caller, error)
 }
 
 // AuthorizedCallersRegistry holds one AuthorizedCallersAdapter per
