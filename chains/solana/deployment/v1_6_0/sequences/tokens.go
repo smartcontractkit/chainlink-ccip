@@ -704,11 +704,17 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
 			}
 
-			poolType := input.TokenPoolRef.Type.String()
-			switch poolType {
-			case common_utils.BurnMintTokenPool.String(), common_utils.LockReleaseTokenPool.String():
+			var (
+				setRouterOp     *operations.Operation[tokenpoolops.SetPoolRouterInput, sequences.OnChainOutput, cldf_solana.Chain]
+				updateRLAdminOp *operations.Operation[tokenpoolops.TokenPoolTransferOwnershipInput, sequences.OnChainOutput, cldf_solana.Chain]
+			)
+			switch input.TokenPoolRef.Type.String() {
+			case common_utils.BurnMintTokenPool.String():
+				setRouterOp, updateRLAdminOp = tokenpoolops.SetRouterBurnMint, tokenpoolops.UpdateRateLimitAdminBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				setRouterOp, updateRLAdminOp = tokenpoolops.SetRouterLockRelease, tokenpoolops.UpdateRateLimitAdminLockRelease
 			default:
-				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", poolType)
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
 			}
 
 			tokenPool, err := solana.PublicKeyFromBase58(input.TokenPoolRef.Address)
@@ -723,28 +729,20 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 			var result sequences.OnChainOutput
 
 			if input.Router != nil {
+				// Router is validated (format + non-zero) by the changeset before it reaches the adapter.
 				newRouter, err := solana.PublicKeyFromBase58(*input.Router)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid router address for chain %d: %s: %w", input.Selector, *input.Router, err)
 				}
-				poolInput := tokenpoolops.SetPoolRouterInput{
+				out, err := operations.ExecuteOperation(b, setRouterOp, chain, tokenpoolops.SetPoolRouterInput{
 					Program:   tokenPool,
 					TokenMint: tokenMint,
 					NewRouter: newRouter,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set router on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
 				}
-				if poolType == common_utils.BurnMintTokenPool.String() {
-					out, err := operations.ExecuteOperation(b, tokenpoolops.SetRouterBurnMint, chain, poolInput)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to set router on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
-					}
-					result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
-				} else {
-					out, err := operations.ExecuteOperation(b, tokenpoolops.SetRouterLockRelease, chain, poolInput)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to set router on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
-					}
-					result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
-				}
+				result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
 			}
 
 			if input.RateLimitAdmin != nil {
@@ -752,25 +750,15 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s: %w", input.Selector, *input.RateLimitAdmin, err)
 				}
-
-				ownerInput := tokenpoolops.TokenPoolTransferOwnershipInput{
+				out, err := operations.ExecuteOperation(b, updateRLAdminOp, chain, tokenpoolops.TokenPoolTransferOwnershipInput{
 					Program:   tokenPool,
 					TokenMint: tokenMint,
 					NewOwner:  rlAdmin,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
 				}
-				if poolType == common_utils.BurnMintTokenPool.String() {
-					out, err := operations.ExecuteOperation(b, tokenpoolops.UpdateRateLimitAdminBurnMint, chain, ownerInput)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
-					}
-					result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
-				} else {
-					out, err := operations.ExecuteOperation(b, tokenpoolops.UpdateRateLimitAdminLockRelease, chain, ownerInput)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin on token pool %s on chain %d: %w", input.TokenPoolRef.Address, input.Selector, err)
-					}
-					result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
-				}
+				result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
 			}
 
 			return result, nil
