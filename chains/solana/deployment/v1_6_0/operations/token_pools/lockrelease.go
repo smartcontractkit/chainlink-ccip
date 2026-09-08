@@ -593,6 +593,10 @@ var SetRouterLockRelease = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data for lock release token pool: %w", err)
 		}
+		// Build two independent instructions below (probe and real). Do not collapse them into one
+		// builder: AccountMetaSlice holds pointers shared with the built instruction, so marking
+		// the state writable after building the probe would silently make the probe writable too
+		// and invert the version detection.
 		newSetRouter := func() *lockrelease_token_pool.SetRouter {
 			return lockrelease_token_pool.NewSetRouterInstruction(
 				input.NewRouter,
@@ -611,7 +615,7 @@ var SetRouterLockRelease = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set router probe instruction: %w", err)
 		}
-		if err := ensureSetRouterPersists(b.GetContext(), chain, input.Program, probe, "lock release"); err != nil {
+		if err := ensureSetRouterPersists(b, chain, input.Program, probe, "lock release"); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 		// The real instruction marks the state account writable, as the bindings generated from

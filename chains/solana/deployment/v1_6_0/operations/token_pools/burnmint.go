@@ -650,6 +650,10 @@ var SetRouterBurnMint = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data for burn mint token pool: %w", err)
 		}
+		// Build two independent instructions below (probe and real). Do not collapse them into one
+		// builder: AccountMetaSlice holds pointers shared with the built instruction, so marking
+		// the state writable after building the probe would silently make the probe writable too
+		// and invert the version detection.
 		newSetRouter := func() *burnmint_token_pool.SetRouter {
 			return burnmint_token_pool.NewSetRouterInstruction(
 				input.NewRouter,
@@ -668,7 +672,7 @@ var SetRouterBurnMint = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set router probe instruction: %w", err)
 		}
-		if err := ensureSetRouterPersists(b.GetContext(), chain, input.Program, probe, "burn mint"); err != nil {
+		if err := ensureSetRouterPersists(b, chain, input.Program, probe, "burn mint"); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 		// The real instruction marks the state account writable, as the bindings generated from
