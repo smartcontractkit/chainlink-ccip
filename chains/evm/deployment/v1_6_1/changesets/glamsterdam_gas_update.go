@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -16,38 +15,28 @@ import (
 
 	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	glamsterdamseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences/glamsterdam"
-	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 )
 
-// getAllConfiguredTokensArgs is the input to getAllConfiguredTokens.
-type getAllConfiguredTokensArgs struct {
-	StartIndex uint64
-	MaxCount   uint64
+// resolveUSDCTokenPoolRef finds the chain's non-canonical USDC token pool address ref, if any.
+// v1.6.1 has no USDC-specific ContractType; by this version's convention (see
+// adapters/non_canonical_usdc_chain.go), the USDC pool is deployed as a
+// BurnMintWithLockReleaseFlagTokenPool, and there is at most one per chain, so the first match by
+// type is returned regardless of version or qualifier.
+func resolveUSDCTokenPoolRef(addrs []datastore.AddressRef, sel uint64) datastore.AddressRef {
+	for _, ref := range addrs {
+		if ref.ChainSelector == sel && ref.Type == datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType) {
+			return ref
+		}
+	}
+	return datastore.AddressRef{}
 }
-
-// getAllConfiguredTokensMaxCount is large enough to fetch every configured token on a chain in a
-// single call for any realistic v1.6 lane fan-out.
-const getAllConfiguredTokensMaxCount = 1000
-
-// getAllConfiguredTokens reads every token TokenAdminRegistry knows about on a chain. Used to
-// build the candidate token list for row 5 of the v1.6 Glamsterdam mapping table
-// (FeeQuoter.TokenTransferFeeConfig.DestGasOverhead, keyed by (destChainSelector, token)).
-var getAllConfiguredTokens = contract.NewRead(contract.ReadParams[getAllConfiguredTokensArgs, []common.Address, *tar_bindings.TokenAdminRegistry]{
-	Name:         "glamsterdam:token-admin-registry:get-all-configured-tokens",
-	Version:      token_admin_registry.Version,
-	Description:  "Calls getAllConfiguredTokens on TokenAdminRegistry",
-	ContractType: token_admin_registry.ContractType,
-	NewContract:  tar_bindings.NewTokenAdminRegistry,
-	CallContract: func(c *tar_bindings.TokenAdminRegistry, opts *bind.CallOpts, args getAllConfiguredTokensArgs) ([]common.Address, error) {
-		return c.GetAllConfiguredTokens(opts, args.StartIndex, args.MaxCount)
-	},
-})
 
 // GlamsterdamGasUpdateV16Cfg is configuration for the UpdateGasConfigForGlamsterdamV16 changeset.
 type GlamsterdamGasUpdateV16Cfg struct {
@@ -132,9 +121,10 @@ func UpdateGasConfigForGlamsterdamV16(mcmsRegistry *cs_core.MCMSReaderRegistry) 
 			}
 			lanes = append(lanes, lane)
 
-			tarRef := datastore_utils.GetAddressRef(addrs, sel, token_admin_registry.ContractType, token_admin_registry.Version, "")
-			if datastore_utils.IsAddressRefEmpty(tarRef) {
-				report.AddUnresolvedContract(sel, "TokenAdminRegistry")
+			usdcPoolRef := resolveUSDCTokenPoolRef(addrs, sel)
+			if datastore_utils.IsAddressRefEmpty(usdcPoolRef) {
+				// No non-canonical USDC pool deployed on this chain — nothing to update for the
+				// USDC-specific row of the v1.6 mapping table.
 				continue
 			}
 
@@ -142,21 +132,19 @@ func UpdateGasConfigForGlamsterdamV16(mcmsRegistry *cs_core.MCMSReaderRegistry) 
 			if !ok {
 				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("chain with selector %d not found", sel)
 			}
-			tokensReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, getAllConfiguredTokens, chain, contract.FunctionInput[getAllConfiguredTokensArgs]{
+			usdcTokenReport, err := cldf_ops.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, chain, contract.FunctionInput[struct{}]{
 				ChainSelector: sel,
-				Address:       common.HexToAddress(tarRef.Address),
-				Args:          getAllConfiguredTokensArgs{StartIndex: 0, MaxCount: getAllConfiguredTokensMaxCount},
+				Address:       common.HexToAddress(usdcPoolRef.Address),
+				Args:          struct{}{},
 			})
 			if err != nil {
-				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to read configured tokens for src %d: %w", sel, err)
+				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to read underlying token for USDC pool %s on src %d: %w", usdcPoolRef.Address, sel, err)
 			}
-			if len(tokensReport.Output) > 0 {
-				tokenLanes = append(tokenLanes, glamsterdamseq.TokenTransferFeeConfigLane{
-					ChainSelector:    sel,
-					FeeQuoterAddress: feeQuoterAddrByChain[sel],
-					CandidateTokens:  tokensReport.Output,
-				})
-			}
+			tokenLanes = append(tokenLanes, glamsterdamseq.TokenTransferFeeConfigLane{
+				ChainSelector:    sel,
+				FeeQuoterAddress: feeQuoterAddrByChain[sel],
+				CandidateTokens:  []common.Address{usdcTokenReport.Output},
+			})
 		}
 
 		var batchOps []mcms_types.BatchOperation

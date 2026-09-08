@@ -15,6 +15,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
@@ -62,6 +63,42 @@ func resolveAddressRefsAllVersions(
 		}
 	}
 	return out
+}
+
+// resolveAddressRefsAllQualifiers returns every distinct address matching contractType and
+// version for the given chain, regardless of qualifier — unlike GetAddressRef, it doesn't stop at
+// the first match. Lombard deployment supports multiple qualifier-scoped pools per chain (e.g. one
+// per remote-chain grouping), and all of them need updating, not just whichever one has an empty
+// qualifier.
+func resolveAddressRefsAllQualifiers(
+	addrs []datastore.AddressRef, contractType cldf_deployment.ContractType, version *semver.Version,
+) []common.Address {
+	seen := make(map[common.Address]bool)
+	var out []common.Address
+	for _, ref := range addrs {
+		if ref.Type != datastore.ContractType(contractType) || !ref.Version.Equal(version) {
+			continue
+		}
+		addr := common.HexToAddress(ref.Address)
+		if !seen[addr] {
+			seen[addr] = true
+			out = append(out, addr)
+		}
+	}
+	return out
+}
+
+// usdcTokenPoolContractTypes lists every TokenPool implementation that can own a USDC
+// target-lane TokenTransferFeeConfig: the standard SiloedUSDCTokenPool, and the
+// CCTPThroughCCVTokenPool used for CCTP-capable EVM remotes. Both must be checked, since a chain
+// can have either (or both) configured, and each is a distinct on-chain contract with its own
+// DestGasOverhead to migrate.
+var usdcTokenPoolContractTypes = []struct {
+	ContractType cldf_deployment.ContractType
+	Version      *semver.Version
+}{
+	{siloed_usdc_token_pool.ContractType, siloed_usdc_token_pool.Version},
+	{cctp_through_ccv_token_pool.ContractType, cctp_through_ccv_token_pool.Version},
 }
 
 // GlamsterdamGasUpdateCfg is configuration for the UpdateGasConfigForGlamsterdamV2 changeset.
@@ -161,17 +198,19 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 			}
 			lanes = append(lanes, lane)
 
-			if lombardRef := datastore_utils.GetAddressRef(addrs, sel, lombard_token_pool.ContractType, lombard_token_pool.Version, ""); !datastore_utils.IsAddressRefEmpty(lombardRef) {
+			for _, lombardAddr := range resolveAddressRefsAllQualifiers(addrs, lombard_token_pool.ContractType, lombard_token_pool.Version) {
 				lombardPools = append(lombardPools, glamsterdamseq.TokenPoolLane{
 					ChainSelector: sel,
-					PoolAddress:   common.HexToAddress(lombardRef.Address),
+					PoolAddress:   lombardAddr,
 				})
 			}
-			if usdcRef := datastore_utils.GetAddressRef(addrs, sel, siloed_usdc_token_pool.ContractType, siloed_usdc_token_pool.Version, ""); !datastore_utils.IsAddressRefEmpty(usdcRef) {
-				usdcPools = append(usdcPools, glamsterdamseq.TokenPoolLane{
-					ChainSelector: sel,
-					PoolAddress:   common.HexToAddress(usdcRef.Address),
-				})
+			for _, usdcType := range usdcTokenPoolContractTypes {
+				for _, usdcAddr := range resolveAddressRefsAllQualifiers(addrs, usdcType.ContractType, usdcType.Version) {
+					usdcPools = append(usdcPools, glamsterdamseq.TokenPoolLane{
+						ChainSelector: sel,
+						PoolAddress:   usdcAddr,
+					})
+				}
 			}
 		}
 

@@ -91,6 +91,18 @@ var UpdateTokenPoolGasConfig = cldf_ops.NewSequence(
 					lane.PoolAddress, lane.ChainSelector, input.TargetChainSelector, err,
 				)
 			}
+			if !cur.Output.IsEnabled {
+				// No enabled config for this lane (either no override configured, or the
+				// destination chain isn't supported by this pool yet). Skip: TokenPool.
+				// applyTokenTransferFeeConfigUpdates rejects writes with isEnabled=false and
+				// reverts on an unsupported chain, so building a write here would make the whole
+				// MCMS batch revert on execution.
+				output.Report.AddLine(fmt.Sprintf(
+					"chain %d: TokenPool(%s) has no enabled token transfer fee config for dst %d, skipping",
+					lane.ChainSelector, lane.PoolAddress, input.TargetChainSelector,
+				))
+				return nil
+			}
 
 			result := glamsterdamutils.Resolve(spec, cur.Output.DestGasOverhead)
 			glamsterdamutils.AddField(output.Report, lane.ChainSelector, result)
