@@ -124,6 +124,13 @@ func ConfigureChainsForLanesFromTopology(
 		if len(chains) == 0 {
 			return fmt.Errorf("no lane chains are available in environment")
 		}
+		laneChainSelectors := make([]uint64, 0, len(chains))
+		for _, chainCfg := range chains {
+			laneChainSelectors = append(laneChainSelectors, chainCfg.ChainSelector)
+		}
+		if err := validateExecutorPoolCoverage(cfg.Topology, laneChainSelectors); err != nil {
+			return fmt.Errorf("executor pool validation failed: %w", err)
+		}
 		for _, chainCfg := range chains {
 			if !slices.Contains(e.BlockChains.ListChainSelectors(), chainCfg.ChainSelector) {
 				return fmt.Errorf("chain selector %d is not available in environment", chainCfg.ChainSelector)
@@ -138,6 +145,12 @@ func ConfigureChainsForLanesFromTopology(
 			if err := validateDefaultCCVsResolvable(chainCfg, committeeVerifierContractRegistry, e); err != nil {
 				return err
 			}
+		}
+		if err := validateLaneAddressesResolvable(e, chainFamilyRegistry, chains, cfg.UseTestRouter()); err != nil {
+			return fmt.Errorf("lane address validation failed: %w", err)
+		}
+		if err := validateLaneSignersResolvable(e, cfg.Topology, chains); err != nil {
+			return fmt.Errorf("lane signer validation failed: %w", err)
 		}
 		return nil
 	}
@@ -240,7 +253,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter(), cfg.AllowOnrampOverride)
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter(), cfg.AllowOnrampOverride, cfg.AllowLoweringBaseExecutionGasCost)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -266,6 +279,7 @@ func applyConfigureChains(
 	mcmsInput mcms.Input,
 	useTestRouter bool,
 	allowOnrampOverride bool,
+	allowLoweringBaseExecutionGasCost bool,
 ) (deployment.ChangesetOutput, error) {
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -348,14 +362,15 @@ func applyConfigureChains(
 			ChainSelector: chainCfg.ChainSelector,
 			// Overriding an existing prod-router OnRamp mapping is allowed either implicitly on the
 			// test router or explicitly via AllowOnrampOverride (set by migrate_chain_lanes_to_v2).
-			AllowOnrampOverride: useTestRouter || allowOnrampOverride,
-			Router:              routerBytes,
-			OnRamp:              onRampBytes,
-			CommitteeVerifiers:  committeeVerifiers,
-			FeeQuoter:           feeQuoterBytes,
-			OffRamp:             offRampBytes,
-			RemoteChains:        remoteChains,
-			FamilyExtras:        chainCfg.FamilyExtras,
+			AllowOnrampOverride:               useTestRouter || allowOnrampOverride,
+			AllowLoweringBaseExecutionGasCost: allowLoweringBaseExecutionGasCost,
+			Router:                            routerBytes,
+			OnRamp:                            onRampBytes,
+			CommitteeVerifiers:                committeeVerifiers,
+			FeeQuoter:                         feeQuoterBytes,
+			OffRamp:                           offRampBytes,
+			RemoteChains:                      remoteChains,
+			FamilyExtras:                      chainCfg.FamilyExtras,
 		})
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", chainCfg.ChainSelector, err)

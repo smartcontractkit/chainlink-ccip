@@ -102,7 +102,12 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 type ConfigureChainForLanesInput struct {
 	ChainSelector       uint64
 	AllowOnrampOverride bool
-	Router              []byte
+	// AllowLoweringBaseExecutionGasCost permits writing a BaseExecutionGasCost below the
+	// value already on chain. Off by default: the per-family default is a single flat
+	// value, so re-running a lane whose gas cost was raised by hand would otherwise put
+	// the default back and break execution on the destination.
+	AllowLoweringBaseExecutionGasCost bool
+	Router                            []byte
 	// OnRamp is the local OnRamp as returned by this chain's GetOnRampAddress, so it
 	// carries the family's message encoding rather than its plain contract address.
 	// On EVM that means 32 abi-encoded bytes; the sequence decodes the address from it.

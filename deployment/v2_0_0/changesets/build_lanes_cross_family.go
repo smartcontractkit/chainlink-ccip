@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -49,6 +50,11 @@ type BuildLanesCrossFamilyConfig struct {
 	// AllowOnrampOverride permits replacing an existing OnRamp mapping in the production Router
 	// with a different OnRamp address. This should only be used for v2 migrations.
 	AllowOnrampOverride bool `json:"allowOnrampOverride,omitempty" yaml:"allowOnrampOverride,omitempty"`
+	// AllowLoweringBaseExecutionGasCost permits writing a baseExecutionGasCost below the
+	// value already on chain. Set it only to deliberately reduce a destination's gas
+	// allocation; leaving it unset stops a lane re-run from resetting a hand-raised value
+	// back to the family default.
+	AllowLoweringBaseExecutionGasCost bool `json:"allowLoweringBaseExecutionGasCost,omitempty" yaml:"allowLoweringBaseExecutionGasCost,omitempty"`
 }
 
 // UseTestRouter reports whether the test router should be used instead of the production router.
@@ -64,10 +70,22 @@ type ConfigureChainsForLanesFromTopologyConfig struct {
 	BuildLanesCrossFamilyConfig
 }
 
+var (
+	// ErrChainMissingFromCommittees means a lane chain has no chain_configs entry in
+	// any committee.
+	ErrChainMissingFromCommittees = errors.New("chain missing from all committee chain_configs")
+	// ErrChainsShareNoCommittee means both lane chains are configured, but never in
+	// the same committee.
+	ErrChainsShareNoCommittee = errors.New("lane chains share no committee")
+)
+
 // committeeQualifiersForLaneLeg returns the committee qualifiers that apply to the leg
 // from local → remote. A committee applies only if both the local and remote chain
 // selectors appear in its ChainConfigs — meaning the committee is configured for both
 // sides of the lane. When committees is nil, the single default qualifier is returned.
+//
+// A leg with no applicable committee is an error: the lane would still be wired end to
+// end while carrying traffic no committee can verify.
 func committeeQualifiersForLaneLeg(local, remote uint64, committees map[string]offchain.CommitteeConfig) ([]string, error) {
 	if committees == nil {
 		return []string{defaultQualifier}, nil
@@ -75,13 +93,28 @@ func committeeQualifiersForLaneLeg(local, remote uint64, committees map[string]o
 	localKey := strconv.FormatUint(local, 10)
 	remoteKey := strconv.FormatUint(remote, 10)
 	qualifiers := make([]string, 0, len(committees))
+	var anyHasLocal, anyHasRemote bool
 	for q, committee := range committees {
 		_, hasLocal := committee.ChainConfigs[localKey]
 		_, hasRemote := committee.ChainConfigs[remoteKey]
+		anyHasLocal = anyHasLocal || hasLocal
+		anyHasRemote = anyHasRemote || hasRemote
 		if hasLocal && hasRemote {
 			qualifiers = append(qualifiers, q)
 		}
 	}
+
+	switch {
+	case !anyHasLocal && !anyHasRemote:
+		return nil, fmt.Errorf("chains %d, %d: %w", local, remote, ErrChainMissingFromCommittees)
+	case !anyHasLocal:
+		return nil, fmt.Errorf("chain %d: %w", local, ErrChainMissingFromCommittees)
+	case !anyHasRemote:
+		return nil, fmt.Errorf("chain %d: %w", remote, ErrChainMissingFromCommittees)
+	case len(qualifiers) == 0:
+		return nil, fmt.Errorf("chains %d, %d: %w", local, remote, ErrChainsShareNoCommittee)
+	}
+
 	sort.Strings(qualifiers)
 	return qualifiers, nil
 }
