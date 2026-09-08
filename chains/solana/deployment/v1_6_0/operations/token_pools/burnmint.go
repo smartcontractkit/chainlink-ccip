@@ -612,6 +612,65 @@ var UpdateRateLimitAdminBurnMint = operations.NewOperation(
 	},
 )
 
+var SetRouterBurnMint = operations.NewOperation(
+	"burnmint:set-router",
+	common_utils.Version_1_6_0,
+	"Updates the router for a BurnMintTokenPool",
+	func(b operations.Bundle, chain cldf_solana.Chain, input SetPoolRouterInput) (sequences.OnChainOutput, error) {
+		burnmint_token_pool.SetProgramID(input.Program)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.Program)
+		var chainConfig test_token_pool.State
+		err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &chainConfig)
+		if err != nil && !errors.Is(err, rpc.ErrNotFound) {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to read burn mint token pool config for token mint %s: %w", input.TokenMint.String(), err)
+		}
+		if err == nil && chainConfig.Config.Router == input.NewRouter {
+			b.Logger.Info("Router already matches the desired value for burn mint token pool with token mint:", input.TokenMint.String())
+			return sequences.OnChainOutput{}, nil
+		}
+		authority := chainConfig.Config.Owner
+		if err != nil {
+			authority, err = utils.GetUpgradeAuthority(chain.Client, input.Program)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
+			}
+		}
+		programData, err := utils.GetSolProgramData(chain.Client, input.Program)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data for burn mint token pool: %w", err)
+		}
+		ixn, err := burnmint_token_pool.NewSetRouterInstruction(
+			input.NewRouter,
+			poolConfigPDA,
+			input.TokenMint,
+			authority,
+			input.Program,
+			programData.Address,
+		).ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set router instruction: %w", err)
+		}
+		if authority != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{ixn},
+				input.Program.String(),
+				common_utils.BurnMintTokenPool.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		err = chain.Confirm([]solana.Instruction{ixn})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm set router: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
 func GetAuthorityBurnMint(chain cldf_solana.Chain, program solana.PublicKey, tokenMint solana.PublicKey) (solana.PublicKey, error) {
 	programData := burnmint_token_pool.State{}
 	poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenMint, program)

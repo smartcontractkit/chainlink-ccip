@@ -39,12 +39,13 @@ type PoolOps interface {
 	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
-	// SetAdmins updates the admin roles on the pool. A nil pointer means "leave this
-	// admin unchanged". Implementations own version-specific semantics: pre-2.0 pools
-	// reject a non-nil feeAdmin (no such concept on the contract); v2.0+ sets both
-	// admins in a single SetDynamicConfig write. Returns no writes when on-chain
-	// state already matches.
-	SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
+	// SetAdmins updates the admin roles and, when non-nil, the router on the pool. A nil
+	// pointer means "leave this value unchanged". Implementations own version-specific
+	// semantics: pre-2.0 pools reject a non-nil feeAdmin (no such concept on the
+	// contract) and set the router via setRouter, while v2.0+ sets router and both
+	// admins in a single SetDynamicConfig write. Returns no writes when on-chain state
+	// already matches.
+	SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
 	// RemoveRemotePools removes the given remote pool entries from the pool. Implementations
 	// read the current on-chain remote pools for each remote chain and return a clear error when
@@ -219,6 +220,17 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 			}
 			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
 
+			var router *common.Address
+			if input.Router != nil {
+				if !common.IsHexAddress(*input.Router) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid router address for chain %d: %s", input.Selector, *input.Router)
+				}
+				addr := common.HexToAddress(*input.Router)
+				if addr == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("router address for chain %d must not be zero", input.Selector)
+				}
+				router = &addr
+			}
 			var rateLimitAdmin *common.Address
 			if input.RateLimitAdmin != nil {
 				if !common.IsHexAddress(*input.RateLimitAdmin) {
@@ -235,11 +247,11 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 				addr := common.HexToAddress(*input.FeeAdmin)
 				feeAdmin = &addr
 			}
-			if rateLimitAdmin == nil && feeAdmin == nil {
+			if router == nil && rateLimitAdmin == nil && feeAdmin == nil {
 				return sequences.OnChainOutput{}, nil
 			}
 
-			writes, err := a.Ops.SetAdmins(b, chain, poolAddr, rateLimitAdmin, feeAdmin)
+			writes, err := a.Ops.SetAdmins(b, chain, poolAddr, router, rateLimitAdmin, feeAdmin)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to set admins on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
 			}
@@ -458,7 +470,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 						return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
 					}
 					rlAdminAddr := common.HexToAddress(rlAdminHex)
-					output, err := a.Ops.SetAdmins(b, chain, poolAddr, &rlAdminAddr, nil)
+					output, err := a.Ops.SetAdmins(b, chain, poolAddr, nil, &rlAdminAddr, nil)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
 					}

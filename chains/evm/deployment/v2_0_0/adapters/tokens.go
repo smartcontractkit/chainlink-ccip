@@ -425,7 +425,7 @@ func (p *poolOpsV200) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	return writes, nil
 }
 
-func (p *poolOpsV200) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]contract.WriteOutput, error) {
+func (p *poolOpsV200) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]contract.WriteOutput, error) {
 	pool, err := token_pool.NewTokenPoolContract(poolAddr, chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate token pool v2.0.0 contract at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
@@ -435,6 +435,10 @@ func (p *poolOpsV200) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr com
 		return nil, fmt.Errorf("failed to get dynamic config of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 	}
 
+	desiredRouter := cfg.Router
+	if router != nil {
+		desiredRouter = *router
+	}
 	desiredRateLimitAdmin := cfg.RateLimitAdmin
 	if rlAdmin != nil {
 		desiredRateLimitAdmin = *rlAdmin
@@ -443,8 +447,8 @@ func (p *poolOpsV200) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr com
 	if feeAdmin != nil {
 		desiredFeeAdmin = *feeAdmin
 	}
-	if desiredRateLimitAdmin == cfg.RateLimitAdmin && desiredFeeAdmin == cfg.FeeAdmin {
-		b.Logger.Infof("Token pool admins already match desired values for pool %s on chain %d; skipping", poolAddr.Hex(), chain.Selector)
+	if desiredRouter == cfg.Router && desiredRateLimitAdmin == cfg.RateLimitAdmin && desiredFeeAdmin == cfg.FeeAdmin {
+		b.Logger.Infof("Token pool router and admins already match desired values for pool %s on chain %d; skipping", poolAddr.Hex(), chain.Selector)
 		return nil, nil
 	}
 
@@ -457,7 +461,7 @@ func (p *poolOpsV200) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr com
 			Args: token_pool.SetDynamicConfigArgs{
 				RateLimitAdmin: desiredRateLimitAdmin,
 				FeeAdmin:       desiredFeeAdmin,
-				Router:         cfg.Router,
+				Router:         desiredRouter,
 			},
 		},
 	)

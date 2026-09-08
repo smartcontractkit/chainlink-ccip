@@ -51,6 +51,9 @@ type PoolConfigUpdate struct {
 	RateLimitAdmin *string `yaml:"rateLimitAdmin,omitempty" json:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if set, is the desired fee admin address (v2+ only).
 	FeeAdmin *string `yaml:"feeAdmin,omitempty" json:"feeAdmin,omitempty"`
+	// RouterRef, if set, selects the router the pool is wired to. It may be an explicit
+	// address or a datastore ref (e.g. the chain's Router contract type) resolved in apply.
+	RouterRef *datastore.AddressRef `yaml:"routerRef,omitempty" json:"routerRef,omitempty"`
 	// Remotes lists per-lane configuration updates.
 	Remotes []RemoteConfigUpdate `yaml:"remotes,omitempty" json:"remotes,omitempty"`
 }
@@ -96,8 +99,16 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 				if pool.TokenPoolRef.ChainSelector != 0 && pool.TokenPoolRef.ChainSelector != chainCfg.ChainSelector {
 					return fmt.Errorf("pool entry %s has tokenPoolRef.chainSelector %d that does not match the enclosing chain selector %d", datastore_utils.SprintRef(pool.TokenPoolRef), pool.TokenPoolRef.ChainSelector, chainCfg.ChainSelector)
 				}
-				if pool.FinalityConfig == nil && pool.RateLimitAdmin == nil && pool.FeeAdmin == nil && len(pool.Remotes) == 0 {
+				if pool.FinalityConfig == nil && pool.RateLimitAdmin == nil && pool.FeeAdmin == nil && pool.RouterRef == nil && len(pool.Remotes) == 0 {
 					return fmt.Errorf("pool entry %s on chain selector %d has no fields to update", datastore_utils.SprintRef(pool.TokenPoolRef), chainCfg.ChainSelector)
+				}
+				if pool.RouterRef != nil {
+					if datastore_utils.IsAddressRefEmpty(*pool.RouterRef) {
+						return fmt.Errorf("pool entry %s on chain selector %d has an empty routerRef", datastore_utils.SprintRef(pool.TokenPoolRef), chainCfg.ChainSelector)
+					}
+					if pool.RouterRef.ChainSelector != 0 && pool.RouterRef.ChainSelector != chainCfg.ChainSelector {
+						return fmt.Errorf("pool entry %s has routerRef.chainSelector %d that does not match the enclosing chain selector %d", datastore_utils.SprintRef(pool.TokenPoolRef), pool.RouterRef.ChainSelector, chainCfg.ChainSelector)
+					}
 				}
 				if pool.FinalityConfig != nil {
 					if err := pool.FinalityConfig.Validate(); err != nil {
@@ -174,7 +185,16 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 					reports = append(reports, report.ExecutionReports...)
 				}
 
-				if pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
+				var router *string
+				if pool.RouterRef != nil {
+					resolved, err := resolveRouterRef(e, selector, *pool.RouterRef)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve router for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.TokenPoolRef), selector, err)
+					}
+					router = &resolved
+				}
+
+				if pool.RouterRef != nil || pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
 					adminAdapter, ok := adapter.(TokenPoolAdminAdapter)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf(
@@ -184,6 +204,7 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 					}
 					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
 						Selector:       selector,
+						Router:         router,
 						RateLimitAdmin: pool.RateLimitAdmin,
 						FeeAdmin:       pool.FeeAdmin,
 						TokenPoolRef:   fullPoolRef,
@@ -214,4 +235,28 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+// resolveRouterRef resolves a RouterRef to a family-specific address string for the given
+// chain. An explicit address is normalized in place; otherwise the ref is looked up in the
+// datastore (by type/qualifier/version) before normalization.
+func resolveRouterRef(e cldf.Environment, selector uint64, routerRef datastore.AddressRef) (string, error) {
+	full := routerRef
+	if full.Address == "" {
+		resolved, err := datastore_utils.FindAndFormatRef(e.DataStore, routerRef, selector, datastore_utils.FullRef)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve router ref %s on chain selector %d: %w", datastore_utils.SprintRef(routerRef), selector, err)
+		}
+		full = resolved
+	}
+
+	normalized, err := deploy.TryNormalizeAddressRef(selector, full)
+	if err != nil {
+		return "", fmt.Errorf("failed to normalize router ref %s on chain selector %d: %w", datastore_utils.SprintRef(routerRef), selector, err)
+	}
+	if normalized.Address == "" {
+		return "", fmt.Errorf("router ref %s on chain selector %d resolved to an empty address", datastore_utils.SprintRef(routerRef), selector)
+	}
+
+	return normalized.Address, nil
 }

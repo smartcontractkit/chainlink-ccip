@@ -40,6 +40,12 @@ type TokenPoolTransferOwnershipInput struct {
 	TokenMint solana.PublicKey
 }
 
+type SetPoolRouterInput struct {
+	Program   solana.PublicKey
+	TokenMint solana.PublicKey
+	NewRouter solana.PublicKey
+}
+
 type Params struct {
 	TokenPool solana.PublicKey
 	TokenMint solana.PublicKey

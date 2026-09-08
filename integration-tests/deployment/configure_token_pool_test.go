@@ -90,6 +90,22 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			errors: []string{"does not match the enclosing chain selector"},
 		},
 		{
+			name: "rejects_mismatched_router_ref_chain_selector",
+			input: singlePoolInput(tokensapi.PoolConfigUpdate{
+				TokenPoolRef: poolRef,
+				RouterRef:    &datastore.AddressRef{Address: "0x3333333333333333333333333333333333333333", ChainSelector: dst},
+			}),
+			errors: []string{"routerRef.chainSelector"},
+		},
+		{
+			name: "rejects_empty_router_ref",
+			input: singlePoolInput(tokensapi.PoolConfigUpdate{
+				TokenPoolRef: poolRef,
+				RouterRef:    &datastore.AddressRef{},
+			}),
+			errors: []string{"empty routerRef"},
+		},
+		{
 			name:   "rejects_empty_pool_update",
 			input:  singlePoolInput(tokensapi.PoolConfigUpdate{TokenPoolRef: poolRef}),
 			errors: []string{"no fields to update"},
@@ -397,6 +413,54 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 	require.ErrorContains(t, err, "invalid fee admin address")
 }
 
+func TestConfigureTokenPool_Router(t *testing.T) {
+	tc := setupV2PoolsForConfigureImpl(t, "CTP_RTR", false)
+
+	pool, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	preCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+
+	newRouter := "0x9999999999999999999999999999999999999999"
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: tc.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+				RouterRef:    &datastore.AddressRef{Address: newRouter},
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+
+	postCfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(newRouter), postCfg.Router, "router must match the requested value")
+	require.Equal(t, preCfg.RateLimitAdmin, postCfg.RateLimitAdmin, "rateLimitAdmin must be preserved")
+	require.Equal(t, preCfg.FeeAdmin, postCfg.FeeAdmin, "feeAdmin must be preserved")
+
+	// Idempotency: setting the same router sends no transaction.
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	before := CurrentBlockEVM(t, tc.env, tc.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.NoError(t, err)
+	after := CurrentBlockEVM(t, tc.env, tc.selA)
+	require.Equal(t, before, after, "no-op router update must not send a transaction")
+
+	// A zero router is rejected by the EVM SetTokenPoolAdmins sequence at apply time.
+	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+		RouterRef:    &datastore.AddressRef{Address: "0x0000000000000000000000000000000000000000"},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.ErrorContains(t, err, "must not be zero")
+}
+
 func TestConfigureTokenPool_Admins_PreV2(t *testing.T) {
 	t.Run("v1_5_1", func(t *testing.T) { testConfigureTokenPoolAdminsPreV2(t, cciputils.Version_1_5_1) })
 	t.Run("v1_6_1", func(t *testing.T) { testConfigureTokenPoolAdminsPreV2(t, cciputils.Version_1_6_1) })
@@ -472,6 +536,68 @@ func getRateLimitAdminPreV2(t *testing.T, version *semver.Version, address commo
 		return rlAdmin
 	default:
 		t.Fatalf("unsupported pre-2.0 pool version for fetching rate limit admin: %s", version.String())
+		return common.Address{}
+	}
+}
+
+func TestConfigureTokenPool_Router_PreV2(t *testing.T) {
+	t.Run("v1_5_1", func(t *testing.T) { testConfigureTokenPoolRouterPreV2(t, cciputils.Version_1_5_1) })
+	t.Run("v1_6_1", func(t *testing.T) { testConfigureTokenPoolRouterPreV2(t, cciputils.Version_1_6_1) })
+}
+
+func testConfigureTokenPoolRouterPreV2(t *testing.T, version *semver.Version) {
+	pair := setupLegacyConnectedBnMPair(t, version)
+
+	chainA := pair.env.BlockChains.EVMChains()[pair.selA]
+
+	newRouter := "0x9999999999999999999999999999999999999999"
+	input := tokensapi.ConfigureTokenPoolInput{
+		MCMS: mcms.Input{},
+		Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+			ChainSelector: pair.selA,
+			Pools: []tokensapi.PoolConfigUpdate{{
+				TokenPoolRef: datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+				RouterRef:    &datastore.AddressRef{Address: newRouter},
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*pair.env, input))
+	_, err := tokensapi.ConfigureTokenPool().Apply(*pair.env, input)
+	require.NoError(t, err)
+
+	router := getRouterPreV2(t, version, pair.oldPoolAddrA, chainA.Client)
+	require.Equal(t, common.HexToAddress(newRouter), router)
+
+	// Idempotency: re-applying the same value sends no transaction.
+	pair.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(pair.env.OperationsBundle)
+	before := CurrentBlockEVM(t, pair.env, pair.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*pair.env, input)
+	require.NoError(t, err)
+	after := CurrentBlockEVM(t, pair.env, pair.selA)
+	require.Equal(t, before, after, "no-op router update must not send a transaction")
+}
+
+// getRouterPreV2 reads the on-chain router for a pre-2.0 EVM token pool. Like
+// getRateLimitAdminPreV2, getRouter is ABI-identical across 1.5.1 and 1.6.1 but was folded
+// into DynamicConfig in 2.0, so the version-specific binding must be selected explicitly.
+func getRouterPreV2(t *testing.T, version *semver.Version, address common.Address, backend bind.ContractBackend) common.Address {
+	t.Helper()
+	opts := &bind.CallOpts{Context: t.Context()}
+	switch {
+	case cciputils.Version_1_5_1.Equal(version):
+		tp, err := tokenpoolV1_5_1.NewTokenPool(address, backend)
+		require.NoError(t, err)
+		router, err := tp.GetRouter(opts)
+		require.NoError(t, err)
+		return router
+	case cciputils.Version_1_6_1.Equal(version):
+		tp, err := tokenpoolV1_6_1.NewTokenPool(address, backend)
+		require.NoError(t, err)
+		router, err := tp.GetRouter(opts)
+		require.NoError(t, err)
+		return router
+	default:
+		t.Fatalf("unsupported pre-2.0 pool version for fetching router: %s", version.String())
 		return common.Address{}
 	}
 }
@@ -847,6 +973,16 @@ func solanaPoolRateLimitAdmin(t *testing.T, chain solchain.Chain, poolProgramID 
 	return poolState.Config.RateLimitAdmin
 }
 
+// solanaPoolRouter reads the on-chain router for a Solana token pool.
+func solanaPoolRouter(t *testing.T, chain solchain.Chain, poolProgramID solana.PublicKey, tokenMint solana.PublicKey) solana.PublicKey {
+	t.Helper()
+	poolStatePDA, err := tokens.TokenPoolConfigAddress(tokenMint, poolProgramID)
+	require.NoError(t, err)
+	var poolState burnmint_token_pool.State
+	require.NoError(t, chain.GetAccountDataBorshInto(t.Context(), poolStatePDA, &poolState))
+	return poolState.Config.Router
+}
+
 func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
 	env, bnm, lnr := setupSolanaPoolsForConfigure(t) // helper from Step 6
 
@@ -907,6 +1043,60 @@ func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
 			require.Empty(t, out2.MCMSTimelockProposals, "re-applying an unchanged admin must emit no proposals")
 			require.Equal(t, newAdmin, solanaPoolRateLimitAdmin(t, solChain, poolProgramID, tc.pool.Mint),
 				"rate limit admin must be unchanged after the no-op apply")
+		})
+	}
+}
+
+func TestConfigureTokenPool_Router_Solana(t *testing.T) {
+	env, bnm, lnr := setupSolanaPoolsForConfigure(t)
+
+	for _, tc := range []struct {
+		name string
+		pool solanaPoolFixture
+	}{
+		{"burnmint", bnm},
+		{"lockrelease", lnr},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			newRouter := solana.NewWallet().PublicKey()
+			newRouterStr := newRouter.String()
+
+			solChain := env.BlockChains.SolanaChains()[tc.pool.Ref.ChainSelector]
+			poolProgramID := solana.MustPublicKeyFromBase58(tc.pool.Ref.Address)
+			apiPoolRef := solanaApiPoolRef(t, tc.pool)
+
+			out, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+					ChainSelector: tc.pool.Ref.ChainSelector,
+					Pools: []tokensapi.PoolConfigUpdate{{
+						TokenPoolRef: apiPoolRef,
+						RouterRef:    &datastore.AddressRef{Address: newRouterStr},
+					}},
+				}},
+				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+			})
+			require.NoError(t, err)
+			testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+			require.Equal(t, newRouter, solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint),
+				"router should match the requested value")
+
+			// Re-applying the same value must produce no proposals.
+			env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(env.OperationsBundle)
+			out2, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+					ChainSelector: tc.pool.Ref.ChainSelector,
+					Pools: []tokensapi.PoolConfigUpdate{{
+						TokenPoolRef: apiPoolRef,
+						RouterRef:    &datastore.AddressRef{Address: newRouterStr},
+					}},
+				}},
+				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+			})
+			require.NoError(t, err)
+			require.Empty(t, out2.MCMSTimelockProposals, "re-applying an unchanged router must emit no proposals")
+			require.Equal(t, newRouter, solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint),
+				"router must be unchanged after the no-op apply")
 		})
 	}
 }

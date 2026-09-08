@@ -47,6 +47,9 @@ type TokenPoolAdminAdapter interface {
 type SetTokenPoolAdminsSequenceInput struct {
 	// Selector is the chain selector for the chain on which the pool lives.
 	Selector uint64 `json:"selector" yaml:"selector"`
+	// Router, if non-nil, is the desired router address (already resolved to a
+	// family-specific string by the changeset).
+	Router *string `json:"router,omitempty" yaml:"router,omitempty"`
 	// RateLimitAdmin, if non-nil, is the desired rate limit admin.
 	RateLimitAdmin *string `json:"rateLimitAdmin,omitempty" yaml:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if non-nil, is the desired fee admin.
