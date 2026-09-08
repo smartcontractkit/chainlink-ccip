@@ -139,15 +139,15 @@ type DeployTokenPoolInput struct {
 	//     matches). The production Router is NOT re-applied on existing pools.
 	// EVM 2.0.0+ only.
 	RouterRef *datastore.AddressRef `yaml:"routerRef,omitempty" json:"routerRef,omitempty"`
-	// FeeAggregator is the per-pool feeAdmin: an address (besides the pool owner)
-	// allowed to call WithdrawFeeTokens on the pool. Empty or the zero address
-	// leaves the current on-chain feeAdmin unchanged; this changeset cannot be
-	// used to clear an existing feeAdmin back to the zero address (use a direct
+	// FeeAdmin is an address (besides the pool owner) allowed to call
+	// WithdrawFeeTokens on the pool. Empty or the zero address leaves the
+	// current on-chain feeAdmin unchanged; this changeset cannot be used to
+	// clear an existing feeAdmin back to the zero address (use a direct
 	// setDynamicConfig call for that). On fresh deploys a non-zero value flows
 	// through to the pool's dynamic config; on existing pools it triggers a
 	// declarative setDynamicConfig reconcile (no-op if it already matches).
 	// EVM 2.0.0+ only.
-	FeeAggregator string `yaml:"feeAggregator,omitempty" json:"feeAggregator,omitempty"`
+	FeeAdmin string `yaml:"feeAdmin,omitempty" json:"feeAdmin,omitempty"`
 	// LockBoxGroups declares the liquidity topology of a SiloedLockReleaseTokenPool. Each group is a
 	// set of remote chain selectors that share one ERC20LockBox; chains in different groups have
 	// isolated ("siloed") liquidity. One lockbox is deployed per group and mapped to every chain in

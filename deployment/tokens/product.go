@@ -460,6 +460,11 @@ type ConfigureTokenForTransfersInput struct {
 	// to cover all chains the currently-registered pool supports. Set this when the pool being configured
 	// is not a direct replacement for the registered pool (e.g. CCTP-through-CCV alongside USDCTokenPoolProxy).
 	SkipActivePoolSupportedChainsCheck bool
+	// SkipTokenAdminRegistrySetup suppresses the TokenAdminRegistry registration (proposeAdministrator /
+	// acceptAdminRole / setPool). Set it when the registration ops were already emitted by an earlier
+	// changeset in the same MCMS batch: re-emitting them would revert AlreadyRegistered at execution
+	// time. The pool remote-chain configuration is unaffected by this flag.
+	SkipTokenAdminRegistrySetup bool
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore

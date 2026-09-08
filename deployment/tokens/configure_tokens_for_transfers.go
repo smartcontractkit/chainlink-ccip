@@ -94,6 +94,14 @@ type TokenTransferConfig struct {
 	// implement that interface (e.g. USDCTokenPoolProxy) cause auto-migrate to fail; list remote chains
 	// explicitly in that case.
 	AutoMigrateRemoteChains bool `yaml:"autoMigrateRemoteChains" json:"autoMigrateRemoteChains"`
+	// SkipTokenAdminRegistrySetup suppresses the TokenAdminRegistry registration and the token
+	// admin role handover for this chain while still configuring the pool remote chains. Set it
+	// when the token's registry setup ops were already emitted by an earlier changeset in the
+	// same MCMS batch (the token is already recorded in the datastore but the registration has
+	// not executed yet): a second identical proposeAdministrator would revert with
+	// AlreadyRegistered at execution time and, because MCMS ops must run in per-chain nonce
+	// order, block every later operation for that chain.
+	SkipTokenAdminRegistrySetup bool `yaml:"skipTokenAdminRegistrySetup" json:"skipTokenAdminRegistrySetup"`
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -404,15 +412,16 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 		// Configure pool remotes (fee configs are excluded as they require
 		// special handling see comment below)
 		configureTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureTokenForTransfersSequence(), e.BlockChains, ConfigureTokenForTransfersInput{
-			ChainSelector:         selector,
-			TokenPoolAddress:      tokenPool.Address,
-			RemoteChains:          remoteChainsWithoutFeeConfigs,
-			ExternalAdmin:         token.ExternalAdmin,
-			RegistryAddress:       registryAddr,
-			TokenRef:              fullTokenRef,
-			PoolType:              tokenPool.Type.String(),
-			ExistingDataStore:     e.DataStore,
-			AllowedFinalityConfig: token.AllowedFinalityConfig,
+			ChainSelector:               selector,
+			TokenPoolAddress:            tokenPool.Address,
+			RemoteChains:                remoteChainsWithoutFeeConfigs,
+			ExternalAdmin:               token.ExternalAdmin,
+			RegistryAddress:             registryAddr,
+			TokenRef:                    fullTokenRef,
+			PoolType:                    tokenPool.Type.String(),
+			ExistingDataStore:           e.DataStore,
+			AllowedFinalityConfig:       token.AllowedFinalityConfig,
+			SkipTokenAdminRegistrySetup: token.SkipTokenAdminRegistrySetup,
 		})
 		if err != nil {
 			return batchOps, reports, nil, fmt.Errorf("failed to configure token pool on chain with selector %d: %w", selector, err)
@@ -491,13 +500,26 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				// it is being migrated to in this changeset. If they differ, or it has no current pool then it's
 				// getting a new pool and we leave it alone. If they are the same, then it keeps its current pool
 				// and should be told about the new pool.
-				if _, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
+				if peerCfg, alsoMigrating := cfg[ru.remoteSelector]; alsoMigrating {
 					targetBytes, err := ru.remoteNormalizer.StringToBytes(ru.remotePoolRef.Address)
 					if err != nil {
 						return nil, nil, nil, fmt.Errorf("failed to convert remote pool ref to bytes for chain selector %d: %w", ru.remoteSelector, err)
 					}
+
+					// A peer that's being replaced this batch gets a brand-new pool that isn't live yet so reverse
+					// propagation into it would prematurely activate it and break its own migration - instead, its
+					// forward config wires the web instead.
 					activeBytes := activePoolsSnapshot[ru.remoteSelector]
 					if len(activeBytes) == 0 || !bytes.Equal(activeBytes, targetBytes) {
+						continue
+					}
+
+					// If the peer is configured to connect to the migrating chain (selector), then its own forward
+					// config in this batch already adds this migration's pool as an additional remote, so reverse-
+					// propagation would add it a second time and revert with PoolAlreadyAdded. For these cases, we
+					// need to skip reverse propagation into that peer.
+					_, peerConnectsToMigratingChain := peerCfg.RemoteChains[selector]
+					if peerConnectsToMigratingChain {
 						continue
 					}
 				}

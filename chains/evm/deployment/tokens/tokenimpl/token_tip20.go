@@ -1,7 +1,6 @@
 package tokenimpl
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 
@@ -44,12 +43,12 @@ func (tokenTIP20) RevokeAdminRole(b operations.Bundle, chain evm.Chain, token, u
 	return []contract.WriteOutput{report.Output}, nil
 }
 
-func (tokenTIP20) HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error) {
+func (tokenTIP20) HasAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) (bool, error) {
 	tokenContract, err := tip20.NewTIP20Token(token, chain.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate TIP-20 token contract: %w", err)
 	}
-	hasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: ctx}, user, tip20.DefaultAdminRole)
+	hasRole, err := tokenContract.HasRole(&bind.CallOpts{Context: b.GetContext()}, user, tip20.DefaultAdminRole)
 	if err != nil {
 		return false, fmt.Errorf("failed to check TIP-20 admin role for %s: %w", user.Hex(), err)
 	}

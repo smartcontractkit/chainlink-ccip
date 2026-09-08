@@ -216,6 +216,8 @@ contracts:
         access: public
       - name: setDynamicConfig
         access: owner
+      - name: withdrawFeeTokens
+        access: public
 
   - contract_name: OffRamp
     package_name: offramp

@@ -33,8 +33,9 @@ type ConfigureTokenPoolInput struct {
 	// RateLimitAdmin is an additional address allowed to set rate limiters.
 	// If left empty, setRateLimitAdmin will not be attempted.
 	RateLimitAdmin common.Address
-	// FeeAggregator is the address that will receive fee tokens when WithdrawFeeTokens is called.
-	FeeAggregator common.Address
+	// FeeAdmin is an additional address (besides the pool owner) allowed to call
+	// withdrawFeeTokens on the pool.
+	FeeAdmin common.Address
 }
 
 var ConfigureTokenPool = cldf_ops.NewSequence(
@@ -67,7 +68,7 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 		}
 
 		// Set dynamic config (if necessary)
-		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAggregator != (common.Address{}) {
+		if input.RouterAddress != (common.Address{}) || input.RateLimitAdmin != (common.Address{}) || input.FeeAdmin != (common.Address{}) {
 			currentDynamicConfigReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetDynamicConfig, chain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
@@ -89,8 +90,8 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 			}
 
 			desiredFeeAdmin := currentDynamicConfig.FeeAdmin
-			if input.FeeAggregator != (common.Address{}) {
-				desiredFeeAdmin = input.FeeAggregator
+			if input.FeeAdmin != (common.Address{}) {
+				desiredFeeAdmin = input.FeeAdmin
 			}
 
 			if desiredRouter != currentDynamicConfig.Router || desiredRateLimitAdmin != currentDynamicConfig.RateLimitAdmin || desiredFeeAdmin != currentDynamicConfig.FeeAdmin {

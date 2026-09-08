@@ -214,6 +214,9 @@ func (m *mockLombardAdapter) RemoteTokenAddress(_ cldf_ops.Bundle, _ datastore.D
 func (m *mockLombardAdapter) RemoteTokenPoolAddress(_ datastore.DataStore, _ cldf_chain.BlockChains, _ uint64, _ string) ([]byte, error) {
 	return []byte("pool"), nil
 }
+func (m *mockLombardAdapter) RemoteTokenDecimals(_ cldf_ops.Bundle, _ datastore.DataStore, _ cldf_chain.BlockChains, _ uint64, _ string) (uint8, error) {
+	return 8, nil
+}
 func (m *mockLombardAdapter) AddressRefToBytes(_ datastore.AddressRef) ([]byte, error) {
 	return []byte("bytes"), nil
 }

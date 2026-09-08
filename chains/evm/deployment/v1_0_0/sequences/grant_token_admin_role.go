@@ -65,7 +65,7 @@ var GrantTokenAdminRole = cldf_ops.NewSequence(
 
 		timelockHasAdminRole := false
 		if timelockAddress != (common.Address{}) {
-			if hasRole, err := tokenImpl.HasAdminRole(b.GetContext(), chain, tokenAddress, timelockAddress); err != nil {
+			if hasRole, err := tokenImpl.HasAdminRole(b, chain, tokenAddress, timelockAddress); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to check admin role for timelock %s on token %s: %w", timelockAddress.Hex(), tokenAddress.Hex(), err)
 			} else {
 				timelockHasAdminRole = hasRole
@@ -73,7 +73,7 @@ var GrantTokenAdminRole = cldf_ops.NewSequence(
 		}
 		deployerHasAdminRole := false
 		if chain.DeployerKey.From != (common.Address{}) {
-			if hasRole, err := tokenImpl.HasAdminRole(b.GetContext(), chain, tokenAddress, chain.DeployerKey.From); err != nil {
+			if hasRole, err := tokenImpl.HasAdminRole(b, chain, tokenAddress, chain.DeployerKey.From); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to check admin role for deployer %s on token %s: %w", chain.DeployerKey.From.Hex(), tokenAddress.Hex(), err)
 			} else {
 				deployerHasAdminRole = hasRole
@@ -84,7 +84,7 @@ var GrantTokenAdminRole = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, nil
 		}
 
-		targetHasAdminRole, err := tokenImpl.HasAdminRole(b.GetContext(), chain, tokenAddress, grantAddress)
+		targetHasAdminRole, err := tokenImpl.HasAdminRole(b, chain, tokenAddress, grantAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to check admin role for target %s on token %s: %w", grantAddress.Hex(), tokenAddress.Hex(), err)
 		}

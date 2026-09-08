@@ -3,6 +3,7 @@ package adapters
 import (
 	"fmt"
 	"slices"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -27,43 +28,67 @@ import (
 type CurseAdapter struct {
 	rmnAddressCache    map[uint64]common.Address
 	routerAddressCache map[uint64]common.Address
+	mu                 sync.RWMutex
 }
 
 func NewCurseAdapter() *CurseAdapter {
-	return &CurseAdapter{}
+	return &CurseAdapter{
+		rmnAddressCache:    make(map[uint64]common.Address),
+		routerAddressCache: make(map[uint64]common.Address),
+	}
+}
+
+func (ca *CurseAdapter) getRMNAddress(selector uint64) (common.Address, bool) {
+	ca.mu.RLock()
+	defer ca.mu.RUnlock()
+	addr, ok := ca.rmnAddressCache[selector]
+	return addr, ok
+}
+
+func (ca *CurseAdapter) setRMNAddress(selector uint64, addr common.Address) {
+	ca.mu.Lock()
+	defer ca.mu.Unlock()
+	ca.rmnAddressCache[selector] = addr
+}
+
+func (ca *CurseAdapter) getRouterAddress(selector uint64) (common.Address, bool) {
+	ca.mu.RLock()
+	defer ca.mu.RUnlock()
+	addr, ok := ca.routerAddressCache[selector]
+	return addr, ok
+}
+
+func (ca *CurseAdapter) setRouterAddress(selector uint64, addr common.Address) {
+	ca.mu.Lock()
+	defer ca.mu.Unlock()
+	ca.routerAddressCache[selector] = addr
 }
 
 func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
-	if ca.rmnAddressCache == nil {
-		ca.rmnAddressCache = make(map[uint64]common.Address)
-	}
-	if ca.routerAddressCache == nil {
-		ca.routerAddressCache = make(map[uint64]common.Address)
-	}
-
 	chain, ok := e.BlockChains.EVMChains()[selector]
 	if !ok {
 		return fmt.Errorf("no EVM chain found for selector %d", selector)
 	}
-	if _, exists := ca.rmnAddressCache[chain.Selector]; !exists {
+	if _, exists := ca.getRMNAddress(selector); !exists {
 		rmnAddr, err := rmnAddressOnChain(e, chain.Selector)
 		if err != nil {
 			return fmt.Errorf("failed to find RMN address on chain %d: %w", chain.Selector, err)
 		}
-		ca.rmnAddressCache[chain.Selector] = rmnAddr
+		ca.setRMNAddress(selector, rmnAddr)
 	}
-	if _, exists := ca.routerAddressCache[chain.Selector]; !exists {
+
+	if _, exists := ca.getRouterAddress(selector); !exists {
 		routerAddr, err := routerAddressOnChain(e, chain.Selector)
 		if err != nil {
 			return fmt.Errorf("failed to find router address on chain %d: %w", chain.Selector, err)
 		}
-		ca.routerAddressCache[chain.Selector] = routerAddr
+		ca.setRouterAddress(selector, routerAddr)
 	}
 	return nil
 }
 
 func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint64, subject api.Subject) (bool, error) {
-	rmnAddr, ok := ca.rmnAddressCache[selector]
+	rmnAddr, ok := ca.getRMNAddress(selector)
 	if !ok {
 		return false, fmt.Errorf("no RMN address cached for chain %d", selector)
 	}
@@ -85,7 +110,7 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 }
 
 func (ca *CurseAdapter) IsChainConnectedToTargetChain(e cldf.Environment, selector uint64, targetSel uint64) (bool, error) {
-	routerAddr, ok := ca.routerAddressCache[selector]
+	routerAddr, ok := ca.getRouterAddress(selector)
 	if !ok {
 		return false, fmt.Errorf("no router address cached for chain %d", selector)
 	}
@@ -103,7 +128,7 @@ func (ca *CurseAdapter) IsChainConnectedToTargetChain(e cldf.Environment, select
 }
 
 func (ca *CurseAdapter) IsCurseEnabledForChain(e cldf.Environment, selector uint64) (bool, error) {
-	_, ok := ca.rmnAddressCache[selector]
+	_, ok := ca.getRMNAddress(selector)
 	if !ok {
 		return false, fmt.Errorf("no RMN address cached for chain %d", selector)
 	}
@@ -128,7 +153,7 @@ func (ca *CurseAdapter) Curse() *cldf_ops.Sequence[api.CurseInput, sequences.OnC
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
 			}
-			rmnAddr, ok := ca.rmnAddressCache[chain.Selector]
+			rmnAddr, ok := ca.getRMNAddress(chain.Selector)
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMN address cached for chain %d", chain.Selector)
 			}
@@ -155,7 +180,7 @@ func (ca *CurseAdapter) Uncurse() *cldf_ops.Sequence[api.CurseInput, sequences.O
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
 			}
-			rmnAddr, ok := ca.rmnAddressCache[chain.Selector]
+			rmnAddr, ok := ca.getRMNAddress(chain.Selector)
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMN address cached for chain %d", chain.Selector)
 			}
@@ -194,7 +219,7 @@ func rmnAddressOnChain(e cldf.Environment, selector uint64) (common.Address, err
 }
 
 func (ca *CurseAdapter) ListConnectedChains(e cldf.Environment, selector uint64) ([]uint64, error) {
-	routerAddr, ok := ca.routerAddressCache[selector]
+	routerAddr, ok := ca.getRouterAddress(selector)
 	if !ok {
 		return nil, fmt.Errorf("no router address cached for chain %d", selector)
 	}

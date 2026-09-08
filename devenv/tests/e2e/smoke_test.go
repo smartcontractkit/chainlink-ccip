@@ -27,5 +27,6 @@ func TestE2ESmoke(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	tests.WaitForCCIPFilterRegistration(t, in.NodeSets[0].Out.CLNodes, selectors)
 	tests.RunSmokeTests(t, e, selectors)
 }
