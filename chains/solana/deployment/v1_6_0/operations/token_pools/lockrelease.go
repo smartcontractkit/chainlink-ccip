@@ -593,14 +593,25 @@ var SetRouterLockRelease = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data for lock release token pool: %w", err)
 		}
-		ixn, err := lockrelease_token_pool.NewSetRouterInstruction(
+		setRouter := lockrelease_token_pool.NewSetRouterInstruction(
 			input.NewRouter,
 			poolConfigPDA,
 			input.TokenMint,
 			authority,
 			input.Program,
 			programData.Address,
-		).ValidateAndBuild()
+		)
+		// The v0.1.1 IDL predates solana-v1.6.2, which made AdminUpdateTokenPool.state mutable, so
+		// the generated builder marks the state account read-only. Programs >= 1.6.2 reject that with
+		// ConstraintMut; older programs accept either. Mark it writable explicitly rather than pulling
+		// in a second binding version for this one instruction (two binding packages calling
+		// SetProgramID for the same program ID panic in solana-go's decoder registry).
+		for _, meta := range setRouter.AccountMetaSlice {
+			if meta.PublicKey.Equals(poolConfigPDA) {
+				meta.IsWritable = true
+			}
+		}
+		ixn, err := setRouter.ValidateAndBuild()
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set router instruction: %w", err)
 		}
@@ -620,6 +631,19 @@ var SetRouterLockRelease = operations.NewOperation(
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm set router: %w", err)
+		}
+		// Token pool programs before solana-v1.6.2 accept set_router and return success without
+		// persisting anything (the state account was not marked mut). Read the state back so that
+		// case surfaces as an error instead of a silent no-op.
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &poolState); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to re-read lock release token pool config for token mint %s after set router: %w", input.TokenMint.String(), err)
+		}
+		if poolState.Config.Router != input.NewRouter {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"set router for lock release token pool with token mint %s was confirmed but the on-chain router is unchanged (%s): "+
+					"token pool programs before solana-v1.6.2 silently ignore set_router; upgrade program %s",
+				input.TokenMint.String(), poolState.Config.Router.String(), input.Program.String(),
+			)
 		}
 		return sequences.OnChainOutput{}, nil
 	},

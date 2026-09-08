@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -236,10 +237,25 @@ var solanaContracts = map[string]datastore.ContractType{
 	"test_ccip_receiver":     datastore.ContractType("TestReceiver"),
 }
 
+// PreloadSolanaEnvironment downloads the solana-v1.6.0 program artifacts and seeds a datastore
+// with the predeployed program addresses. Tests that need a newer on-chain program (e.g. the
+// token pool set_router fix that landed in solana-v1.6.2) should use
+// PreloadSolanaEnvironmentWithArtifacts instead.
 func PreloadSolanaEnvironment(t *testing.T, chainSelector uint64) (string, *datastore.MemoryDataStore, error) {
+	return PreloadSolanaEnvironmentWithArtifacts(t, chainSelector, utils.VersionSolanaV1_6_0)
+}
+
+// PreloadSolanaEnvironmentWithArtifacts is PreloadSolanaEnvironment with an explicit program
+// artifact version (one of the utils.VersionSolana* constants). The datastore entries are still
+// labelled 1.6.0 because that is the tooling adapter version, independent of the program build.
+func PreloadSolanaEnvironmentWithArtifacts(t *testing.T, chainSelector uint64, artifactVersion string) (string, *datastore.MemoryDataStore, error) {
 	programsPath := t.TempDir()
 	ds := datastore.NewMemoryDataStore()
-	err := utils.DownloadSolanaCCIPProgramArtifacts(t.Context(), programsPath, utils.VersionToShortCommitSHA[utils.VersionSolanaV1_6_0])
+	sha, ok := utils.VersionToShortCommitSHA[artifactVersion]
+	if !ok {
+		return "", nil, fmt.Errorf("unknown Solana artifact version %q", artifactVersion)
+	}
+	err := utils.DownloadSolanaCCIPProgramArtifacts(t.Context(), programsPath, sha)
 	if err != nil {
 		return "", nil, err
 	}
