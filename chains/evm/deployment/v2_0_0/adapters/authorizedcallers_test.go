@@ -1,6 +1,7 @@
 package adapters_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -76,7 +77,7 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 				ChainSelector: chainSelector,
 				ContractType:  rmnops.ContractType,
 				Version:       rmnops.Version,
-				Update:        api.CallerUpdate{AddedCallers: []api.Caller{deployer.Bytes()}},
+				Update:        api.CallerUpdate{AddedCallers: []api.Caller{deployer.Hex()}},
 			},
 		},
 	})
@@ -86,7 +87,7 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 	afterAdd, err := adapter.GetAllAuthorizedCallers(*e, chainSelector, rmnops.ContractType, rmnops.Version)
 	require.NoError(t, err)
 	require.Len(t, afterAdd, 1)
-	require.Equal(t, deployer.Bytes(), afterAdd[0])
+	require.Equal(t, deployer.Hex(), afterAdd[0])
 
 	// Step 6 — remove.
 	_, err = api.ConfigureAuthorizedCallersChangeset(reg, mcmsRegistry).Apply(*e, api.Config{
@@ -96,7 +97,7 @@ func TestAuthorizedCallersAdapter_OperatorFlow(t *testing.T) {
 				ChainSelector: chainSelector,
 				ContractType:  rmnops.ContractType,
 				Version:       rmnops.Version,
-				Update:        api.CallerUpdate{RemovedCallers: []api.Caller{deployer.Bytes()}},
+				Update:        api.CallerUpdate{RemovedCallers: []api.Caller{deployer.Hex()}},
 			},
 		},
 	})
@@ -139,8 +140,8 @@ func TestConfigureAuthorizedCallersChangeset_Force(t *testing.T) {
 				ContractType:  rmnops.ContractType,
 				Version:       rmnops.Version,
 				Update: api.CallerUpdate{
-					AddedCallers:   []api.Caller{deployer.Bytes()},
-					RemovedCallers: []api.Caller{common.HexToAddress("0x1234").Bytes()},
+					AddedCallers:   []api.Caller{deployer.Hex()},
+					RemovedCallers: []api.Caller{common.HexToAddress("0x1234").Hex()},
 				},
 			},
 		},
@@ -197,13 +198,13 @@ func TestConfigureAuthorizedCallersChangeset_MultiTarget(t *testing.T) {
 				ChainSelector: chainSelector,
 				ContractType:  rmnops.ContractType,
 				Version:       rmnops.Version,
-				Update:        api.CallerUpdate{AddedCallers: []api.Caller{deployer.Bytes()}},
+				Update:        api.CallerUpdate{AddedCallers: []api.Caller{deployer.Hex()}},
 			},
 			{
 				ChainSelector: chainSelector,
 				ContractType:  secondType,
 				Version:       rmnops.Version,
-				Update:        api.CallerUpdate{AddedCallers: []api.Caller{deployer.Bytes()}},
+				Update:        api.CallerUpdate{AddedCallers: []api.Caller{deployer.Hex()}},
 			},
 		},
 	}
@@ -228,4 +229,81 @@ func deployRMNForTest(
 	}, nil)
 	require.NoError(t, err)
 	return ref
+}
+
+// TestConfigureAuthorizedCallersChangeset_NormalizesCallerCase confirms the idempotency
+// filter compares callers in canonical form. The deployer is already authorized, so
+// re-adding it under a lowercase spelling must be filtered out as a no-op rather than
+// treated as a distinct address.
+func TestConfigureAuthorizedCallersChangeset_NormalizesCallerCase(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+
+	e.DataStore = datastore.NewMemoryDataStore().Seal()
+	mcmsRegistry := cs_core.GetRegistry()
+
+	rmnRef := deployRMNForTest(t, e.OperationsBundle, chain, []common.Address{deployer})
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(rmnRef))
+	e.DataStore = ds.Seal()
+
+	lowercased := strings.ToLower(deployer.Hex())
+	require.NotEqual(t, deployer.Hex(), lowercased, "deployer address must contain letters for this test to be meaningful")
+
+	reg := api.GetAuthorizedCallersRegistry()
+	csOut, err := api.ConfigureAuthorizedCallersChangeset(reg, mcmsRegistry).Apply(*e, api.Config{
+		Force: false,
+		Updates: []api.ApplyInput{
+			{
+				ChainSelector: chainSelector,
+				ContractType:  rmnops.ContractType,
+				Version:       rmnops.Version,
+				Update:        api.CallerUpdate{AddedCallers: []api.Caller{lowercased}},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Nil(t, csOut.MCMSTimelockProposals,
+		"a lowercase spelling of an already-authorized caller should filter to a no-op")
+}
+
+// TestNormalizeCaller_RejectsMalformed guards against common.HexToAddress silently
+// zero-padding or truncating invalid input.
+func TestNormalizeCaller_RejectsMalformed(t *testing.T) {
+	adapter := adapters.NewEVMAuthorizedCallersAdapter(
+		rmnops.ApplyAuthorizedCallerUpdates,
+		rmnops.GetAllAuthorizedCallers,
+		func(added, removed []common.Address) rmnops.AuthorizedCallerArgs {
+			return rmnops.AuthorizedCallerArgs{AddedCallers: added, RemovedCallers: removed}
+		},
+	)
+
+	canonical := common.HexToAddress("0x2ace0735c229a2cd12c86c734be48007578e1200").Hex()
+
+	t.Run("canonicalizes equivalent spellings", func(t *testing.T) {
+		for _, in := range []string{
+			"0x2ace0735c229a2cd12c86c734be48007578e1200",
+			"0x2ACE0735C229A2CD12C86C734BE48007578E1200",
+			"2ace0735c229a2cd12c86c734be48007578e1200",
+			canonical,
+		} {
+			got, err := adapter.NormalizeCaller(in)
+			require.NoError(t, err, "input %q", in)
+			require.Equal(t, canonical, got, "input %q", in)
+		}
+	})
+
+	t.Run("rejects invalid", func(t *testing.T) {
+		for _, in := range []string{"", "0x", "0xnothex", "0x1234", "not-an-address"} {
+			_, err := adapter.NormalizeCaller(in)
+			require.Error(t, err, "input %q should be rejected", in)
+		}
+	})
 }
