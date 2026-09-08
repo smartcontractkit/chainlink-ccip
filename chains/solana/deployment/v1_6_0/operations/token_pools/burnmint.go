@@ -650,24 +650,33 @@ var SetRouterBurnMint = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get program data for burn mint token pool: %w", err)
 		}
-		setRouter := burnmint_token_pool.NewSetRouterInstruction(
-			input.NewRouter,
-			poolConfigPDA,
-			input.TokenMint,
-			authority,
-			input.Program,
-			programData.Address,
-		)
-		// The v0.1.1 IDL predates solana-v1.6.2, which made AdminUpdateTokenPool.state mutable, so
-		// the generated builder marks the state account read-only. Programs >= 1.6.2 reject that with
-		// ConstraintMut; older programs accept either. Mark it writable explicitly rather than pulling
-		// in a second binding version for this one instruction (two binding packages calling
-		// SetProgramID for the same program ID panic in solana-go's decoder registry).
-		for _, meta := range setRouter.AccountMetaSlice {
-			if meta.PublicKey.Equals(poolConfigPDA) {
-				meta.IsWritable = true
-			}
+		newSetRouter := func() *burnmint_token_pool.SetRouter {
+			return burnmint_token_pool.NewSetRouterInstruction(
+				input.NewRouter,
+				poolConfigPDA,
+				input.TokenMint,
+				authority,
+				input.Program,
+				programData.Address,
+			)
 		}
+		// The v0.1.1 IDL predates solana-v1.6.2, which made AdminUpdateTokenPool.state mutable, so
+		// the generated builder marks the state account read-only. That is exactly the probe
+		// ensureSetRouterPersists needs to tell a legacy program (accepts it, silently drops the
+		// write) from a fixed one (rejects it with ConstraintMut) before anything is sent or proposed.
+		probe, err := newSetRouter().ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set router probe instruction: %w", err)
+		}
+		if err := ensureSetRouterPersists(b.GetContext(), chain, input.Program, probe, "burn mint"); err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		// The real instruction marks the state account writable, as the bindings generated from
+		// >= 1.6.2 IDLs do. This is done in place rather than by importing a second binding version:
+		// two binding packages calling SetProgramID for the same program ID panic in solana-go's
+		// decoder registry.
+		setRouter := newSetRouter()
+		setRouter.GetStateAccount().WRITE()
 		ixn, err := setRouter.ValidateAndBuild()
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to build set router instruction: %w", err)
@@ -688,19 +697,6 @@ var SetRouterBurnMint = operations.NewOperation(
 		err = chain.Confirm([]solana.Instruction{ixn})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm set router: %w", err)
-		}
-		// Token pool programs before solana-v1.6.2 accept set_router and return success without
-		// persisting anything (the state account was not marked mut). Read the state back so that
-		// case surfaces as an error instead of a silent no-op.
-		if err := chain.GetAccountDataBorshInto(b.GetContext(), poolConfigPDA, &poolState); err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to re-read burn mint token pool config for token mint %s after set router: %w", input.TokenMint.String(), err)
-		}
-		if poolState.Config.Router != input.NewRouter {
-			return sequences.OnChainOutput{}, fmt.Errorf(
-				"set router for burn mint token pool with token mint %s was confirmed but the on-chain router is unchanged (%s): "+
-					"token pool programs before solana-v1.6.2 silently ignore set_router; upgrade program %s",
-				input.TokenMint.String(), poolState.Config.Router.String(), input.Program.String(),
-			)
 		}
 		return sequences.OnChainOutput{}, nil
 	},

@@ -691,7 +691,9 @@ func remotePoolAddressToBytes(remoteSelector uint64, address string) ([]byte, er
 // also be the token pool program's upgrade authority (the on-chain AdminUpdateTokenPool context
 // requires a single signer holding both roles), and the deployed program must be
 // >= solana-v1.6.2, since earlier releases accept set_router without persisting the new value.
-// Both cases return a descriptive error instead of a doomed transaction or proposal.
+// The op checks the first by reading on-chain state and the second by simulating set_router, so
+// both cases fail with a descriptive error before anything is sent or proposed — on the direct
+// and MCMS paths alike.
 func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"SetTokenPoolAdmins",

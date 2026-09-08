@@ -2,9 +2,12 @@ package token_pools
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -14,6 +17,50 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/types"
 )
+
+// ensureSetRouterPersists checks, before anything is sent or proposed, that the token pool
+// program at programID actually persists set_router. Programs before solana-v1.6.2 declared
+// AdminUpdateTokenPool.state without mut, so they accept set_router and silently discard the
+// write. readOnlyStateProbe must be a set_router instruction whose state account meta is
+// read-only (what the v0.1.1 bindings generate): simulating it against a program >= 1.6.2 fails
+// with Anchor's ConstraintMut (error 2000), while a legacy program executes it successfully.
+// Signature verification is disabled for the simulation so the same probe works when the
+// authority is an MCMS signer rather than the deployer key.
+func ensureSetRouterPersists(ctx context.Context, chain cldf_solana.Chain, programID solana.PublicKey, readOnlyStateProbe solana.Instruction, poolTypeName string) error {
+	tx, err := solana.NewTransaction([]solana.Instruction{readOnlyStateProbe}, solana.Hash{}, solana.TransactionPayer(chain.DeployerKey.PublicKey()))
+	if err != nil {
+		return fmt.Errorf("failed to build set router probe transaction for %s token pool: %w", poolTypeName, err)
+	}
+	// The validator sanitizes the wire format before simulating, so the transaction must carry
+	// one signature slot per required signer even though none of them is verified.
+	tx.Signatures = make([]solana.Signature, tx.Message.Header.NumRequiredSignatures)
+	res, err := chain.Client.SimulateTransactionWithOpts(ctx, tx, &rpc.SimulateTransactionOpts{
+		SigVerify:              false,
+		ReplaceRecentBlockhash: true,
+		Commitment:             rpc.CommitmentConfirmed,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to simulate set router probe for %s token pool program %s: %w", poolTypeName, programID, err)
+	}
+	if res == nil || res.Value == nil {
+		return fmt.Errorf("set router probe for %s token pool program %s returned no simulation result", poolTypeName, programID)
+	}
+	if res.Value.Err == nil {
+		return fmt.Errorf(
+			"%s token pool program %s does not persist set_router: token pool programs before solana-v1.6.2 accept the instruction without writing the state; upgrade the program",
+			poolTypeName, programID,
+		)
+	}
+	for _, log := range res.Value.Logs {
+		if strings.Contains(log, "ConstraintMut") {
+			return nil
+		}
+	}
+	return fmt.Errorf(
+		"set router probe for %s token pool program %s failed for an unexpected reason: %v (logs: %s)",
+		poolTypeName, programID, res.Value.Err, strings.Join(res.Value.Logs, " | "),
+	)
+}
 
 // get diff of pool addresses
 func poolDiff(existingPoolAddresses []base_token_pool.RemoteAddress, newPoolAddresses []base_token_pool.RemoteAddress) []base_token_pool.RemoteAddress {

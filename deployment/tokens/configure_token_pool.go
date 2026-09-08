@@ -61,7 +61,8 @@ type PoolConfigUpdate struct {
 	//
 	// Solana: set_router requires the pool owner to also be the token pool program's upgrade
 	// authority, and only persists on programs >= solana-v1.6.2 (earlier releases accept the
-	// instruction without writing the state); the adapter fails clearly in both cases.
+	// instruction without writing the state). The adapter checks both before sending or
+	// proposing anything and fails with a descriptive error.
 	RouterRef *datastore.AddressRef `yaml:"routerRef,omitempty" json:"routerRef,omitempty"`
 	// Remotes lists per-lane configuration updates.
 	Remotes []RemoteConfigUpdate `yaml:"remotes,omitempty" json:"remotes,omitempty"`

@@ -1168,7 +1168,8 @@ func solanaBalance(t *testing.T, chain solchain.Chain, account solana.PublicKey)
 // TestConfigureTokenPool_Router_Solana_LegacyProgram pins the behaviour against token pool
 // programs before solana-v1.6.2. Those programs accept set_router and return success without
 // persisting anything (AdminUpdateTokenPool.state was not marked mut), so the op must detect the
-// unchanged on-chain router and fail rather than report a successful no-op.
+// legacy program up front and fail without sending a transaction, rather than report a
+// successful no-op.
 func TestConfigureTokenPool_Router_Solana_LegacyProgram(t *testing.T) {
 	env, bnm, lnr := setupSolanaPoolsForConfigureWithArtifacts(t, solanautils.VersionSolanaV1_6_0)
 
@@ -1182,7 +1183,9 @@ func TestConfigureTokenPool_Router_Solana_LegacyProgram(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			solChain := env.BlockChains.SolanaChains()[tc.pool.Ref.ChainSelector]
 			poolProgramID := solana.MustPublicKeyFromBase58(tc.pool.Ref.Address)
+			deployer := solChain.DeployerKey.PublicKey()
 			originalRouter := solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint)
+			balanceBefore := solanaBalance(t, solChain, deployer)
 			newRouterStr := solana.NewWallet().PublicKey().String()
 
 			_, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
@@ -1195,8 +1198,10 @@ func TestConfigureTokenPool_Router_Solana_LegacyProgram(t *testing.T) {
 				}},
 				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
 			})
-			require.ErrorContains(t, err, "on-chain router is unchanged")
+			require.ErrorContains(t, err, "does not persist set_router")
 			require.ErrorContains(t, err, "before solana-v1.6.2")
+			require.Equal(t, balanceBefore, solanaBalance(t, solChain, deployer),
+				"legacy program must be detected before any transaction is sent")
 			require.Equal(t, originalRouter, solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint),
 				"legacy program must leave the router untouched")
 		})
