@@ -118,6 +118,13 @@ func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) e
 		return fmt.Errorf("Amount must be positive")
 	}
 	if exactMode {
+		// UnsiloedExactAmount is a companion to SiloExactAmounts, not a standalone mode: migrating
+		// only the shared bucket while leaving every silo untouched isn't supported by this loop
+		// (it would migrate all siloed chains too), so reject it outright rather than silently
+		// draining silos the operator didn't intend to touch.
+		if input.UnsiloedExactAmount != nil && len(input.SiloExactAmounts) == 0 {
+			return fmt.Errorf("UnsiloedExactAmount requires SiloExactAmounts to also be set; exact mode cannot migrate the unsiloed bucket alone")
+		}
 		seen := make(map[uint64]bool, len(input.SiloExactAmounts))
 		for i, sa := range input.SiloExactAmounts {
 			if seen[sa.ChainSelector] {
@@ -360,11 +367,33 @@ func migrateSiloedPool(
 	// migration is more likely to be an oversight than intent, so surface it before any write is
 	// emitted rather than migrating a partial set of silos.
 	if exactMode {
-		var missingSilos []uint64
+		validSiloedChains := make(map[uint64]bool, len(supportedChains))
 		for _, remoteChain := range supportedChains {
-			if !isSiloedByChain[remoteChain] {
-				continue
+			if isSiloedByChain[remoteChain] {
+				validSiloedChains[remoteChain] = true
 			}
+		}
+
+		// A ChainSelector that isn't actually a siloed chain of the old pool would otherwise be
+		// silently ignored by the withdraw loop below, leaving no trace in the execution logs that
+		// the entry was never applied - fail loudly instead so a typo'd or stale selector surfaces
+		// immediately.
+		var unknownSilos []uint64
+		for _, sa := range input.SiloExactAmounts {
+			if !validSiloedChains[sa.ChainSelector] {
+				unknownSilos = append(unknownSilos, sa.ChainSelector)
+			}
+		}
+		if len(unknownSilos) > 0 {
+			slices.Sort(unknownSilos)
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"SiloExactAmounts references chain selectors %v that are not siloed chains on old pool %s",
+				unknownSilos, oldPoolAddr,
+			)
+		}
+
+		var missingSilos []uint64
+		for remoteChain := range validSiloedChains {
 			if _, ok := siloExactAmount(input, remoteChain); !ok {
 				missingSilos = append(missingSilos, remoteChain)
 			}

@@ -92,6 +92,9 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 				return fmt.Errorf("migration[%d]: Amount must be positive", i)
 			}
 			if exactMode {
+				if migration.UnsiloedExactAmount != nil && len(migration.SiloExactAmounts) == 0 {
+					return fmt.Errorf("migration[%d]: UnsiloedExactAmount requires SiloExactAmounts to also be set; exact mode cannot migrate the unsiloed bucket alone", i)
+				}
 				seen := make(map[uint64]bool, len(migration.SiloExactAmounts))
 				for j, sa := range migration.SiloExactAmounts {
 					if seen[sa.ChainSelector] {

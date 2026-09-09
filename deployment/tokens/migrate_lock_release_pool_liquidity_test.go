@@ -66,9 +66,17 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *tes
 		{
 			name: "negative UnsiloedExactAmount",
 			mutate: func(m *LockReleasePoolMigration) {
+				m.SiloExactAmounts = []SiloExactAmount{{ChainSelector: 2, Amount: big.NewInt(100)}}
 				m.UnsiloedExactAmount = big.NewInt(-1)
 			},
 			expectedErr: "UnsiloedExactAmount must be positive",
+		},
+		{
+			name: "UnsiloedExactAmount without SiloExactAmounts",
+			mutate: func(m *LockReleasePoolMigration) {
+				m.UnsiloedExactAmount = big.NewInt(50)
+			},
+			expectedErr: "UnsiloedExactAmount requires SiloExactAmounts to also be set",
 		},
 		{
 			name: "valid SiloExactAmounts and UnsiloedExactAmount",
