@@ -1221,23 +1221,42 @@ func TestConfigureChainForLanes_RequiresDestinationGasPrice(t *testing.T) {
 	chainSelector := chainsel.TEST_90000001.Selector
 	remoteChainSelector := chainsel.TEST_90000002.Selector
 
+	const seededGasPrice = 7_000
+
 	tests := []struct {
 		name          string
 		usdPerUnitGas *big.Int
 		seedOnChain   bool
 		wantErr       error
+		wantOnChain   int64
 	}{
 		{
 			name:          "Success - gas price supplied with the lane config",
 			usdPerUnitGas: big.NewInt(42_000),
+			wantOnChain:   42_000,
 		},
 		{
 			name:        "Success - gas price already on the FeeQuoter",
 			seedOnChain: true,
+			wantOnChain: seededGasPrice,
 		},
 		{
 			name:    "Failure - no gas price supplied and none on the FeeQuoter",
 			wantErr: sequences.ErrNoDestGasPrice,
+		},
+		{
+			// An explicit "usdPerUnitGas: 0" in the pipeline YAML unmarshals to a
+			// non-nil zero. A non-positive value is not a gas price, so it is refused
+			// outright rather than treated as "not supplied" or silently ignored.
+			name:          "Failure - explicit zero gas price is refused",
+			usdPerUnitGas: big.NewInt(0),
+			wantErr:       sequences.ErrInvalidGasPrice,
+		},
+		{
+			name:          "Failure - explicit zero gas price is refused even with an on-chain price",
+			usdPerUnitGas: big.NewInt(0),
+			seedOnChain:   true,
+			wantErr:       sequences.ErrInvalidGasPrice,
 		},
 	}
 
@@ -1254,7 +1273,7 @@ func TestConfigureChainForLanes_RequiresDestinationGasPrice(t *testing.T) {
 			if tc.seedOnChain {
 				seeded := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
 				rc := seeded.RemoteChains[remoteChainSelector]
-				rc.FeeQuoterDestChainConfig.USDPerUnitGas = big.NewInt(7_000)
+				rc.FeeQuoterDestChainConfig.USDPerUnitGas = big.NewInt(seededGasPrice)
 				seeded.RemoteChains[remoteChainSelector] = rc
 				_, err = operations.ExecuteSequence(
 					testsetup.BundleWithFreshReporter(e.OperationsBundle),
@@ -1278,6 +1297,17 @@ func TestConfigureChainForLanes_RequiresDestinationGasPrice(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+
+			evmChain := e.BlockChains.EVMChains()[chainSelector]
+			gasPrice, err := operations.ExecuteOperation(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				fee_quoter.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
+					ChainSelector: evmChain.Selector,
+					Address:       common.HexToAddress(local.feeQuoter),
+					Args:          remoteChainSelector,
+				})
+			require.NoError(t, err)
+			require.Equal(t, tc.wantOnChain, gasPrice.Output.Value.Int64())
 		})
 	}
 }

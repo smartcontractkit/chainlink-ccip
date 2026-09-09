@@ -45,18 +45,18 @@ type committeeVerifierInputConfig struct {
 // PartialRemoteChainConfig is the internal per-remote chain input after lane expansion.
 // Unset fields use adapter defaults, datastore resolution, or CCV auto-resolution.
 type PartialRemoteChainConfig struct {
-	AllowTrafficFrom          *bool
-	DefaultExecutorQualifier  *string
-	DefaultInboundCCVs        []datastore.AddressRef
-	LaneMandatedInboundCCVs   []datastore.AddressRef
-	DefaultOutboundCCVs       []datastore.AddressRef
-	LaneMandatedOutboundCCVs  []datastore.AddressRef
-	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides
-	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig
-	BaseExecutionGasCost      *uint32
-	TokenReceiverAllowed      *bool
-	MessageNetworkFeeUSDCents *uint16
-	TokenNetworkFeeUSDCents   *uint16
+	AllowTrafficFrom          *bool                                      `json:"allowTrafficFrom,omitempty" yaml:"allowTrafficFrom,omitempty"`
+	DefaultExecutorQualifier  *string                                    `json:"defaultExecutorQualifier,omitempty" yaml:"defaultExecutorQualifier,omitempty"`
+	DefaultInboundCCVs        []datastore.AddressRef                     `json:"defaultInboundCCVs,omitempty" yaml:"defaultInboundCCVs,omitempty"`
+	LaneMandatedInboundCCVs   []datastore.AddressRef                     `json:"laneMandatedInboundCCVs,omitempty" yaml:"laneMandatedInboundCCVs,omitempty"`
+	DefaultOutboundCCVs       []datastore.AddressRef                     `json:"defaultOutboundCCVs,omitempty" yaml:"defaultOutboundCCVs,omitempty"`
+	LaneMandatedOutboundCCVs  []datastore.AddressRef                     `json:"laneMandatedOutboundCCVs,omitempty" yaml:"laneMandatedOutboundCCVs,omitempty"`
+	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides `json:"feeQuoterDestChainConfig,omitempty" yaml:"feeQuoterDestChainConfig,omitempty"`
+	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig          `json:"executorDestChainConfig,omitempty" yaml:"executorDestChainConfig,omitempty"`
+	BaseExecutionGasCost      *uint32                                    `json:"baseExecutionGasCost,omitempty" yaml:"baseExecutionGasCost,omitempty"`
+	TokenReceiverAllowed      *bool                                      `json:"tokenReceiverAllowed,omitempty" yaml:"tokenReceiverAllowed,omitempty"`
+	MessageNetworkFeeUSDCents *uint16                                    `json:"messageNetworkFeeUSDCents,omitempty" yaml:"messageNetworkFeeUSDCents,omitempty"`
+	TokenNetworkFeeUSDCents   *uint16                                    `json:"tokenNetworkFeeUSDCents,omitempty" yaml:"tokenNetworkFeeUSDCents,omitempty"`
 }
 
 type partialChainConfig struct {
