@@ -197,8 +197,16 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	// Amount specifies an exact token amount to migrate. Mutually exclusive with BasisPoints.
 	Amount *big.Int
 	// BasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
-	// Mutually exclusive with Amount. For siloed pools, only BasisPoints is supported.
+	// Mutually exclusive with Amount.
 	BasisPoints *uint16
+	// SiloExactAmounts specifies exact per-silo migration amounts, keyed by remote chain selector.
+	// Mutually exclusive with Amount/BasisPoints. When set, every siloed chain on the old pool must
+	// have a corresponding entry (exact mode is explicit, not inferred). Amounts are raw base units.
+	SiloExactAmounts []SiloExactAmount
+	// UnsiloedExactAmount specifies the exact amount to migrate from the unsiloed (shared) balance.
+	// Mutually exclusive with Amount/BasisPoints. Required when SiloExactAmounts is set and the old
+	// pool holds unsiloed liquidity. Nil means unset, not zero.
+	UnsiloedExactAmount *big.Int
 	// UnsiloedLockBoxAddress names the lockbox that receives the old pool's unsiloed (shared) balance.
 	//
 	// Required when migrating a siloed pool that holds unsiloed liquidity. The shared balance backs
@@ -216,6 +224,15 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	UsePlainTransfer bool
 	// SetPoolConfig, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
 	SetPoolConfig *MigrationSetPoolConfig
+}
+
+// SiloExactAmount specifies an exact migration amount for a single silo, keyed by the remote chain
+// selector whose silo it funds.
+type SiloExactAmount struct {
+	// ChainSelector is the remote chain whose silo this amount funds.
+	ChainSelector uint64
+	// Amount is the exact amount, in raw base units, to migrate for this silo.
+	Amount *big.Int
 }
 
 // MigrationSetPoolConfig configures the optional setPool call during migration.

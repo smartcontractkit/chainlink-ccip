@@ -70,21 +70,43 @@ var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 		isSiloed := oldPoolType == utils.SiloedLockReleaseTokenPool.String()
 
 		if isSiloed {
-			if input.Amount != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("siloed pools only support BasisPoints, not exact Amount")
-			}
 			return migrateSiloedPool(b, evmChain, input, oldPoolAddr, newPoolAddr, tokenAddr, timelockAddr)
+		}
+		if isExactSiloMode(input) {
+			return sequences.OnChainOutput{}, fmt.Errorf("SiloExactAmounts/UnsiloedExactAmount are only supported for siloed pools")
 		}
 		return migrateUnsiloedPool(b, evmChain, input, oldPoolAddr, newPoolAddr, tokenAddr, timelockAddr)
 	},
 )
 
+// isExactSiloMode reports whether the input requests exact-amount migration (per-silo and/or
+// unsiloed shared bucket) rather than the legacy Amount/BasisPoints proportional mode.
+func isExactSiloMode(input tokens.MigrateLockReleasePoolLiquidityInput) bool {
+	return len(input.SiloExactAmounts) > 0 || input.UnsiloedExactAmount != nil
+}
+
+// siloExactAmount returns the exact amount configured for the given remote chain's silo, if any.
+func siloExactAmount(input tokens.MigrateLockReleasePoolLiquidityInput, chainSel uint64) (*big.Int, bool) {
+	for _, sa := range input.SiloExactAmounts {
+		if sa.ChainSelector == chainSel {
+			return sa.Amount, true
+		}
+	}
+	return nil, false
+}
+
 func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) error {
+	exactMode := isExactSiloMode(input)
+	legacyMode := input.Amount != nil || input.BasisPoints != nil
+
+	if exactMode && legacyMode {
+		return fmt.Errorf("SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints")
+	}
+	if !exactMode && !legacyMode {
+		return fmt.Errorf("one of Amount, BasisPoints, or SiloExactAmounts/UnsiloedExactAmount must be provided")
+	}
 	if input.Amount != nil && input.BasisPoints != nil {
 		return fmt.Errorf("Amount and BasisPoints are mutually exclusive")
-	}
-	if input.Amount == nil && input.BasisPoints == nil {
-		return fmt.Errorf("one of Amount or BasisPoints must be provided")
 	}
 	if input.BasisPoints != nil {
 		bp := *input.BasisPoints
@@ -94,6 +116,21 @@ func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) e
 	}
 	if input.Amount != nil && input.Amount.Sign() <= 0 {
 		return fmt.Errorf("Amount must be positive")
+	}
+	if exactMode {
+		seen := make(map[uint64]bool, len(input.SiloExactAmounts))
+		for i, sa := range input.SiloExactAmounts {
+			if seen[sa.ChainSelector] {
+				return fmt.Errorf("duplicate ChainSelector %d in SiloExactAmounts", sa.ChainSelector)
+			}
+			seen[sa.ChainSelector] = true
+			if sa.Amount == nil || sa.Amount.Sign() <= 0 {
+				return fmt.Errorf("SiloExactAmounts[%d].Amount must be positive", i)
+			}
+		}
+		if input.UnsiloedExactAmount != nil && input.UnsiloedExactAmount.Sign() <= 0 {
+			return fmt.Errorf("UnsiloedExactAmount must be positive")
+		}
 	}
 	if input.OldPoolAddress == "" || input.NewPoolAddress == "" {
 		return fmt.Errorf("OldPoolAddress and NewPoolAddress must be provided")
@@ -317,6 +354,30 @@ func migrateSiloedPool(
 		)
 	}
 
+	exactMode := isExactSiloMode(input)
+
+	// In exact mode, every siloed chain must be explicit - a chain silently falling back to zero
+	// migration is more likely to be an oversight than intent, so surface it before any write is
+	// emitted rather than migrating a partial set of silos.
+	if exactMode {
+		var missingSilos []uint64
+		for _, remoteChain := range supportedChains {
+			if !isSiloedByChain[remoteChain] {
+				continue
+			}
+			if _, ok := siloExactAmount(input, remoteChain); !ok {
+				missingSilos = append(missingSilos, remoteChain)
+			}
+		}
+		if len(missingSilos) > 0 {
+			slices.Sort(missingSilos)
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"SiloExactAmounts is missing entries for siloed chains %v of old pool %s; exact mode requires every siloed chain to be explicit",
+				missingSilos, oldPoolAddr,
+			)
+		}
+	}
+
 	// Read the shared balance here, for the same reason as the coverage check above: a missing
 	// destination must surface before the rebalancer is repointed at the timelock, not once the
 	// silos have already been drained.
@@ -328,7 +389,29 @@ func migrateSiloedPool(
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed liquidity from old pool %s: %w", oldPoolAddr, err)
 	}
 
-	unsiloedAmount := computeAmount(unsiloedReport.Output, input)
+	var unsiloedAmount *big.Int
+	if exactMode {
+		if unsiloedReport.Output.Sign() > 0 && input.UnsiloedExactAmount == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"old pool %s holds %s unsiloed liquidity to migrate but UnsiloedExactAmount was not set; "+
+					"exact mode requires an explicit amount for the shared bucket",
+				oldPoolAddr, unsiloedReport.Output,
+			)
+		}
+		if input.UnsiloedExactAmount != nil {
+			unsiloedAmount = new(big.Int).Set(input.UnsiloedExactAmount)
+		} else {
+			unsiloedAmount = big.NewInt(0)
+		}
+		if unsiloedAmount.Cmp(unsiloedReport.Output) > 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"UnsiloedExactAmount %s exceeds old pool %s unsiloed balance %s",
+				unsiloedAmount, oldPoolAddr, unsiloedReport.Output,
+			)
+		}
+	} else {
+		unsiloedAmount = computeAmount(unsiloedReport.Output, input)
+	}
 	if unsiloedAmount.Sign() > 0 && unsiloedLockBox == (common.Address{}) {
 		return sequences.OnChainOutput{}, fmt.Errorf(
 			"old pool %s holds %s unsiloed liquidity to migrate but UnsiloedLockBoxAddress was not set; "+
@@ -336,6 +419,39 @@ func migrateSiloedPool(
 				"set it to the lockbox serving those chains on new pool %s",
 			oldPoolAddr, unsiloedAmount, newPoolAddr,
 		)
+	}
+
+	// Resolve every siloed chain's migration amount and validate it against the on-chain balance
+	// up front, before any write is emitted (the rebalancer handover below is the first write).
+	siloAmounts := make(map[uint64]*big.Int, len(supportedChains))
+	for _, remoteChain := range supportedChains {
+		if !isSiloedByChain[remoteChain] {
+			continue
+		}
+
+		availableReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetAvailableTokens, evmChain, evm_contract.FunctionInput[uint64]{
+			ChainSelector: chainSel,
+			Address:       oldPoolAddr,
+			Args:          remoteChain,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get available tokens for chain %d: %w", remoteChain, err)
+		}
+		siloBalance := availableReport.Output
+
+		var siloAmount *big.Int
+		if exactMode {
+			amt, _ := siloExactAmount(input, remoteChain) // presence guaranteed by the missing-silo check above
+			siloAmount = amt
+		} else {
+			siloAmount = computeAmount(siloBalance, input)
+		}
+		if siloAmount.Cmp(siloBalance) > 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"migration amount %s for chain %d exceeds silo balance %s", siloAmount, remoteChain, siloBalance,
+			)
+		}
+		siloAmounts[remoteChain] = siloAmount
 	}
 
 	rebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
@@ -411,17 +527,7 @@ func migrateSiloedPool(
 			return sequences.OnChainOutput{}, fmt.Errorf("no lockbox configured for chain %d on new siloed pool", info.chainSelector)
 		}
 
-		availableReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetAvailableTokens, evmChain, evm_contract.FunctionInput[uint64]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
-			Args:          info.chainSelector,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get available tokens for chain %d: %w", info.chainSelector, err)
-		}
-
-		siloBalance := availableReport.Output
-		siloAmount := computeAmount(siloBalance, input)
+		siloAmount := siloAmounts[info.chainSelector]
 		if siloAmount.Sign() == 0 {
 			continue
 		}
