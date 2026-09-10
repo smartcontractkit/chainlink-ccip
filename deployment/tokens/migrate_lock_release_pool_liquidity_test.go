@@ -79,6 +79,14 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *tes
 			expectedErr: "UnsiloedExactAmount requires SiloExactAmounts to also be set",
 		},
 		{
+			name: "zero SiloExactAmount.Amount is allowed",
+			mutate: func(m *LockReleasePoolMigration) {
+				m.SiloExactAmounts = []SiloExactAmount{{ChainSelector: 2, Amount: big.NewInt(0)}}
+				m.UnsiloedExactAmount = big.NewInt(50)
+			},
+			expectedErr: "",
+		},
+		{
 			name: "valid SiloExactAmounts and UnsiloedExactAmount",
 			mutate: func(m *LockReleasePoolMigration) {
 				m.SiloExactAmounts = []SiloExactAmount{{ChainSelector: 2, Amount: big.NewInt(100)}}

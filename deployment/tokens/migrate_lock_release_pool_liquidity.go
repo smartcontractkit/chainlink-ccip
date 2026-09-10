@@ -101,7 +101,7 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 						return fmt.Errorf("migration[%d]: duplicate ChainSelector %d in SiloExactAmounts", i, sa.ChainSelector)
 					}
 					seen[sa.ChainSelector] = true
-					if sa.Amount == nil || sa.Amount.Sign() <= 0 {
+					if sa.Amount == nil || sa.Amount.Sign() < 0 {
 						return fmt.Errorf("migration[%d]: SiloExactAmounts[%d].Amount must be positive", i, j)
 					}
 				}

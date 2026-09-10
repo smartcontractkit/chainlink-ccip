@@ -901,6 +901,11 @@ func setupSiloedMigrationTest(t *testing.T, chainSel uint64, topology siloedTopo
 	require.NoError(t, err)
 
 	for _, silo := range topology.siloedChains {
+		if silo.amount.Sign() == 0 {
+			// The contract rejects a zero-amount provide call; a silo can still be designated with
+			// no liquidity behind it (e.g. it was already fully drained by a prior migration).
+			continue
+		}
 		_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.ProvideSiloedLiquidity, chain,
 			evm_contract.FunctionInput[old_siloed.ProvideSiloedLiquidityArgs]{
 				ChainSelector: chainSel, Address: oldPoolAddr,
@@ -1963,6 +1968,50 @@ func TestMigrateSiloedPool_ExactAmounts_UnknownChainSelector(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "SiloExactAmounts references chain selectors")
 	require.Contains(t, err.Error(), "not siloed chains on old pool")
+}
+
+// TestMigrateSiloedPool_ExactAmounts_ZeroAmountForEmptySilo asserts that a zero exact amount is
+// accepted, so an operator draining every silo can explicitly name an already-empty silo as "migrate
+// nothing" rather than being forced to omit it (which the missing-silo check would then reject).
+func TestMigrateSiloedPool_ExactAmounts_ZeroAmountForEmptySilo(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	siloed2 := uint64(4949039107694359620)
+	shared1 := uint64(15971525489660198786)
+
+	silo1Amount := big.NewInt(1000)
+	unsiloedAmount := big.NewInt(500)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains: []siloedChainSpec{
+			{selector: siloed1, amount: silo1Amount},
+			{selector: siloed2, amount: big.NewInt(0)},
+		},
+		sharedChains:   []uint64{shared1},
+		unsiloedAmount: unsiloedAmount,
+	})
+
+	executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: silo1Amount},
+				{ChainSelector: siloed2, Amount: big.NewInt(0)},
+			},
+			UnsiloedExactAmount:    unsiloedAmount,
+			UnsiloedLockBoxAddress: s.sharedLockBox.Hex(),
+		},
+	)
+
+	require.Equal(t, 0, big.NewInt(0).Cmp(s.balanceOf(t, s.oldPoolAddr)), "Old pool balance should be zero after migrating everything")
+	require.Equal(t, 0, silo1Amount.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed1])), "Silo 1 lockbox should have its full amount")
+	require.Equal(t, 0, big.NewInt(0).Cmp(s.balanceOf(t, s.siloLockBoxes[siloed2])), "Silo 2 lockbox should have zero since it was already empty")
+	require.Equal(t, 0, unsiloedAmount.Cmp(s.balanceOf(t, s.sharedLockBox)), "Shared lockbox should have its full amount")
 }
 
 // TestMigrateSiloedPool_ExactAmounts_OverWithdrawal asserts that an exact amount exceeding a silo's

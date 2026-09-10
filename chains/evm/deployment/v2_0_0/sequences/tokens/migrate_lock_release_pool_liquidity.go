@@ -131,7 +131,7 @@ func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) e
 				return fmt.Errorf("duplicate ChainSelector %d in SiloExactAmounts", sa.ChainSelector)
 			}
 			seen[sa.ChainSelector] = true
-			if sa.Amount == nil || sa.Amount.Sign() <= 0 {
+			if sa.Amount == nil || sa.Amount.Sign() < 0 {
 				return fmt.Errorf("SiloExactAmounts[%d].Amount must be positive", i)
 			}
 		}
