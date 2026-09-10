@@ -27,19 +27,25 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	evm_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	tokens_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 )
 
 const (
-	mechanismCCTPV1        = "CCTP_V1"
-	mechanismCCTPV2        = "CCTP_V2"
-	mechanismLockRelease   = "LOCK_RELEASE"
-	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
+	MechanismCCTPV1        = "CCTP_V1"
+	MechanismCCTPV2        = "CCTP_V2"
+	MechanismLockRelease   = "LOCK_RELEASE"
+	MechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
+
+	LockOrBurnMechanismInvalid     uint8 = 0
+	LockOrBurnMechanismCCTPV1      uint8 = 1
+	LockOrBurnMechanismCCTPV2      uint8 = 2
+	LockOrBurnMechanismLockRelease uint8 = 3
+	LockOrBurnMechanismCCV         uint8 = 4
 )
 
 var v162 = semver.MustParse("1.6.2")
@@ -73,7 +79,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		lockReleaseSelectors := make([]uint64, 0)
 		for sel, cfg := range input.RemoteChains {
-			if cfg.LockOrBurnMechanism == mechanismLockRelease {
+			if cfg.LockOrBurnMechanism == MechanismLockRelease {
 				lockReleaseSelectors = append(lockReleaseSelectors, sel)
 			}
 		}
@@ -237,7 +243,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Configure remote chains on CCTP V1 token pool (1.6.1 sequence).
 		cctpV1TokenPoolAddress := common.HexToAddress(refs.CCTPV1TokenPool.Address)
 		for remoteChainSelector, remoteChain := range input.RemoteChains {
-			if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+			if remoteChain.LockOrBurnMechanism != MechanismCCTPV1 {
 				continue
 			}
 			if refs.CCTPV1TokenPool.Address == "" {
@@ -262,15 +268,9 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		// Proactively configure the CCTP-through-CCV pool for all CCTP-capable remotes.
 		// This excludes lock-release lanes, but includes V1/V2 remotes so the CCV pool
 		// is ready before proxy routing is switched to CCTP_V2_WITH_CCV.
-		// Non-EVM remotes (e.g. Solana) are excluded: CCIP 2.0 does not support them, so
-		// CCTP_V2_WITH_CCV will never be enabled for them and preconfiguring the CCV pool
-		// would be wasted state.
 		cctpThroughCCVRemoteChainConfigs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string])
 		for remoteChainSelector, remoteChainConfig := range remoteChainConfigs {
-			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == mechanismLockRelease {
-				continue
-			}
-			if !isEVMRemote(remoteChainSelector) {
+			if input.RemoteChains[remoteChainSelector].LockOrBurnMechanism == MechanismLockRelease {
 				continue
 			}
 			cctpThroughCCVRemoteChainConfigs[remoteChainSelector] = remoteChainConfig
@@ -333,7 +333,7 @@ func resolveConfigureCCTPChainRefs(
 	}
 	refs.CCTPVerifierResolver, err = datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
-		Version: cctp_verifier.Version,
+		Version: versioned_verifier_resolver.Version,
 	}, chainSelector, datastore_utils.FullRef)
 	if err != nil {
 		return refs, nil, fmt.Errorf("failed to find CCTPVerifierResolver ref on chain %d: %w", chainSelector, err)
@@ -512,17 +512,13 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 }
 
 // buildVerifierResolverOutboundArgs builds outbound implementation args for the CCTPVerifierResolver.
-// Includes every CCTP-capable EVM remote (V1, V2, V2_WITH_CCV) and excludes lock-release lanes, matching the
+// Includes every CCTP-capable remote (V1, V2, V2_WITH_CCV) and excludes lock-release lanes, matching the
 // set of chains preconfigured on the CCTP-through-CCV pool. This keeps CCTPThroughCCVTokenPool.getTokenTransferFeeConfig
 // from reverting on V1 remotes before proxy routing is switched to CCTP_V2_WITH_CCV.
-// Non-EVM remotes (e.g. Solana) are skipped: CCIP 2.0 does not support them, so the CCV pool will never be used for them.
 func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanesInput, cctpVerifierAddress common.Address) []versioned_verifier_resolver.OutboundImplementationArgs {
 	out := make([]versioned_verifier_resolver.OutboundImplementationArgs, 0, len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		if remoteChain.LockOrBurnMechanism == mechanismLockRelease {
-			continue
-		}
-		if !isEVMRemote(remoteChainSelector) {
+		if remoteChain.LockOrBurnMechanism == MechanismLockRelease {
 			continue
 		}
 		out = append(out, versioned_verifier_resolver.OutboundImplementationArgs{
@@ -531,16 +527,6 @@ func buildVerifierResolverOutboundArgs(input adapters.ConfigureCCTPChainForLanes
 		})
 	}
 	return out
-}
-
-// isEVMRemote reports whether a remote chain selector belongs to the EVM family.
-// Selectors that fail to resolve are treated as non-EVM (skipped by callers).
-func isEVMRemote(remoteChainSelector uint64) bool {
-	family, err := chain_selectors.GetSelectorFamily(remoteChainSelector)
-	if err != nil {
-		return false
-	}
-	return family == chain_selectors.FamilyEVM
 }
 
 // buildUSDCTokenPoolProxyMechanismArgs builds remote chain selectors and lock/burn mechanisms for the USDCTokenPoolProxy.
@@ -566,10 +552,6 @@ func buildCCTPVerifierArgs(dep adapters.ConfigureCCTPChainForLanesDeps, input ad
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
 		if dep.RemoteChains[remoteChainSelector].USDCType() == adapters.NonCanonical {
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
-			continue
-		}
-		if !isEVMRemote(remoteChainSelector) {
-			// Non-EVM remotes (e.g. Solana) are not supported by CCIP 2.0 yet, so we don't configure it yet.
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV2AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
@@ -654,7 +636,7 @@ func buildCCTPV1PoolDomainUpdates(dep adapters.ConfigureCCTPChainForLanesDeps, i
 			// Non-canonical USDC chains do not support CCTP, so we don't need to perform any CCTP-specific operations.
 			continue
 		}
-		if remoteChain.LockOrBurnMechanism != mechanismCCTPV1 {
+		if remoteChain.LockOrBurnMechanism != MechanismCCTPV1 {
 			continue
 		}
 		allowedCallerOnDest, err := dep.RemoteChains[remoteChainSelector].CCTPV1AllowedCallerOnDest(dep.DataStore, dep.BlockChains, remoteChainSelector)
@@ -921,19 +903,19 @@ func applyCCTPV1PoolSetDomainsWrites(b cldf_ops.Bundle, chain evm.Chain, poolAdd
 
 func convertMechanismToUint8(mechanism string) (uint8, error) {
 	switch mechanism {
-	case mechanismCCTPV1:
-		return 1, nil
-	case mechanismCCTPV2:
-		return 2, nil
-	case mechanismLockRelease:
-		return 3, nil
-	case mechanismCCTPV2WithCCV:
-		return 4, nil
+	case MechanismCCTPV1:
+		return LockOrBurnMechanismCCTPV1, nil
+	case MechanismCCTPV2:
+		return LockOrBurnMechanismCCTPV2, nil
+	case MechanismLockRelease:
+		return LockOrBurnMechanismLockRelease, nil
+	case MechanismCCTPV2WithCCV:
+		return LockOrBurnMechanismCCV, nil
 	default:
-		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", mechanismCCTPV1, mechanismCCTPV2, mechanismLockRelease, mechanismCCTPV2WithCCV, mechanism)
+		return 0, fmt.Errorf("invalid mechanism, must be %s, %s, %s, or %s: %s", MechanismCCTPV1, MechanismCCTPV2, MechanismLockRelease, MechanismCCTPV2WithCCV, mechanism)
 	}
 }
 
 func isV2Mechanism(mechanism string) bool {
-	return mechanism == mechanismCCTPV2 || mechanism == mechanismCCTPV2WithCCV
+	return mechanism == MechanismCCTPV2 || mechanism == MechanismCCTPV2WithCCV
 }

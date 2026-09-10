@@ -35,6 +35,11 @@ type AddRemotePoolArgs struct {
 	RemotePoolAddress   []byte
 }
 
+type RemoveRemotePoolArgs struct {
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+}
+
 type SetRateLimitAdminArgs struct {
 	NewAdmin common.Address
 }
@@ -113,6 +118,20 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *t
 	Validate:        func(args AddRemotePoolArgs) error { return nil },
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args AddRemotePoolArgs) (*types.Transaction, error) {
 		return tp.AddRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
+var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemoveRemotePoolArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:remove-remote-pool",
+	Version:         Version,
+	Description:     "Removes a remote pool for a given chain selector on the TokenPool 1.5.1 contract",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemoveRemotePoolArgs],
+	Validate:        func(args RemoveRemotePoolArgs) error { return nil },
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args RemoveRemotePoolArgs) (*types.Transaction, error) {
+		return tp.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
 	},
 })
 

@@ -63,10 +63,11 @@ var offChainCfg = pluginconfig.CommitOffchainConfig{
 func TestGetConsensusObservation(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
-		lggr:        lggr,
-		destChain:   destChainSel,
-		offChainCfg: offChainCfg,
-		fRoleDON:    1,
+		lggr:            lggr,
+		destChain:       destChainSel,
+		offChainCfg:     offChainCfg,
+		fRoleDON:        1,
+		metricsReporter: NoopMetrics{},
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 and fail feedChain 2f+1
@@ -142,7 +143,7 @@ func TestOutcome(t *testing.T) {
 		destChain:       destChainSel,
 		offChainCfg:     offChainCfg,
 		fRoleDON:        1,
-		metricsReporter: plugincommon.NoopReporter{},
+		metricsReporter: NoopMetrics{},
 	}
 
 	outcome, err := p.Outcome(ctx, Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{
@@ -176,7 +177,7 @@ func TestOutcome_EmptyObservations(t *testing.T) {
 		destChain:       destChainSel,
 		offChainCfg:     offChainCfg,
 		fRoleDON:        fChains[destChainSel], // Use f from fChains for the destination chain
-		metricsReporter: plugincommon.NoopReporter{},
+		metricsReporter: NoopMetrics{},
 	}
 
 	// Prepare attributed observations with only minimal data

@@ -50,6 +50,40 @@ func isLiveOffRampSourceLane(cfg readerpkg.StaticSourceChainConfig, exists bool)
 	return exists && cfg.IsEnabled && len(cfg.OnRamp) > 0
 }
 
+// Offramp lane status labels used with MetricsReporter.TrackOffRampLaneStatus. Mutually exclusive: a
+// source chain is in exactly one of these buckets every round.
+const (
+	laneStatusLive             = "live"
+	laneStatusSkippedNotALane  = "skipped_not_a_lane"
+	laneStatusSkippedDisabled  = "skipped_disabled"
+	laneStatusRMNMisconfigured = "rmn_misconfigured"
+)
+
+var allOffRampLaneStatuses = []string{
+	laneStatusLive, laneStatusSkippedNotALane, laneStatusSkippedDisabled, laneStatusRMNMisconfigured,
+}
+
+// Reasons passed to MetricsReporter.TrackObservationError. Named here, rather than left as inline
+// literals, because these are effectively a stable label-value contract for dashboards/runbooks/alerts
+// (see docs/runbooks/uncommitted-message.md's metric reference table) with no test asserting on the
+// literal spelling -- a typo at a call site would silently create an unmonitored label value instead of
+// failing to compile.
+const (
+	obsErrNoBindings         = "no_bindings"
+	obsErrTimeout            = "timeout"
+	obsErrRPCError           = "rpc_error"
+	obsErrMsgCountMismatch   = "msg_count_mismatch"
+	obsErrSeqNumMismatch     = "seq_num_mismatch"
+	obsErrHashError          = "hash_error"
+	obsErrAddressLookupError = "address_lookup_error"
+)
+
+// Curse-type labels used with MetricsReporter.TrackRmnCurseActive.
+const (
+	curseTypeGlobal      = "global"
+	curseTypeDestination = "destination"
+)
+
 // offRampLaneClassification buckets source chains by their offramp lane status.
 type offRampLaneClassification struct {
 	// live lanes are enabled, have an onRamp, and have RMN verification disabled (queryable).
@@ -60,6 +94,25 @@ type offRampLaneClassification struct {
 	skippedDisabled []cciptypes.ChainSelector
 	// rmnMisconfigured are live lanes that unexpectedly have RMN verification enabled.
 	rmnMisconfigured []cciptypes.ChainSelector
+}
+
+// statusByChain returns the single status bucket each source chain landed in.
+func (c offRampLaneClassification) statusByChain() map[cciptypes.ChainSelector]string {
+	statuses := make(map[cciptypes.ChainSelector]string,
+		len(c.live)+len(c.skippedNotALane)+len(c.skippedDisabled)+len(c.rmnMisconfigured))
+	for _, chain := range c.live {
+		statuses[chain] = laneStatusLive
+	}
+	for _, chain := range c.skippedNotALane {
+		statuses[chain] = laneStatusSkippedNotALane
+	}
+	for _, chain := range c.skippedDisabled {
+		statuses[chain] = laneStatusSkippedDisabled
+	}
+	for _, chain := range c.rmnMisconfigured {
+		statuses[chain] = laneStatusRMNMisconfigured
+	}
+	return statuses
 }
 
 // classifyOffRampSourceLanes buckets the supported source chains based on their offramp source chain
@@ -501,12 +554,13 @@ func (o *asyncObserver) Close() error {
 }
 
 type observerImpl struct {
-	lggr         logger.Logger
-	homeChain    reader.HomeChain
-	oracleID     commontypes.OracleID
-	chainSupport plugincommon.ChainSupport
-	ccipReader   readerpkg.CCIPReader
-	msgHasher    cciptypes.MessageHasher
+	lggr            logger.Logger
+	homeChain       reader.HomeChain
+	oracleID        commontypes.OracleID
+	chainSupport    plugincommon.ChainSupport
+	ccipReader      readerpkg.CCIPReader
+	msgHasher       cciptypes.MessageHasher
+	metricsReporter MetricsReporter
 }
 
 func newObserverImpl(
@@ -516,14 +570,16 @@ func newObserverImpl(
 	chainSupport plugincommon.ChainSupport,
 	ccipReader readerpkg.CCIPReader,
 	msgHasher cciptypes.MessageHasher,
+	metricsReporter MetricsReporter,
 ) observerImpl {
 	return observerImpl{
-		lggr:         lggr,
-		homeChain:    homeChain,
-		oracleID:     oracleID,
-		chainSupport: chainSupport,
-		ccipReader:   ccipReader,
-		msgHasher:    msgHasher,
+		lggr:            lggr,
+		homeChain:       homeChain,
+		oracleID:        oracleID,
+		chainSupport:    chainSupport,
+		ccipReader:      ccipReader,
+		msgHasher:       msgHasher,
+		metricsReporter: metricsReporter,
 	}
 }
 
@@ -559,6 +615,15 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		)
 		return nil
 	}
+
+	// Report curse state unconditionally (including "not cursed") so the gauges reflect the current
+	// round rather than sticking at a stale "1" from a curse that has since cleared.
+	o.metricsReporter.TrackRmnCurseActive(curseTypeGlobal, curseInfo.GlobalCurse)
+	o.metricsReporter.TrackRmnCurseActive(curseTypeDestination, curseInfo.CursedDestination)
+	for _, sourceChain := range allSourceChains {
+		o.metricsReporter.TrackSourceChainCursed(sourceChain, curseInfo.CursedSourceChains[sourceChain])
+	}
+
 	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
 		lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
 		return nil
@@ -590,6 +655,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	result := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
 	for chainSelector, seqNum := range offRampNextSeqNums {
 		result = append(result, plugintypes.NewSeqNumChain(chainSelector, seqNum))
+		o.metricsReporter.TrackOffRampNextSeqNum(chainSelector, seqNum)
 	}
 
 	sort.Slice(result, func(i, j int) bool { return result[i].ChainSel < result[j].ChainSel })
@@ -597,6 +663,8 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 }
 
 // ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
+//
+//nolint:gocyclo
 func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
@@ -631,6 +699,14 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	classification := classifyOffRampSourceLanes(supportedSourceChains, sourceChainsCfg)
 
+	// Report unconditionally (all four statuses, active and inactive) so the gauge can't get stuck
+	// showing an old status as "still active" once a chain moves to a different bucket.
+	for chain, actualStatus := range classification.statusByChain() {
+		for _, status := range allOffRampLaneStatuses {
+			o.metricsReporter.TrackOffRampLaneStatus(chain, status, status == actualStatus)
+		}
+	}
+
 	if len(classification.skippedNotALane) > 0 || len(classification.skippedDisabled) > 0 {
 		logutil.LogWhenExceedFrequency(&lastSkippedLanesLog, skippedLanesLogFrequency, func() {
 			lggr.Debugw("skipping onRamp seq num observations for non-live lanes",
@@ -659,14 +735,18 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 					// when a source chain is disabled there will not be a binding for the onRamp contract
 					// we don't want to log this as an error.
 					lggr.Debugw("no bindings for source chain, ignore if chain is disabled", "sourceChain", sourceChain)
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrNoBindings)
 				} else if errors.Is(err, context.DeadlineExceeded) {
 					lggr.Warnw("timed out getting latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain)
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrTimeout)
 				} else {
 					lggr.Errorw("failed to get latest msg seq num for source chain", logutil.FieldSourceChain, sourceChain, "err", err)
+					o.metricsReporter.TrackObservationError(sourceChain, obsErrRPCError)
 				}
 				return
 			}
 
+			o.metricsReporter.TrackOnRampMaxSeqNum(sourceChain, latestOnRampSeqNum)
 			mu.Lock()
 			latestOnRampSeqNums = append(
 				latestOnRampSeqNums,
@@ -712,8 +792,10 @@ func (o observerImpl) ObserveMerkleRoots(
 							logutil.FieldSourceChain, chainRange.ChainSel,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrTimeout)
 					} else {
 						lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrRPCError)
 					}
 					return
 				}
@@ -725,6 +807,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
 						"actual", len(msgs),
 					)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrMsgCountMismatch)
 					return
 				}
 
@@ -740,6 +823,7 @@ func (o observerImpl) ObserveMerkleRoots(
 							"msgSeqNum", msgSeqNum,
 							logutil.FieldSeqNumRange, chainRange.SeqNumRange,
 						)
+						o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrSeqNumMismatch)
 						return
 					}
 					msgIdx++
@@ -748,6 +832,7 @@ func (o observerImpl) ObserveMerkleRoots(
 				root, err := o.computeMerkleRoot(ctx, lggr, msgs)
 				if err != nil {
 					lggr.Warnw("call to computeMerkleRoot failed", "err", err)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrHashError)
 					return
 				}
 
@@ -758,6 +843,7 @@ func (o observerImpl) ObserveMerkleRoots(
 						"err", err,
 						logutil.FieldSourceChain, chainRange.ChainSel,
 					)
+					o.metricsReporter.TrackObservationError(chainRange.ChainSel, obsErrAddressLookupError)
 					return
 				}
 
@@ -864,8 +950,8 @@ func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSele
 
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
-		// TODO: metrics
 		lggr.Errorw("call to GetFChain failed", "err", err)
+		o.metricsReporter.TrackFChainReadError()
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

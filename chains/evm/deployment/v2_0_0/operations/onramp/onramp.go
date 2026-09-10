@@ -101,6 +101,20 @@ func (c *OnRampContract) GetStaticConfig(opts *bind.CallOpts) (StaticConfig, err
 	return *abi.ConvertType(out[0], new(StaticConfig)).(*StaticConfig), nil
 }
 
+func (c *OnRampContract) GetAllDestChainConfigs(opts *bind.CallOpts) (GetAllDestChainConfigsResult, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getAllDestChainConfigs")
+	outstruct := new(GetAllDestChainConfigsResult)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.Ret0 = *abi.ConvertType(out[0], new([]uint64)).(*[]uint64)
+	outstruct.Ret1 = *abi.ConvertType(out[1], new([]DestChainConfig)).(*[]DestChainConfig)
+
+	return *outstruct, nil
+}
+
 type DestChainConfig struct {
 	Router                    common.Address
 	MessageNumber             uint64
@@ -133,6 +147,11 @@ type DynamicConfig struct {
 	FeeQuoter              common.Address
 	ReentrancyGuardEntered bool
 	FeeAggregator          common.Address
+}
+
+type GetAllDestChainConfigsResult struct {
+	Ret0 []uint64
+	Ret1 []DestChainConfig
 }
 
 type StaticConfig struct {
@@ -247,5 +266,16 @@ var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, StaticConfi
 	NewContract:  NewOnRampContract,
 	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args struct{}) (StaticConfig, error) {
 		return c.GetStaticConfig(opts)
+	},
+})
+
+var GetAllDestChainConfigs = contract.NewRead(contract.ReadParams[struct{}, GetAllDestChainConfigsResult, *OnRampContract]{
+	Name:         "onramp:get-all-dest-chain-configs",
+	Version:      Version,
+	Description:  "Calls getAllDestChainConfigs on the contract",
+	ContractType: ContractType,
+	NewContract:  NewOnRampContract,
+	CallContract: func(c *OnRampContract, opts *bind.CallOpts, args struct{}) (GetAllDestChainConfigsResult, error) {
+		return c.GetAllDestChainConfigs(opts)
 	},
 })

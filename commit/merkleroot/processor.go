@@ -66,6 +66,7 @@ func NewProcessor(
 		chainSupport,
 		ccipReader,
 		msgHasher,
+		metricsReporter,
 	)
 	if !offchainCfg.MerkleRootAsyncObserverDisabled {
 		observer = newAsyncObserver(

@@ -135,18 +135,24 @@ var ConfigureTokenForTransfers = cldf_ops.NewSequence(
 		}
 		ops = append(ops, configureTokenPoolForRemoteChainsReport.Output.BatchOps...)
 
-		// Register the token with the token admin registry
-		registerTokenReport, err := cldf_ops.ExecuteSequence(b, v1_5_0.RegisterToken, evmChain, v1_5_0.RegisterTokenInput{
-			ChainSelector:             input.ChainSelector,
-			TokenAddress:              tokenAddress,
-			TokenPoolAddress:          registryTokenPoolAddress,
-			ExternalAdmin:             common.HexToAddress(input.ExternalAdmin),
-			TokenAdminRegistryAddress: registryAddress,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to register token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
+		// Register the token with the token admin registry. Skipped when an earlier changeset in
+		// the same MCMS batch already emitted the registration (SkipTokenAdminRegistrySetup): the
+		// on-chain gate inside RegisterToken cannot detect a pending but unexecuted registration,
+		// and a second identical proposeAdministrator would revert AlreadyRegistered at execution
+		// time, blocking every later op for this chain in the root.
+		if !input.SkipTokenAdminRegistrySetup {
+			registerTokenReport, err := cldf_ops.ExecuteSequence(b, v1_5_0.RegisterToken, evmChain, v1_5_0.RegisterTokenInput{
+				ChainSelector:             input.ChainSelector,
+				TokenAddress:              tokenAddress,
+				TokenPoolAddress:          registryTokenPoolAddress,
+				ExternalAdmin:             common.HexToAddress(input.ExternalAdmin),
+				TokenAdminRegistryAddress: registryAddress,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token pool with address %s on %s: %w", input.TokenPoolAddress, evmChain, err)
+			}
+			ops = append(ops, registerTokenReport.Output.BatchOps...)
 		}
-		ops = append(ops, registerTokenReport.Output.BatchOps...)
 
 		return sequences.OnChainOutput{
 			BatchOps: ops,

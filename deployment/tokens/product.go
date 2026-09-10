@@ -64,6 +64,32 @@ type SetTokenPoolAdminsSequenceInput struct {
 // TokenAdminRoleAdapter is an optional interface for chain families that support token admin role management.
 type TokenAdminRoleAdapter interface {
 	RevokeTokenAdminRole() *cldf_ops.Sequence[RevokeTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	GrantTokenAdminRole() *cldf_ops.Sequence[GrantTokenAdminRoleSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// RemotePoolRemover is an optional interface for adapters that support removing remote pool
+// entries from a token pool. Implementations must read the current on-chain remote pools and
+// return a clear error when a requested remote pool is not currently configured, rather than
+// emitting a no-op transaction.
+type RemotePoolRemover interface {
+	RemoveRemotePools() *cldf_ops.Sequence[RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// RemoveRemotePoolsSequenceInput defines the input for removing remote pool entries from a
+// token pool. Each entry in RemotePoolsToRemove names one remote pool to remove.
+type RemoveRemotePoolsSequenceInput struct {
+	Selector            uint64               `json:"selector" yaml:"selector"`
+	TokenPoolRef        datastore.AddressRef `json:"tokenPoolRef" yaml:"tokenPoolRef"`
+	TokenRef            datastore.AddressRef `json:"tokenRef" yaml:"tokenRef"`
+	RemotePoolsToRemove []RemotePoolToRemove `json:"remotePoolsToRemove" yaml:"remotePoolsToRemove"`
+}
+
+// RemotePoolToRemove identifies a single remote pool entry to remove from a token pool. The
+// remote pool is referenced by an AddressRef so operators can identify it by qualifier, by
+// address, or by any other unique combination of ref fields.
+type RemotePoolToRemove struct {
+	Selector uint64               `json:"selector" yaml:"selector"`
+	Remote   datastore.AddressRef `json:"remote" yaml:"remote"`
 }
 
 // TokenRefResolver is an optional interface that can be implemented by TokenAdapters. It acts as a form of middleware that allows token
@@ -99,15 +125,26 @@ type RateLimitReaderAdapter interface {
 	) (OnchainRateLimits, error)
 }
 
+// TokenAdminRegistryReader is a versionless interface for reading the active pool from a chain's
+// TokenAdminRegistry (or equivalent). Implementations are registered per chain family via
+// TokenAdapterRegistry.RegisterTokenAdminRegistryReader and can be looked up by family regardless
+// of pool version.
+type TokenAdminRegistryReader interface {
+	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
+	// as raw address bytes. Returns empty bytes (no error) when no pool is registered.
+	// Overrides are optional registry refs to use instead of the datastore default;
+	// the first one that resolves from the datastore is used.
+	GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error)
+	// GetTokenAdminRegistryRef resolves the TokenAdminRegistry ref for the given chain from the datastore.
+	GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error)
+}
+
 // TokenPoolMigrator is an optional interface implemented by adapters that can read an existing pool's
 // cross-chain configuration on-chain. It powers AutoMigrateRemoteChains: during an upgrade, the remote
 // chains/tokens/pools the active pool is configured for are read back (as raw bytes) and carried forward
 // onto the new pool. All addresses are raw on-chain bytes so the interface stays chain-family-agnostic;
 // callers convert them per family via the AddressNormalizer registry when a string form is needed.
 type TokenPoolMigrator interface {
-	// GetActivePool returns the pool currently registered for the token (tokenRef) in the TokenAdminRegistry
-	// (regRef), as raw address bytes. Returns empty bytes (no error) when no pool is registered.
-	GetActivePool(e deployment.Environment, chainSelector uint64, regRef datastore.AddressRef, tokenRef datastore.AddressRef) ([]byte, error)
 	// GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
 	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error)
 	// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
@@ -160,10 +197,42 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	// Amount specifies an exact token amount to migrate. Mutually exclusive with BasisPoints.
 	Amount *big.Int
 	// BasisPoints specifies a percentage of the old pool's balance to migrate (1-10000, where 10000 = 100%).
-	// Mutually exclusive with Amount. For siloed pools, only BasisPoints is supported.
+	// Mutually exclusive with Amount.
 	BasisPoints *uint16
+	// SiloExactAmounts specifies exact per-silo migration amounts, keyed by remote chain selector.
+	// Mutually exclusive with Amount/BasisPoints. When set, every siloed chain on the old pool must
+	// have a corresponding entry (exact mode is explicit, not inferred). Amounts are raw base units.
+	SiloExactAmounts []SiloExactAmount
+	// UnsiloedExactAmount specifies the exact amount to migrate from the unsiloed (shared) balance.
+	// Mutually exclusive with Amount/BasisPoints. Required when SiloExactAmounts is set and the old
+	// pool holds unsiloed liquidity. Nil means unset, not zero.
+	UnsiloedExactAmount *big.Int
+	// UnsiloedLockBoxAddress names the lockbox that receives the old pool's unsiloed (shared) balance.
+	//
+	// Required when migrating a siloed pool that holds unsiloed liquidity. The shared balance backs
+	// the pool's non-siloed chains, and those chains may map to a different lockbox than any siloed
+	// chain, so there is nothing on-chain to infer the destination from. Guessing here would send the
+	// shared balance to a silo that does not own it: no funds are lost, but the chains that should
+	// draw on the shared balance cannot release.
+	//
+	// Must match one of the lockboxes in the new pool's getAllLockBoxConfigs. Ignored for
+	// non-siloed pools, which have a single lockbox.
+	UnsiloedLockBoxAddress string
+	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer
+	// instead of using the lockbox's deposit() function. This bypasses the Deposit event emission.
+	// Use only as a break-glass option when the standard deposit path is unavailable.
+	UsePlainTransfer bool
 	// SetPoolConfig, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
 	SetPoolConfig *MigrationSetPoolConfig
+}
+
+// SiloExactAmount specifies an exact migration amount for a single silo, keyed by the remote chain
+// selector whose silo it funds.
+type SiloExactAmount struct {
+	// ChainSelector is the remote chain whose silo this amount funds.
+	ChainSelector uint64
+	// Amount is the exact amount, in raw base units, to migrate for this silo.
+	Amount *big.Int
 }
 
 // MigrationSetPoolConfig configures the optional setPool call during migration.
@@ -408,6 +477,11 @@ type ConfigureTokenForTransfersInput struct {
 	// to cover all chains the currently-registered pool supports. Set this when the pool being configured
 	// is not a direct replacement for the registered pool (e.g. CCTP-through-CCV alongside USDCTokenPoolProxy).
 	SkipActivePoolSupportedChainsCheck bool
+	// SkipTokenAdminRegistrySetup suppresses the TokenAdminRegistry registration (proposeAdministrator /
+	// acceptAdminRole / setPool). Set it when the registration ops were already emitted by an earlier
+	// changeset in the same MCMS batch: re-emitting them would revert AlreadyRegistered at execution
+	// time. The pool remote-chain configuration is unaffected by this flag.
+	SkipTokenAdminRegistrySetup bool
 	// Below are not provided by the user and populated programmatically.
 	// ExistingDataStore is the datastore containing existing deployment data.
 	ExistingDataStore datastore.DataStore
@@ -435,16 +509,19 @@ type SetTokenTransferFeeSequenceInput struct {
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
-	tokenRefResolverReg map[string]TokenRefResolver
-	tokenAdapterReg     map[tokenAdapterID]TokenAdapter
-	tokenRefResolverMu  sync.Mutex
-	tokenAdapterMu      sync.Mutex
+	tokenRefResolverReg         map[string]TokenRefResolver
+	tokenAdminRegistryReaderReg map[string]TokenAdminRegistryReader
+	tokenAdapterReg             map[tokenAdapterID]TokenAdapter
+	tokenRefResolverMu          sync.Mutex
+	tokenAdminRegistryReaderMu  sync.Mutex
+	tokenAdapterMu              sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
-		tokenRefResolverReg: make(map[string]TokenRefResolver),
-		tokenAdapterReg:     make(map[tokenAdapterID]TokenAdapter),
+		tokenRefResolverReg:         make(map[string]TokenRefResolver),
+		tokenAdminRegistryReaderReg: make(map[string]TokenAdminRegistryReader),
+		tokenAdapterReg:             make(map[tokenAdapterID]TokenAdapter),
 	}
 }
 
@@ -463,6 +540,23 @@ func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRef
 	defer r.tokenRefResolverMu.Unlock()
 	resolver, ok := r.tokenRefResolverReg[chainFamily]
 	return resolver, ok
+}
+
+// RegisterTokenAdminRegistryReader registers a versionless TAR reader for the given chain family.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryReader(family string, reader TokenAdminRegistryReader) {
+	r.tokenAdminRegistryReaderMu.Lock()
+	defer r.tokenAdminRegistryReaderMu.Unlock()
+	if _, exists := r.tokenAdminRegistryReaderReg[family]; !exists {
+		r.tokenAdminRegistryReaderReg[family] = reader
+	}
+}
+
+// GetTokenAdminRegistryReader retrieves a registered TokenAdminRegistryReader for the given chain family.
+func (r *TokenAdapterRegistry) GetTokenAdminRegistryReader(family string) (TokenAdminRegistryReader, bool) {
+	r.tokenAdminRegistryReaderMu.Lock()
+	defer r.tokenAdminRegistryReaderMu.Unlock()
+	reader, ok := r.tokenAdminRegistryReaderReg[family]
+	return reader, ok
 }
 
 // RegisterTokenAdapter allows chains to register their changeset logic.

@@ -15,6 +15,7 @@ var CommitteeVerifierContractType cldf_deployment.ContractType = "CommitteeVerif
 var CommitteeVerifierResolverType cldf_deployment.ContractType = "CommitteeVerifierResolver"
 var CCTPVerifierResolverType cldf_deployment.ContractType = "CCTPVerifierResolver"
 var LombardVerifierResolverType cldf_deployment.ContractType = "LombardVerifierResolver"
+var TestVerifierResolverType cldf_deployment.ContractType = "TestVerifierResolver"
 
 var Version = semver.MustParse("2.0.0")
 
@@ -91,6 +92,28 @@ var GetAllOutboundImplementations = contract.NewRead(contract.ReadParams[any, []
 	NewContract:  versioned_verifier_resolver.NewVersionedVerifierResolver,
 	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, _ any) ([]OutboundImplementationArgs, error) {
 		return resolver.GetAllOutboundImplementations(opts)
+	},
+})
+
+var GetOwner = contract.NewRead(contract.ReadParams[any, common.Address, *versioned_verifier_resolver.VersionedVerifierResolver]{
+	Name:         "versioned-verifier-resolver:get-owner",
+	Version:      Version,
+	Description:  "Gets the current owner of the resolver",
+	ContractType: ContractType,
+	NewContract:  versioned_verifier_resolver.NewVersionedVerifierResolver,
+	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, _ any) (common.Address, error) {
+		return resolver.Owner(opts)
+	},
+})
+
+var GetTypeAndVersion = contract.NewRead(contract.ReadParams[any, string, *versioned_verifier_resolver.VersionedVerifierResolver]{
+	Name:         "versioned-verifier-resolver:get-type-and-version",
+	Version:      Version,
+	Description:  "Gets the type and version string of the resolver",
+	ContractType: ContractType,
+	NewContract:  versioned_verifier_resolver.NewVersionedVerifierResolver,
+	CallContract: func(resolver *versioned_verifier_resolver.VersionedVerifierResolver, opts *bind.CallOpts, _ any) (string, error) {
+		return resolver.TypeAndVersion(opts)
 	},
 })
 

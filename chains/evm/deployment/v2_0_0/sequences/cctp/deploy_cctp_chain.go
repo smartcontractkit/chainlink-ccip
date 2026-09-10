@@ -25,12 +25,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	v2_0_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/verifier_tags"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 )
 
 const (
@@ -418,7 +418,7 @@ func deployOrResolveCCTPVerifierResolver(
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chain.Selector),
 		datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType)),
-		datastore.AddressRefByVersion(cctp_verifier.Version),
+		datastore.AddressRefByVersion(versioned_verifier_resolver.Version),
 	)
 	if len(refs) == 0 {
 		if create2FactoryAddress == (common.Address{}) {
@@ -427,7 +427,7 @@ func deployOrResolveCCTPVerifierResolver(
 		report, err := cldf_ops.ExecuteSequence(b, v2_0_0_sequences.DeployVerifierResolverViaCREATE2, chain, v2_0_0_sequences.DeployVerifierResolverViaCREATE2Input{
 			ChainSelector:  chainSelector,
 			Type:           datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
-			Version:        cctp_verifier.Version,
+			Version:        versioned_verifier_resolver.Version,
 			CREATE2Factory: create2FactoryAddress,
 		})
 		if err != nil {

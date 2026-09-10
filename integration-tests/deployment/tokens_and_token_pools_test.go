@@ -251,6 +251,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	}
 
 	// Deploy TAR + other contracts
+	SeedUltraFastCurseMCMS(t, env)
 	output, err := deployapi.DeployContracts(deployRegistry).Apply(*env, deployapi.ContractDeploymentConfig{Chains: deployInput, MCMS: mcms.Input{}})
 	require.NoError(t, err)
 	MergeAddresses(t, env, output.DataStore)

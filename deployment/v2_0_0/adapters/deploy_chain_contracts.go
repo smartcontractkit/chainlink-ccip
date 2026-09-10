@@ -28,11 +28,6 @@ type CommitteeVerifierDeployParams struct {
 	Qualifier        string
 }
 
-type RMNRemoteDeployParams struct {
-	Version   *semver.Version
-	LegacyRMN string
-}
-
 type OffRampDeployParams struct {
 	Version                   *semver.Version
 	GasForCallExactCheck      uint16
@@ -76,13 +71,6 @@ type MockReceiverDeployParams struct {
 	Qualifier             string
 }
 
-// RMNRemoteDeployParamsOverrides holds optional RMN remote deploy overrides.
-// Unset pointer fields use adapter defaults at apply time.
-type RMNRemoteDeployParamsOverrides struct {
-	Version   *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
-	LegacyRMN *string         `json:"legacyRMN,omitempty" yaml:"legacyRMN,omitempty"`
-}
-
 // OffRampDeployParamsOverrides holds optional off-ramp deploy overrides.
 type OffRampDeployParamsOverrides struct {
 	Version                   *semver.Version `json:"version,omitempty" yaml:"version,omitempty"`
@@ -110,7 +98,6 @@ type FeeQuoterDeployParamsOverrides struct {
 // DeployContractParamsOverrides holds optional contract deploy overrides.
 // Unset pointer fields use adapter defaults at apply time.
 type DeployContractParamsOverrides struct {
-	RMNRemote     *RMNRemoteDeployParamsOverrides `json:"rmnRemote,omitempty" yaml:"rmnRemote,omitempty"`
 	OffRamp       *OffRampDeployParamsOverrides   `json:"offRamp,omitempty" yaml:"offRamp,omitempty"`
 	OnRamp        *OnRampDeployParamsOverrides    `json:"onRamp,omitempty" yaml:"onRamp,omitempty"`
 	FeeQuoter     *FeeQuoterDeployParamsOverrides `json:"feeQuoter,omitempty" yaml:"feeQuoter,omitempty"`
@@ -122,7 +109,6 @@ type DeployContractParamsOverrides struct {
 // BuildDeployContractParams produces this; DeployChainContracts consumes it via
 // DeployChainContractsInput.ContractParams.
 type DeployContractParams struct {
-	RMNRemote          RMNRemoteDeployParams
 	OffRamp            OffRampDeployParams
 	CommitteeVerifiers []CommitteeVerifierDeployParams
 	OnRamp             OnRampDeployParams
@@ -172,6 +158,9 @@ type DeployChainConfigCreatorInput struct {
 type DeployChainContractsOutput struct {
 	sequences.OnChainOutput
 	RefsToTransferOwnership []datastore.AddressRef
+	// RefsToTransferOwnershipRMN lists contracts owned by the RMNMCMS timelock rather than CLLCCIP.
+	// They are transferred separately because a transfer applies one owner to every ref it is given.
+	RefsToTransferOwnershipRMN []datastore.AddressRef
 }
 
 // DeployChainResolvedAddresses is the result of DeployChainContractsAdapter.ResolveDeployAddresses.
@@ -199,11 +188,6 @@ type BuildDeployContractParamsInput struct {
 func ApplyDeployContractParamsOverrides(params DeployContractParams, overrides *DeployContractParamsOverrides) DeployContractParams {
 	if overrides == nil {
 		return params
-	}
-	if overrides.RMNRemote != nil {
-		o := overrides.RMNRemote
-		params.RMNRemote.Version = utils.CoalescePtr(o.Version, params.RMNRemote.Version)
-		params.RMNRemote.LegacyRMN = utils.Coalesce(o.LegacyRMN, params.RMNRemote.LegacyRMN)
 	}
 	if overrides.OffRamp != nil {
 		o := overrides.OffRamp

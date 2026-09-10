@@ -11,9 +11,10 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
-	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	evm_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
+	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -74,18 +75,18 @@ func (a *FeeAggregatorAdapter) GetFeeAggregator(e cldf.Environment, chainSelecto
 	return dynamicCfg.FeeAggregator.Hex(), nil
 }
 
-func (a *FeeAggregatorAdapter) resolveOnRampRef(e cldf.Environment, input fees.FeeAggregatorForChain) (datastore.AddressRef, error) {
-	if len(input.Contracts) > 0 {
-		if len(input.Contracts) != 1 {
-			return datastore.AddressRef{}, fmt.Errorf("EVM 1.6 adapter supports exactly one contract ref, got %d", len(input.Contracts))
+func (a *FeeAggregatorAdapter) resolveOnRampRef(e cldf.Environment, chainSelector uint64, contracts []datastore.AddressRef) (datastore.AddressRef, error) {
+	if len(contracts) > 0 {
+		if len(contracts) != 1 {
+			return datastore.AddressRef{}, fmt.Errorf("EVM 1.6 adapter supports exactly one contract ref, got %d", len(contracts))
 		}
-		ref := input.Contracts[0]
+		ref := contracts[0]
 		if ref.Type != datastore.ContractType(onrampops.ContractType) {
 			return datastore.AddressRef{}, fmt.Errorf("EVM 1.6 adapter only supports contract type %q, got %q", onrampops.ContractType, ref.Type)
 		}
-		return datastore_utils.FindAndFormatRef(e.DataStore, ref, input.ChainSelector, datastore_utils.FullRef)
+		return datastore_utils.FindAndFormatRef(e.DataStore, ref, chainSelector, datastore_utils.FullRef)
 	}
-	return a.getOnRampRef(e, input.ChainSelector)
+	return a.getOnRampRef(e, chainSelector)
 }
 
 func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.Sequence[fees.FeeAggregatorForChain, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -106,7 +107,7 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			}
 			newFeeAggregator := common.HexToAddress(input.FeeAggregator)
 
-			onRampRef, err := a.resolveOnRampRef(e, input)
+			onRampRef, err := a.resolveOnRampRef(e, input.ChainSelector, input.Contracts)
 			if err != nil {
 				return result, err
 			}
@@ -136,6 +137,75 @@ func (a *FeeAggregatorAdapter) SetFeeAggregator(e cldf.Environment) *operations.
 			)
 			if err != nil {
 				return result, fmt.Errorf("failed to set OnRamp dynamic config on chain %d: %w", input.ChainSelector, err)
+			}
+
+			batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeReport.Output})
+			if err != nil {
+				return result, fmt.Errorf("failed to create batch operation from writes for chain %d: %w", input.ChainSelector, err)
+			}
+			result.BatchOps = append(result.BatchOps, batch)
+
+			return result, nil
+		},
+	)
+}
+
+func (a *FeeAggregatorAdapter) WithdrawFeeTokens(e cldf.Environment) *operations.Sequence[fees.WithdrawFeeTokensForChain, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"WithdrawFeeTokens",
+		semver.MustParse("1.6.0"),
+		"Withdraws accumulated fee token balances to the fee aggregator on the CCIP 1.6.0 OnRamp",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input fees.WithdrawFeeTokensForChain) (sequences.OnChainOutput, error) {
+			var result sequences.OnChainOutput
+
+			evmChain, ok := chains.EVMChains()[input.ChainSelector]
+			if !ok {
+				return result, fmt.Errorf("EVM chain with selector %d not defined", input.ChainSelector)
+			}
+
+			feeTokens, err := evm_utils.EVMFeeTokenAddresses(input.FeeTokens, input.ChainSelector)
+			if err != nil {
+				return result, err
+			}
+
+			onRampRef, err := a.resolveOnRampRef(e, input.ChainSelector, input.Contracts)
+			if err != nil {
+				return result, err
+			}
+			onRampAddr := common.HexToAddress(onRampRef.Address)
+
+			// Check the OnRamp we are about to sweep rather than the default one: input.Contracts
+			// may name a different OnRamp, and its fee aggregator can differ. Withdrawing while it
+			// is unset reverts on-chain with ZeroAddressNotAllowed, which is harder to act on.
+			cfgReport, err := operations.ExecuteOperation(
+				b, onrampops.GetDynamicConfig, evmChain,
+				contract.FunctionInput[struct{}]{
+					ChainSelector: evmChain.Selector,
+					Address:       onRampAddr,
+				},
+			)
+			if err != nil {
+				return result, fmt.Errorf("failed to read OnRamp dynamic config at %s on chain %d: %w",
+					onRampAddr.Hex(), input.ChainSelector, err)
+			}
+			if cfgReport.Output.FeeAggregator == (common.Address{}) {
+				return result, fmt.Errorf("fee aggregator is not set on OnRamp at %s (chain %d); set it before withdrawing fee tokens",
+					onRampAddr.Hex(), input.ChainSelector)
+			}
+
+			// withdrawFeeTokens takes the whole token list in one call, so a chain with many fee
+			// tokens still costs a single transaction.
+			writeReport, err := operations.ExecuteOperation(
+				b, onrampops.WithdrawFeeTokens, evmChain,
+				contract.FunctionInput[[]common.Address]{
+					ChainSelector: evmChain.Selector,
+					Address:       onRampAddr,
+					Args:          feeTokens,
+				},
+			)
+			if err != nil {
+				return result, fmt.Errorf("failed to withdraw fee tokens from OnRamp at %s on chain %d: %w",
+					onRampAddr.Hex(), input.ChainSelector, err)
 			}
 
 			batch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeReport.Output})

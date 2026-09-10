@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -15,6 +16,9 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader/rcmetrics"
+
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -78,14 +82,27 @@ type observedCCIPReader struct {
 	queryHistogram   *prometheus.HistogramVec
 	dataSetSizeGauge *prometheus.GaugeVec
 	chainFeesGauge   *prometheus.GaugeVec
+
+	// Beholder instrumentation (never nil; NoOp when no meter configured).
+	obMetrics rcmetrics.ObservedReaderMetrics
 }
 
 func NewObservedCCIPReader(
 	reader CCIPReader,
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
-) CCIPReader {
+	meters ...metric.Meter,
+) (CCIPReader, error) {
 	chainFamily, chainID, _ := libs.GetChainInfoFromSelector(destChainSelector)
+
+	var meter metric.Meter
+	if len(meters) > 0 {
+		meter = meters[0]
+	}
+	obMetrics, err := rcmetrics.NewObservedReaderMetrics(meter, destChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("init observed reader metrics: %w", err)
+	}
 
 	return &observedCCIPReader{
 		CCIPReader: reader,
@@ -98,7 +115,9 @@ func NewObservedCCIPReader(
 		queryHistogram:   PromQueryHistogram,
 		dataSetSizeGauge: PromDataSetSizeGauge,
 		chainFeesGauge:   PromChainFeeGauge,
-	}
+
+		obMetrics: obMetrics,
+	}, nil
 }
 
 func (o *observedCCIPReader) CommitReportsGTETimestamp(
@@ -308,12 +327,14 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, execCostLabel).
 				Set(execFeeFloat)
+			o.obMetrics.RecordChainFee(k, execCostLabel, int64(execFeeFloat))
 		}
 		if v.DataAvailabilityFee != nil {
 			dataFeeFloat, _ := new(big.Float).SetInt(v.DataAvailabilityFee).Float64()
 			o.chainFeesGauge.
 				WithLabelValues(chainFamily, chainID, dataCostLabel).
 				Set(dataFeeFloat)
+			o.obMetrics.RecordChainFee(k, dataCostLabel, int64(dataFeeFloat))
 		}
 
 		o.lggr.Debugw(
@@ -343,11 +364,15 @@ func withObservedQueryAndResult[T any](
 		WithLabelValues(o.destChainFamily, o.destChain, queryName).
 		Observe(float64(duration))
 
+	size := float64(0)
 	if err == nil && dataSizeFn != nil {
+		size = dataSizeFn(results)
 		o.dataSetSizeGauge.
 			WithLabelValues(o.destChainFamily, o.destChain, queryName).
-			Set(dataSizeFn(results))
+			Set(size)
 	}
+
+	o.recordReadOutcome(queryName, err, dataSizeFn != nil, size)
 
 	o.lggr.Debugw("observed CCIP Reader query",
 		"duration", duration,
@@ -356,6 +381,20 @@ func withObservedQueryAndResult[T any](
 	)
 
 	return results, err
+}
+
+// recordReadOutcome classifies a reader query into ok/empty/error. Reads that
+// have no size fn can't distinguish empty from ok, so they're reported as ok
+// unless they errored.
+func (o *observedCCIPReader) recordReadOutcome(queryName string, err error, hasSizeFn bool, size float64) {
+	outcome := "ok"
+	switch {
+	case err != nil:
+		outcome = "error"
+	case hasSizeFn && size == 0:
+		outcome = "empty"
+	}
+	o.obMetrics.RecordReadOutcome(o.destChainSelector, queryName, outcome)
 }
 
 func sliceLength[T any](slice []T) float64 {

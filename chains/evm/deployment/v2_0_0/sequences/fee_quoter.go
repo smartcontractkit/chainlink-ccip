@@ -1119,7 +1119,7 @@ func GetLastKnownPriceUpdates(tokenPrices map[common.Address]*big.Int, gasPrices
 }
 
 func GetFeeQuoterAddressAndVersionFromOnRamp(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) (common.Address, *semver.Version, error) {
-	onRampAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+	onRampAddr, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,

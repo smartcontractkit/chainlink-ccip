@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -55,6 +57,10 @@ func (c *SiloedLockReleaseTokenPoolContract) Owner(opts *bind.CallOpts) (common.
 		return common.Address{}, err
 	}
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *SiloedLockReleaseTokenPoolContract) ConfigureLockBoxes(opts *bind.TransactOpts, args []LockBoxConfig) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "configureLockBoxes", args)
 }
 
 func (c *SiloedLockReleaseTokenPoolContract) GetLockBox(opts *bind.CallOpts, args uint64) (common.Address, error) {
@@ -104,6 +110,24 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var ConfigureLockBoxes = contract.NewWrite(contract.WriteParams[[]LockBoxConfig, *SiloedLockReleaseTokenPoolContract]{
+	Name:            "siloed-lock-release-token-pool:configure-lock-boxes",
+	Version:         Version,
+	Description:     "Calls configureLockBoxes on the contract",
+	ContractType:    ContractType,
+	ContractABI:     SiloedLockReleaseTokenPoolABI,
+	NewContract:     NewSiloedLockReleaseTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*SiloedLockReleaseTokenPoolContract, []LockBoxConfig],
+	Validate:        func([]LockBoxConfig) error { return nil },
+	CallContract: func(
+		c *SiloedLockReleaseTokenPoolContract,
+		opts *bind.TransactOpts,
+		args []LockBoxConfig,
+	) (*types.Transaction, error) {
+		return c.ConfigureLockBoxes(opts, args)
+	},
 })
 
 var GetLockBox = contract.NewRead(contract.ReadParams[uint64, common.Address, *SiloedLockReleaseTokenPoolContract]{

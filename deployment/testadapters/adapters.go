@@ -180,6 +180,67 @@ type ForkCCIPSendTestAdapter interface {
 	TestAdapterForFamily
 }
 
+// MessageExecutor is an optional post-send hook that verifies message
+// execution on the destination chain. It is registered per chain family.
+// Domains that need execution verification register
+// an executor, and the hook calls ExecuteMessage after each successful send.
+type MessageExecutor interface {
+	ExecuteMessage(ctx context.Context, env deployment.Environment, srcSel, destSel uint64, msgID string) (txHash string, err error)
+}
+
+// ErrSkipExecute indicates the executor skipped execution intentionally.
+// Callers should treat this as a no-op, not a failure.
+var ErrSkipExecute = fmt.Errorf("executor skipped execution")
+
+// MessageExecutorRegistry maps chain family to a MessageExecutor (at most one per family).
+type MessageExecutorRegistry struct {
+	providers map[string]MessageExecutor
+	mu        *sync.Mutex
+}
+
+func newMessageExecutorRegistry() *MessageExecutorRegistry {
+	return &MessageExecutorRegistry{
+		providers: make(map[string]MessageExecutor),
+		mu:        &sync.Mutex{},
+	}
+}
+
+var (
+	singletonMessageExecutorRegistry *MessageExecutorRegistry
+	onceMessageExecutorRegistry      sync.Once
+)
+
+// GetMessageExecutorRegistry returns the global singleton instance.
+func GetMessageExecutorRegistry() *MessageExecutorRegistry {
+	onceMessageExecutorRegistry.Do(func() {
+		singletonMessageExecutorRegistry = newMessageExecutorRegistry()
+	})
+	return singletonMessageExecutorRegistry
+}
+
+// Register registers a MessageExecutor for a chain family. First registration wins.
+func (r *MessageExecutorRegistry) Register(family string, executor MessageExecutor) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.providers[family]; !exists {
+		r.providers[family] = executor
+	}
+}
+
+// Get returns the executor for the given chain family, or false if not registered.
+func (r *MessageExecutorRegistry) Get(family string) (MessageExecutor, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	executor, ok := r.providers[family]
+	return executor, ok
+}
+
+// ResetMessageExecutorRegistryForTest replaces the registry and resets sync.Once for isolated tests.
+func ResetMessageExecutorRegistryForTest() {
+	singletonMessageExecutorRegistry = newMessageExecutorRegistry()
+	onceMessageExecutorRegistry = sync.Once{}
+}
+
 type TestAdapterFactory = func(env *deployment.Environment, selector uint64) TestAdapter
 type ForkCCIPSendTestAdapterFactory = func(env *deployment.Environment, selector uint64) ForkCCIPSendTestAdapter
 type TestAdapterForFamilyFactory = func(ds datastore.DataStore, selector uint64) TestAdapterForFamily

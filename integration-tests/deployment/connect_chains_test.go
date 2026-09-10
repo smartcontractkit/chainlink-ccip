@@ -18,6 +18,7 @@ import (
 
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
@@ -252,6 +253,7 @@ func setupEVM2SVMForConnectChains(t *testing.T) (
 	version = semver.MustParse("1.6.0")
 	for _, chainSel := range allChains {
 		mint, _ := solana.NewRandomPrivateKey()
+		SeedUltraFastCurseMCMS(t, e)
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
@@ -369,6 +371,7 @@ func setupEVM2EVMForConnectChains(t *testing.T, chains []uint64) (
 		GasForCallExactCheck:                    uint16(5000),
 	}
 	for _, chainSel := range chains {
+		SeedUltraFastCurseMCMS(t, e)
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS:   mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{chainSel: deployCfg},
@@ -747,6 +750,12 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 		RampsVersion:         semver.MustParse("1.6.0"),
 		RemoteChainSelectors: []uint64{chain_selectors.ETHEREUM_MAINNET.Selector},
 	}
+
+	// The chain-contract deploy requires the Ultra Fast Curse timelock, which it uses as the RMN's
+	// curse admin. This flow deploys the real MCMS instances later, so seed the ref: the address is
+	// only ever a constructor argument here, never called.
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chains...)
+	require.NoError(t, err)
 
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},

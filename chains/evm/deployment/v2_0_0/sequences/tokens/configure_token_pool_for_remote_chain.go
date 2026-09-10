@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -128,7 +129,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						RemoteChainSelector: input.RemoteChainSelector,
 						FastFinality:        false,
 					},
-				})
+				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs], evm.Chain]())
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get default rate limiter state for remote chain %d: %w", input.RemoteChainSelector, err)
 				}
@@ -227,7 +228,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 				Args:          input.RemoteChainSelector,
-			})
+			}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain]())
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
 			}
@@ -258,7 +259,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					ChainSelector: input.ChainSelector,
 					Address:       input.TokenPoolAddress,
 					Args:          input.RemoteChainSelector,
-				})
+				}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain]())
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pools: %w", err)
 				}
@@ -408,7 +409,7 @@ func maybeUpdateRateLimiters(
 				RemoteChainSelector: remoteChainSelector,
 				FastFinality:        desiredRL.FastFinality,
 			},
-		})
+		}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs], evm.Chain]())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get rate limiter state: %w", err)
 		}
@@ -437,18 +438,68 @@ func maybeUpdateRateLimiters(
 	}
 
 	if len(args) > 0 {
-		setInboundRateLimiterReport, err := cldf_ops.ExecuteOperation(b, token_pool.SetRateLimitConfig, chain, evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
-			ChainSelector: chainSelector,
-			Address:       tokenPoolAddress,
-			Args:          args,
-		})
+		setInboundRateLimiterReport, err := setRateLimiterConfigWithLaneVisibilityRetry(b, chain, tokenPoolAddress, args)
 		if err != nil {
-			return nil, fmt.Errorf("failed to set rate limiters config: %w", err)
+			return nil, fmt.Errorf("failed to set rate limiter config: %w", err)
 		}
-		return &setInboundRateLimiterReport.Output, nil
+		return setInboundRateLimiterReport, nil
 	}
 
 	return nil, nil
+}
+
+// setRateLimiterConfigWithLaneVisibilityRetry executes SetRateLimitConfig with a short block-scale
+// backoff. When the lane is being added in the same sequence (this pool just went through the not-
+// supported add-lane path) the `applyChainUpdates` tx that created the lane may not yet be visible
+// to the RPC node's estimate view when SetRateLimitConfig is prepared, which produces a misleading
+// NonExistentChain revert. Retrying over base-block intervals lets the change propagate before the
+// next prepare attempt.
+func setRateLimiterConfigWithLaneVisibilityRetry(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	tokenPoolAddress common.Address,
+	args []token_pool.RateLimitConfigArgs,
+) (*evm_contract.WriteOutput, error) {
+	type RateLimitArgs = evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]
+
+	retryBuffer := 2 * time.Second
+	retryPolicy := cldf_ops.RetryPolicy{MaxAttempts: 5}
+	retryConfig := cldf_ops.RetryConfig[RateLimitArgs, evm.Chain]{
+		Enabled: true,
+		Policy:  retryPolicy,
+		InputHook: func(attempt uint, err error, in RateLimitArgs, _ evm.Chain) RateLimitArgs {
+			wait := time.Duration(attempt+1) * retryBuffer
+
+			b.Logger.Infof(
+				"Retrying SetRateLimitConfig for chain %d, attempt %d/%d, waiting %s, err: %v",
+				chain.Selector, attempt+1, retryPolicy.MaxAttempts, wait, err,
+			)
+
+			// We avoid time.Sleep since it doesn't respect context cancellation. Instead, we either wait
+			// for the entire backoff duration or for the context to be cancelled, whichever comes first.
+			select {
+			case <-b.GetContext().Done():
+			case <-time.After(wait):
+			}
+
+			return in
+		},
+	}
+
+	setRateLimitReport, err := cldf_ops.ExecuteOperation(
+		b, token_pool.SetRateLimitConfig, chain,
+		evm_contract.FunctionInput[[]token_pool.RateLimitConfigArgs]{
+			ChainSelector: chain.Selector,
+			Address:       tokenPoolAddress,
+			Args:          args,
+		},
+		cldf_ops.WithRetryConfig(retryConfig),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set rate limiters config: %w", err)
+	}
+
+	return &setRateLimitReport.Output, nil
 }
 
 // rateLimiterConfigsEqual returns true if the current rate limiter config on-chain matches the desired config.

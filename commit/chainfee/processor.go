@@ -24,7 +24,7 @@ type processor struct {
 	ccipReader      readerpkg.CCIPReader
 	cfg             pluginconfig.CommitOffchainConfig
 	chainSupport    plugincommon.ChainSupport
-	metricsReporter plugincommon.MetricsReporter
+	metricsReporter MetricsReporter
 	fRoleDON        int
 	obs             observer
 	runner          *asynclib.Runner
@@ -39,7 +39,7 @@ func NewProcessor(
 	offChainConfig pluginconfig.CommitOffchainConfig,
 	chainSupport plugincommon.ChainSupport,
 	fRoleDON int,
-	metricsReporter plugincommon.MetricsReporter,
+	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	var obs observer
 	baseObs := newBaseObserver(

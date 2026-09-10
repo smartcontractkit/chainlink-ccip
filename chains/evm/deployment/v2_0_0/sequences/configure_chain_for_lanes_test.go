@@ -62,10 +62,11 @@ func deployChain(
 	report, err := operations.ExecuteSequence(
 		e.OperationsBundle, sequences.DeployChainContracts, evmChain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSelector,
-			CREATE2Factory:   common.HexToAddress(create2Ref.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2Ref.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
 		},
 	)
 	require.NoError(t, err)
@@ -487,11 +488,12 @@ func deployChainWithTestRouter(
 	report, err := operations.ExecuteSequence(
 		e.OperationsBundle, sequences.DeployChainContracts, evmChain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSelector,
-			CREATE2Factory:   common.HexToAddress(create2Ref.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
-			DeployTestRouter: true,
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2Ref.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned:  true,
+			DeployTestRouter:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
 		},
 	)
 	require.NoError(t, err)

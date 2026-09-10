@@ -239,10 +239,11 @@ func TestDeployLockReleaseTokenPool(t *testing.T) {
 				sequences.DeployChainContracts,
 				e.BlockChains.EVMChains()[chainSel],
 				sequences.DeployChainContractsInput{
-					ChainSelector:    chainSel,
-					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-					ContractParams:   testsetup.CreateBasicContractParams(),
-					DeployerKeyOwned: true,
+					ChainSelector:     chainSel,
+					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:    testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned:  true,
+					ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")

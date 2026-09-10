@@ -455,6 +455,7 @@ func resolveRemoteChainConfig(
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
 		FeeQuoterDestChainConfig:  fqConfig,
 		ExecutorDestChainConfig:   utils.Coalesce(inCfg.ExecutorDestChainConfig, defaults.ExecutorDestChainConfig),
+		SkipExecutorConfig:        defaults.SkipExecutorConfig,
 		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
 		BaseExecutionGasCost:      utils.Coalesce(inCfg.BaseExecutionGasCost, defaults.BaseExecutionGasCost),
 		TokenReceiverAllowed:      &tokenReceiverAllowed,

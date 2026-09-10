@@ -79,13 +79,17 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 		{
 			desc: "empty datastore",
 			makeDatastore: func() *datastore.MemoryDataStore {
-				return datastore.NewMemoryDataStore()
+				ds := datastore.NewMemoryDataStore()
+				_ = testsetup.SeedUltraFastCurseMCMS(ds, 5009297550715157269)
+
+				return ds
 			},
 		},
 		{
 			desc: "non-empty datastore",
 			makeDatastore: func() *datastore.MemoryDataStore {
 				ds := datastore.NewMemoryDataStore()
+				_ = testsetup.SeedUltraFastCurseMCMS(ds, 5009297550715157269)
 				_ = ds.Addresses().Add(datastore.AddressRef{
 					ChainSelector: 5009297550715157269,
 					Type:          datastore.ContractType(link.ContractType),
@@ -157,6 +161,10 @@ func TestDeployChainContracts_DeployTestRouter(t *testing.T) {
 	)
 	require.NoError(t, err, "Failed to create test environment")
 	require.NotNil(t, e, "Environment should be created")
+
+	seedDS := datastore.NewMemoryDataStore()
+	require.NoError(t, testsetup.SeedUltraFastCurseMCMS(seedDS, 5009297550715157269))
+	e.DataStore = seedDS.Seal()
 
 	mcmsRegistry := cs_core.GetRegistry()
 	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[5009297550715157269], contract_utils.DeployInput[create2_factory.ConstructorArgs]{

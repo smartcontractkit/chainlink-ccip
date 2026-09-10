@@ -97,6 +97,7 @@ func TestProposalHookForCCIPSend(t *testing.T) {
 			GasForCallExactCheck:                    uint16(5000),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,

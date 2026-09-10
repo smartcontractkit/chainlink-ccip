@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -138,7 +139,8 @@ func (p *processor) getConsensusObservation(
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
-	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	fChains, fChainDrops := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	reportChainFeeConsensusDrops(p.metricsReporter, "fChain", fChainDrops)
 
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
@@ -153,17 +155,18 @@ func (p *processor) getConsensusObservation(
 	}
 	timestamp := consensus.Median(aggObs.Timestamps, consensus.TimestampComparator)
 
-	chainFeeUpdatesConsensus := consensus.GetConsensusMapAggregator(
+	chainFeeUpdatesConsensus, chainFeeUpdatesDrops := consensus.GetConsensusMapAggregator(
 		lggr,
 		"ChainFeeUpdates",
 		aggObs.ChainFeeUpdates,
 		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
 		chainFeeUpdateAggregator,
 	)
+	reportChainFeeConsensusDrops(p.metricsReporter, "ChainFeeUpdates", chainFeeUpdatesDrops)
 
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 
-	feeComponents := consensus.GetConsensusMapAggregator(
+	feeComponents, feeComponentsDrops := consensus.GetConsensusMapAggregator(
 		lggr,
 		"FeeComponents",
 		aggObs.FeeComponents,
@@ -182,8 +185,9 @@ func (p *processor) getConsensusObservation(
 			}
 		},
 	)
+	reportChainFeeConsensusDrops(p.metricsReporter, "FeeComponents", feeComponentsDrops)
 
-	nativeTokenPrices := consensus.GetConsensusMapAggregator(
+	nativeTokenPrices, nativeTokenPricesDrops := consensus.GetConsensusMapAggregator(
 		lggr,
 		"NativeTokenPrices",
 		aggObs.NativeTokenPrices,
@@ -193,6 +197,7 @@ func (p *processor) getConsensusObservation(
 			return consensus.Median(vals, consensus.BigIntComparator)
 		},
 	)
+	reportChainFeeConsensusDrops(p.metricsReporter, "NativeTokenPrices", nativeTokenPricesDrops)
 
 	consensusObs := Observation{
 		FChain:            fChains,
@@ -203,6 +208,21 @@ func (p *processor) getConsensusObservation(
 	}
 
 	return consensusObs, nil
+}
+
+func reportChainFeeConsensusDrops(
+	reporter MetricsReporter,
+	objectName string,
+	drops map[cciptypes.ChainSelector]consensus.ConsensusDropReason,
+) {
+	for chain, reason := range drops {
+		reporter.TrackConsensusDropped(
+			objectName,
+			strconv.FormatUint(uint64(chain), 10),
+			reason.String(),
+			chain,
+		)
+	}
 }
 
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {

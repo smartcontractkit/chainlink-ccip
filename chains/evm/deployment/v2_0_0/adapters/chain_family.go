@@ -46,7 +46,7 @@ func (a *ChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence[ccvad
 // Callers that need to call the contract decode the address out of it, which
 // common.BytesToAddress does by taking the low 20 bytes.
 func (a *ChainFamilyAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,
@@ -73,7 +73,7 @@ func (a *ChainFamilyAdapter) GetFQAddress(ds datastore.DataStore, chainSelector 
 }
 
 func (a *ChainFamilyAdapter) GetFQAddressDynamic(ds datastore.DataStore, chainSelector uint64, chains cldf_chain.BlockChains) ([]byte, error) {
-	onRampAddr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+	onRampAddr, err := datastore_utils.FindAndFormatCanonicalRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
 		Version:       onramp.Version,

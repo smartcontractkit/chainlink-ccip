@@ -44,7 +44,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260529212215-bfcc2ee071c8
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260706103253-30ab530178da
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260518100439-9564f35fd264
-	github.com/smartcontractkit/chainlink-deployments-framework v0.117.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.119.0
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260710181111-6417709a55ee // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260710181111-6417709a55ee
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6
@@ -52,7 +52,7 @@ require (
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20260723133120-84f330f77b91
 	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20260723133120-84f330f77b91
 	github.com/smartcontractkit/libocr v0.0.0-20260529134643-c101335a64cd
-	github.com/smartcontractkit/mcms v0.52.0
+	github.com/smartcontractkit/mcms v0.52.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/xssnick/tonutils-go v1.14.1
@@ -60,6 +60,8 @@ require (
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sync v0.22.0
 )
+
+require github.com/lib/pq v1.12.3
 
 require (
 	cloud.google.com/go/auth v0.20.0 // indirect
@@ -285,7 +287,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lib/pq v1.12.3 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lufia/plan9stats v0.0.0-20260216142805-b3301c5f2a88 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
@@ -375,7 +376,7 @@ require (
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
-	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
+	github.com/smartcontractkit/ccip-owner-contracts v0.2.1 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc // indirect
 	github.com/smartcontractkit/chainlink-canton v0.0.0-20260615233851-4e78e7c23a58 // indirect
 	github.com/smartcontractkit/chainlink-common/keystore v1.2.1-0.20260623104656-f39eba3e2bc6 // indirect

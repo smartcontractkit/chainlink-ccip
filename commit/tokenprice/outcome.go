@@ -2,6 +2,7 @@ package tokenprice
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -40,7 +41,10 @@ func (p *processor) getConsensusObservation(
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
-	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	fChains, fChainDrops := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	reportTokenPriceConsensusDrops(
+		p.metricsReporter, "fChain", fChainDrops,
+		func(k cciptypes.ChainSelector) string { return strconv.FormatUint(uint64(k), 10) })
 
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
@@ -61,7 +65,7 @@ func (p *processor) getConsensusObservation(
 			fmt.Errorf("no consensus value for f for FeedChain: %d", p.offChainCfg.PriceFeedChainSelector)
 	}
 
-	feedPricesConsensus := consensus.GetConsensusMapAggregator(
+	feedPricesConsensus, feedPricesDrops := consensus.GetConsensusMapAggregator(
 		lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
@@ -70,8 +74,11 @@ func (p *processor) getConsensusObservation(
 			return consensus.Median(vals, consensus.TokenPriceComparator)
 		},
 	)
+	reportTokenPriceConsensusDrops(
+		p.metricsReporter, "FeedTokenPrices", feedPricesDrops,
+		func(k cciptypes.UnknownEncodedAddress) string { return string(k) })
 
-	feeQuoterUpdatesConsensus := consensus.GetConsensusMapAggregator(
+	feeQuoterUpdatesConsensus, feeQuoterUpdatesDrops := consensus.GetConsensusMapAggregator(
 		lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
@@ -80,6 +87,9 @@ func (p *processor) getConsensusObservation(
 		// and the median prices as price value
 		consensus.TimestampedBigAggregator,
 	)
+	reportTokenPriceConsensusDrops(
+		p.metricsReporter, "FeeQuoterUpdates", feeQuoterUpdatesDrops,
+		func(k cciptypes.UnknownEncodedAddress) string { return string(k) })
 
 	consensusObs := ConsensusObservation{
 		FChain:                fChains,
@@ -89,6 +99,17 @@ func (p *processor) getConsensusObservation(
 	}
 
 	return consensusObs, nil
+}
+
+func reportTokenPriceConsensusDrops[K comparable](
+	reporter MetricsReporter,
+	objectName string,
+	drops map[K]consensus.ConsensusDropReason,
+	keyToString func(K) string,
+) {
+	for key, reason := range drops {
+		reporter.TrackConsensusDropped(objectName, keyToString(key), reason.String(), 0)
+	}
 }
 
 // selectTokensForUpdate checks which tokens need to be updated based on the observed token prices and

@@ -99,6 +99,9 @@ func deployLaneContractsToDatastore(
 	)
 	require.NoError(t, err)
 
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSelector)
+	require.NoError(t, err)
+
 	deployOut, err := evmchangesets.DeployChainContracts(changesets.GetRegistry()).Apply(*e, changesets.WithMCMS[evmchangesets.DeployChainContractsCfg]{
 		Cfg: evmchangesets.DeployChainContractsCfg{
 			ChainSel:         chainSelector,

@@ -316,7 +316,10 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 	chain := e.BlockChains.EVMChains()[selector]
 	timelockAddrs := make(map[uint64]string)
 	for _, addrRef := range e.DataStore.Addresses().Filter() {
-		if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) {
+		// Qualifier-scoped on purpose: the datastore also holds the UltraFastCurse RBACTimelock, and
+		// an unqualified match would let it win this loop and become the proposed owner.
+		if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) &&
+			addrRef.Qualifier == common_utils.CLLQualifier {
 			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
 		}
 	}
@@ -520,10 +523,13 @@ func DeployChainContractsV2_0_0(t *testing.T, e *cldf_deployment.Environment, cu
 		sequencesV2_0_0.DeployChainContracts,
 		e.BlockChains.EVMChains()[chainSel],
 		sequencesV2_0_0.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetupV2_0_0.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:  chainSel,
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ContractParams: testsetupV2_0_0.CreateBasicContractParams(),
+			// The RMN is always deployed with the Ultra Fast Curse MCMS timelock as its curse admin,
+			// so the sequence requires that ref to be resolvable.
+			ExistingAddresses: testsetupV2_0_0.UltraFastCurseMCMSRefs(chainSel),
+			DeployerKeyOwned:  true,
 		},
 	)
 	require.NoError(t, err)
@@ -636,4 +642,21 @@ func CurrentBlockEVM(t *testing.T, e *cldf_deployment.Environment, sel uint64) u
 	header, err := chain.Client.HeaderByNumber(t.Context(), nil)
 	require.NoError(t, err)
 	return header.Number.Uint64()
+}
+
+// SeedUltraFastCurseMCMS registers an Ultra Fast Curse RBACTimelock ref for every EVM chain in the
+// environment.
+//
+// Chain-contract deploys use that timelock as the RMN's curse admin and fail without it. These test
+// flows deploy contracts before any MCMS exists, so the ref is seeded rather than deployed: the
+// address is only ever passed as a constructor argument, never called.
+func SeedUltraFastCurseMCMS(t *testing.T, e *cldf_deployment.Environment) {
+	t.Helper()
+	selectors := make([]uint64, 0)
+	for sel := range e.BlockChains.EVMChains() {
+		selectors = append(selectors, sel)
+	}
+	ds, err := testsetupV2_0_0.WithUltraFastCurseMCMS(e.DataStore, selectors...)
+	require.NoError(t, err, "failed to seed UltraFastCurse MCMS timelock refs")
+	e.DataStore = ds
 }

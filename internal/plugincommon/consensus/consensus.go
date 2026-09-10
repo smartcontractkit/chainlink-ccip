@@ -28,8 +28,9 @@ func GetConsensusMap[K comparable, T any](
 	objectName string,
 	itemsByKey map[K][]T,
 	minObs MultiThreshold[K],
-) map[K]T {
+) (map[K]T, map[K]ConsensusDropReason) {
 	consensus := make(map[K]T)
+	dropReasons := make(map[K]ConsensusDropReason)
 
 	for key, items := range itemsByKey {
 		if minThresh, exists := minObs.Get(key); exists {
@@ -38,22 +39,27 @@ func GetConsensusMap[K comparable, T any](
 				minObservations.Add(item)
 			}
 			items = minObservations.GetValid()
-			if len(items) != 1 {
-				// TODO: metrics
+			if len(items) == 1 {
+				consensus[key] = items[0]
+			} else {
+				reason := DropReasonInsufficientAgreement
+				if len(items) > 1 {
+					reason = DropReasonSplit
+				}
+				dropReasons[key] = reason
 				lggr.Debugw("could not reach consensus due to not enough observations meeting the minimum threshold",
 					"objectName", objectName,
 					"key", key,
 					"minThreshold", minThresh,
-					"items", items)
-			} else {
-				consensus[key] = items[0]
+					"items", items,
+					"reason", reason)
 			}
 		} else {
-			// TODO: metrics
+			dropReasons[key] = DropReasonThresholdNotDefined
 			lggr.Warnw("min threshold not found defined", "objectName", objectName, "key", key)
 		}
 	}
-	return consensus
+	return consensus, dropReasons
 }
 
 // Aggregator is a function type that aggregates a slice of values into a single value.
@@ -65,11 +71,17 @@ func GetConsensusMapAggregator[K comparable, T any](
 	items map[K][]T,
 	f MultiThreshold[K],
 	agg Aggregator[T],
-) map[K]T {
+) (map[K]T, map[K]ConsensusDropReason) {
 	consensus := make(map[K]T)
+	dropReasons := make(map[K]ConsensusDropReason)
 
 	for key, values := range items {
 		if thresh, ok := f.Get(key); !ok || len(values) < int(thresh) {
+			if !ok {
+				dropReasons[key] = DropReasonThresholdNotDefined
+			} else {
+				dropReasons[key] = DropReasonInsufficientAgreement
+			}
 			lggr.Debugw("could not reach consensus in consensusMapAggregator",
 				"objectName", objectName,
 				"key", key)
@@ -77,7 +89,7 @@ func GetConsensusMapAggregator[K comparable, T any](
 		}
 		consensus[key] = agg(values)
 	}
-	return consensus
+	return consensus, dropReasons
 }
 
 // Median returns the middle element after sorting the provided slice.
@@ -114,17 +126,20 @@ func GetOrderedConsensus[K comparable, T cmp.Ordered](
 	lggr logger.Logger,
 	objectName string,
 	itemsByKey map[K][]T,
-	minObs MultiThreshold[K]) map[K]T {
+	minObs MultiThreshold[K]) (map[K]T, map[K]ConsensusDropReason) {
 	result := make(map[K]T)
+	dropReasons := make(map[K]ConsensusDropReason)
 
 	for key, items := range itemsByKey {
 		if _, exists := minObs.Get(key); !exists {
+			dropReasons[key] = DropReasonThresholdNotDefined
 			lggr.Warnw("could not find threshold value", "objectName", objectName, "key", key)
 			continue
 		}
 
 		minThresh, _ := minObs.Get(key)
 		if minThresh <= 0 {
+			dropReasons[key] = DropReasonInvalidThreshold
 			lggr.Errorw("found a negative or 0 threshold",
 				"objectName", objectName,
 				"key", key,
@@ -133,6 +148,7 @@ func GetOrderedConsensus[K comparable, T cmp.Ordered](
 		}
 
 		if len(items) < 2*int(minThresh)+1 {
+			dropReasons[key] = DropReasonInsufficientAgreement
 			lggr.Errorw(MsgInsufficientObservationsForConsensus,
 				"objectName", objectName,
 				"key", key,
@@ -144,7 +160,7 @@ func GetOrderedConsensus[K comparable, T cmp.Ordered](
 		slices.Sort(items)
 		result[key] = items[minThresh]
 	}
-	return result
+	return result, dropReasons
 }
 
 func TimestampComparator(a, b time.Time) bool {

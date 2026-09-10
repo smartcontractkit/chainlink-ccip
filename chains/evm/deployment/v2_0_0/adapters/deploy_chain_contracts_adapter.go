@@ -133,14 +133,6 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		return sequences.DeployChainContractsInput{}, err
 	}
 
-	var legacyRMN common.Address
-	if input.ContractParams.RMNRemote.LegacyRMN != "" {
-		legacyRMN, err = parseHexAddress(input.ContractParams.RMNRemote.LegacyRMN, "RMNRemote.LegacyRMN")
-		if err != nil {
-			return sequences.DeployChainContractsInput{}, err
-		}
-	}
-
 	var onRampFeeAgg common.Address
 	if input.ContractParams.OnRamp.FeeAggregator != "" {
 		onRampFeeAgg, err = parseHexAddress(input.ContractParams.OnRamp.FeeAggregator, "OnRamp.FeeAggregator")
@@ -158,10 +150,6 @@ func toEVMDeployInput(input ccvadapters.DeployChainContractsInput) (sequences.De
 		DeployTestRouter:  input.DeployTestRouter,
 		DeployerKeyOwned:  input.DeployerKeyOwned,
 		ContractParams: sequences.ContractParams{
-			RMNRemote: sequences.RMNRemoteParams{
-				Version:   input.ContractParams.RMNRemote.Version,
-				LegacyRMN: legacyRMN,
-			},
 			OffRamp: sequences.OffRampParams{
 				Version:                   input.ContractParams.OffRamp.Version,
 				GasForCallExactCheck:      input.ContractParams.OffRamp.GasForCallExactCheck,

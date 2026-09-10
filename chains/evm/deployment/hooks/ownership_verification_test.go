@@ -15,13 +15,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	seq2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -81,7 +81,7 @@ func TestExpectedOwnerForRef_UsesRMNTimelockForRMNRemote(t *testing.T) {
 	require.NoError(t, err)
 	rmn, err := e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
-		Type:          datastore.ContractType(rmn_remote.ContractType),
+		Type:          datastore.ContractType(rmn.ContractType),
 	})
 	mcmsRmn, err := e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
@@ -116,7 +116,7 @@ func TestExpectedOwnerForRef_MissingTimelockReturnsError(t *testing.T) {
 	e.rmntimelockAddr.Store(selector, common.Address{})
 	_, err = e.expectedOwnerForRef(datastore.AddressRef{
 		ChainSelector: selector,
-		Type:          datastore.ContractType(rmn_remote.ContractType),
+		Type:          datastore.ContractType(rmn.ContractType),
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "RMNMCMS RBACTimelock address not found")
@@ -132,7 +132,7 @@ func TestNeedsOwnershipCheck_UsesLaneMigratorContractTypes(t *testing.T) {
 		datastore.ContractType(offrampops.ContractType),
 		datastore.ContractType(fqops.ContractType),
 		datastore.ContractType(routerops.ContractType),
-		datastore.ContractType(rmn_remote.ContractType),
+		datastore.ContractType(rmn.ContractType),
 		datastore.ContractType(rmn_proxy.ContractType),
 		datastore.ContractType(token_admin_registry.ContractType),
 	}

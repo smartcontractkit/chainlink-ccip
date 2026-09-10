@@ -225,10 +225,11 @@ func TestConfigureTokenPoolForRemoteChain(t *testing.T) {
 				sequences.DeployChainContracts,
 				e.BlockChains.EVMChains()[chainSel],
 				sequences.DeployChainContractsInput{
-					ChainSelector:    chainSel,
-					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-					ContractParams:   testsetup.CreateBasicContractParams(),
-					DeployerKeyOwned: true,
+					ChainSelector:     chainSel,
+					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+					ContractParams:    testsetup.CreateBasicContractParams(),
+					DeployerKeyOwned:  true,
+					ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")
@@ -300,10 +301,11 @@ func TestConfigureTokenPoolForRemoteChainUpgradeImport(t *testing.T) {
 		sequences.DeployChainContracts,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:     chainSel,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")
@@ -514,10 +516,11 @@ func TestConfigureTokenPoolForRemoteChainUpgradeMetadataLegacyInboundDecimals(t 
 		sequences.DeployChainContracts,
 		chain,
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:     chainSel,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 		},
 	)
 	require.NoError(t, err, "DeployChainContracts should not error")
@@ -696,10 +699,11 @@ func TestConfigureTokenPoolForRemoteChain_DynamicFinalityRateLimits(t *testing.T
 		sequences.DeployChainContracts,
 		e.BlockChains.EVMChains()[chainSel],
 		sequences.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetup.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:     chainSel,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 		},
 	)
 	require.NoError(t, err, "ExecuteSequence should not error")

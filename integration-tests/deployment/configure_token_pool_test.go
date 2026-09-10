@@ -768,6 +768,7 @@ func setupSolanaPoolsForConfigure(t *testing.T) (env *cldf_deployment.Environmen
 	require.True(t, ok, "Solana chain not found in environment")
 
 	deployRegistry := deployapi.GetRegistry()
+	SeedUltraFastCurseMCMS(t, env)
 	deployOut, err := deployapi.DeployContracts(deployRegistry).Apply(*env, deployapi.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deployapi.ContractDeploymentConfigPerChain{

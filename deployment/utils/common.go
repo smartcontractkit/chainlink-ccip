@@ -30,6 +30,7 @@ const (
 	TokenPoolLookupTable       cldf.ContractType = "TokenPoolLookupTable"
 	BurnWithFromMintTokenPool  cldf.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool      cldf.ContractType = "BurnFromMintTokenPool"
+	BurnToAddressMintTokenPool cldf.ContractType = "BurnToAddressMintTokenPool"
 	CCTPTokenPool              cldf.ContractType = "CCTPTokenPool"
 	FeeQuoter                  cldf.ContractType = "FeeQuoter"
 	RegistryModule             cldf.ContractType = "RegistryModuleOwnerCustom"
@@ -73,7 +74,8 @@ func IsLockReleasePoolType(poolType string) bool {
 func IsBurnMintPoolType(poolType string) bool {
 	return poolType == BurnMintTokenPool.String() ||
 		poolType == BurnFromMintTokenPool.String() ||
-		poolType == BurnWithFromMintTokenPool.String()
+		poolType == BurnWithFromMintTokenPool.String() ||
+		poolType == BurnToAddressMintTokenPool.String()
 }
 
 // familySelectors is a concurrent-safe registry of chain family → 4-byte

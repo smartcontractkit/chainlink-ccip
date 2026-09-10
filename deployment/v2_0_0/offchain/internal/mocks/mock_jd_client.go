@@ -83,9 +83,9 @@ type MockJDClient_ListNodeChainConfigs_Call struct {
 //   - ctx context.Context
 //   - in *node.ListNodeChainConfigsRequest
 //   - opts ...grpc.CallOption
-func (_e *MockJDClient_Expecter) ListNodeChainConfigs(ctx interface{}, in interface{}, opts ...interface{}) *MockJDClient_ListNodeChainConfigs_Call {
+func (_e *MockJDClient_Expecter) ListNodeChainConfigs(ctx any, in any, opts ...any) *MockJDClient_ListNodeChainConfigs_Call {
 	return &MockJDClient_ListNodeChainConfigs_Call{Call: _e.mock.On("ListNodeChainConfigs",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockJDClient_ListNodeChainConfigs_Call) Run(run func(ctx context.Context, in *node.ListNodeChainConfigsRequest, opts ...grpc.CallOption)) *MockJDClient_ListNodeChainConfigs_Call {
@@ -166,9 +166,9 @@ type MockJDClient_ListNodes_Call struct {
 //   - ctx context.Context
 //   - in *node.ListNodesRequest
 //   - opts ...grpc.CallOption
-func (_e *MockJDClient_Expecter) ListNodes(ctx interface{}, in interface{}, opts ...interface{}) *MockJDClient_ListNodes_Call {
+func (_e *MockJDClient_Expecter) ListNodes(ctx any, in any, opts ...any) *MockJDClient_ListNodes_Call {
 	return &MockJDClient_ListNodes_Call{Call: _e.mock.On("ListNodes",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockJDClient_ListNodes_Call) Run(run func(ctx context.Context, in *node.ListNodesRequest, opts ...grpc.CallOption)) *MockJDClient_ListNodes_Call {
@@ -249,9 +249,9 @@ type MockJDClient_ListProposals_Call struct {
 //   - ctx context.Context
 //   - in *job.ListProposalsRequest
 //   - opts ...grpc.CallOption
-func (_e *MockJDClient_Expecter) ListProposals(ctx interface{}, in interface{}, opts ...interface{}) *MockJDClient_ListProposals_Call {
+func (_e *MockJDClient_Expecter) ListProposals(ctx any, in any, opts ...any) *MockJDClient_ListProposals_Call {
 	return &MockJDClient_ListProposals_Call{Call: _e.mock.On("ListProposals",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockJDClient_ListProposals_Call) Run(run func(ctx context.Context, in *job.ListProposalsRequest, opts ...grpc.CallOption)) *MockJDClient_ListProposals_Call {
@@ -332,9 +332,9 @@ type MockJDClient_ProposeJob_Call struct {
 //   - ctx context.Context
 //   - in *job.ProposeJobRequest
 //   - opts ...grpc.CallOption
-func (_e *MockJDClient_Expecter) ProposeJob(ctx interface{}, in interface{}, opts ...interface{}) *MockJDClient_ProposeJob_Call {
+func (_e *MockJDClient_Expecter) ProposeJob(ctx any, in any, opts ...any) *MockJDClient_ProposeJob_Call {
 	return &MockJDClient_ProposeJob_Call{Call: _e.mock.On("ProposeJob",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockJDClient_ProposeJob_Call) Run(run func(ctx context.Context, in *job.ProposeJobRequest, opts ...grpc.CallOption)) *MockJDClient_ProposeJob_Call {
@@ -415,9 +415,9 @@ type MockJDClient_RevokeJob_Call struct {
 //   - ctx context.Context
 //   - in *job.RevokeJobRequest
 //   - opts ...grpc.CallOption
-func (_e *MockJDClient_Expecter) RevokeJob(ctx interface{}, in interface{}, opts ...interface{}) *MockJDClient_RevokeJob_Call {
+func (_e *MockJDClient_Expecter) RevokeJob(ctx any, in any, opts ...any) *MockJDClient_RevokeJob_Call {
 	return &MockJDClient_RevokeJob_Call{Call: _e.mock.On("RevokeJob",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockJDClient_RevokeJob_Call) Run(run func(ctx context.Context, in *job.RevokeJobRequest, opts ...grpc.CallOption)) *MockJDClient_RevokeJob_Call {
@@ -451,85 +451,6 @@ func (_c *MockJDClient_RevokeJob_Call) Return(revokeJobResponse *job.RevokeJobRe
 }
 
 func (_c *MockJDClient_RevokeJob_Call) RunAndReturn(run func(ctx context.Context, in *job.RevokeJobRequest, opts ...grpc.CallOption) (*job.RevokeJobResponse, error)) *MockJDClient_RevokeJob_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// BatchProposeJob provides a mock function for the type MockJDClient
-func (_mock *MockJDClient) BatchProposeJob(ctx context.Context, in *job.BatchProposeJobRequest, opts ...grpc.CallOption) (*job.BatchProposeJobResponse, error) {
-	var tmpRet mock.Arguments
-	if len(opts) > 0 {
-		tmpRet = _mock.Called(ctx, in, opts)
-	} else {
-		tmpRet = _mock.Called(ctx, in)
-	}
-	ret := tmpRet
-
-	if len(ret) == 0 {
-		panic("no return value specified for BatchProposeJob")
-	}
-
-	var r0 *job.BatchProposeJobResponse
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *job.BatchProposeJobRequest, ...grpc.CallOption) (*job.BatchProposeJobResponse, error)); ok {
-		return returnFunc(ctx, in, opts...)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *job.BatchProposeJobRequest, ...grpc.CallOption) *job.BatchProposeJobResponse); ok {
-		r0 = returnFunc(ctx, in, opts...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*job.BatchProposeJobResponse)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *job.BatchProposeJobRequest, ...grpc.CallOption) error); ok {
-		r1 = returnFunc(ctx, in, opts...)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockJDClient_BatchProposeJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchProposeJob'
-type MockJDClient_BatchProposeJob_Call struct {
-	*mock.Call
-}
-
-// BatchProposeJob is a helper method to define mock.On call
-//   - ctx context.Context
-//   - in *job.BatchProposeJobRequest
-//   - opts ...grpc.CallOption
-func (_e *MockJDClient_Expecter) BatchProposeJob(ctx interface{}, in interface{}, opts ...interface{}) *MockJDClient_BatchProposeJob_Call {
-	return &MockJDClient_BatchProposeJob_Call{Call: _e.mock.On("BatchProposeJob",
-		append([]interface{}{ctx, in}, opts...)...)}
-}
-
-func (_c *MockJDClient_BatchProposeJob_Call) Run(run func(ctx context.Context, in *job.BatchProposeJobRequest, opts ...grpc.CallOption)) *MockJDClient_BatchProposeJob_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *job.BatchProposeJobRequest
-		if args[1] != nil {
-			arg1 = args[1].(*job.BatchProposeJobRequest)
-		}
-		var arg2 []grpc.CallOption
-		var variadicArgs []grpc.CallOption
-		if len(args) > 2 {
-			variadicArgs = args[2].([]grpc.CallOption)
-		}
-		arg2 = variadicArgs
-		run(arg0, arg1, arg2...)
-	})
-	return _c
-}
-
-func (_c *MockJDClient_BatchProposeJob_Call) Return(batchProposeJobResponse *job.BatchProposeJobResponse, err error) *MockJDClient_BatchProposeJob_Call {
-	_c.Call.Return(batchProposeJobResponse, err)
-	return _c
-}
-
-func (_c *MockJDClient_BatchProposeJob_Call) RunAndReturn(run func(ctx context.Context, in *job.BatchProposeJobRequest, opts ...grpc.CallOption) (*job.BatchProposeJobResponse, error)) *MockJDClient_BatchProposeJob_Call {
 	_c.Call.Return(run)
 	return _c
 }
