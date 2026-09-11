@@ -108,10 +108,7 @@ func setupDeployNewOnRampTest(t *testing.T) *deployment.Environment {
 	)
 	lanes := make([]v2changesets.CrossFamilyLanePair, 0, len(upgradeTestChains)-1)
 	for _, remoteSel := range upgradeTestChains[1:] {
-		lanes = append(lanes, v2changesets.CrossFamilyLanePair{
-			ChainA: upgradeTestChains[0],
-			ChainB: remoteSel,
-		})
+		lanes = append(lanes, laneWithSeededGasPrice(upgradeTestChains[0], remoteSel))
 	}
 	_, err = cs.Apply(*e, v2changesets.ConfigureChainsForLanesFromTopologyConfig{
 		Topology: bidirectionalLaneTopology(deployer, upgradeTestChains...),

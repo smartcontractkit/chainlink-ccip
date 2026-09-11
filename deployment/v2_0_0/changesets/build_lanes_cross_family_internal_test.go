@@ -373,3 +373,119 @@ func TestMergeLaneLeg(t *testing.T) {
 		require.Equal(t, feeSecond, *cfg.RemoteChains[remoteB].MessageNetworkFeeUSDCents)
 	})
 }
+
+// committeeWithChains builds a committee whose chain_configs cover the given selectors.
+func committeeWithChains(qualifier string, selectors ...uint64) offchain.CommitteeConfig {
+	chainConfigs := make(map[string]offchain.ChainCommitteeConfig, len(selectors))
+	for _, selector := range selectors {
+		chainConfigs[strconv.FormatUint(selector, 10)] = offchain.ChainCommitteeConfig{}
+	}
+	return offchain.CommitteeConfig{Qualifier: qualifier, ChainConfigs: chainConfigs}
+}
+
+// A lane leg with no covering committee used to yield an empty qualifier list, which
+// configured the ramps, fee quoter and router while leaving the lane with no committee
+// verifier. That is the zkSync <-> Arbitrum failure mode.
+func TestCommitteeQualifiersForLaneLeg(t *testing.T) {
+	local := uint64(100)
+	remote := uint64(200)
+
+	tests := []struct {
+		name       string
+		committees map[string]offchain.CommitteeConfig
+		want       []string
+		wantErr    error
+	}{
+		{
+			name:       "Success - nil committees fall back to the default qualifier",
+			committees: nil,
+			want:       []string{defaultQualifier},
+		},
+		{
+			name: "Success - only committees covering both chains are returned",
+			committees: map[string]offchain.CommitteeConfig{
+				"alpha": committeeWithChains("alpha", local, remote),
+				"beta":  committeeWithChains("beta", local),
+			},
+			want: []string{"alpha"},
+		},
+		{
+			name: "Failure - local chain missing from every committee",
+			committees: map[string]offchain.CommitteeConfig{
+				"default": committeeWithChains("default", remote),
+			},
+			wantErr: ErrChainMissingFromCommittees,
+		},
+		{
+			name: "Failure - remote chain missing from every committee",
+			committees: map[string]offchain.CommitteeConfig{
+				"default": committeeWithChains("default", local),
+			},
+			wantErr: ErrChainMissingFromCommittees,
+		},
+		{
+			name:       "Failure - no committees defined",
+			committees: map[string]offchain.CommitteeConfig{},
+			wantErr:    ErrChainMissingFromCommittees,
+		},
+		{
+			name: "Failure - both chains present but never in the same committee",
+			committees: map[string]offchain.CommitteeConfig{
+				"beta":  committeeWithChains("beta", local),
+				"gamma": committeeWithChains("gamma", remote),
+			},
+			wantErr: ErrChainsShareNoCommittee,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := committeeQualifiersForLaneLeg(local, remote, tc.committees)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestExpandLanesToPartialChainConfigs_CommitteeCoverage(t *testing.T) {
+	chainA := uint64(100)
+	chainB := uint64(200)
+
+	tests := []struct {
+		name       string
+		committees map[string]offchain.CommitteeConfig
+		wantErr    error
+	}{
+		{
+			name: "Success - committee covers both lane chains",
+			committees: map[string]offchain.CommitteeConfig{
+				"default": committeeWithChains("default", chainA, chainB),
+			},
+		},
+		{
+			name: "Failure - lane chain missing from committee chain_configs",
+			committees: map[string]offchain.CommitteeConfig{
+				"default": committeeWithChains("default", chainA),
+			},
+			wantErr: ErrChainMissingFromCommittees,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
+				{ChainA: chainA, ChainB: chainB},
+			}, tc.committees)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Contains(t, err.Error(), "lane 0")
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}

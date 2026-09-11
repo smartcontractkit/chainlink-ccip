@@ -163,8 +163,8 @@ func signerAddressForNOPAlias(
 	}
 
 	return "", fmt.Errorf(
-		"NOP %q missing signer_address for family %s on committee %q chain %d",
-		alias, localFamily, committeeQualifier, remoteSelector,
+		"NOP %q missing signer_address for family %s on committee %q chain %d: %w",
+		alias, localFamily, committeeQualifier, remoteSelector, ErrNOPMissingSigner,
 	)
 }
 

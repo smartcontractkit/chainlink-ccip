@@ -2,6 +2,7 @@ package sequences
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -34,6 +35,19 @@ import (
 // OnRamp's default-executor field for a lane whose destination executes messages manually,
 // so there is no real Executor contract to name. The OnRamp then charges no execution fee.
 const NoExecutionAddress = "0xEBa517d200000000000000000000000000000000"
+
+// ErrNoDestGasPrice means the FeeQuoter has no gas price for a destination chain and the
+// lane config supplies none, so sends on the lane would revert with NoGasPriceAvailable.
+var ErrNoDestGasPrice = errors.New("fee quoter has no gas price for destination chain")
+
+// ErrInvalidGasPrice means the lane config supplied a USDPerUnitGas that is not a usable
+// gas price. A non-positive value (e.g. 0) is not a price: writing it on-chain would either
+// be rejected or silently break the lane, so it is refused rather than ignored.
+var ErrInvalidGasPrice = errors.New("usdPerUnitGas must be a positive value")
+
+// ErrBaseExecutionGasCostLowered means the lane config would write a BaseExecutionGasCost
+// below the value already on the OnRamp without AllowLoweringBaseExecutionGasCost set.
+var ErrBaseExecutionGasCostLowered = errors.New("refusing to lower baseExecutionGasCost")
 
 // ConfigureChainForLanes is the canonical sequence for configuring an EVM chain to participate
 // in CCIP 2.0 lanes with multiple remote chains. It is self-contained: all contract writes
@@ -137,21 +151,39 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 				return seqtypes.OnChainOutput{}, fmt.Errorf("remote chain %d: %w", remoteSelector, err)
 			}
 
-			if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas != nil {
-				gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-					ChainSelector: chain.Selector,
-					Address:       feeQuoterAddr,
-					Args:          remoteSelector,
-				})
-				if err != nil {
-					return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
-				}
-				if remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas.Cmp(gasPriceReport.Output.Value) != 0 {
+			// A FeeQuoter with no gas price for the destination reverts with
+			// NoGasPriceAvailable on the first send, so the lane needs one either already
+			// on chain or supplied with this config.
+			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
+				ChainSelector: chain.Selector,
+				Address:       feeQuoterAddr,
+				Args:          remoteSelector,
+			})
+			if err != nil {
+				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
+			}
+			onChainGasPrice := gasPriceReport.Output.Value
+			// The binding always returns a non-nil *big.Int for the on-chain price: a zero
+			// uint224 decodes to a non-nil zero, never to nil. So "no gas price on chain"
+			// is signalled by Sign() == 0, not by a nil pointer.
+			switch desired := remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas; {
+			case desired != nil && desired.Sign() > 0:
+				if desired.Cmp(onChainGasPrice) != 0 {
 					gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
 						DestChainSelector: remoteSelector,
-						UsdPerUnitGas:     remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas,
+						UsdPerUnitGas:     desired,
 					})
 				}
+			case desired != nil:
+				return seqtypes.OnChainOutput{}, fmt.Errorf(
+					"FeeQuoter(%s) on chain %d, dest chain %d: %w",
+					feeQuoterAddr, chain.Selector, remoteSelector, ErrInvalidGasPrice,
+				)
+			case onChainGasPrice.Sign() == 0:
+				return seqtypes.OnChainOutput{}, fmt.Errorf(
+					"FeeQuoter(%s) on chain %d, dest chain %d: %w",
+					feeQuoterAddr, chain.Selector, remoteSelector, ErrNoDestGasPrice,
+				)
 			}
 
 			// Router OnRamp: only add if the router doesn't already point to our OnRamp
@@ -494,6 +526,15 @@ func maybeAddOnRampDestChainConfigArgOnLocalChain(
 	}
 	if desired.BaseExecutionGasCost == 0 {
 		desired.BaseExecutionGasCost = current.BaseExecutionGasCost
+	}
+	// The family default is one flat value, so a lane re-run would otherwise reset a
+	// destination whose gas cost was raised by hand and break execution there.
+	if desired.BaseExecutionGasCost < current.BaseExecutionGasCost && !input.AllowLoweringBaseExecutionGasCost {
+		return nil, fmt.Errorf(
+			"OnRamp(%s) dest chain %d has baseExecutionGasCost %d, refusing to lower it to %d: %w",
+			onRampAddr, remoteSelector, current.BaseExecutionGasCost, desired.BaseExecutionGasCost,
+			ErrBaseExecutionGasCostLowered,
+		)
 	}
 	if desired.AddressBytesLength == 0 {
 		desired.AddressBytesLength = current.AddressBytesLength

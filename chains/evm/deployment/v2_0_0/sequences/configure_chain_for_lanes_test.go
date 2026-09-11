@@ -111,6 +111,11 @@ func buildConfigureChainForLanesInput(
 	remote deployedContracts,
 	remoteSelector uint64,
 ) changesetadapters.ConfigureChainForLanesInput {
+	// Lane configuration requires a gas price for the destination, either already on the
+	// FeeQuoter or supplied here.
+	fqDestChainConfig := testsetup.CreateBasicFeeQuoterDestChainConfigOverrides()
+	fqDestChainConfig.USDPerUnitGas = big.NewInt(20_000)
+
 	return changesetadapters.ConfigureChainForLanesInput{
 		ChainSelector: localSelector,
 		Router:        addrBytes(local.router),
@@ -136,7 +141,7 @@ func buildConfigureChainForLanesInput(
 				DefaultExecutor:          local.executor,
 				DefaultInboundCCVs:       []string{local.committeeVerifier},
 				DefaultOutboundCCVs:      []string{local.committeeVerifier},
-				FeeQuoterDestChainConfig: testsetup.CreateBasicFeeQuoterDestChainConfigOverrides(),
+				FeeQuoterDestChainConfig: fqDestChainConfig,
 				ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
 					USDCentsFee: 50,
 					Enabled:     true,
@@ -555,6 +560,7 @@ func TestConfigureChainForLanes_ConfiguresMultipleRemoteChainsInSingleCall(t *te
 			cfg.DefaultTokenDestGasOverhead = new(uint32(100_000))
 			cfg.DefaultTxGasLimit = new(uint32(250_000))
 			cfg.NetworkFeeUSDCents = func() *uint16 { v := uint16(20); return &v }()
+			cfg.USDPerUnitGas = big.NewInt(20_000)
 			return cfg
 		}(),
 		ExecutorDestChainConfig: changesetadapters.ExecutorDestChainConfig{
@@ -1206,4 +1212,193 @@ func TestConfigureChainForLanes_GasPriceUpdateSkippedWhenAlreadySet(t *testing.T
 	require.NoError(t, err)
 	assert.Less(t, len(report2.ExecutionReports), len(report1.ExecutionReports),
 		"second run should skip gas price update since value is already set")
+}
+
+// A FeeQuoter with no gas price for the destination reverts with NoGasPriceAvailable on
+// the first send. That is how the zkSync <-> Arbitrum lane came up dead: the lane was
+// configured correctly but neither FeeQuoter had ever been seeded with prices.
+func TestConfigureChainForLanes_RequiresDestinationGasPrice(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	const seededGasPrice = 7_000
+
+	tests := []struct {
+		name          string
+		usdPerUnitGas *big.Int
+		seedOnChain   bool
+		wantErr       error
+		wantOnChain   int64
+	}{
+		{
+			name:          "Success - gas price supplied with the lane config",
+			usdPerUnitGas: big.NewInt(42_000),
+			wantOnChain:   42_000,
+		},
+		{
+			name:        "Success - gas price already on the FeeQuoter",
+			seedOnChain: true,
+			wantOnChain: seededGasPrice,
+		},
+		{
+			name:    "Failure - no gas price supplied and none on the FeeQuoter",
+			wantErr: sequences.ErrNoDestGasPrice,
+		},
+		{
+			// An explicit "usdPerUnitGas: 0" in the pipeline YAML unmarshals to a
+			// non-nil zero. A non-positive value is not a gas price, so it is refused
+			// outright rather than treated as "not supplied" or silently ignored.
+			name:          "Failure - explicit zero gas price is refused",
+			usdPerUnitGas: big.NewInt(0),
+			wantErr:       sequences.ErrInvalidGasPrice,
+		},
+		{
+			name:          "Failure - explicit zero gas price is refused even with an on-chain price",
+			usdPerUnitGas: big.NewInt(0),
+			seedOnChain:   true,
+			wantErr:       sequences.ErrInvalidGasPrice,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+			)
+			require.NoError(t, err)
+
+			local := deployChain(t, e, chainSelector)
+			remote := deployChain(t, e, remoteChainSelector)
+
+			if tc.seedOnChain {
+				seeded := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+				rc := seeded.RemoteChains[remoteChainSelector]
+				rc.FeeQuoterDestChainConfig.USDPerUnitGas = big.NewInt(seededGasPrice)
+				seeded.RemoteChains[remoteChainSelector] = rc
+				_, err = operations.ExecuteSequence(
+					testsetup.BundleWithFreshReporter(e.OperationsBundle),
+					sequences.ConfigureChainForLanes, e.BlockChains, seeded,
+				)
+				require.NoError(t, err)
+			}
+
+			input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+			rc := input.RemoteChains[remoteChainSelector]
+			rc.FeeQuoterDestChainConfig.USDPerUnitGas = tc.usdPerUnitGas
+			input.RemoteChains[remoteChainSelector] = rc
+
+			_, err = operations.ExecuteSequence(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				sequences.ConfigureChainForLanes, e.BlockChains, input,
+			)
+			if tc.wantErr != nil {
+				// ExecuteSequence flattens the wrap chain, so match the sentinel's text.
+				require.ErrorContains(t, err, tc.wantErr.Error())
+				return
+			}
+			require.NoError(t, err)
+
+			evmChain := e.BlockChains.EVMChains()[chainSelector]
+			gasPrice, err := operations.ExecuteOperation(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				fee_quoter.GetDestinationChainGasPrice, evmChain, contract.FunctionInput[uint64]{
+					ChainSelector: evmChain.Selector,
+					Address:       common.HexToAddress(local.feeQuoter),
+					Args:          remoteChainSelector,
+				})
+			require.NoError(t, err)
+			require.Equal(t, tc.wantOnChain, gasPrice.Output.Value.Int64())
+		})
+	}
+}
+
+// zkSync needed baseExecutionGasCost 5_000_000 where the EVM adapter default is 200_000,
+// so a plain lane re-run would push the default over the corrected value and silently
+// re-break execution on the destination.
+func TestConfigureChainForLanes_RefusesToLowerBaseExecutionGasCost(t *testing.T) {
+	chainSelector := chainsel.TEST_90000001.Selector
+	remoteChainSelector := chainsel.TEST_90000002.Selector
+
+	const seeded = uint32(5_000_000)
+
+	tests := []struct {
+		name        string
+		gasCost     uint32
+		allowLower  bool
+		wantErr     error
+		wantOnChain uint32
+	}{
+		{
+			name:        "Success - same value is a no-op",
+			gasCost:     seeded,
+			wantOnChain: seeded,
+		},
+		{
+			name:        "Success - raising the value is applied",
+			gasCost:     seeded + 1_000_000,
+			wantOnChain: seeded + 1_000_000,
+		},
+		{
+			name:    "Failure - lowering the value is refused",
+			gasCost: 200_000,
+			wantErr: sequences.ErrBaseExecutionGasCostLowered,
+		},
+		{
+			name:        "Success - lowering is allowed with the opt-in flag",
+			gasCost:     200_000,
+			allowLower:  true,
+			wantOnChain: 200_000,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e, err := environment.New(t.Context(),
+				environment.WithEVMSimulated(t, []uint64{chainSelector, remoteChainSelector}),
+			)
+			require.NoError(t, err)
+
+			local := deployChain(t, e, chainSelector)
+			remote := deployChain(t, e, remoteChainSelector)
+
+			// Establish the corrected on-chain value first.
+			seedInput := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+			seedRC := seedInput.RemoteChains[remoteChainSelector]
+			seedRC.BaseExecutionGasCost = seeded
+			seedInput.RemoteChains[remoteChainSelector] = seedRC
+			_, err = operations.ExecuteSequence(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				sequences.ConfigureChainForLanes, e.BlockChains, seedInput,
+			)
+			require.NoError(t, err)
+
+			input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
+			input.AllowLoweringBaseExecutionGasCost = tc.allowLower
+			rc := input.RemoteChains[remoteChainSelector]
+			rc.BaseExecutionGasCost = tc.gasCost
+			input.RemoteChains[remoteChainSelector] = rc
+
+			_, err = operations.ExecuteSequence(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				sequences.ConfigureChainForLanes, e.BlockChains, input,
+			)
+			if tc.wantErr != nil {
+				// ExecuteSequence flattens the wrap chain, so match the sentinel's text.
+				require.ErrorContains(t, err, tc.wantErr.Error())
+				return
+			}
+			require.NoError(t, err)
+
+			evmChain := e.BlockChains.EVMChains()[chainSelector]
+			destCfg, err := operations.ExecuteOperation(
+				testsetup.BundleWithFreshReporter(e.OperationsBundle),
+				onramp.GetDestChainConfig, evmChain, contract.FunctionInput[uint64]{
+					ChainSelector: evmChain.Selector,
+					Address:       common.HexToAddress(local.onRamp),
+					Args:          remoteChainSelector,
+				})
+			require.NoError(t, err)
+			require.Equal(t, tc.wantOnChain, destCfg.Output.BaseExecutionGasCost)
+		})
+	}
 }
