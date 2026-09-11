@@ -27,6 +27,7 @@ import (
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	solchangesets "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -1237,6 +1238,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 				chain.Selector,
 				cciputils.CLLQualifier,
 			)
+			// After token expansion, the token's mint authority should be the pool-signer PDA
+			poolProgramID := solana.MustPublicKeyFromBase58(tokenPool.Address)
+			poolSigner, err := tokens.TokenPoolSignerAddress(tokenMint, poolProgramID)
+			require.NoError(t, err)
+			require.Equal(t, poolSigner, solanautils.GetTokenMintAuthority(chain, tokenMint),
+				"precondition: after manual registration the mint authority is the pool signer PDA")
 
 			// Verify that a new admin was proposed for the specified token
 			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
@@ -1348,7 +1355,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 							Address: tokenAddr.Address,
 						},
 						SVMExtraArgs: &tokensapi.SVMExtraArgs{
-							SkipTokenPoolInit: true,
+							SkipTokenPoolInit:     true,
+							TransferMintAuthority: true,
 							CustomerMintAuthorities: []solana.PublicKey{
 								externalAdmin,
 							},
@@ -1360,6 +1368,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			MergeAddresses(t, env, output.DataStore)
 			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
+			// SPL token multisig should have been created
 			multisigRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 				ChainSelector: solbnm.Chain.Selector,
 				Version:       cciputils.Version_1_6_0,
@@ -1368,12 +1377,52 @@ func TestTokensAndTokenPools(t *testing.T) {
 			}, solbnm.Chain.Selector, datastore_utils.FullRef)
 			require.NoError(t, err)
 
+			// ALT should have been extended
 			lutAfter, err := solcommon.GetAddressLookupTable(t.Context(), chain.Client, tar.LookupTable)
 			require.NoError(t, err)
-
 			multisigPubkey := solana.MustPublicKeyFromBase58(multisigRef.Address)
 			require.Contains(t, lutAfter, multisigPubkey, "multisig must be present in token pool lookup table entries")
 			require.GreaterOrEqual(t, len(lutAfter), lutLenBefore+1, "token pool lookup table should include the new multisig entry")
+
+			// Token mint authority is now the token multisig
+			require.Equal(t, multisigPubkey, solanautils.GetTokenMintAuthority(chain, tokenMint),
+				"after the changeset the token multisig is the mint authority")
+
+			// Re-running the standalone remediation changeset with the multisig as the
+			// (already current) target must be an idempotent no-op: no transfer instruction
+			// is built, so no MCMS proposal is produced.
+			noopOut, err := solchangesets.TransferMintAuthoritiesChangeset().Apply(*env,
+				solchangesets.TransferMintAuthoritiesChangesetInput{
+					ChainSelector: solbnm.Chain.Selector,
+					MCMS:          NewDefaultInputForMCMS("re-run mint authority transfer (idempotent no-op)"),
+					Updates: []solchangesets.TokenMintAuthorityUpdate{{
+						TokenPoolRef:     datastore.AddressRef{Address: tokenPool.Address, Type: datastore.ContractType(solbnm.TokenPoolType)},
+						TokenMint:        tokenMint,
+						NewMintAuthority: multisigPubkey,
+					}},
+				})
+			require.NoError(t, err)
+			require.Empty(t, noopOut.MCMSTimelockProposals,
+				"re-running with the current authority as target should not schedule an MCMS proposal")
+			require.Equal(t, multisigPubkey, solanautils.GetTokenMintAuthority(chain, tokenMint),
+				"mint authority must be unchanged after the idempotent re-run")
+
+			// Transfers are only valid from the pool signer PDA, so once the authority has
+			// moved off the pool signer a follow-up transfer to a different authority must
+			// fail fast instead of scheduling an instruction that reverts at execution.
+			rejectOut, err := solchangesets.TransferMintAuthoritiesChangeset().Apply(*env,
+				solchangesets.TransferMintAuthoritiesChangesetInput{
+					ChainSelector: solbnm.Chain.Selector,
+					MCMS:          NewDefaultInputForMCMS("re-run mint authority transfer (rejected)"),
+					Updates: []solchangesets.TokenMintAuthorityUpdate{{
+						TokenPoolRef:     datastore.AddressRef{Address: tokenPool.Address, Type: datastore.ContractType(solbnm.TokenPoolType)},
+						TokenMint:        tokenMint,
+						NewMintAuthority: solana.NewWallet().PublicKey(),
+					}},
+				})
+			require.Error(t, err, "transfer away from a non-pool-signer authority must be rejected")
+			require.Contains(t, err.Error(), "neither the pool signer")
+			require.Empty(t, rejectOut.MCMSTimelockProposals)
 		})
 	})
 }
