@@ -102,8 +102,21 @@ func transferMintAuthoritiesApply(e cldf.Environment, input TransferMintAuthorit
 			return cldf.ChangesetOutput{}, fmt.Errorf("update[%d]: failed to resolve token pool ref: %w", i, err)
 		}
 		poolSigner, _ := tokens.TokenPoolSignerAddress(u.TokenMint, poolPubkey)
-		if current := solanautils.GetTokenMintAuthority(chain, u.TokenMint); current != poolSigner && current != u.NewMintAuthority {
+		current := solanautils.GetTokenMintAuthority(chain, u.TokenMint)
+		if current == u.NewMintAuthority {
+			// Idempotent update: the transfer is a no-op, so it never reaches the
+			// pool's upgrade-authority check and needs no further validation here
+			continue
+		}
+		if current != poolSigner {
 			return cldf.ChangesetOutput{}, fmt.Errorf("update[%d]: current mint authority %s is neither the pool signer PDA %s nor the target %s", i, current, poolSigner, u.NewMintAuthority)
+		}
+		authority, err := solanautils.GetUpgradeAuthority(chain.Client, poolPubkey)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("update[%d]: failed to get upgrade authority for token pool: %w", i, err)
+		}
+		if authority == (solana.PublicKey{}) {
+			return cldf.ChangesetOutput{}, fmt.Errorf("update[%d]: pool is immutable (no upgrade authority); cannot transfer mint authority", i)
 		}
 	}
 
