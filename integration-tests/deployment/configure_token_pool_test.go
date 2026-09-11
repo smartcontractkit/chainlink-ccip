@@ -13,7 +13,6 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
-	evmrouterops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evm_testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	tokenpoolV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
@@ -89,30 +88,6 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 				FeeAdmin:     new("0x2222222222222222222222222222222222222222"),
 			}),
 			errors: []string{"does not match the enclosing chain selector"},
-		},
-		{
-			name: "rejects_mismatched_router_ref_chain_selector",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				RouterRef:    &datastore.AddressRef{Address: "0x3333333333333333333333333333333333333333", ChainSelector: dst},
-			}),
-			errors: []string{"routerRef.chainSelector"},
-		},
-		{
-			name: "rejects_empty_router_ref",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				RouterRef:    &datastore.AddressRef{},
-			}),
-			errors: []string{"empty routerRef"},
-		},
-		{
-			name: "rejects_malformed_router_ref_address",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				RouterRef:    &datastore.AddressRef{Address: "not-an-address"},
-			}),
-			errors: []string{"routerRef", "unnormalizable"},
 		},
 		{
 			name:   "rejects_empty_pool_update",
@@ -437,7 +412,7 @@ func TestConfigureTokenPool_Router(t *testing.T) {
 			ChainSelector: tc.selA,
 			Pools: []tokensapi.PoolConfigUpdate{{
 				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
-				RouterRef:    &datastore.AddressRef{Address: newRouter},
+				Router:       &newRouter,
 			}},
 		}},
 	}
@@ -459,40 +434,31 @@ func TestConfigureTokenPool_Router(t *testing.T) {
 	after := CurrentBlockEVM(t, tc.env, tc.selA)
 	require.Equal(t, before, after, "no-op router update must not send a transaction")
 
-	// Datastore lookup: a Type-only ref resolves to the chain's production Router and
-	// repoints the pool back to it.
-	prodRouter, err := datastore_utils.FindAndFormatRef(tc.env.DataStore, datastore.AddressRef{
-		Type:    datastore.ContractType(evmrouterops.ContractType),
-		Version: evmrouterops.Version,
-	}, tc.selA, datastore_utils.FullRef)
-	require.NoError(t, err)
-	require.NotEqual(t, common.HexToAddress(newRouter), common.HexToAddress(prodRouter.Address))
-
-	input.Chains[0].Pools[0].RouterRef = &datastore.AddressRef{Type: datastore.ContractType(evmrouterops.ContractType), Version: evmrouterops.Version}
-	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
-	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
-	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
-	require.NoError(t, err)
-	postCfg, err = pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
-	require.NoError(t, err)
-	require.Equal(t, common.HexToAddress(prodRouter.Address), postCfg.Router, "Type-only routerRef must resolve to the production Router")
-
-	// A zero router would revert on-chain, so the EVM adapter rejects it before emitting
-	// anything. VerifyPreconditions passes: what counts as a zero address is family-specific,
-	// so that judgement belongs to the chain adapter rather than the top-level changeset.
-	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
-		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
-		RouterRef:    &datastore.AddressRef{Address: "0x0000000000000000000000000000000000000000"},
+	// Address validation lives in the EVM adapter, so malformed and zero addresses pass
+	// VerifyPreconditions (what either looks like is family-specific) and fail at apply,
+	// before any transaction is sent.
+	for _, bad := range []struct {
+		name, router, wantErr string
+	}{
+		{"malformed", "not-an-address", "invalid router address"},
+		{"zero", "0x0000000000000000000000000000000000000000", "must not be the zero address"},
+	} {
+		t.Run("rejects_"+bad.name+"_router", func(t *testing.T) {
+			input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
+				TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
+				Router:       &bad.router,
+			}
+			require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+			tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+			beforeBad := CurrentBlockEVM(t, tc.env, tc.selA)
+			_, err := tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+			require.ErrorContains(t, err, bad.wantErr)
+			require.Equal(t, beforeBad, CurrentBlockEVM(t, tc.env, tc.selA), "must be rejected before any transaction is sent")
+			cfg, err := pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			require.Equal(t, common.HexToAddress(newRouter), cfg.Router, "on-chain router must be untouched")
+		})
 	}
-	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
-	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
-	beforeZero := CurrentBlockEVM(t, tc.env, tc.selA)
-	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
-	require.ErrorContains(t, err, "must not be the zero address")
-	require.Equal(t, beforeZero, CurrentBlockEVM(t, tc.env, tc.selA), "zero router must be rejected before any transaction is sent")
-	postCfg, err = pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
-	require.NoError(t, err)
-	require.Equal(t, common.HexToAddress(prodRouter.Address), postCfg.Router, "zero router must leave the on-chain router untouched")
 }
 
 func TestConfigureTokenPool_Admins_PreV2(t *testing.T) {
@@ -591,7 +557,7 @@ func testConfigureTokenPoolRouterPreV2(t *testing.T, version *semver.Version) {
 			ChainSelector: pair.selA,
 			Pools: []tokensapi.PoolConfigUpdate{{
 				TokenPoolRef: datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
-				RouterRef:    &datastore.AddressRef{Address: newRouter},
+				Router:       &newRouter,
 			}},
 		}},
 	}
@@ -1112,7 +1078,7 @@ func TestConfigureTokenPool_UnsupportedFields_Solana(t *testing.T) {
 				ChainSelector: bnm.Ref.ChainSelector,
 				Pools: []tokensapi.PoolConfigUpdate{{
 					TokenPoolRef: apiPoolRef,
-					RouterRef:    &datastore.AddressRef{Address: router},
+					Router:       &router,
 				}},
 			}},
 			MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
