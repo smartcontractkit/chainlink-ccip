@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	_ tokens.TokenPoolAdminAdapter = &TokenAdapter{}
+	_ tokens.TokenPoolDynamicConfigAdapter = &TokenAdapter{}
 	_ tokens.TokenPoolMigrator     = &TokenAdapter{}
 	_ tokens.TokenFeeAdapter       = &TokenAdapter{}
 	_ tokens.RemotePoolRemover     = &TokenAdapter{}
@@ -425,7 +425,7 @@ func (p *poolOpsV200) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	return writes, nil
 }
 
-func (p *poolOpsV200) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]contract.WriteOutput, error) {
+func (p *poolOpsV200) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]contract.WriteOutput, error) {
 	pool, err := token_pool.NewTokenPoolContract(poolAddr, chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate token pool v2.0.0 contract at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)

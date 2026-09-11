@@ -28,7 +28,7 @@ import (
 var (
 	_ tokensapi.TokenPoolMigrator     = &TokenAdapter{}
 	_ tokensapi.TokenAdapter          = &TokenAdapter{}
-	_ tokensapi.TokenPoolAdminAdapter = &TokenAdapter{}
+	_ tokensapi.TokenPoolDynamicConfigAdapter = &TokenAdapter{}
 )
 
 // TokenAdapter handles EVM token pools at version 1.6.1.
@@ -218,7 +218,7 @@ func (p *poolOpsV161) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	return []evm_contract.WriteOutput{report.Output}, nil
 }
 
-func (p *poolOpsV161) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error) {
+func (p *poolOpsV161) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error) {
 	if feeAdmin != nil {
 		return nil, fmt.Errorf("fee admin is not supported on v1.6.x token pools (pool %s on chain %d)", poolAddr.Hex(), chain.Selector)
 	}

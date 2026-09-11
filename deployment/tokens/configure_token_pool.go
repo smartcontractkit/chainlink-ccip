@@ -200,7 +200,7 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 				}
 
 				if pool.RouterRef != nil || pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
-					adminAdapter, ok := adapter.(TokenPoolAdminAdapter)
+					dynamicConfigAdapter, ok := adapter.(TokenPoolDynamicConfigAdapter)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf(
 							"adapter for chain selector %d (family %s, version %s) does not support router or admin role updates",
@@ -215,7 +215,7 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 						}
 						router = &resolved
 					}
-					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
+					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, dynamicConfigAdapter.SetTokenPoolDynamicConfig(), e.BlockChains, SetTokenPoolDynamicConfigSequenceInput{
 						Selector:       selector,
 						Router:         router,
 						RateLimitAdmin: pool.RateLimitAdmin,

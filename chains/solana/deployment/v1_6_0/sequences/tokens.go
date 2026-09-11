@@ -599,7 +599,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 	)
 }
 
-var _ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
+var _ tokenapi.TokenPoolDynamicConfigAdapter = (*SolanaAdapter)(nil)
 var _ tokenapi.RemotePoolRemover = (*SolanaAdapter)(nil)
 
 // RemoveRemotePools removes remote pool entries from a Solana 1.6 token pool. The pool address
@@ -681,18 +681,18 @@ func remotePoolAddressToBytes(remoteSelector uint64, address string) ([]byte, er
 	return normalizer.StringToBytes(address)
 }
 
-// SetTokenPoolAdmins updates the rate limit admin on a Solana 1.6 token pool. Solana pools
-// have no fee admin concept, so a non-nil FeeAdmin is rejected, and the router is not
+// SetTokenPoolDynamicConfig updates the rate limit admin on a Solana 1.6 token pool. Solana
+// pools have no fee admin concept, so a non-nil FeeAdmin is rejected, and the router is not
 // configurable here either (see below), so a non-nil Router is rejected too. The pool address
 // is a program ID shared across mints, so the token mint comes from input.TokenRef and the
 // pool type from input.TokenPoolRef. The underlying operation performs the read-compare no-op
 // check and emits an MCMS batch operation when the pool authority is not the deployer key.
-func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *SolanaAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokenapi.SetTokenPoolDynamicConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
-		"SetTokenPoolAdmins",
+		"SetTokenPoolDynamicConfig",
 		common_utils.Version_1_6_0,
 		"Sets the rate limit admin on a Solana 1.6 token pool; no-op when the value already matches",
-		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.SetTokenPoolDynamicConfigSequenceInput) (sequences.OnChainOutput, error) {
 			if input.FeeAdmin != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("fee admin is not supported on Solana 1.6 token pools (pool %s on chain %d)", input.TokenPoolRef.Address, input.Selector)
 			}

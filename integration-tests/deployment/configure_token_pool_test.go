@@ -409,7 +409,7 @@ func TestConfigureTokenPool_Admins(t *testing.T) {
 	after := CurrentBlockEVM(t, tc.env, tc.selA)
 	require.Equal(t, before, after, "no-op admin update must not send transactions")
 
-	// Invalid admin address formats are validated by the EVM SetTokenPoolAdmins sequence at
+	// Invalid admin address formats are validated by the EVM SetTokenPoolDynamicConfig sequence at
 	// apply time; the top-level changeset stays chain-agnostic and no longer checks formats.
 	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
 		TokenPoolRef:   datastore.AddressRef{Address: tc.poolA.Hex()},
