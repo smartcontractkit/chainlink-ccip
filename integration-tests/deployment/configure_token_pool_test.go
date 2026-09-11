@@ -115,14 +115,6 @@ func TestConfigureTokenPool_VerifyPreconditions(t *testing.T) {
 			errors: []string{"routerRef", "unnormalizable"},
 		},
 		{
-			name: "rejects_zero_router_ref_address",
-			input: singlePoolInput(tokensapi.PoolConfigUpdate{
-				TokenPoolRef: poolRef,
-				RouterRef:    &datastore.AddressRef{Address: "0x0000000000000000000000000000000000000000"},
-			}),
-			errors: []string{"router address", "must not be zero"},
-		},
-		{
 			name:   "rejects_empty_pool_update",
 			input:  singlePoolInput(tokensapi.PoolConfigUpdate{TokenPoolRef: poolRef}),
 			errors: []string{"no fields to update"},
@@ -485,13 +477,22 @@ func TestConfigureTokenPool_Router(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, common.HexToAddress(prodRouter.Address), postCfg.Router, "Type-only routerRef must resolve to the production Router")
 
-	// A zero router is rejected up front by VerifyPreconditions, before anything executes.
+	// A zero router would revert on-chain, so the EVM adapter rejects it before emitting
+	// anything. VerifyPreconditions passes: what counts as a zero address is family-specific,
+	// so that judgement belongs to the chain adapter rather than the top-level changeset.
 	input.Chains[0].Pools[0] = tokensapi.PoolConfigUpdate{
 		TokenPoolRef: datastore.AddressRef{Address: tc.poolA.Hex()},
 		RouterRef:    &datastore.AddressRef{Address: "0x0000000000000000000000000000000000000000"},
 	}
-	err = tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input)
-	require.ErrorContains(t, err, "must not be zero")
+	require.NoError(t, tokensapi.ConfigureTokenPool().VerifyPreconditions(*tc.env, input))
+	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
+	beforeZero := CurrentBlockEVM(t, tc.env, tc.selA)
+	_, err = tokensapi.ConfigureTokenPool().Apply(*tc.env, input)
+	require.ErrorContains(t, err, "must not be the zero address")
+	require.Equal(t, beforeZero, CurrentBlockEVM(t, tc.env, tc.selA), "zero router must be rejected before any transaction is sent")
+	postCfg, err = pool.GetDynamicConfig(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(prodRouter.Address), postCfg.Router, "zero router must leave the on-chain router untouched")
 }
 
 func TestConfigureTokenPool_Admins_PreV2(t *testing.T) {

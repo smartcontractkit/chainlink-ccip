@@ -220,13 +220,18 @@ func (a *EVMPoolAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokensap
 			}
 			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
 
-			// Router is validated (format + non-zero) by the changeset before it reaches the adapter.
 			var router *common.Address
 			if input.Router != nil {
 				if !common.IsHexAddress(*input.Router) {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid router address for chain %d: %s", input.Selector, *input.Router)
 				}
 				addr := common.HexToAddress(*input.Router)
+				// A zero router always reverts on-chain (ZeroAddressNotAllowed on pre-2.0
+				// setRouter, ZeroAddressInvalid on 2.0+ setDynamicConfig), so reject it here
+				// rather than emit a transaction or proposal that is certain to fail.
+				if addr == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("router address for chain %d must not be the zero address", input.Selector)
+				}
 				router = &addr
 			}
 			var rateLimitAdmin *common.Address

@@ -40,7 +40,8 @@ type ConfigureTokenPoolPerChain struct {
 // PoolConfigUpdate describes a partial configuration update for a single token pool.
 // Every field other than TokenPoolRef is optional: absent fields leave on-chain state
 // untouched. To clear an admin value, provide it explicitly (e.g. the zero address).
-// RouterRef cannot be cleared: token pools reject a zero router on every family.
+// RouterRef cannot be cleared: token pools revert on a zero router, and the chain adapter
+// rejects one up front.
 type PoolConfigUpdate struct {
 	// TokenPoolRef is a reference to the token pool in the datastore. For Solana, this must be
 	// the pool's config PDA, not the pool program ID: a Solana pool address is a program ID
@@ -253,12 +254,15 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 // routerContractType is the datastore Type used for the production router on every family.
 const routerContractType = datastore.ContractType("Router")
 
-// resolveRouterRef resolves a RouterRef to a normalized, non-zero, family-specific address
-// string for the given chain. Semantics match EVMTokenBase.ResolveRouterAddress (used by the
+// resolveRouterRef resolves a RouterRef to a normalized, family-specific address string for
+// the given chain. Semantics match EVMTokenBase.ResolveRouterAddress (used by the
 // deploy-token-pool sequences under the same `routerRef` YAML field):
 //   - an explicit Address is normalized and used directly, with no datastore lookup;
 //   - otherwise the ref is looked up in the datastore for this chain, with Type defaulting to
 //     the production Router contract type when unset.
+//
+// Semantic validation of the resolved address (in particular rejecting the family's zero
+// address, which every token pool reverts on) belongs to the chain adapter, not here.
 func resolveRouterRef(ds datastore.DataStore, selector uint64, routerRef datastore.AddressRef) (string, error) {
 	if routerRef.Address != "" {
 		return normalizeRouterAddress(selector, routerRef.Address)
@@ -275,10 +279,10 @@ func resolveRouterRef(ds datastore.DataStore, selector uint64, routerRef datasto
 	return normalizeRouterAddress(selector, found.Address)
 }
 
-// normalizeRouterAddress canonicalizes a router address (explicit or datastore-resolved) for the
-// given chain using the family AddressNormalizer and rejects the zero address. Token pools on
-// every supported family reject a zero router on-chain, so this fails fast instead of producing
-// a doomed transaction or proposal.
+// normalizeRouterAddress canonicalizes a router address (explicit or datastore-resolved) for
+// the given chain using the family AddressNormalizer. It only checks that the address is
+// well-formed for its family; what constitutes a usable router (e.g. not the family's zero
+// address) is the chain adapter's call, since each family spells that differently.
 func normalizeRouterAddress(selector uint64, address string) (string, error) {
 	if address == "" {
 		return "", fmt.Errorf("router address on chain selector %d must not be empty", selector)
@@ -295,20 +299,6 @@ func normalizeRouterAddress(selector uint64, address string) (string, error) {
 	normalized, err := normalizer.NormalizeAddress(address)
 	if err != nil {
 		return "", fmt.Errorf("router address %s on chain selector %d is unnormalizable: %w", address, selector, err)
-	}
-	raw, err := normalizer.StringToBytes(normalized)
-	if err != nil {
-		return "", fmt.Errorf("router address %s on chain selector %d is unnormalizable: %w", address, selector, err)
-	}
-	allZero := true
-	for _, b := range raw {
-		if b != 0 {
-			allZero = false
-			break
-		}
-	}
-	if allZero {
-		return "", fmt.Errorf("router address for chain selector %d must not be zero", selector)
 	}
 	return normalized, nil
 }
