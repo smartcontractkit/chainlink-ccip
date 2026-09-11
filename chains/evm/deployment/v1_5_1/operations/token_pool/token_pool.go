@@ -203,3 +203,17 @@ var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *tok
 		return tp.GetRemotePools(opts, args)
 	},
 })
+
+var SetRouter = contract.NewWrite(contract.WriteParams[common.Address, *token_pool.TokenPool]{
+	Name:            "token-pool:set-router",
+	Version:         Version,
+	Description:     "Calls setRouter on the TokenPool 1.5.1 contract",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return tp.SetRouter(opts, args)
+	},
+})

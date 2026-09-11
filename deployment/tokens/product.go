@@ -35,18 +35,23 @@ type TokenFeeAdapter interface {
 	GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeConfig
 }
 
-// TokenPoolAdminAdapter is an optional interface for adapters that support updating a token
-// pool's admin roles. Implementations must read the current on-chain values and emit no
-// writes when the desired values already match (idempotent apply).
-type TokenPoolAdminAdapter interface {
-	SetTokenPoolAdmins() *cldf_ops.Sequence[SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+// TokenPoolDynamicConfigAdapter is an optional interface for adapters that support updating a
+// token pool's dynamic configuration: its router and its admin roles. These are bundled
+// because v2.0+ EVM pools write router and both admins in a single SetDynamicConfig call.
+// Implementations must read the current on-chain values and emit no writes when the desired
+// values already match (idempotent apply).
+type TokenPoolDynamicConfigAdapter interface {
+	SetTokenPoolDynamicConfig() *cldf_ops.Sequence[SetTokenPoolDynamicConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
-// SetTokenPoolAdminsSequenceInput defines the input for updating a token pool's admin roles.
-// Nil fields are left unchanged on-chain.
-type SetTokenPoolAdminsSequenceInput struct {
+// SetTokenPoolDynamicConfigSequenceInput defines the input for updating a token pool's router
+// and admin roles. Nil fields are left unchanged on-chain.
+type SetTokenPoolDynamicConfigSequenceInput struct {
 	// Selector is the chain selector for the chain on which the pool lives.
 	Selector uint64 `json:"selector" yaml:"selector"`
+	// Router, if non-nil, is the desired router address (already resolved to a
+	// family-specific string by the changeset).
+	Router *string `json:"router,omitempty" yaml:"router,omitempty"`
 	// RateLimitAdmin, if non-nil, is the desired rate limit admin.
 	RateLimitAdmin *string `json:"rateLimitAdmin,omitempty" yaml:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if non-nil, is the desired fee admin.

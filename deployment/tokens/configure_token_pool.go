@@ -39,7 +39,9 @@ type ConfigureTokenPoolPerChain struct {
 
 // PoolConfigUpdate describes a partial configuration update for a single token pool.
 // Every field other than TokenPoolRef is optional: absent fields leave on-chain state
-// untouched. To clear a value, provide it explicitly (e.g. the zero address).
+// untouched. To clear an admin value, provide it explicitly (e.g. the zero address).
+// Router cannot be cleared: token pools revert on a zero router, and the chain adapter
+// rejects one up front.
 type PoolConfigUpdate struct {
 	// TokenPoolRef is a reference to the token pool in the datastore. For Solana, this must be
 	// the pool's config PDA, not the pool program ID: a Solana pool address is a program ID
@@ -51,6 +53,13 @@ type PoolConfigUpdate struct {
 	RateLimitAdmin *string `yaml:"rateLimitAdmin,omitempty" json:"rateLimitAdmin,omitempty"`
 	// FeeAdmin, if set, is the desired fee admin address (v2+ only).
 	FeeAdmin *string `yaml:"feeAdmin,omitempty" json:"feeAdmin,omitempty"`
+	// Router, if set, is the desired router address for the pool, in the chain family's own
+	// address format. The chain adapter validates it and rejects the family's zero address.
+	//
+	// EVM only. Solana has a single router program per chain (it doubles as the OnRamp and the
+	// token admin registry) that is upgraded in place, so repointing a pool at a different
+	// router is not a meaningful operation there; the Solana adapter rejects a non-nil Router.
+	Router *string `yaml:"router,omitempty" json:"router,omitempty"`
 	// Remotes lists per-lane configuration updates.
 	Remotes []RemoteConfigUpdate `yaml:"remotes,omitempty" json:"remotes,omitempty"`
 }
@@ -96,7 +105,7 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 				if pool.TokenPoolRef.ChainSelector != 0 && pool.TokenPoolRef.ChainSelector != chainCfg.ChainSelector {
 					return fmt.Errorf("pool entry %s has tokenPoolRef.chainSelector %d that does not match the enclosing chain selector %d", datastore_utils.SprintRef(pool.TokenPoolRef), pool.TokenPoolRef.ChainSelector, chainCfg.ChainSelector)
 				}
-				if pool.FinalityConfig == nil && pool.RateLimitAdmin == nil && pool.FeeAdmin == nil && len(pool.Remotes) == 0 {
+				if pool.FinalityConfig == nil && pool.RateLimitAdmin == nil && pool.FeeAdmin == nil && pool.Router == nil && len(pool.Remotes) == 0 {
 					return fmt.Errorf("pool entry %s on chain selector %d has no fields to update", datastore_utils.SprintRef(pool.TokenPoolRef), chainCfg.ChainSelector)
 				}
 				if pool.FinalityConfig != nil {
@@ -174,16 +183,17 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 					reports = append(reports, report.ExecutionReports...)
 				}
 
-				if pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
-					adminAdapter, ok := adapter.(TokenPoolAdminAdapter)
+				if pool.Router != nil || pool.RateLimitAdmin != nil || pool.FeeAdmin != nil {
+					dynamicConfigAdapter, ok := adapter.(TokenPoolDynamicConfigAdapter)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf(
-							"adapter for chain selector %d (family %s, version %s) does not support admin role updates",
+							"adapter for chain selector %d (family %s, version %s) does not support router or admin role updates",
 							selector, family, fullPoolRef.Version,
 						)
 					}
-					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adminAdapter.SetTokenPoolAdmins(), e.BlockChains, SetTokenPoolAdminsSequenceInput{
+					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, dynamicConfigAdapter.SetTokenPoolDynamicConfig(), e.BlockChains, SetTokenPoolDynamicConfigSequenceInput{
 						Selector:       selector,
+						Router:         pool.Router,
 						RateLimitAdmin: pool.RateLimitAdmin,
 						FeeAdmin:       pool.FeeAdmin,
 						TokenPoolRef:   fullPoolRef,

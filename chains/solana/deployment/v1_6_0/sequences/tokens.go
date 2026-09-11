@@ -599,7 +599,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 	)
 }
 
-var _ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
+var _ tokenapi.TokenPoolDynamicConfigAdapter = (*SolanaAdapter)(nil)
 var _ tokenapi.RemotePoolRemover = (*SolanaAdapter)(nil)
 
 // RemoveRemotePools removes remote pool entries from a Solana 1.6 token pool. The pool address
@@ -681,19 +681,32 @@ func remotePoolAddressToBytes(remoteSelector uint64, address string) ([]byte, er
 	return normalizer.StringToBytes(address)
 }
 
-// SetTokenPoolAdmins updates the rate limit admin on a Solana 1.6 token pool. Solana pools
-// have no fee admin concept, so a non-nil FeeAdmin is rejected. The pool address is a program
-// ID shared across mints, so the token mint comes from input.TokenRef and the pool type from
-// input.TokenPoolRef. The underlying operation performs the read-compare no-op check and
-// emits an MCMS batch operation when the pool authority is not the deployer key.
-func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+// SetTokenPoolDynamicConfig updates the rate limit admin on a Solana 1.6 token pool. Solana
+// pools have no fee admin concept, so a non-nil FeeAdmin is rejected, and the router is not
+// configurable here either (see below), so a non-nil Router is rejected too. The pool address
+// is a program ID shared across mints, so the token mint comes from input.TokenRef and the
+// pool type from input.TokenPoolRef. The underlying operation performs the read-compare no-op
+// check and emits an MCMS batch operation when the pool authority is not the deployer key.
+func (a *SolanaAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokenapi.SetTokenPoolDynamicConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
-		"SetTokenPoolAdmins",
+		"SetTokenPoolDynamicConfig",
 		common_utils.Version_1_6_0,
 		"Sets the rate limit admin on a Solana 1.6 token pool; no-op when the value already matches",
-		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.SetTokenPoolDynamicConfigSequenceInput) (sequences.OnChainOutput, error) {
 			if input.FeeAdmin != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("fee admin is not supported on Solana 1.6 token pools (pool %s on chain %d)", input.TokenPoolRef.Address, input.Selector)
+			}
+			// Router updates are deliberately unsupported on Solana 1.6. Unlike EVM, there is a
+			// single router program per chain (it doubles as the OnRamp and the token admin
+			// registry) and it is upgraded in place, so repointing a pool at a different router
+			// is not a meaningful operation on this family. Two further constraints would have to
+			// be handled if that ever changes: the on-chain AdminUpdateTokenPool context needs a
+			// single signer that is both the pool owner and the token pool program's upgrade
+			// authority, and token pool programs before solana-v1.6.2 declare
+			// AdminUpdateTokenPool.state without `mut`, so set_router succeeds on-chain while
+			// silently discarding the write.
+			if input.Router != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("router is not supported on Solana 1.6 token pools (pool %s on chain %d)", input.TokenPoolRef.Address, input.Selector)
 			}
 			if input.RateLimitAdmin == nil {
 				return sequences.OnChainOutput{}, nil
