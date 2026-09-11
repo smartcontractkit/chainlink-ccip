@@ -6,10 +6,12 @@ import (
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/hooks" // registers EVM post-proposal CCIP send hook provider
 	adapters1_2_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	evmseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	adaptersV1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 	rmnadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -33,6 +35,9 @@ func init() {
 	laneMigratorRegistry := deploy.GetLaneMigratorRegistry()
 	laneMigratorRegistry.RegisterRouterUpdater(chainsel.FamilyEVM, v1_2_0, &adapters1_2_0.RouterUpdater{})
 	laneMigratorRegistry.RegisterRampUpdater(chainsel.FamilyEVM, v1_6_0, &LaneMigrator{})
+
+	// TODO: replace me with an actual v1.6.0 implementation
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v1_6_0, adaptersV1_6_1.NewTokenAdapter())
 
 	// NOTE: the fee quoter method signature for updating token transfer fee configs and
 	// dest chain configs is the same between versions v1.6.0 and v1.6.3 so this adapter
