@@ -318,10 +318,16 @@ func (p *poolOpsV151) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr com
 func (p *poolOpsV151) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error) {
 	var writes []evm_contract.WriteOutput
 	for _, remote := range remotes {
-		if !common.IsHexAddress(remote.Remote.Address) {
+		var target []byte
+		if common.IsHexAddress(remote.Remote.Address) {
+			// EVM (20-byte) remote: left-pad to 32 for the on-chain bytes32.
+			target = common.LeftPadBytes(common.HexToAddress(remote.Remote.Address).Bytes(), 32)
+		} else if parsed := common.FromHex(remote.Remote.Address); len(parsed) == 32 {
+			// Non-EVM (32-byte, e.g. Solana) remote encoded as 64-hex.
+			target = parsed
+		} else {
 			return nil, fmt.Errorf("invalid remote pool address for chain %d: %s", remote.Selector, remote.Remote.Address)
 		}
-		target := common.LeftPadBytes(common.HexToAddress(remote.Remote.Address).Bytes(), 32)
 
 		poolsReport, err := cldf_ops.ExecuteOperation(
 			b, tpOps.GetRemotePools, chain,
