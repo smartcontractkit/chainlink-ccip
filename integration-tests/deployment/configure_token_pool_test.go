@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
@@ -906,23 +905,14 @@ type solanaPoolFixture struct {
 
 // setupSolanaPoolsForConfigure stands up a Solana chain (plus a throwaway EVM chain, matching
 // the environment.New pattern used elsewhere in this package) with an initialized BurnMint pool
-// and an initialized LockRelease pool, ready for ConfigureTokenPool tests. It deploys the
-// default solana-v1.6.0 program artifacts; use setupSolanaPoolsForConfigureWithArtifacts when a
-// test depends on a newer on-chain program.
+// and an initialized LockRelease pool, ready for ConfigureTokenPool tests.
 func setupSolanaPoolsForConfigure(t *testing.T) (env *cldf_deployment.Environment, bnm solanaPoolFixture, lnr solanaPoolFixture) {
-	t.Helper()
-	return setupSolanaPoolsForConfigureWithArtifacts(t, solanautils.VersionSolanaV1_6_0)
-}
-
-// setupSolanaPoolsForConfigureWithArtifacts is setupSolanaPoolsForConfigure with an explicit
-// Solana program artifact version (one of the solanautils.VersionSolana* constants).
-func setupSolanaPoolsForConfigureWithArtifacts(t *testing.T, artifactVersion string) (env *cldf_deployment.Environment, bnm solanaPoolFixture, lnr solanaPoolFixture) {
 	t.Helper()
 
 	src := chainsel.SOLANA_DEVNET.Selector
 	dst := chainsel.TEST_90000002.Selector
 
-	programsPath, ds, err := PreloadSolanaEnvironmentWithArtifacts(t, src, artifactVersion)
+	programsPath, ds, err := PreloadSolanaEnvironment(t, src)
 	require.NoError(t, err)
 
 	env, err = environment.New(
@@ -1016,16 +1006,6 @@ func solanaPoolRateLimitAdmin(t *testing.T, chain solchain.Chain, poolProgramID 
 	return poolState.Config.RateLimitAdmin
 }
 
-// solanaPoolRouter reads the on-chain router for a Solana token pool.
-func solanaPoolRouter(t *testing.T, chain solchain.Chain, poolProgramID solana.PublicKey, tokenMint solana.PublicKey) solana.PublicKey {
-	t.Helper()
-	poolStatePDA, err := tokens.TokenPoolConfigAddress(tokenMint, poolProgramID)
-	require.NoError(t, err)
-	var poolState burnmint_token_pool.State
-	require.NoError(t, chain.GetAccountDataBorshInto(t.Context(), poolStatePDA, &poolState))
-	return poolState.Config.Router
-}
-
 func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
 	env, bnm, lnr := setupSolanaPoolsForConfigure(t) // helper from Step 6
 
@@ -1090,124 +1070,6 @@ func TestConfigureTokenPool_Admins_Solana(t *testing.T) {
 	}
 }
 
-func TestConfigureTokenPool_Router_Solana(t *testing.T) {
-	// set_router only persists on token pool programs >= solana-v1.6.2 (earlier releases did not
-	// mark AdminUpdateTokenPool.state as mut); see TestConfigureTokenPool_Router_Solana_LegacyProgram
-	// for the pre-1.6.2 behaviour.
-	env, bnm, lnr := setupSolanaPoolsForConfigureWithArtifacts(t, solanautils.VersionSolanaV1_6_4)
-
-	for _, tc := range []struct {
-		name string
-		pool solanaPoolFixture
-	}{
-		{"burnmint", bnm},
-		{"lockrelease", lnr},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			newRouter := solana.NewWallet().PublicKey()
-			newRouterStr := newRouter.String()
-
-			solChain := env.BlockChains.SolanaChains()[tc.pool.Ref.ChainSelector]
-			poolProgramID := solana.MustPublicKeyFromBase58(tc.pool.Ref.Address)
-			apiPoolRef := solanaApiPoolRef(t, tc.pool)
-			deployer := solChain.DeployerKey.PublicKey()
-
-			// The fixture pool is deployer-owned (owner == program upgrade authority == deployer), so
-			// the router update executes directly instead of going through MCMS. The deployer pays
-			// the fee for that transaction, so its balance is the Solana analogue of the EVM tests'
-			// block-height check: it drops when a transaction is sent and stays flat on a no-op.
-			balanceBefore := solanaBalance(t, solChain, deployer)
-			out, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
-				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
-					ChainSelector: tc.pool.Ref.ChainSelector,
-					Pools: []tokensapi.PoolConfigUpdate{{
-						TokenPoolRef: apiPoolRef,
-						RouterRef:    &datastore.AddressRef{Address: newRouterStr},
-					}},
-				}},
-				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
-			})
-			require.NoError(t, err)
-			require.Empty(t, out.MCMSTimelockProposals, "deployer-owned pool must execute the router update directly, not via MCMS")
-			require.Less(t, solanaBalance(t, solChain, deployer), balanceBefore, "router update must have sent a fee-paying transaction")
-			require.Equal(t, newRouter, solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint),
-				"router should match the requested value")
-
-			// Idempotency: re-applying the same value must send no transaction and emit no proposals.
-			// Refresh the bundle's reporter first: ExecuteSequence memoizes on (sequence def, input)
-			// and would otherwise return the first apply's cached report without re-running the op.
-			env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(env.OperationsBundle)
-			balanceBeforeNoop := solanaBalance(t, solChain, deployer)
-			out2, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
-				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
-					ChainSelector: tc.pool.Ref.ChainSelector,
-					Pools: []tokensapi.PoolConfigUpdate{{
-						TokenPoolRef: apiPoolRef,
-						RouterRef:    &datastore.AddressRef{Address: newRouterStr},
-					}},
-				}},
-				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
-			})
-			require.NoError(t, err)
-			require.Empty(t, out2.MCMSTimelockProposals, "re-applying an unchanged router must emit no proposals")
-			require.Equal(t, balanceBeforeNoop, solanaBalance(t, solChain, deployer), "no-op router update must not send a transaction")
-			require.Equal(t, newRouter, solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint),
-				"router must be unchanged after the no-op apply")
-		})
-	}
-}
-
-// solanaBalance returns the lamport balance of an account at confirmed commitment.
-func solanaBalance(t *testing.T, chain solchain.Chain, account solana.PublicKey) uint64 {
-	t.Helper()
-	res, err := chain.Client.GetBalance(t.Context(), account, rpc.CommitmentConfirmed)
-	require.NoError(t, err)
-	return res.Value
-}
-
-// TestConfigureTokenPool_Router_Solana_LegacyProgram pins the behaviour against token pool
-// programs before solana-v1.6.2. Those programs accept set_router and return success without
-// persisting anything (AdminUpdateTokenPool.state was not marked mut), so the op must detect the
-// legacy program up front and fail without sending a transaction, rather than report a
-// successful no-op.
-func TestConfigureTokenPool_Router_Solana_LegacyProgram(t *testing.T) {
-	env, bnm, lnr := setupSolanaPoolsForConfigureWithArtifacts(t, solanautils.VersionSolanaV1_6_0)
-
-	for _, tc := range []struct {
-		name string
-		pool solanaPoolFixture
-	}{
-		{"burnmint", bnm},
-		{"lockrelease", lnr},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			solChain := env.BlockChains.SolanaChains()[tc.pool.Ref.ChainSelector]
-			poolProgramID := solana.MustPublicKeyFromBase58(tc.pool.Ref.Address)
-			deployer := solChain.DeployerKey.PublicKey()
-			originalRouter := solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint)
-			balanceBefore := solanaBalance(t, solChain, deployer)
-			newRouterStr := solana.NewWallet().PublicKey().String()
-
-			_, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
-				Chains: []tokensapi.ConfigureTokenPoolPerChain{{
-					ChainSelector: tc.pool.Ref.ChainSelector,
-					Pools: []tokensapi.PoolConfigUpdate{{
-						TokenPoolRef: solanaApiPoolRef(t, tc.pool),
-						RouterRef:    &datastore.AddressRef{Address: newRouterStr},
-					}},
-				}},
-				MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
-			})
-			require.ErrorContains(t, err, "does not persist set_router")
-			require.ErrorContains(t, err, "before solana-v1.6.2")
-			require.Equal(t, balanceBefore, solanaBalance(t, solChain, deployer),
-				"legacy program must be detected before any transaction is sent")
-			require.Equal(t, originalRouter, solanaPoolRouter(t, solChain, poolProgramID, tc.pool.Mint),
-				"legacy program must leave the router untouched")
-		})
-	}
-}
-
 // solanaApiPoolRef builds the API-facing TokenPoolRef for a Solana pool fixture: the pool
 // config PDA, not the bare pool program ID. Passing the program ID directly into
 // ConfigureTokenPool().Apply fails with "token derivation is only possible if a pool PDA is
@@ -1240,6 +1102,22 @@ func TestConfigureTokenPool_UnsupportedFields_Solana(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fee admin is not supported")
+	})
+
+	t.Run("router", func(t *testing.T) {
+		router := solana.NewWallet().PublicKey().String()
+		_, err := tokensapi.ConfigureTokenPool().Apply(*env, tokensapi.ConfigureTokenPoolInput{
+			Chains: []tokensapi.ConfigureTokenPoolPerChain{{
+				ChainSelector: bnm.Ref.ChainSelector,
+				Pools: []tokensapi.PoolConfigUpdate{{
+					TokenPoolRef: apiPoolRef,
+					RouterRef:    &datastore.AddressRef{Address: router},
+				}},
+			}},
+			MCMS: NewDefaultInputForMCMS("Configure Token Pool"),
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "router is not supported")
 	})
 
 	t.Run("finalityConfig", func(t *testing.T) {

@@ -54,15 +54,14 @@ type PoolConfigUpdate struct {
 	FeeAdmin *string `yaml:"feeAdmin,omitempty" json:"feeAdmin,omitempty"`
 	// RouterRef, if set, selects the router the pool is wired to. An explicit non-zero Address
 	// bypasses the datastore. Otherwise the ref is resolved in the datastore for this chain,
-	// with Type defaulting to the production Router contract type when unset (on EVM, set Type
-	// to the TestRouter contract type to target the test router; Solana has no TestRouter).
-	// Same semantics as TokenExpansionInputPerChain.RouterRef. Like TokenPoolRef, a datastore
-	// lookup that finds no match is reported at apply time, not by VerifyPreconditions.
+	// with Type defaulting to the production Router contract type when unset (set Type to the
+	// TestRouter contract type to target the test router). Same semantics as
+	// TokenExpansionInputPerChain.RouterRef. Like TokenPoolRef, a datastore lookup that finds
+	// no match is reported at apply time, not by VerifyPreconditions.
 	//
-	// Solana: set_router requires the pool owner to also be the token pool program's upgrade
-	// authority, and only persists on programs >= solana-v1.6.2 (earlier releases accept the
-	// instruction without writing the state). The adapter checks both before sending or
-	// proposing anything and fails with a descriptive error.
+	// EVM only. Solana has a single router program per chain (it doubles as the OnRamp and the
+	// token admin registry) that is upgraded in place, so repointing a pool at a different
+	// router is not a meaningful operation there; the Solana adapter rejects a non-nil RouterRef.
 	RouterRef *datastore.AddressRef `yaml:"routerRef,omitempty" json:"routerRef,omitempty"`
 	// Remotes lists per-lane configuration updates.
 	Remotes []RemoteConfigUpdate `yaml:"remotes,omitempty" json:"remotes,omitempty"`

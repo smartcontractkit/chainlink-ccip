@@ -3,10 +3,8 @@ package token_pools
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -16,76 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/types"
 )
-
-// ensureSetRouterPersists checks, before anything is sent or proposed, that the token pool
-// program at programID actually persists set_router. Programs before solana-v1.6.2 declared
-// AdminUpdateTokenPool.state without mut, so they accept set_router and silently discard the
-// write. readOnlyStateProbe must be a set_router instruction whose state account meta is
-// read-only (what the v0.1.1 bindings generate): simulating it against a program >= 1.6.2 fails
-// with Anchor's ConstraintMut (error 2000), while a legacy program executes it successfully.
-// Signature verification is disabled for the simulation so the same probe works when the
-// authority is an MCMS signer rather than the deployer key.
-//
-// A successful simulation is therefore a legacy program and returns an error. A failed one is
-// classified by its logs: ConstraintMut on the state account means the program is fixed (nil);
-// no program logs at all means the simulation failed before the program ran (e.g. the deployer
-// key used as fee payer is unfunded in a proposal-only environment), which is inconclusive
-// rather than a verdict on the program version — a warning is logged and nil is returned so the
-// real transaction or proposal can report the underlying problem.
-func ensureSetRouterPersists(b operations.Bundle, chain cldf_solana.Chain, programID solana.PublicKey, readOnlyStateProbe solana.Instruction, poolTypeName string) error {
-	tx, err := solana.NewTransaction([]solana.Instruction{readOnlyStateProbe}, solana.Hash{}, solana.TransactionPayer(chain.DeployerKey.PublicKey()))
-	if err != nil {
-		return fmt.Errorf("failed to build set router probe transaction for %s token pool: %w", poolTypeName, err)
-	}
-	// The validator sanitizes the wire format before simulating, so the transaction must carry
-	// one signature slot per required signer even though none of them is verified.
-	tx.Signatures = make([]solana.Signature, tx.Message.Header.NumRequiredSignatures)
-	res, err := chain.Client.SimulateTransactionWithOpts(b.GetContext(), tx, &rpc.SimulateTransactionOpts{
-		SigVerify:              false,
-		ReplaceRecentBlockhash: true,
-		Commitment:             rpc.CommitmentConfirmed,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to simulate set router probe for %s token pool program %s: %w", poolTypeName, programID, err)
-	}
-	if res == nil || res.Value == nil {
-		return fmt.Errorf("set router probe for %s token pool program %s returned no simulation result", poolTypeName, programID)
-	}
-	// Err alone decides whether the program accepted the probe: a successful simulation means the
-	// runtime executed set_router to completion with a read-only state account, which only a
-	// legacy program allows. Logs are only needed to classify a failure.
-	if res.Value.Err == nil {
-		return fmt.Errorf(
-			"%s token pool program %s does not persist set_router: token pool programs before solana-v1.6.2 accept the instruction without writing the state; upgrade the program",
-			poolTypeName, programID,
-		)
-	}
-	if len(res.Value.Logs) == 0 {
-		// The program never ran (bad blockhash, unfunded fee payer, ...), so the probe is
-		// inconclusive rather than a verdict on the program version.
-		b.Logger.Warnf(
-			"set router probe for %s token pool program %s was inconclusive (simulation failed before the program ran: %v); "+
-				"could not verify that the program persists set_router — if it predates solana-v1.6.2 the resulting transaction or proposal will silently no-op",
-			poolTypeName, programID, res.Value.Err,
-		)
-		return nil
-	}
-	// Anchor logs "AnchorError caused by account: state. Error Code: ConstraintMut. Error Number: 2000. ...".
-	// Match on the state account specifically: it is the only account whose writability differs
-	// between the probe and the real instruction, so a ConstraintMut on any other account would
-	// not tell us anything about set_router persistence. The account name is the Rust field name
-	// of AdminUpdateTokenPool in chains/solana/contracts/programs/*-token-pool/src/context.rs.
-	for _, log := range res.Value.Logs {
-		if strings.Contains(log, "caused by account: state") &&
-			(strings.Contains(log, "ConstraintMut") || strings.Contains(log, "Error Number: 2000")) {
-			return nil
-		}
-	}
-	return fmt.Errorf(
-		"set router probe for %s token pool program %s failed for an unexpected reason: %v (logs: %s)",
-		poolTypeName, programID, res.Value.Err, strings.Join(res.Value.Logs, " | "),
-	)
-}
 
 // get diff of pool addresses
 func poolDiff(existingPoolAddresses []base_token_pool.RemoteAddress, newPoolAddresses []base_token_pool.RemoteAddress) []base_token_pool.RemoteAddress {
@@ -110,12 +38,6 @@ type TokenPoolTransferOwnershipInput struct {
 	Program   solana.PublicKey
 	NewOwner  solana.PublicKey
 	TokenMint solana.PublicKey
-}
-
-type SetPoolRouterInput struct {
-	Program   solana.PublicKey
-	TokenMint solana.PublicKey
-	NewRouter solana.PublicKey
 }
 
 type Params struct {

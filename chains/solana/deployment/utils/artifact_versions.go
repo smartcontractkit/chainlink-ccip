@@ -16,12 +16,6 @@ const (
 	VersionSolanaV0_1_0           = "solana-v0.1.0"
 	VersionSolanaV1_6_0           = "solana-v1.6.0"
 	VersionSolanaV1_6_1           = "solana-v1.6.1"
-	// VersionSolanaV1_6_2 is the first release where the token pools' AdminUpdateTokenPool.state
-	// account is marked mut, so set_router / set_rmn actually persist. Earlier releases accept
-	// those instructions and silently discard the write.
-	VersionSolanaV1_6_2 = "solana-v1.6.2"
-	VersionSolanaV1_6_3 = "solana-v1.6.3"
-	VersionSolanaV1_6_4 = "solana-v1.6.4"
 )
 
 // VersionToShortCommitSHA maps a version tag to its corresponding short commit SHA.
@@ -32,9 +26,6 @@ var VersionToShortCommitSHA = map[string]string{
 	VersionSolanaV0_1_0:           "be8d09930aaa",
 	VersionSolanaV1_6_0:           "d0d81df31957",
 	VersionSolanaV1_6_1:           "cb23ec38649f",
-	VersionSolanaV1_6_2:           "9546a59bd0a3",
-	VersionSolanaV1_6_3:           "1f9fb0b2d9e5",
-	VersionSolanaV1_6_4:           "c73892d4d339",
 }
 
 var VersionToFullCommitSHA = map[string]string{
@@ -44,7 +35,4 @@ var VersionToFullCommitSHA = map[string]string{
 	VersionSolanaV0_1_0:           "be8d09930aaaae31b574ef316ca73021fe272b08",
 	VersionSolanaV1_6_0:           "d0d81df3195728091cad1b0569a2980201a92e97",
 	VersionSolanaV1_6_1:           "cb23ec38649f9d23aabd0350e30d3d649ebc2174",
-	VersionSolanaV1_6_2:           "9546a59bd0a3cee4ddc8ae4042da533e62225b78",
-	VersionSolanaV1_6_3:           "1f9fb0b2d9e57626d5bb2d5c64840415228be732",
-	VersionSolanaV1_6_4:           "c73892d4d33926195eee87b77013883e650a833c",
 }
