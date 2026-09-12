@@ -200,7 +200,7 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 						TokenRef:       fullTokenRef,
 					})
 					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to set admin roles on pool %s: %w", fullPoolRef.Address, err)
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to set dynamic config on pool %s: %w", fullPoolRef.Address, err)
 					}
 					batchOps = append(batchOps, report.Output.BatchOps...)
 					reports = append(reports, report.ExecutionReports...)
@@ -221,7 +221,7 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
-			WithBatchOps(batchOps).
+			WithSingleBatchOpPerChain(batchOps).
 			Build(cfg.MCMS)
 	}
 }

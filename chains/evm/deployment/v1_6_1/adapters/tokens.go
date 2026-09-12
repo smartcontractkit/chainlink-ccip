@@ -26,8 +26,8 @@ import (
 )
 
 var (
-	_ tokensapi.TokenPoolMigrator     = &TokenAdapter{}
-	_ tokensapi.TokenAdapter          = &TokenAdapter{}
+	_ tokensapi.TokenPoolMigrator             = &TokenAdapter{}
+	_ tokensapi.TokenAdapter                  = &TokenAdapter{}
 	_ tokensapi.TokenPoolDynamicConfigAdapter = &TokenAdapter{}
 )
 
