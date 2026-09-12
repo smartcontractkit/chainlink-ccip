@@ -133,21 +133,46 @@ var TransferMintAuthorityBurnMint = operations.NewOperation(
 	"Transfers the mint authority of the token pool's mint",
 	func(b operations.Bundle, chain cldf_solana.Chain, input Params) (sequences.OnChainOutput, error) {
 		burnmint_token_pool.SetProgramID(input.TokenPool)
+
+		// Idempotency guard: if the mint's authority is already the requested new
+		// authority, the transfer is a no-op (the on-chain instruction would otherwise
+		// revert with MintAuthorityAlreadySet). Skipping here lets both callers
+		// (manual registration and TransferMintAuthoritiesChangeset) re-run safely.
+		current := utils.GetTokenMintAuthority(chain, input.TokenMint)
+		if current == input.NewMintAuthority {
+			return sequences.OnChainOutput{}, nil
+		}
+
+		// NOTE: the on-chain `transferMintAuthorityToMultisig` instruction only allows the program's upgrade authority to sign the instruction - see the comment in the code for details:
+		// https://github.com/smartcontractkit/chainlink-ccip/blob/e35d9898c782fdc046920051c70ef8e34627714c/chains/solana/contracts/programs/burnmint-token-pool/src/context.rs#L144-L146.
+		// As a result, it would be incorrect to use GetAuthorityBurnMint here since that returns the *pool config owner*, which is NOT the same as the upgrade authority. The pool config
+		// owner is the PDA that owns the pool config account which is usually a different account than the program's upgrade authority. The pool config owner can be set to any arbitrary
+		// address, but the upgrade authority is the only account that can sign for the `transferMintAuthorityToMultisig` instruction. On environments where that upgrade authority IS the
+		// deployer keypair (e.g. the containerized tests) we sign directly; where it is the CCIP timelock/signer PDA, it must be executed through MCMS, which can present that PDA as the
+		// signer.
+		authority, err := utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		if authority == (solana.PublicKey{}) {
+			return sequences.OnChainOutput{}, errors.New("burn mint token pool program is immutable (no upgrade authority); cannot transfer mint authority")
+		}
 		programData, err := utils.GetSolProgramData(chain.Client, input.TokenPool)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		authority, err := GetAuthorityBurnMint(chain, input.TokenPool, input.TokenMint)
-		if err != nil {
-			// assume the authority is the upgrade authority if we fail to fetch the current authority, since the pool might not be initialized yet and there won't be an authority set on-chain yet (since the config account won't exist until initialization)
-			authority, err = utils.GetUpgradeAuthority(chain.Client, input.TokenPool)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for burn mint token pool: %w", err)
-			}
-		}
+
+		// This operation assumes that the current mint authority is the pool signer PDA to keep the
+		// code simple. When the mint authority differs, the onchain code requires the old authority
+		// account to be provided in `remaining_accounts` otherwise the instruction will fail. We do
+		// an explicit check for that gap here and fail fast instead of letting it fail at execution
+		// time.
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(input.TokenMint, input.TokenPool)
 		poolSignerPDA, _ := tokens.TokenPoolSignerAddress(input.TokenMint, input.TokenPool)
-		batches := make([]types.BatchOperation, 0)
+		if current != poolSignerPDA {
+			return sequences.OnChainOutput{}, fmt.Errorf("cannot transfer mint authority of %s: current mint authority %s is not the pool signer PDA %s", input.TokenMint, current, poolSignerPDA)
+		}
+
 		ixn, err := burnmint_token_pool.NewTransferMintAuthorityToMultisigInstruction(
 			poolConfigPDA,
 			input.TokenMint,
@@ -161,6 +186,7 @@ var TransferMintAuthorityBurnMint = operations.NewOperation(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+
 		if authority != chain.DeployerKey.PublicKey() {
 			b, err := utils.BuildMCMSBatchOperation(
 				chain.Selector,
@@ -171,8 +197,7 @@ var TransferMintAuthorityBurnMint = operations.NewOperation(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
 			}
-			batches = append(batches, b)
-			return sequences.OnChainOutput{BatchOps: batches}, nil
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{b}}, nil
 		} else {
 			err = chain.Confirm([]solana.Instruction{ixn})
 			if err != nil {

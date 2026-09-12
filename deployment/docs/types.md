@@ -509,10 +509,15 @@ Solana-specific arguments for manual registration.
 
 ```go
 type SVMExtraArgs struct {
-    CustomerMintAuthorities []solana.PublicKey
-    SkipTokenPoolInit       bool
+    CustomerMintAuthorities []solana.PublicKey `yaml:"customerMintAuthorities,omitempty" json:"customerMintAuthorities,omitempty"`
+    TransferMintAuthority   bool               `yaml:"transferMintAuthority" json:"transferMintAuthority"`
+    SkipTokenPoolInit       bool               `yaml:"skipTokenPoolInit" json:"skipTokenPoolInit"`
 }
 ```
+
+- `CustomerMintAuthorities`: customer authorities that (together with the pool signer PDA) form the token multisig signer set.
+- `TransferMintAuthority`: when `true`, creates the token multisig *and* transfers the mint authority to it in the same proposal. Only supported for BurnMint pools and requires `CustomerMintAuthorities` to be provided.
+- `SkipTokenPoolInit`: when `true`, skips token pool initialization during manual registration.
 
 ### TPRLInput
 
