@@ -44,6 +44,39 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
   }
 
+  function test_verifyMessage_32ByteEncodedTokenWithAdapter() public {
+    // Register the dest token with a local adapter: the bridge payload then
+    // encodes the adapter address as toToken. s_destToken is a makeAddr label,
+    // so mock the approve calls that updateSupportedTokens triggers.
+    address adapter = makeAddr("32byteAdapter");
+    vm.mockCall(s_destToken, abi.encodeWithSignature("approve(address,uint256)"), abi.encode(true));
+    LombardVerifier.SupportedTokenArgs[] memory tokensToAdd = new LombardVerifier.SupportedTokenArgs[](1);
+    tokensToAdd[0] = LombardVerifier.SupportedTokenArgs({localToken: s_destToken, localAdapter: adapter});
+    s_lombardVerifier.updateSupportedTokens(new address[](0), tokensToAdd);
+
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
+      _createForwardMessage(address(s_testToken), address(12));
+    // Canonical CCIP encoding for EVM addresses is the 32-byte abi.encode form.
+    message.tokenTransfer[0].destTokenAddress = abi.encode(s_destToken);
+
+    // The bridge payload carries the adapter address, as forwardToVerifier would have deposited it.
+    bytes memory rawPayload = _generateValidRawPayload(
+      abi.encodePacked(adapter),
+      message.sender,
+      message.tokenTransfer[0].tokenReceiver,
+      message.tokenTransfer[0].amount,
+      messageId
+    );
+    bytes memory ccvData = _encodeCcvData(rawPayload, "");
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
+
+    vm.startPrank(s_offRamp);
+
+    // Must not revert: the adapter override has to resolve from the 32-byte padded form.
+    s_lombardVerifier.verifyMessage(message, messageId, ccvData);
+  }
+
+
   function test_verifyMessage_RevertWhen_InvalidMessageId() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
