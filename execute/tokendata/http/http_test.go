@@ -454,3 +454,50 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 		})
 	}
 }
+
+// panicOnUseLogger stands in for a zaptest logger whose *testing.T has already finished: any use
+// of it panics, exactly as the testing package does for "Log in goroutine after Test... completed".
+type panicOnUseLogger struct {
+	logger.Logger
+	t *testing.T
+}
+
+func (l *panicOnUseLogger) Debugw(string, ...any) {
+	l.t.Error("stale logger was used by a cached httpClient")
+	panic("Log in goroutine after test has completed")
+}
+
+func (l *panicOnUseLogger) With(...any) logger.Logger  { return l }
+func (l *panicOnUseLogger) Named(string) logger.Logger { return l }
+
+// Test_HTTPClient_GetInstance_RefreshesLogger pins the fix for a CI panic seen under
+// `-count 20 -shuffle on`.
+//
+// GetHTTPClient caches one client per API URL for the lifetime of the process, so the rate limiter
+// and cool-down state are shared. Before this fix the cached client also kept the logger of
+// whichever caller created it first. httptest servers get an ephemeral port, and across a
+// high-count run a later server can be handed the same host:port a closed one used - producing an
+// identical cache key. The later test then reused a client logging into the earlier, already
+// finished test, and the testing package turned that into a process-wide panic.
+func Test_HTTPClient_GetInstance_RefreshesLogger(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write(validAttestationResponse)
+		require.NoError(t, err)
+	}))
+	defer ts.Close()
+
+	stale := &panicOnUseLogger{Logger: logger.Nop(), t: t}
+
+	// First caller seeds the cache, mimicking the test that "owns" the logger.
+	_, err := GetHTTPClient(stale, ts.URL, 1*time.Millisecond, longTimeout, 0)
+	require.NoError(t, err)
+
+	// A later caller hits the same URL and must not inherit the stale logger.
+	client, err := GetHTTPClient(logger.Nop(), ts.URL, 1*time.Millisecond, longTimeout, 0)
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() {
+		_, _, getErr := client.Get(t.Context(), cciptypes.Bytes32{1, 2, 3}.String())
+		require.NoError(t, getErr)
+	})
+}
