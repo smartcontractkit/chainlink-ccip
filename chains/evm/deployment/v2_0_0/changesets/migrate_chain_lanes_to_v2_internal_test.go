@@ -193,6 +193,56 @@ func TestDiscoverLanesToMigrate_ExcludesBlocklistedRemotes(t *testing.T) {
 	assert.Equal(t, remoteKeep, lanes[0].ChainB)
 }
 
+func TestDiscoverLanesToMigrate_IncludesOnlyAllowlistedRemotes(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	remoteKeep := chainsel.TEST_90000002.Selector
+	remoteDrop := chainsel.TEST_90000003.Selector
+
+	resolver := &fakeLaneVersionResolver{
+		supported: map[uint64]bool{chainA: true},
+		lanes: map[uint64]map[uint64]*semver.Version{
+			chainA: {
+				remoteKeep: semver.MustParse("1.6.0"),
+				remoteDrop: semver.MustParse("1.6.0"),
+			},
+		},
+	}
+
+	lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil, MigrateChainLanesToV2Config{
+		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+			ChainSelectors: []uint64{chainA},
+			RemoteChains:   []uint64{remoteKeep},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, lanes, 1)
+	assert.Equal(t, remoteKeep, lanes[0].ChainB)
+}
+
+func TestMigrateChainLanesToV2_ValidateRejectsRemoteBothIncludedAndExcluded(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	remote := chainsel.TEST_90000002.Selector
+
+	cs := MigrateChainLanesToV2(
+		adapters.NewCommitteeVerifierContractRegistry(),
+		adapters.NewChainFamilyRegistry(),
+		changesetscore.GetRegistry(),
+		adapters.NewDeployChainContractsRegistry(),
+		newFQRegistry(),
+	)
+
+	err := cs.VerifyPreconditions(cldf.Environment{}, MigrateChainLanesToV2Config{
+		Topology: &offchain.EnvironmentTopology{},
+		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+			ChainSelectors:       []uint64{chainA},
+			RemoteChains:         []uint64{remote},
+			ExcludedRemoteChains: []uint64{remote},
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be in both remoteChains and excludedRemoteChains")
+}
+
 func TestDiscoverLanesToMigrate_DedupsAcrossMultipleChains(t *testing.T) {
 	chainA := chainsel.TEST_90000001.Selector
 	chainB := chainsel.TEST_90000002.Selector

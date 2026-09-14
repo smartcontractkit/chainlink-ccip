@@ -67,6 +67,10 @@ type MigrateChainLanesToV2Input struct {
 	// discovery. Any lane to one of these remotes is left untouched. Useful for routing around
 	// a flaky/unreachable remote chain RPC or to intentionally hold a lane back from migration.
 	ExcludedRemoteChains []uint64 `json:"excludedRemoteChains,omitempty" yaml:"excludedRemoteChains,omitempty"`
+	// RemoteChains is an optional allowlist of remote chain selectors. When set, only lanes to
+	// these remotes are migrated; all others are left untouched. ExcludedRemoteChains is still
+	// honored as a subtraction from this set.
+	RemoteChains []uint64 `json:"remoteChains,omitempty" yaml:"remoteChains,omitempty"`
 	// ExcludeLanesWithTokenSymbols optionally skips any lane where either chain has a token with one
 	// of these symbols configured (supported) for the other chain — e.g. []string{"USDC", "LBTC"}
 	// to hold back token lanes that need a dedicated migration path. Symbols are matched
@@ -132,6 +136,12 @@ func MigrateChainLanesToV2(
 		// migrated must not also be excluded, and each EVM chain must have a lane version resolver
 		// so we fail fast on missing wiring. Non-EVM chains (e.g. Solana) are not migrated by this
 		// changeset and are skipped here.
+		allowedRemotes := newUint64Set(cfg.RemoteChains)
+		for _, remote := range cfg.ExcludedRemoteChains {
+			if _, included := allowedRemotes[remote]; included {
+				return fmt.Errorf("remote chain %d cannot be in both remoteChains and excludedRemoteChains", remote)
+			}
+		}
 		excludedRemotes := newUint64Set(cfg.ExcludedRemoteChains)
 		for _, chainSel := range cfg.ChainSelectors {
 			if _, excluded := excludedRemotes[chainSel]; excluded {
@@ -407,13 +417,15 @@ type laneDiscoverer struct {
 	resolvers       *adapters.DeployChainContractsRegistry
 	fqRegistry      *deploy.FQAndRampUpdaterRegistry
 	symbolOf        tokenSymbolLookup
+	allowedRemotes  map[uint64]struct{}
 	excludedRemotes map[uint64]struct{}
 	excludedSymbols map[string]struct{}
 }
 
 // discoverLanesToMigrate returns a deduplicated, deterministically ordered set of bidirectional
-// lane pairs to migrate: connected, EVM-only, not already on CCIP 2.0, not blocklisted, and (when
-// ExcludeLanesWithTokenSymbols is set) not carrying a token with an excluded symbol.
+// lane pairs to migrate: connected, EVM-only, not already on CCIP 2.0, within the RemoteChains
+// allowlist when set, not blocklisted, and (when ExcludeLanesWithTokenSymbols is set) not
+// carrying a token with an excluded symbol.
 func discoverLanesToMigrate(
 	e deployment.Environment,
 	resolvers *adapters.DeployChainContractsRegistry,
@@ -429,6 +441,7 @@ func discoverLanesToMigrate(
 		resolvers:       resolvers,
 		fqRegistry:      fqRegistry,
 		symbolOf:        symbolOf,
+		allowedRemotes:  newUint64Set(cfg.RemoteChains),
 		excludedRemotes: newUint64Set(cfg.ExcludedRemoteChains),
 		excludedSymbols: canonicalSymbolSet(cfg.ExcludeLanesWithTokenSymbols),
 	}
@@ -479,7 +492,8 @@ func (d *laneDiscoverer) run(chainSelectors []uint64) ([]v2changesets.CrossFamil
 }
 
 // chainCandidates returns the sorted remotes on chainSel whose lane should be migrated: connected,
-// EVM, not already on CCIP 2.0, not blocklisted, and not carrying an excluded token symbol. Token
+// EVM, not already on CCIP 2.0, allowlisted (when RemoteChains is set), not blocklisted, and not
+// carrying an excluded token symbol. Token
 // detection runs only over the surviving candidates, so we never read token config for lanes that
 // are already 2.0 or blocklisted.
 func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
@@ -511,6 +525,8 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 	candidateVersions := make(map[uint64]*semver.Version, len(laneVersions))
 	for remote, version := range laneVersions {
 		switch {
+		case len(d.allowedRemotes) > 0 && !isExcluded(d.allowedRemotes, remote):
+			continue
 		case isExcluded(d.excludedRemotes, remote):
 			continue
 		case !isEVMChain(remote):

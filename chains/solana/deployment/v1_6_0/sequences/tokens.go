@@ -330,6 +330,9 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.ChainSelector)
 			}
+			if input.SVMExtraArgs != nil && input.SVMExtraArgs.TransferMintAuthority && len(input.SVMExtraArgs.CustomerMintAuthorities) == 0 {
+				return sequences.OnChainOutput{}, errors.New("transfer mint authority is set to true but no customer mint authorities are provided")
+			}
 
 			// NOTE: we only need token metadata if we're creating a token multisig. If we
 			// don't need to create one, then we can avoid sending extraneous RPC calls to
@@ -368,6 +371,34 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				tokenMint = solana.MustPublicKeyFromBase58(tokRef.Address)
 				tokenSymb = tokRef.Qualifier
 				tokenProg = tokProgramID
+			}
+
+			// Validate a requested mint authority transfer before any side-effecting
+			// operation (registry registration, pool init/ownership, multisig creation),
+			// so an invalid request errors out without partially applying registration.
+			if input.SVMExtraArgs != nil && input.SVMExtraArgs.TransferMintAuthority {
+				poolRef, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
+				}
+				poolPubkey, err := solana.PublicKeyFromBase58(poolRef.Address)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token pool address '%s' as a Solana public key: %w", poolRef.Address, err)
+				}
+				if poolRef.Type.String() != common_utils.BurnMintTokenPool.String() {
+					return sequences.OnChainOutput{}, fmt.Errorf("transfer mint authority is only supported for BurnMint token pools, but got pool type '%s'", poolRef.Type.String())
+				}
+				authority, err := utils.GetUpgradeAuthority(chain.Client, poolPubkey)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to get upgrade authority for token pool: %w", err)
+				}
+				if authority == (solana.PublicKey{}) {
+					return sequences.OnChainOutput{}, errors.New("transfer mint authority requires an upgradable BurnMint token pool, but it is immutable (no upgrade authority); cannot transfer mint authority")
+				}
+				poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, poolPubkey)
+				if currentMintAuthority := utils.GetTokenMintAuthority(chain, tokenMint); currentMintAuthority != poolSigner {
+					return sequences.OnChainOutput{}, fmt.Errorf("transfer mint authority requires the token mint authority to be the pool signer PDA, but got %s; refusing to create an orphan multisig", currentMintAuthority)
+				}
 			}
 
 			routerAddr, err := a.GetRouterAddress(input.ExistingDataStore, chain.Selector)
@@ -458,15 +489,19 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 			/////////////////////////////
 
 			if needTokenMultisig {
-				tokenPool, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, utils.ToAddress)
+				tokenPool, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to find token pool address using the specified reference (%+v): %w", input.TokenPoolRef, err)
+				}
+				poolPubkey, err := solana.PublicKeyFromBase58(tokenPool.Address)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token pool address '%s' as a Solana public key: %w", tokenPool.Address, err)
 				}
 
 				// The multisig will be used as the mint authority (or owner) depending on the pool flow.
 				// We include the TokenPoolSigner PDA as one of the multisig signers so the Token Pool Program
 				// can "sign" via PDA seeds when it needs to act (PDA signing).
-				poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, tokenPool)
+				poolSigner, _ := tokens.TokenPoolSignerAddress(tokenMint, poolPubkey)
 				signers := make([]solana.PublicKey, 0, 1+len(input.SVMExtraArgs.CustomerMintAuthorities))
 				signers = append(signers, poolSigner)
 
@@ -507,6 +542,20 @@ func (a *SolanaAdapter) ManualRegistration() *cldf_ops.Sequence[tokenapi.ManualR
 				})
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to extend token pool lookup table with multisig: %w", err)
+				}
+
+				if input.SVMExtraArgs.TransferMintAuthority {
+					transferAuthorityBurnMintReport, err := cldf_ops.ExecuteOperation(b, tokenpoolops.TransferMintAuthorityBurnMint, chain, tokenpoolops.Params{
+						TokenPool:        poolPubkey,
+						TokenMint:        tokenMint,
+						TokenProgramID:   tokenProg,
+						NewMintAuthority: msigPubkey,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to transfer mint authority: %w", err)
+					}
+					result.Addresses = append(result.Addresses, transferAuthorityBurnMintReport.Output.Addresses...)
+					result.BatchOps = append(result.BatchOps, transferAuthorityBurnMintReport.Output.BatchOps...)
 				}
 			}
 
@@ -599,8 +648,10 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 	)
 }
 
-var _ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
-var _ tokenapi.RemotePoolRemover = (*SolanaAdapter)(nil)
+var (
+	_ tokenapi.TokenPoolAdminAdapter = (*SolanaAdapter)(nil)
+	_ tokenapi.RemotePoolRemover     = (*SolanaAdapter)(nil)
+)
 
 // RemoveRemotePools removes remote pool entries from a Solana 1.6 token pool. The pool address
 // is a program ID shared across mints, so the token mint comes from input.TokenRef and the pool
@@ -621,7 +672,7 @@ func (a *SolanaAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokenapi.RemoveRe
 				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
 			}
 
-			var op = tokenpoolops.RemoveRemotePoolBurnMint
+			op := tokenpoolops.RemoveRemotePoolBurnMint
 			switch input.TokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				op = tokenpoolops.RemoveRemotePoolBurnMint
@@ -709,7 +760,7 @@ func (a *SolanaAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokenapi.SetToke
 				return sequences.OnChainOutput{}, fmt.Errorf("invalid rate limit admin address for chain %d: %s: %w", input.Selector, *input.RateLimitAdmin, err)
 			}
 
-			var op = tokenpoolops.UpdateRateLimitAdminBurnMint
+			op := tokenpoolops.UpdateRateLimitAdminBurnMint
 			switch input.TokenPoolRef.Type.String() {
 			case common_utils.BurnMintTokenPool.String():
 				op = tokenpoolops.UpdateRateLimitAdminBurnMint

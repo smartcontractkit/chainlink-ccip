@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -111,15 +112,13 @@ func PrepareGrantMintAndBurnRoles(
 }
 
 var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Address, *burn_mint_erc677.BurnMintERC677]{
-	Name:         "burn_mint_erc677:grant-mint-and-burn-roles",
-	Version:      cciputils.Version_1_0_0,
-	Description:  "Grant mint and burn roles on BurnMintERC677 (owner-only on-chain)",
-	ContractType: ContractType,
-	ContractABI:  burn_mint_erc677.BurnMintERC677ABI,
-	NewContract:  burn_mint_erc677.NewBurnMintERC677,
-	// On-chain only the owner may call grantMintAndBurnRoles. Do not use OnlyOwner here:
-	// MCMS/timelock flows simulate with the deployer key while ownership is the timelock
-	IsAllowedCaller: contract.AllCallersAllowed[*burn_mint_erc677.BurnMintERC677, common.Address],
+	Name:            "burn_mint_erc677:grant-mint-and-burn-roles",
+	Version:         cciputils.Version_1_0_0,
+	Description:     "Grant mint and burn roles on BurnMintERC677 (owner-only on-chain)",
+	ContractType:    ContractType,
+	ContractABI:     burn_mint_erc677.BurnMintERC677ABI,
+	NewContract:     burn_mint_erc677.NewBurnMintERC677,
+	IsAllowedCaller: contract.OnlyOwner[*burn_mint_erc677.BurnMintERC677, common.Address],
 	Validate: func(address common.Address) error {
 		if address == (common.Address{}) {
 			return errors.New("burn and minter address cannot be zero")
