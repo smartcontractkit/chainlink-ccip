@@ -49,7 +49,10 @@ const (
 	BurnMintWithExternalMinterTokenPool cldf.ContractType = "BurnMintWithExternalMinterTokenPool"
 	HybridWithExternalMinterTokenPool   cldf.ContractType = "HybridWithExternalMinterTokenPool"
 	BurnMintTokenPool                   cldf.ContractType = "BurnMintTokenPool"
-	LockReleaseTokenPool                cldf.ContractType = "LockReleaseTokenPool"
+	// BurnMintTokenPoolAndProxy is the v1.5.0 burn-mint pool, which is its own proxy (one
+	// contract, one address). It has no equivalent at v1.5.1 or later.
+	BurnMintTokenPoolAndProxy cldf.ContractType = "BurnMintTokenPoolAndProxy"
+	LockReleaseTokenPool      cldf.ContractType = "LockReleaseTokenPool"
 	BurnMintWithLockReleaseFlag         cldf.ContractType = "BurnMintWithLockReleaseFlag"
 	TokenGovernor                       cldf.ContractType = "TokenGovernor"
 	ERC20LockBox                        cldf.ContractType = "ERC20LockBox"
@@ -71,11 +74,18 @@ func IsLockReleasePoolType(poolType string) bool {
 }
 
 // IsBurnMintPoolType reports whether poolType is a standard burn-mint pool variant.
+//
+// BurnMintTokenPoolAndProxy is included: it is the v1.5.0 burn-mint pool (pool and proxy in one
+// contract) and needs the same mint/burn role grant on its token. It exists ONLY at v1.5.0, so
+// callers that branch on this predicate to pick a contract to deploy must reject it explicitly
+// for later versions rather than relying on the predicate alone — see the v2.0.0
+// DeployTokenPool sequence.
 func IsBurnMintPoolType(poolType string) bool {
 	return poolType == BurnMintTokenPool.String() ||
 		poolType == BurnFromMintTokenPool.String() ||
 		poolType == BurnWithFromMintTokenPool.String() ||
-		poolType == BurnToAddressMintTokenPool.String()
+		poolType == BurnToAddressMintTokenPool.String() ||
+		poolType == BurnMintTokenPoolAndProxy.String()
 }
 
 // familySelectors is a concurrent-safe registry of chain family → 4-byte
