@@ -29,6 +29,12 @@ type LockReleasePoolMigration struct {
 	// BasisPoints specifies a percentage (1-10000, where 10000 = 100%) of the old pool's balance to migrate.
 	// Mutually exclusive with Amount.
 	BasisPoints *uint16
+	// SiloExactAmounts specifies exact per-silo migration amounts, keyed by remote chain selector.
+	// Mutually exclusive with Amount/BasisPoints. See MigrateLockReleasePoolLiquidityInput.SiloExactAmounts.
+	SiloExactAmounts []SiloExactAmount
+	// UnsiloedExactAmount specifies the exact amount to migrate from the unsiloed (shared) balance.
+	// Mutually exclusive with Amount/BasisPoints. See MigrateLockReleasePoolLiquidityInput.UnsiloedExactAmount.
+	UnsiloedExactAmount *big.Int
 	// UnsiloedLockBoxRef references the lockbox that receives the old pool's unsiloed (shared)
 	// balance. Required when migrating a siloed pool that holds unsiloed liquidity; ignored for
 	// non-siloed pools. See MigrateLockReleasePoolLiquidityInput.UnsiloedLockBoxAddress for why
@@ -64,11 +70,17 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 			return fmt.Errorf("at least one migration is required")
 		}
 		for i, migration := range cfg.Migrations {
+			exactMode := len(migration.SiloExactAmounts) > 0 || migration.UnsiloedExactAmount != nil
+			legacyMode := migration.Amount != nil || migration.BasisPoints != nil
+
+			if exactMode && legacyMode {
+				return fmt.Errorf("migration[%d]: SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints", i)
+			}
+			if !exactMode && !legacyMode {
+				return fmt.Errorf("migration[%d]: one of Amount, BasisPoints, or SiloExactAmounts/UnsiloedExactAmount must be provided", i)
+			}
 			if migration.Amount != nil && migration.BasisPoints != nil {
 				return fmt.Errorf("migration[%d]: Amount and BasisPoints are mutually exclusive", i)
-			}
-			if migration.Amount == nil && migration.BasisPoints == nil {
-				return fmt.Errorf("migration[%d]: one of Amount or BasisPoints must be provided", i)
 			}
 			if migration.BasisPoints != nil {
 				bp := *migration.BasisPoints
@@ -78,6 +90,24 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 			}
 			if migration.Amount != nil && migration.Amount.Sign() <= 0 {
 				return fmt.Errorf("migration[%d]: Amount must be positive", i)
+			}
+			if exactMode {
+				if migration.UnsiloedExactAmount != nil && len(migration.SiloExactAmounts) == 0 {
+					return fmt.Errorf("migration[%d]: UnsiloedExactAmount requires SiloExactAmounts to also be set; exact mode cannot migrate the unsiloed bucket alone", i)
+				}
+				seen := make(map[uint64]bool, len(migration.SiloExactAmounts))
+				for j, sa := range migration.SiloExactAmounts {
+					if seen[sa.ChainSelector] {
+						return fmt.Errorf("migration[%d]: duplicate ChainSelector %d in SiloExactAmounts", i, sa.ChainSelector)
+					}
+					seen[sa.ChainSelector] = true
+					if sa.Amount == nil || sa.Amount.Sign() < 0 {
+						return fmt.Errorf("migration[%d]: SiloExactAmounts[%d].Amount must be positive", i, j)
+					}
+				}
+				if migration.UnsiloedExactAmount != nil && migration.UnsiloedExactAmount.Sign() <= 0 {
+					return fmt.Errorf("migration[%d]: UnsiloedExactAmount must be positive", i)
+				}
 			}
 			if (migration.RegistryRef == nil) != (migration.TokenRef == nil) {
 				return fmt.Errorf("migration[%d]: RegistryRef and TokenRef must both be set or both be omitted", i)
@@ -170,6 +200,8 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				TimelockAddress:        timelockRef.Address,
 				Amount:                 migration.Amount,
 				BasisPoints:            migration.BasisPoints,
+				SiloExactAmounts:       migration.SiloExactAmounts,
+				UnsiloedExactAmount:    migration.UnsiloedExactAmount,
 				UnsiloedLockBoxAddress: unsiloedLockBoxAddress,
 				UsePlainTransfer:       migration.UsePlainTransfer,
 				SetPoolConfig:          setPoolConfig,

@@ -619,14 +619,29 @@ func applyTokenTransferFeeConfig(
 		return nil, nil, fmt.Errorf("token pool version is required to apply token transfer fee config for chain selector %d and remote chain selector %d", src, dst)
 	}
 
-	// NOTE: fee configs are applied differently based on the pool version:
-	//   Pre-V2 pools: apply the fee config on the fee quoter / onRamp (legacy lane).
-	//   On V2+ pools: apply the fee config on the token pool via TokenFeeAdapter.
-	if fullSrcPoolRef.Version.LessThan(utils.Version_2_0_0) {
-		return applyTokenTransferFeeConfigOnFeeQuoter(e, src, dst, fullSrcTokenRef, srcToDstFeeCfg)
+	// NOTE: fees can be configured on either the pool or fee quoter. If a v1.6 OnRamp
+	// is being used, then the FeeQuoter has precedence and the pool fees are ignored.
+	// If a v2.0 OnRamp is being used, then the pool fees have precedence, and if they
+	// are disabled, then the FeeQuoter fees are used as a fallback.
+	var batches []mcms_types.BatchOperation
+	var reports []cldf_ops.Report[any, any]
+	if fqBatches, fqReports, err := applyTokenTransferFeeConfigOnFeeQuoter(e, src, dst, fullSrcTokenRef, srcToDstFeeCfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to apply token transfer fee config on fee quoter for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	} else {
-		return applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, srcToDstFeeCfg)
+		batches = append(batches, fqBatches...)
+		reports = append(reports, fqReports...)
 	}
+
+	if fullSrcPoolRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
+		if poolBatches, poolReports, err := applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, srcToDstFeeCfg); err != nil {
+			return nil, nil, fmt.Errorf("failed to apply token transfer fee config on token pool for chain selector %d and remote chain selector %d: %w", src, dst, err)
+		} else {
+			batches = append(batches, poolBatches...)
+			reports = append(reports, poolReports...)
+		}
+	}
+
+	return batches, reports, nil
 }
 
 func applyTokenTransferFeeConfigOnTokenPool(

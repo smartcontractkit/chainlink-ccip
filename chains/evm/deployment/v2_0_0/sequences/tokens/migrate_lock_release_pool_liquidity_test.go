@@ -72,7 +72,98 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
 				TimelockAddress: "0x0000000000000000000000000000000000000003",
 			},
-			expectedErr: "one of Amount or BasisPoints must be provided",
+			expectedErr: "one of Amount, BasisPoints, or SiloExactAmounts/UnsiloedExactAmount must be provided",
+		},
+		{
+			name: "SiloExactAmounts and BasisPoints provided",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   chainSel,
+				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
+				TimelockAddress: "0x0000000000000000000000000000000000000003",
+				BasisPoints:     new(uint16(5000)),
+				SiloExactAmounts: []tokens_core.SiloExactAmount{
+					{ChainSelector: 1, Amount: big.NewInt(100)},
+				},
+			},
+			expectedErr: "SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints",
+		},
+		{
+			name: "UnsiloedExactAmount and Amount provided",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:       chainSel,
+				OldPoolAddress:      "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:      "0x0000000000000000000000000000000000000002",
+				TimelockAddress:     "0x0000000000000000000000000000000000000003",
+				Amount:              big.NewInt(100),
+				UnsiloedExactAmount: big.NewInt(50),
+			},
+			expectedErr: "SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints",
+		},
+		{
+			name: "duplicate ChainSelector in SiloExactAmounts",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   chainSel,
+				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
+				TimelockAddress: "0x0000000000000000000000000000000000000003",
+				SiloExactAmounts: []tokens_core.SiloExactAmount{
+					{ChainSelector: 1, Amount: big.NewInt(100)},
+					{ChainSelector: 1, Amount: big.NewInt(200)},
+				},
+			},
+			expectedErr: "duplicate ChainSelector 1 in SiloExactAmounts",
+		},
+		{
+			name: "nil SiloExactAmount.Amount",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   chainSel,
+				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
+				TimelockAddress: "0x0000000000000000000000000000000000000003",
+				SiloExactAmounts: []tokens_core.SiloExactAmount{
+					{ChainSelector: 1, Amount: nil},
+				},
+			},
+			expectedErr: "SiloExactAmounts[0].Amount must be positive",
+		},
+		{
+			name: "negative SiloExactAmount.Amount",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   chainSel,
+				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
+				TimelockAddress: "0x0000000000000000000000000000000000000003",
+				SiloExactAmounts: []tokens_core.SiloExactAmount{
+					{ChainSelector: 1, Amount: big.NewInt(-1)},
+				},
+			},
+			expectedErr: "SiloExactAmounts[0].Amount must be positive",
+		},
+		{
+			name: "negative UnsiloedExactAmount",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   chainSel,
+				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
+				TimelockAddress: "0x0000000000000000000000000000000000000003",
+				SiloExactAmounts: []tokens_core.SiloExactAmount{
+					{ChainSelector: 1, Amount: big.NewInt(100)},
+				},
+				UnsiloedExactAmount: big.NewInt(-1),
+			},
+			expectedErr: "UnsiloedExactAmount must be positive",
+		},
+		{
+			name: "UnsiloedExactAmount without SiloExactAmounts",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:       chainSel,
+				OldPoolAddress:      "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:      "0x0000000000000000000000000000000000000002",
+				TimelockAddress:     "0x0000000000000000000000000000000000000003",
+				UnsiloedExactAmount: big.NewInt(50),
+			},
+			expectedErr: "UnsiloedExactAmount requires SiloExactAmounts to also be set",
 		},
 		{
 			name: "BasisPoints zero",
@@ -810,6 +901,11 @@ func setupSiloedMigrationTest(t *testing.T, chainSel uint64, topology siloedTopo
 	require.NoError(t, err)
 
 	for _, silo := range topology.siloedChains {
+		if silo.amount.Sign() == 0 {
+			// The contract rejects a zero-amount provide call; a silo can still be designated with
+			// no liquidity behind it (e.g. it was already fully drained by a prior migration).
+			continue
+		}
 		_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.ProvideSiloedLiquidity, chain,
 			evm_contract.FunctionInput[old_siloed.ProvideSiloedLiquidityArgs]{
 				ChainSelector: chainSel, Address: oldPoolAddr,
@@ -1752,4 +1848,293 @@ func TestMigrateSiloedPool_SharedLockBox_MultiplePartialMigrations(t *testing.T)
 	require.Equal(t, 0, big.NewInt(0).Cmp(s.balanceOf(t, s.oldPoolAddr)), "Old pool balance should be zero after the second migration")
 	require.Equal(t, 0, siloAmount.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed1])), "Silo 1 lockbox should have all its tokens after the second migration")
 	require.Equal(t, 0, unsiloedAmount.Cmp(s.balanceOf(t, s.sharedLockBox)), "Shared lockbox should have all its tokens after the second migration")
+}
+
+// TestMigrateSiloedPool_ExactAmounts covers migrating each silo (and the unsiloed shared bucket) to
+// a distinct, explicitly specified amount, which BasisPoints cannot express since it applies a single
+// uniform fraction across every silo.
+func TestMigrateSiloedPool_ExactAmounts(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	siloed2 := uint64(4949039107694359620)
+	shared1 := uint64(15971525489660198786)
+
+	silo1Amount := big.NewInt(4000)
+	silo2Amount := big.NewInt(2000)
+	unsiloedAmount := big.NewInt(1000)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains: []siloedChainSpec{
+			{selector: siloed1, amount: silo1Amount},
+			{selector: siloed2, amount: silo2Amount},
+		},
+		sharedChains:   []uint64{shared1},
+		unsiloedAmount: unsiloedAmount,
+	})
+
+	exactSilo1 := big.NewInt(2500)
+	exactSilo2 := big.NewInt(500)
+	exactUnsiloed := big.NewInt(700)
+
+	executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:  chainSel,
+			OldPoolAddress: s.oldPoolAddr.Hex(),
+			NewPoolAddress: s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: exactSilo1},
+				{ChainSelector: siloed2, Amount: exactSilo2},
+			},
+			UnsiloedExactAmount:    exactUnsiloed,
+			UnsiloedLockBoxAddress: s.sharedLockBox.Hex(),
+		},
+	)
+
+	expectedTotalMigrated := new(big.Int).Add(exactSilo1, new(big.Int).Add(exactSilo2, exactUnsiloed))
+	expectedOldPoolBalance := new(big.Int).Sub(s.totalMint, expectedTotalMigrated)
+
+	require.Equal(t, 0, expectedOldPoolBalance.Cmp(s.balanceOf(t, s.oldPoolAddr)), "Old pool should have its unmigrated balance remaining")
+	require.Equal(t, 0, exactSilo1.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed1])), "Silo 1 lockbox should have exactly its configured amount")
+	require.Equal(t, 0, exactSilo2.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed2])), "Silo 2 lockbox should have exactly its configured amount")
+	require.Equal(t, 0, exactUnsiloed.Cmp(s.balanceOf(t, s.sharedLockBox)), "Shared lockbox should have exactly its configured amount")
+}
+
+// TestMigrateSiloedPool_ExactAmounts_MissingSilo asserts that exact mode requires every siloed chain
+// on the old pool to be explicit; a silently-skipped silo is more likely an oversight than intent.
+func TestMigrateSiloedPool_ExactAmounts_MissingSilo(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	siloed2 := uint64(4949039107694359620)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains: []siloedChainSpec{
+			{selector: siloed1, amount: big.NewInt(4000)},
+			{selector: siloed2, amount: big.NewInt(2000)},
+		},
+		sharedChains:   []uint64{},
+		unsiloedAmount: big.NewInt(0),
+	})
+
+	_, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		tokens.MigrateLockReleasePoolLiquidity,
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: big.NewInt(1000)},
+			},
+		},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "SiloExactAmounts is missing entries for siloed chains")
+}
+
+// TestMigrateSiloedPool_ExactAmounts_UnknownChainSelector asserts that a SiloExactAmounts entry
+// referencing a chain selector that isn't actually a siloed chain of the old pool fails loudly
+// instead of being silently ignored by the withdraw loop.
+func TestMigrateSiloedPool_ExactAmounts_UnknownChainSelector(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	notASilo := uint64(9999999999999999999)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains:   []siloedChainSpec{{selector: siloed1, amount: big.NewInt(4000)}},
+		sharedChains:   []uint64{},
+		unsiloedAmount: big.NewInt(0),
+	})
+
+	_, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		tokens.MigrateLockReleasePoolLiquidity,
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: big.NewInt(1000)},
+				{ChainSelector: notASilo, Amount: big.NewInt(500)},
+			},
+		},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "SiloExactAmounts references chain selectors")
+	require.Contains(t, err.Error(), "not siloed chains on old pool")
+}
+
+// TestMigrateSiloedPool_ExactAmounts_ZeroAmountForEmptySilo asserts that a zero exact amount is
+// accepted, so an operator draining every silo can explicitly name an already-empty silo as "migrate
+// nothing" rather than being forced to omit it (which the missing-silo check would then reject).
+func TestMigrateSiloedPool_ExactAmounts_ZeroAmountForEmptySilo(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	siloed2 := uint64(4949039107694359620)
+	shared1 := uint64(15971525489660198786)
+
+	silo1Amount := big.NewInt(1000)
+	unsiloedAmount := big.NewInt(500)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains: []siloedChainSpec{
+			{selector: siloed1, amount: silo1Amount},
+			{selector: siloed2, amount: big.NewInt(0)},
+		},
+		sharedChains:   []uint64{shared1},
+		unsiloedAmount: unsiloedAmount,
+	})
+
+	executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: silo1Amount},
+				{ChainSelector: siloed2, Amount: big.NewInt(0)},
+			},
+			UnsiloedExactAmount:    unsiloedAmount,
+			UnsiloedLockBoxAddress: s.sharedLockBox.Hex(),
+		},
+	)
+
+	require.Equal(t, 0, big.NewInt(0).Cmp(s.balanceOf(t, s.oldPoolAddr)), "Old pool balance should be zero after migrating everything")
+	require.Equal(t, 0, silo1Amount.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed1])), "Silo 1 lockbox should have its full amount")
+	require.Equal(t, 0, big.NewInt(0).Cmp(s.balanceOf(t, s.siloLockBoxes[siloed2])), "Silo 2 lockbox should have zero since it was already empty")
+	require.Equal(t, 0, unsiloedAmount.Cmp(s.balanceOf(t, s.sharedLockBox)), "Shared lockbox should have its full amount")
+}
+
+// TestMigrateSiloedPool_ExactAmounts_OverWithdrawal asserts that an exact amount exceeding a silo's
+// available balance errors before any write is emitted.
+func TestMigrateSiloedPool_ExactAmounts_OverWithdrawal(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	siloAmount := big.NewInt(3000)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains:   []siloedChainSpec{{selector: siloed1, amount: siloAmount}},
+		sharedChains:   []uint64{},
+		unsiloedAmount: big.NewInt(0),
+	})
+
+	_, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		tokens.MigrateLockReleasePoolLiquidity,
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: new(big.Int).Add(siloAmount, big.NewInt(1))},
+			},
+		},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exceeds silo balance")
+
+	require.Equal(t, 0, siloAmount.Cmp(s.balanceOf(t, s.oldPoolAddr)), "Old pool balance should be untouched since no write was emitted")
+}
+
+// TestMigrateSiloedPool_ExactAmounts_UnsiloedRequired asserts that exact mode requires an explicit
+// UnsiloedExactAmount when the pool holds unsiloed liquidity, mirroring the equivalent legacy-mode
+// destination check but for the amount itself.
+func TestMigrateSiloedPool_ExactAmounts_UnsiloedRequired(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	shared1 := uint64(15971525489660198786)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains:   []siloedChainSpec{{selector: siloed1, amount: big.NewInt(3000)}},
+		sharedChains:   []uint64{shared1},
+		unsiloedAmount: big.NewInt(1000),
+	})
+
+	_, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		tokens.MigrateLockReleasePoolLiquidity,
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: big.NewInt(1500)},
+			},
+			UnsiloedLockBoxAddress: s.sharedLockBox.Hex(),
+		},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "UnsiloedExactAmount was not set")
+}
+
+// TestMigrateSiloedPool_ExactAmounts_SiloRebalancerRestore confirms exact mode restores per-silo
+// rebalancers just like the proportional BasisPoints path does.
+func TestMigrateSiloedPool_ExactAmounts_SiloRebalancerRestore(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	siloAmount := big.NewInt(3000)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains:   []siloedChainSpec{{selector: siloed1, amount: siloAmount}},
+		sharedChains:   []uint64{},
+		unsiloedAmount: big.NewInt(0),
+	})
+
+	chain := s.env.BlockChains.EVMChains()[chainSel]
+
+	originalRebalancer := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	_, err := operations.ExecuteOperation(
+		s.env.OperationsBundle,
+		old_siloed.SetSiloRebalancer,
+		chain,
+		evm_contract.FunctionInput[old_siloed.SetSiloRebalancerArgs]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+			Args: old_siloed.SetSiloRebalancerArgs{
+				RemoteChainSelector: siloed1,
+				NewRebalancer:       originalRebalancer,
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: siloAmount},
+			},
+		},
+	)
+
+	rebalancerReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		old_siloed.GetChainRebalancer,
+		chain,
+		evm_contract.FunctionInput[uint64]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+			Args:          siloed1,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, originalRebalancer, rebalancerReport.Output, "Silo rebalancer should be restored to the custom address set before migration")
 }

@@ -30,6 +30,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	v2changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	solchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -199,6 +201,33 @@ func setupV2PoolsForConfigureImpl(t *testing.T, tokenSymb string, useMCMS bool) 
 	DeployChainContractsV2_0_0(t, e, cumulative, selB)
 	e.DataStore = cumulative.Seal()
 
+	// Wire CCIP lanes between the test chains. ConfigureTokenPool now always applies fee configs to
+	// the FeeQuoter too, whose resolution path (ResolveFeeAdapter / FeeQuoter reads on A → B) requires
+	// a wired lane. DeployChainContracts caches proxy GetTarget reads from before SetTarget; refresh
+	// the bundle so lane configuration observes the updated on-chain executor target.
+	e.OperationsBundle = evm_testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	deployer := e.BlockChains.EVMChains()[selA].DeployerKey.From.Hex()
+	laneConnectOut, err := v2changesets.ConfigureChainsForLanesFromTopology(
+		ccvadapters.GetCommitteeVerifierContractRegistry(),
+		ccvadapters.GetChainFamilyRegistry(),
+		changesets.GetRegistry(),
+	).Apply(*e, v2changesets.ConfigureChainsForLanesFromTopologyConfig{
+		Topology: NewLaneTopologyForV2(deployer, selA, selB),
+		BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
+			MCMS: mcms.Input{},
+			Lanes: []v2changesets.CrossFamilyLanePair{
+				{
+					ChainA:          selA,
+					ChainB:          selB,
+					ChainAOverrides: NewLaneOverridesForV2(selA),
+					ChainBOverrides: NewLaneOverridesForV2(selB),
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	MergeAddresses(t, e, laneConnectOut.DataStore)
+
 	expansionMCMS := mcms.Input{}
 	if useMCMS {
 		// Register the EVM MCMS deployer/reader (idempotent) and deploy MCMS + timelock so the
@@ -277,6 +306,10 @@ func setupV2PoolsForConfigureImpl(t *testing.T, tokenSymb string, useMCMS bool) 
 	// behavior (production RPCs return a correct estimate / apply a buffer). Same fix the
 	// SetTokenPoolRateLimits tests use via forceSimGasLimit.
 	forceSimGasLimit(e, 5_000_000)
+
+	// DeployChainContracts + token expansion cache pre-lane router reads; refresh so the fee-config
+	// apply in the test (router.getOnRamp on the wired lane) observes fresh on-chain state.
+	e.OperationsBundle = evm_testsetup.BundleWithFreshReporter(e.OperationsBundle)
 
 	return configureTestEnv{
 		env: e, selA: selA, selB: selB, poolA: poolA, poolB: poolB,
