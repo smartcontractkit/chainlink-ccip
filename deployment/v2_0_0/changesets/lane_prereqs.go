@@ -42,9 +42,15 @@ type laneContract struct {
 // only surfaces after the JD round trip and after earlier chains have been processed.
 // Resolving them up front turns that into a precondition failure naming the chain and
 // the contract.
+//
+// This covers the committee verifier contracts and the explicit/default/lane-mandated CCV
+// refs as well as the well-known lane contracts: apply resolves those during enrichment and
+// remote-chain resolution, so a stale explicit CCV or a missing qualified verifier would
+// otherwise pass preconditions and fail after an earlier chain was already configured.
 func validateLaneAddressesResolvable(
 	e deployment.Environment,
 	chainFamilyRegistry *adapters.ChainFamilyRegistry,
+	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
 	chains []partialChainConfig,
 	useTestRouter bool,
 ) error {
@@ -71,6 +77,18 @@ func validateLaneAddressesResolvable(
 			}
 		}
 
+		for _, verifier := range chainCfg.CommitteeVerifiers {
+			contractAdapter, err := committeeVerifierContractRegistry.GetByChain(local)
+			if err != nil {
+				return fmt.Errorf("chain %d committee verifier (qualifier %q): %w: %w",
+					local, verifier.CommitteeQualifier, ErrLaneAddressUnresolved, err)
+			}
+			if _, err := contractAdapter.ResolveCommitteeVerifierContracts(e.DataStore, local, verifier.CommitteeQualifier); err != nil {
+				return fmt.Errorf("chain %d committee verifier (qualifier %q): %w: %w",
+					local, verifier.CommitteeQualifier, ErrLaneAddressUnresolved, err)
+			}
+		}
+
 		// Sorted so a topology with several remotes reports the same chain first every run.
 		for _, remote := range slices.Sorted(maps.Keys(chainCfg.RemoteChains)) {
 			remoteAdapter, err := adapterForChain(chainFamilyRegistry, remote)
@@ -86,6 +104,24 @@ func validateLaneAddressesResolvable(
 					return fmt.Errorf("chain %d remote chain %d %s: %w: %w",
 						local, remote, contract.name, ErrLaneAddressUnresolved, err)
 				}
+			}
+
+			remoteCfg := chainCfg.RemoteChains[remote]
+			if _, err := resolveDefaultCCVs(e, local, remoteCfg.DefaultInboundCCVs, committeeVerifierContractRegistry); err != nil {
+				return fmt.Errorf("chain %d remote chain %d default inbound CCVs: %w: %w",
+					local, remote, ErrLaneAddressUnresolved, err)
+			}
+			if _, err := resolveDefaultCCVs(e, local, remoteCfg.DefaultOutboundCCVs, committeeVerifierContractRegistry); err != nil {
+				return fmt.Errorf("chain %d remote chain %d default outbound CCVs: %w: %w",
+					local, remote, ErrLaneAddressUnresolved, err)
+			}
+			if _, err := resolveLocalContractsForTopologyChangeset(e, local, remoteCfg.LaneMandatedInboundCCVs); err != nil {
+				return fmt.Errorf("chain %d remote chain %d lane-mandated inbound CCVs: %w: %w",
+					local, remote, ErrLaneAddressUnresolved, err)
+			}
+			if _, err := resolveLocalContractsForTopologyChangeset(e, local, remoteCfg.LaneMandatedOutboundCCVs); err != nil {
+				return fmt.Errorf("chain %d remote chain %d lane-mandated outbound CCVs: %w: %w",
+					local, remote, ErrLaneAddressUnresolved, err)
 			}
 
 			// Executor resolution is a separate concern from the contract addresses above.

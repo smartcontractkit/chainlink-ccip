@@ -6,6 +6,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -150,6 +151,22 @@ type ChainFamily interface {
 	GetDefaultCommitteeVerifierRemoteChainConfig() CommitteeVerifierRemoteChainDefaults
 	GetDefaultFinalityConfig() finality.Config
 	ValidateNOPsTopology(chainSelector string, nopCount int) error
+}
+
+// GasPriceValidator is an optional interface a ChainFamily adapter can implement to expose a
+// read-only gas-price preflight. applyConfigureChains runs it for every chain before
+// dispatching any chain's sequence, so a missing or invalid gas price on a later chain fails
+// before earlier chains are written (which would otherwise leave a partially-configured lane).
+//
+// Adapters that do not implement it are skipped; their sequence still enforces the rule per
+// chain at apply time.
+type GasPriceValidator interface {
+	ValidateGasPricesForLanes(
+		e deployment.Environment,
+		chainSelector uint64,
+		feeQuoter []byte,
+		remoteChains map[uint64]RemoteChainConfig[[]byte, string],
+	) error
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.

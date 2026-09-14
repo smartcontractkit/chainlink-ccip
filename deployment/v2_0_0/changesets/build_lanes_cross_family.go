@@ -55,6 +55,10 @@ type BuildLanesCrossFamilyConfig struct {
 	// allocation; leaving it unset stops a lane re-run from resetting a hand-raised value
 	// back to the family default.
 	AllowLoweringBaseExecutionGasCost bool `json:"allowLoweringBaseExecutionGasCost,omitempty" yaml:"allowLoweringBaseExecutionGasCost,omitempty"`
+	// AllowDowngrade permits reconfiguring a lane to a lower version than the one currently
+	// on chain. Off by default: a payload still pinned to an older version cannot silently
+	// downgrade a lane that has already been migrated to a newer one.
+	AllowDowngrade bool `json:"allowDowngrade,omitempty" yaml:"allowDowngrade,omitempty"`
 }
 
 // UseTestRouter reports whether the test router should be used instead of the production router.

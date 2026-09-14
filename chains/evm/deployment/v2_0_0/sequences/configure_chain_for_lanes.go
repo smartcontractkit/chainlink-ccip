@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
+	"math/big"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -154,36 +157,12 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// A FeeQuoter with no gas price for the destination reverts with
 			// NoGasPriceAvailable on the first send, so the lane needs one either already
 			// on chain or supplied with this config.
-			gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
-				ChainSelector: chain.Selector,
-				Address:       feeQuoterAddr,
-				Args:          remoteSelector,
-			})
+			gasPriceUpdate, err := resolveGasPriceUpdate(b, chain, feeQuoterAddr, remoteSelector, remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas)
 			if err != nil {
-				return seqtypes.OnChainOutput{}, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
+				return seqtypes.OnChainOutput{}, err
 			}
-			onChainGasPrice := gasPriceReport.Output.Value
-			// The binding always returns a non-nil *big.Int for the on-chain price: a zero
-			// uint224 decodes to a non-nil zero, never to nil. So "no gas price on chain"
-			// is signalled by Sign() == 0, not by a nil pointer.
-			switch desired := remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas; {
-			case desired != nil && desired.Sign() > 0:
-				if desired.Cmp(onChainGasPrice) != 0 {
-					gasPriceUpdates = append(gasPriceUpdates, fee_quoter.GasPriceUpdate{
-						DestChainSelector: remoteSelector,
-						UsdPerUnitGas:     desired,
-					})
-				}
-			case desired != nil:
-				return seqtypes.OnChainOutput{}, fmt.Errorf(
-					"FeeQuoter(%s) on chain %d, dest chain %d: %w",
-					feeQuoterAddr, chain.Selector, remoteSelector, ErrInvalidGasPrice,
-				)
-			case onChainGasPrice.Sign() == 0:
-				return seqtypes.OnChainOutput{}, fmt.Errorf(
-					"FeeQuoter(%s) on chain %d, dest chain %d: %w",
-					feeQuoterAddr, chain.Selector, remoteSelector, ErrNoDestGasPrice,
-				)
+			if gasPriceUpdate != nil {
+				gasPriceUpdates = append(gasPriceUpdates, *gasPriceUpdate)
 			}
 
 			// Router OnRamp: only add if the router doesn't already point to our OnRamp
@@ -388,6 +367,83 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 		return seqtypes.OnChainOutput{BatchOps: batchOps}, nil
 	},
 )
+
+// resolveGasPriceUpdate reads the on-chain gas price for a destination and decides what, if
+// anything, the lane config should write. It returns nil when no write is needed.
+//
+// A FeeQuoter with no gas price for the destination reverts with NoGasPriceAvailable on the
+// first send, so the lane needs one either already on chain or supplied with this config.
+// The binding always returns a non-nil *big.Int for the on-chain price: a zero uint224
+// decodes to a non-nil zero, never to nil, so "no gas price on chain" is signalled by
+// Sign() == 0 rather than a nil pointer.
+//
+// A non-positive USDPerUnitGas is not a gas price. It reaches here as readily as a nil
+// pointer does -- "usdPerUnitGas: 0" in the pipeline YAML unmarshals to a non-nil zero --
+// so both forms mean "not supplied". Treating a zero as a supplied value would compare it
+// against an unset on-chain price, find them equal, and skip the check; against a good
+// on-chain price it would write the zero over it.
+func resolveGasPriceUpdate(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	feeQuoterAddr common.Address,
+	remoteSelector uint64,
+	desired *big.Int,
+) (*fee_quoter.GasPriceUpdate, error) {
+	gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
+		ChainSelector: chain.Selector,
+		Address:       feeQuoterAddr,
+		Args:          remoteSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get gas prices on FeeQuoter(%s) on chain %s: %w", feeQuoterAddr, chain, err)
+	}
+	onChainGasPrice := gasPriceReport.Output.Value
+
+	switch {
+	case desired != nil && desired.Sign() > 0:
+		if desired.Cmp(onChainGasPrice) == 0 {
+			return nil, nil
+		}
+		return &fee_quoter.GasPriceUpdate{
+			DestChainSelector: remoteSelector,
+			UsdPerUnitGas:     desired,
+		}, nil
+	case desired != nil:
+		return nil, fmt.Errorf(
+			"FeeQuoter(%s) on chain %d, dest chain %d: %w",
+			feeQuoterAddr, chain.Selector, remoteSelector, ErrInvalidGasPrice,
+		)
+	case onChainGasPrice.Sign() == 0:
+		return nil, fmt.Errorf(
+			"FeeQuoter(%s) on chain %d, dest chain %d: %w",
+			feeQuoterAddr, chain.Selector, remoteSelector, ErrNoDestGasPrice,
+		)
+	}
+	return nil, nil
+}
+
+// ValidateGasPricesForLanes is a read-only preflight for the gas-price requirement enforced by
+// ConfigureChainForLanes. It checks every remote chain's gas price without writing anything.
+//
+// The sequence enforces the same rule per chain, but applyConfigureChains dispatches chains
+// sequentially and executes writes immediately in deployer-owned mode. Without this pass, a
+// later chain's missing gas price would only surface after earlier chains were already
+// configured, leaving a partially-configured lane. Callers run this for every chain before
+// dispatching any of them.
+func ValidateGasPricesForLanes(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	feeQuoterAddr common.Address,
+	remoteChains map[uint64]changesetadapters.RemoteChainConfig[[]byte, string],
+) error {
+	for _, remoteSelector := range slices.Sorted(maps.Keys(remoteChains)) {
+		remoteConfig := remoteChains[remoteSelector]
+		if _, err := resolveGasPriceUpdate(b, chain, feeQuoterAddr, remoteSelector, remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // maybeAddSourceChainConfigArgOnLocalChain reads the current OffRamp source chain config
 // and appends to offRampArgs only when the desired state differs. Zero/empty fields in the
