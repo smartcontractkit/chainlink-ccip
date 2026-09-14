@@ -127,7 +127,7 @@ type RateLimitReaderAdapter interface {
 
 // TokenAdminRegistryReader is a versionless interface for reading the active pool from a chain's
 // TokenAdminRegistry (or equivalent). Implementations are registered per chain family via
-// TokenAdapterRegistry.RegisterTokenAdminRegistryReader and can be looked up by family regardless
+// TokenAdapterRegistry.RegisterTokenAdminRegistryManager and can be looked up by family regardless
 // of pool version.
 type TokenAdminRegistryReader interface {
 	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
@@ -139,11 +139,52 @@ type TokenAdminRegistryReader interface {
 	GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error)
 }
 
+// TokenAdminRegistryWriter is a versionless interface for unregistering a token from a chain's
+// TokenAdminRegistry (or equivalent). There is no official unregister on-chain: a pool is
+// unregistered by setting the registry's pool to the null/zero pool. Implementations must only
+// emit the write when the token's current active pool is the pool being removed, and skip (no-op)
+// when the entry already points at a different pool or is already empty, so a live registration
+// that has moved on is never clobbered.
+type TokenAdminRegistryWriter interface {
+	// UnregisterToken returns a sequence that sets the token's registry pool to the null/zero pool.
+	UnregisterToken() *cldf_ops.Sequence[UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// TokenAdminRegistryManager combines the versionless TAR reader and writer for a chain family.
+type TokenAdminRegistryManager interface {
+	TokenAdminRegistryReader
+	TokenAdminRegistryWriter
+}
+
+// UnregisterTokenSequenceInput defines the input for unregistering a token from the
+// TokenAdminRegistry. The token is unregistered by setting its registry pool to the null/zero
+// pool. The write is only emitted when the token's current active pool equals TokenPoolRef.
+type UnregisterTokenSequenceInput struct {
+	// Selector is the chain selector for the chain on which the registry lives.
+	Selector uint64 `json:"selector" yaml:"selector"`
+	// TokenRef is the fully resolved token reference.
+	TokenRef datastore.AddressRef `json:"tokenRef" yaml:"tokenRef"`
+	// TokenPoolRef is the fully resolved pool reference that must currently be the token's
+	// active pool for the unregister to be emitted.
+	TokenPoolRef datastore.AddressRef `json:"tokenPoolRef" yaml:"tokenPoolRef"`
+	// RegistryRef optionally overrides the registry ref used instead of the datastore default.
+	RegistryRef datastore.AddressRef `json:"registryRef,omitempty" yaml:"registryRef,omitempty"`
+	// ExistingDataStore is the datastore containing existing deployment data.
+	ExistingDataStore datastore.DataStore `json:"-" yaml:"-"`
+}
+
 // TokenPoolMigrator is an optional interface implemented by adapters that can read an existing pool's
 // cross-chain configuration on-chain. It powers AutoMigrateRemoteChains: during an upgrade, the remote
 // chains/tokens/pools the active pool is configured for are read back (as raw bytes) and carried forward
-// onto the new pool. All addresses are raw on-chain bytes so the interface stays chain-family-agnostic;
-// callers convert them per family via the AddressNormalizer registry when a string form is needed.
+// onto the new pool. It is also used by RemoveRemotePools to discover a pool's remotes for the
+// allRemotes/deactivate modes and to read a peer's remote list during the reverse pass. All addresses
+// are raw on-chain bytes so the interface stays chain-family-agnostic; callers convert them per family
+// via the AddressNormalizer registry when a string form is needed.
+//
+// NOTE: a Solana pool implementing these reads is NOT a migration source. The auto-migrate gate requires
+// a v2.0.0+ target pool, which no Solana pool has, so Solana always bails at the graceful skip before the
+// TokenPoolMigrator assert. Solana's GetSupportedChains returns an error because supported chains cannot
+// be enumerated on-chain; callers must list remotes explicitly for Solana.
 type TokenPoolMigrator interface {
 	// GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
 	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error)
@@ -493,18 +534,18 @@ type SetTokenTransferFeeSequenceInput struct {
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
 	tokenRefResolverReg         map[string]TokenRefResolver
-	tokenAdminRegistryReaderReg map[string]TokenAdminRegistryReader
+	tokenAdminRegistryManagerReg map[string]TokenAdminRegistryManager
 	tokenAdapterReg             map[tokenAdapterID]TokenAdapter
 	tokenRefResolverMu          sync.Mutex
-	tokenAdminRegistryReaderMu  sync.Mutex
+	tokenAdminRegistryManagerMu sync.Mutex
 	tokenAdapterMu              sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
-		tokenRefResolverReg:         make(map[string]TokenRefResolver),
-		tokenAdminRegistryReaderReg: make(map[string]TokenAdminRegistryReader),
-		tokenAdapterReg:             make(map[tokenAdapterID]TokenAdapter),
+		tokenRefResolverReg:          make(map[string]TokenRefResolver),
+		tokenAdminRegistryManagerReg: make(map[string]TokenAdminRegistryManager),
+		tokenAdapterReg:              make(map[tokenAdapterID]TokenAdapter),
 	}
 }
 
@@ -525,21 +566,22 @@ func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRef
 	return resolver, ok
 }
 
-// RegisterTokenAdminRegistryReader registers a versionless TAR reader for the given chain family.
-func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryReader(family string, reader TokenAdminRegistryReader) {
-	r.tokenAdminRegistryReaderMu.Lock()
-	defer r.tokenAdminRegistryReaderMu.Unlock()
-	if _, exists := r.tokenAdminRegistryReaderReg[family]; !exists {
-		r.tokenAdminRegistryReaderReg[family] = reader
+// RegisterTokenAdminRegistryManager registers a versionless TAR manager (reader + writer) for the
+// given chain family.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryManager(family string, manager TokenAdminRegistryManager) {
+	r.tokenAdminRegistryManagerMu.Lock()
+	defer r.tokenAdminRegistryManagerMu.Unlock()
+	if _, exists := r.tokenAdminRegistryManagerReg[family]; !exists {
+		r.tokenAdminRegistryManagerReg[family] = manager
 	}
 }
 
-// GetTokenAdminRegistryReader retrieves a registered TokenAdminRegistryReader for the given chain family.
-func (r *TokenAdapterRegistry) GetTokenAdminRegistryReader(family string) (TokenAdminRegistryReader, bool) {
-	r.tokenAdminRegistryReaderMu.Lock()
-	defer r.tokenAdminRegistryReaderMu.Unlock()
-	reader, ok := r.tokenAdminRegistryReaderReg[family]
-	return reader, ok
+// GetTokenAdminRegistryManager retrieves a registered TokenAdminRegistryManager for the given chain family.
+func (r *TokenAdapterRegistry) GetTokenAdminRegistryManager(family string) (TokenAdminRegistryManager, bool) {
+	r.tokenAdminRegistryManagerMu.Lock()
+	defer r.tokenAdminRegistryManagerMu.Unlock()
+	manager, ok := r.tokenAdminRegistryManagerReg[family]
+	return manager, ok
 }
 
 // RegisterTokenAdapter allows chains to register their changeset logic.

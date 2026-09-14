@@ -114,6 +114,68 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 			},
 			errors: []string{"duplicate pool entry"},
 		},
+		{
+			name: "rejects_all_remotes_with_remote_pools",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector:       sel,
+					Pool:                poolRef,
+					AllRemotes:          true,
+					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Remote: remoteRef}},
+				}},
+			},
+			errors: []string{"allRemotes and remotePoolsToRemove are mutually exclusive"},
+		},
+		{
+			name: "rejects_bidirectional_without_remotes",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: sel,
+					Pool:          poolRef,
+					Bidirectional: true,
+				}},
+			},
+			errors: []string{"bidirectional requires allRemotes or remotePoolsToRemove"},
+		},
+		{
+			name: "rejects_deactivate_with_all_remotes",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: sel,
+					Pool:          poolRef,
+					Deactivate:    true,
+					AllRemotes:    true,
+				}},
+			},
+			errors: []string{"deactivate must be specified alone"},
+		},
+		{
+			name: "rejects_deactivate_with_bidirectional",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: sel,
+					Pool:          poolRef,
+					Deactivate:    true,
+					Bidirectional: true,
+				}},
+			},
+			errors: []string{"deactivate must be specified alone"},
+		},
+		{
+			name: "rejects_no_mode_selected",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: sel,
+					Pool:          poolRef,
+				}},
+			},
+			errors: []string{"no remote pools to remove"},
+		},
 	}
 
 	for _, tt := range cases {
@@ -158,10 +220,11 @@ func TestRemoveRemotePools_V2(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, remotePools, "pool A should have no remote pool for chain B after removal")
 
-	// Removing an already-removed pool must error clearly (not silently no-op).
+	// Re-running the removal is idempotent: the pairing is already absent, so it is skipped
+	// (with a warn log) rather than erroring.
 	tc.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(tc.env.OperationsBundle)
 	_, err = tokensapi.RemoveRemotePools().Apply(*tc.env, input)
-	require.ErrorContains(t, err, "is not configured")
+	require.NoError(t, err)
 }
 
 // TestRemoveRemotePools_PreV2 exercises remote pool removal on v1.5.1 and v1.6.1 pools.
@@ -199,10 +262,11 @@ func testRemoveRemotePoolsPreV2(t *testing.T, version *semver.Version) {
 	require.NoError(t, err)
 	require.Empty(t, remotePools, "old pool A should have no remote pool for chain B after removal")
 
-	// Removing an already-removed pool must error clearly.
+	// Re-running the removal is idempotent: the pairing is already absent, so it is skipped
+	// (with a warn log) rather than erroring.
 	pair.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(pair.env.OperationsBundle)
 	_, err = tokensapi.RemoveRemotePools().Apply(*pair.env, input)
-	require.ErrorContains(t, err, "is not configured")
+	require.NoError(t, err)
 }
 
 // removeRemotePoolsTestEnv is the result of deploying a fully-connected v2.0.0 BurnMint pool
@@ -335,7 +399,7 @@ func TestRemoveRemotePools_PartialRemoval(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, remotePoolsC, "pool A should still have a remote pool for chain C after partial removal")
 
-	// Removing a remote pool address that is not configured must error clearly.
+	// Removing a remote pool address that is not configured is an idempotent no-op (warn + skip).
 	env.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(env.env.OperationsBundle)
 	nonexistent := tokensapi.RemoveRemotePoolsInput{
 		MCMS: mcms.Input{},
@@ -350,5 +414,162 @@ func TestRemoveRemotePools_PartialRemoval(t *testing.T) {
 	}
 	require.NoError(t, tokensapi.RemoveRemotePools().VerifyPreconditions(*env.env, nonexistent))
 	_, err = tokensapi.RemoveRemotePools().Apply(*env.env, nonexistent)
-	require.ErrorContains(t, err, "is not configured")
+	require.NoError(t, err)
+}
+
+func TestRemoveRemotePools_AllRemotes(t *testing.T) {
+	env := setupV2PoolsForRemoveRemotePools(t)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(env.poolA, env.env.BlockChains.EVMChains()[env.selA].Client)
+	require.NoError(t, err)
+
+	remotePoolsB, err := poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selB)
+	require.NoError(t, err)
+	require.NotEmpty(t, remotePoolsB, "pool A should have a remote pool for chain B before removal")
+	remotePoolsC, err := poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selC)
+	require.NoError(t, err)
+	require.NotEmpty(t, remotePoolsC, "pool A should have a remote pool for chain C before removal")
+
+	input := tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: env.selA,
+			Pool:          datastore.AddressRef{Address: env.poolA.Hex()},
+			AllRemotes:    true,
+		}},
+	}
+	require.NoError(t, tokensapi.RemoveRemotePools().VerifyPreconditions(*env.env, input))
+	_, err = tokensapi.RemoveRemotePools().Apply(*env.env, input)
+	require.NoError(t, err)
+
+	remotePoolsB, err = poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selB)
+	require.NoError(t, err)
+	require.Empty(t, remotePoolsB, "pool A should have no remote pool for chain B after allRemotes")
+	remotePoolsC, err = poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selC)
+	require.NoError(t, err)
+	require.Empty(t, remotePoolsC, "pool A should have no remote pool for chain C after allRemotes")
+}
+
+func TestRemoveRemotePools_Bidirectional(t *testing.T) {
+	env := setupV2PoolsForRemoveRemotePools(t)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(env.poolA, env.env.BlockChains.EVMChains()[env.selA].Client)
+	require.NoError(t, err)
+	poolB, err := tokenpoolV2_0_0.NewTokenPool(env.poolB, env.env.BlockChains.EVMChains()[env.selB].Client)
+	require.NoError(t, err)
+
+	remotePoolsB, err := poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selB)
+	require.NoError(t, err)
+	require.NotEmpty(t, remotePoolsB, "pool A should have a remote pool for chain B before removal")
+	remotePoolsA, err := poolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selA)
+	require.NoError(t, err)
+	require.NotEmpty(t, remotePoolsA, "pool B should have a remote pool for chain A before removal")
+
+	input := tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: env.selA,
+			Pool:          datastore.AddressRef{Address: env.poolA.Hex()},
+			Bidirectional: true,
+			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
+				Selector: env.selB,
+				Remote:   datastore.AddressRef{Address: env.poolB.Hex()},
+			}},
+		}},
+	}
+	require.NoError(t, tokensapi.RemoveRemotePools().VerifyPreconditions(*env.env, input))
+	_, err = tokensapi.RemoveRemotePools().Apply(*env.env, input)
+	require.NoError(t, err)
+
+	remotePoolsB, err = poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selB)
+	require.NoError(t, err)
+	require.Empty(t, remotePoolsB, "pool A should have no remote pool for chain B after bidirectional removal")
+
+	remotePoolsA, err = poolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selA)
+	require.NoError(t, err)
+	require.Empty(t, remotePoolsA, "pool B should have no remote pool for chain A after bidirectional removal")
+
+	env.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(env.env.OperationsBundle)
+	_, err = tokensapi.RemoveRemotePools().Apply(*env.env, input)
+	require.NoError(t, err)
+}
+
+func TestRemoveRemotePools_Deactivate(t *testing.T) {
+	env := setupV2PoolsForRemoveRemotePools(t)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(env.poolA, env.env.BlockChains.EVMChains()[env.selA].Client)
+	require.NoError(t, err)
+	poolB, err := tokenpoolV2_0_0.NewTokenPool(env.poolB, env.env.BlockChains.EVMChains()[env.selB].Client)
+	require.NoError(t, err)
+
+	remotePoolsB, err := poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selB)
+	require.NoError(t, err)
+	require.NotEmpty(t, remotePoolsB, "pool A should have a remote pool for chain B before removal")
+	remotePoolsA, err := poolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selA)
+	require.NoError(t, err)
+	require.NotEmpty(t, remotePoolsA, "pool B should have a remote pool for chain A before removal")
+
+	input := tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: env.selA,
+			Pool:          datastore.AddressRef{Address: env.poolA.Hex()},
+			Deactivate:    true,
+		}},
+	}
+	require.NoError(t, tokensapi.RemoveRemotePools().VerifyPreconditions(*env.env, input))
+	_, err = tokensapi.RemoveRemotePools().Apply(*env.env, input)
+	require.NoError(t, err)
+
+	remotePoolsB, err = poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selB)
+	require.NoError(t, err)
+	require.Empty(t, remotePoolsB, "pool A should have no remote pool for chain B after deactivate")
+	remotePoolsC, err := poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selC)
+	require.NoError(t, err)
+	require.Empty(t, remotePoolsC, "pool A should have no remote pool for chain C after deactivate")
+
+	remotePoolsA, err = poolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, env.selA)
+	require.NoError(t, err)
+	require.Empty(t, remotePoolsA, "pool B should have no remote pool for chain A after deactivate")
+
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR manager should be registered")
+	tokenRef, err := datastore_utils.FindAndFormatRef(env.env.DataStore, datastore.AddressRef{ChainSelector: env.selA, Type: datastore.ContractType(bnmERC20ops.ContractType)}, env.selA, datastore_utils.FullRef)
+	require.NoError(t, err)
+	activePool, err := tarReader.GetActivePool(*env.env, env.selA, tokenRef)
+	require.NoError(t, err)
+	require.Empty(t, activePool, "pool A should be unregistered from the TAR after deactivate")
+}
+
+func TestRemoveRemotePools_DeactivateSkipsUnregisterWhenActivePoolEmpty(t *testing.T) {
+	env := setupV2PoolsForRemoveRemotePools(t)
+
+	input := tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: env.selA,
+			Pool:          datastore.AddressRef{Address: env.poolA.Hex()},
+			Deactivate:    true,
+		}},
+	}
+
+	require.NoError(t, tokensapi.RemoveRemotePools().VerifyPreconditions(*env.env, input))
+	_, err := tokensapi.RemoveRemotePools().Apply(*env.env, input)
+	require.NoError(t, err)
+
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR manager should be registered")
+	fullTokenRef, err := datastore_utils.FindAndFormatRef(env.env.DataStore, datastore.AddressRef{ChainSelector: env.selA, Type: datastore.ContractType(bnmERC20ops.ContractType)}, env.selA, datastore_utils.FullRef)
+	require.NoError(t, err)
+	activePool, err := tarReader.GetActivePool(*env.env, env.selA, fullTokenRef)
+	require.NoError(t, err)
+	require.Empty(t, activePool, "pool A should be unregistered from the TAR after deactivate")
+
+	env.env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(env.env.OperationsBundle)
+	_, err = tokensapi.RemoveRemotePools().Apply(*env.env, input)
+	require.NoError(t, err)
+
+	activePool, err = tarReader.GetActivePool(*env.env, env.selA, fullTokenRef)
+	require.NoError(t, err)
+	require.Empty(t, activePool, "the registry entry should remain empty after a repeated deactivate")
 }

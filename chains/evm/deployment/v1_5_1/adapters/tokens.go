@@ -17,6 +17,7 @@ import (
 	seqV1_5_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences"
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/sequences/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -318,10 +319,16 @@ func (p *poolOpsV151) SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr com
 func (p *poolOpsV151) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error) {
 	var writes []evm_contract.WriteOutput
 	for _, remote := range remotes {
-		if !common.IsHexAddress(remote.Remote.Address) {
-			return nil, fmt.Errorf("invalid remote pool address for chain %d: %s", remote.Selector, remote.Remote.Address)
+		var target []byte
+		if common.IsHexAddress(remote.Remote.Address) {
+			target = common.LeftPadBytes(common.HexToAddress(remote.Remote.Address).Bytes(), 32)
+		} else {
+			remoteBytes, err := deployapi.StringToBytes(remote.Selector, remote.Remote.Address)
+			if err != nil {
+				return nil, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remote.Selector, remote.Remote.Address, err)
+			}
+			target = remoteBytes
 		}
-		target := common.LeftPadBytes(common.HexToAddress(remote.Remote.Address).Bytes(), 32)
 
 		poolsReport, err := cldf_ops.ExecuteOperation(
 			b, tpOps.GetRemotePools, chain,
@@ -333,10 +340,8 @@ func (p *poolOpsV151) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, pool
 		}
 
 		if !slices.ContainsFunc(poolsReport.Output, func(p []byte) bool { return bytes.Equal(p, target) }) {
-			return nil, fmt.Errorf(
-				"remote pool %s is not configured for remote chain %d on pool %s (chain %d)",
-				remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector,
-			)
+			b.Logger.Warnf("skipping removal of remote pool %s for remote chain %d from pool %s on chain %d: pairing already absent", remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector)
+			continue
 		}
 
 		removeReport, err := cldf_ops.ExecuteOperation(

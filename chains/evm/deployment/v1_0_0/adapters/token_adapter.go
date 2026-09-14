@@ -419,6 +419,69 @@ func (a *EVMTokenBase) GetTokenAdminRegistryRef(e deployment.Environment, chainS
 	return ref, nil
 }
 
+// UnregisterToken unregisters a token from the TokenAdminRegistry by setting its pool to
+// address(0). The write is gated by the token's TAR Administrator via the SetPool operation's
+// IsAllowedCaller. The caller is responsible for the read-check guard (only unregister when the
+// token's current active pool is the pool being removed) before executing this sequence.
+func (a *EVMTokenBase) UnregisterToken() *cldf_ops.Sequence[tokensapi.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-base:unregister-token",
+		cciputils.Version_1_0_0,
+		"Unregister a token from the TokenAdminRegistry by setting its pool to address(0)",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.UnregisterTokenSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.EVMChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
+			}
+
+			token, err := a.ParseNonZeroAddressRef(input.ExistingDataStore, input.TokenRef, input.Selector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token address from ref %v on chain %d: %w", input.TokenRef, input.Selector, err)
+			}
+
+			var registryAddr common.Address
+			for _, override := range []datastore.AddressRef{input.RegistryRef} {
+				if !datastore_utils.IsAddressRefEmpty(override) {
+					if addr, err := datastore_utils.FindAndFormatRef(input.ExistingDataStore, override, input.Selector, datastore_utils_evm.ToNonZeroEVMAddress); err == nil {
+						registryAddr = addr
+						break
+					}
+				}
+			}
+			if registryAddr == (common.Address{}) {
+				registryAddr, err = a.GetTokenAdminRegistryAddress(input.ExistingDataStore, input.Selector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve TokenAdminRegistry on chain %d: %w", input.Selector, err)
+				}
+			}
+
+			report, err := cldf_ops.ExecuteOperation(
+				b,
+				tarops.SetPool, chain,
+				contract.FunctionInput[tarops.SetPoolArgs]{
+					ChainSelector: input.Selector,
+					Address:       registryAddr,
+					Args: tarops.SetPoolArgs{
+						TokenAddress:     token,
+						TokenPoolAddress: common.Address{},
+					},
+				},
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to unregister token %s from registry %s on chain %d: %w", token.Hex(), registryAddr.Hex(), input.Selector, err)
+			}
+
+			var result sequences.OnChainOutput
+			batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{report.Output})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from unregister write: %w", err)
+			}
+			result.BatchOps = append(result.BatchOps, batchOp)
+			return result, nil
+		},
+	)
+}
+
 // GetTimelockAddressCLL looks up the timelock (RBACTimelock) address from the datastore using the CLL qualifier.
 func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector uint64) (common.Address, error) {
 	filter := datastore.AddressRef{
