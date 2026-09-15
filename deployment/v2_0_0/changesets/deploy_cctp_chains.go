@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -60,18 +61,48 @@ func DeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistr
 	return cldf.CreateChangeSet(makeApplyDeployCCTPChains(cctpChainRegistry, mcmsRegistry), makeVerifyDeployCCTPChains(cctpChainRegistry, mcmsRegistry))
 }
 
+// create2FactoryContractType and create2FactoryVersion identify the CREATE2Factory
+// deployment in the datastore used as the default DeployerContract.
+const create2FactoryContractType = datastore.ContractType("CREATE2Factory")
+
+var create2FactoryVersion = semver.MustParse("2.0.0")
+
 // applyCCTPDefaults fills in any unset CCTPChainConfig fields with the
-// Circle-defined defaults for the chain and its remote chains. Values that are
-// explicitly provided take precedence, which allows test environments with
-// their own chain selectors and mock CCTP/USDC contracts to override them. If
-// no defaults exist for a chain, the input is left unchanged.
-func applyCCTPDefaults(cfg DeployCCTPChainsConfig) DeployCCTPChainsConfig {
+// Circle-defined defaults for the chain and its remote chains, and resolves the
+// DeployerContract from the datastore when omitted. Values that are explicitly
+// provided take precedence, which allows test environments with their own chain
+// selectors and mock CCTP/USDC contracts to override them. If no defaults exist
+// for a chain, the input is left unchanged.
+func applyCCTPDefaults(ds datastore.DataStore, cfg DeployCCTPChainsConfig) DeployCCTPChainsConfig {
 	chains := make(map[uint64]CCTPChainConfig, len(cfg.Chains))
 	for chainSel, chainCfg := range cfg.Chains {
-		chains[chainSel] = withCCTPChainDefaults(chainSel, chainCfg)
+		normalized := withCCTPChainDefaults(chainSel, chainCfg)
+		if normalized.DeployerContract == "" {
+			normalized.DeployerContract = findDeployerContract(ds, chainSel)
+		}
+		chains[chainSel] = normalized
 	}
 	cfg.Chains = chains
 	return cfg
+}
+
+// findDeployerContract returns the CREATE2Factory address for the chain from the
+// datastore, if one is registered. The lookup is best-effort: an empty result
+// leaves DeployerContract unset so the downstream sequence can report whether it
+// is actually required.
+func findDeployerContract(ds datastore.DataStore, chainSel uint64) string {
+	if ds == nil {
+		return ""
+	}
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSel),
+		datastore.AddressRefByType(create2FactoryContractType),
+		datastore.AddressRefByVersion(create2FactoryVersion),
+	)
+	if len(refs) == 0 {
+		return ""
+	}
+	return refs[0].Address
 }
 
 func withCCTPChainDefaults(chainSel uint64, chainCfg CCTPChainConfig) CCTPChainConfig {
@@ -114,7 +145,7 @@ func withCCTPChainDefaults(chainSel uint64, chainCfg CCTPChainConfig) CCTPChainC
 
 func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) error {
 	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) error {
-		cfg = applyCCTPDefaults(cfg)
+		cfg = applyCCTPDefaults(e.DataStore, cfg)
 		if cfg.MCMS != nil {
 			err := cfg.MCMS.Validate()
 			if err != nil {
@@ -162,7 +193,7 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 
 func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
-		cfg = applyCCTPDefaults(cfg)
+		cfg = applyCCTPDefaults(e.DataStore, cfg)
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
