@@ -36,7 +36,7 @@ type Config struct {
 // finality config work as an OR meaning that the allowed finality config can be a combination of the following:
 // - WaitForFinality
 // - WaitForSafe
-// - BlockDepth (define max allowed block depth to wait for)
+// - BlockDepth (define min allowed block depth to wait for)
 //
 // WaitForFinality is the zero-value sentinel (0x00000000) and is therefore
 // implicit: it is "allowed" whenever the raw value is 0x00000000 OR when
