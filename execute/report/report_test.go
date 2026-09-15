@@ -1617,6 +1617,7 @@ func Test_Builder_MultiReport(t *testing.T) {
 		name                        string
 		args                        args
 		expectedExecReports         int
+		expectedMessagesPerExec     []int // if empty, expect all messages to be in the report.
 		expectedChainReportsPerExec []int
 		// Map tracking which sequence numbers to skip per chain selector
 		expectedSkippedSeqsByChain map[cciptypes.ChainSelector]mapset.Set[cciptypes.SeqNum]
@@ -1840,10 +1841,10 @@ func Test_Builder_MultiReport(t *testing.T) {
 			expectedChainReportsPerExec: []int{2, 1}, // 2 chains in first exec report, 1 in second
 		},
 		{
-			name: "non-zero nonces limit to single report despite multipleReportsEnabled - " +
-				"same inputs as one and half reports",
+			name: "non-zero nonces are not allowed with multiple report generation when maxMessages is used",
 			args: args{
 				maxReportSize: 9700,
+				maxMessages:   1,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -1853,7 +1854,20 @@ func Test_Builder_MultiReport(t *testing.T) {
 						nil,                 // executed
 						false,               // zero nonces
 					),
-					makeTestCommitReport(hasher, 20, 3, 100, 999, 10101010101,
+				},
+			},
+			wantErr: "message with ordered execution detected with incompatible report builder parameters: " +
+				"messages with non-zero nonces detected",
+		},
+		{
+			name: "non-zero nonces are allowed with multiple report generation when maxMessages is used",
+			args: args{
+				maxReportSize:         9500,
+				maxGasLimit:           10000000,
+				maxSingleChainReports: 1,
+				nonces:                defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 30, 2, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil,                 // executed
@@ -1861,7 +1875,8 @@ func Test_Builder_MultiReport(t *testing.T) {
 					),
 				},
 			},
-			wantErr: "multiple reports validate nonces: messages with non-zero nonces detected",
+			expectedExecReports:     1,
+			expectedMessagesPerExec: []int{19}, // ensure the remaining messages are not included in a second report.
 		},
 		{
 			name: "multiple input reports splitting across maxMessages - no maxSingleChainReports",
@@ -1985,6 +2000,14 @@ func Test_Builder_MultiReport(t *testing.T) {
 			// Verify expected number of exec reports
 			require.Equal(t, tt.expectedExecReports, len(execReports))
 
+			if len(tt.expectedMessagesPerExec) > 0 {
+				require.Len(t, tt.expectedMessagesPerExec, len(execReports))
+				for i := range len(execReports) {
+					require.Equal(t, tt.expectedMessagesPerExec[i], len(execReports[i].ChainReports[0].Messages),
+						"Unexpected number of messages in exec report %d", i)
+				}
+			}
+
 			// Verify expected chain reports per exec report
 			for i := 0; i < tt.expectedExecReports; i++ {
 				if i < len(tt.expectedChainReportsPerExec) {
@@ -2045,13 +2068,16 @@ func Test_Builder_MultiReport(t *testing.T) {
 				totalExecuted += seqNums.Cardinality()
 			}
 
-			totalMessages := 0
-			// count all messages across all reports
-			for _, cr := range tt.args.reports {
-				totalMessages += len(cr.Messages)
-			}
+			// Only verify that all messages are executed if the test case did not specify expected messages per exec.
+			if len(tt.expectedMessagesPerExec) == 0 {
+				totalMessages := 0
+				// count all messages across all reports
+				for _, cr := range tt.args.reports {
+					totalMessages += len(cr.Messages)
+				}
 
-			require.Equal(t, totalMessages-totalSkipped, totalExecuted)
+				require.Equal(t, totalMessages-totalSkipped, totalExecuted)
+			}
 		})
 	}
 }
