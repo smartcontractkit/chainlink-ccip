@@ -14,6 +14,9 @@ importers:
       '@chainlink/contracts':
         specifier: 1.5.0
         version: 1.5.0(ethers@5.8.0)
+      '@eth-optimism/contracts-bedrock':
+        specifier: 0.17.2
+        version: 0.17.2
       '@openzeppelin/contracts-4.8.3':
         specifier: npm:@openzeppelin/contracts@4.8.3
         version: '@openzeppelin/contracts@4.8.3'
@@ -132,6 +135,9 @@ packages:
   '@eslint/eslintrc@3.3.5':
     resolution: {integrity: sha512-4IlJx0X0qftVsN5E+/vGujTRIFtwuLbNsVUe7TO6zYPDR1O6nFwvwhIKEKSrl6dZchmYBITazxKoUYOjdtjlRg==, tarball: https://registry.npmjs.org/@eslint/eslintrc/-/eslintrc-3.3.5.tgz}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@eth-optimism/contracts-bedrock@0.17.2':
+    resolution: {integrity: sha512-YVwPHpBZgFwFX9qY8+iToVAAH7mSnVIVmih+YfHhqjAhlLvLZfYjvj+hRNgcB9eRyl1SOOB0jevp4JOOV1v2BA==}
 
   '@eth-optimism/contracts@0.6.0':
     resolution: {integrity: sha512-vQ04wfG9kMf1Fwy3FEMqH2QZbgS0gldKhcBeBUPfO8zu68L61VI97UDXmsMQXzTsEAxK8HnokW3/gosl4/NW3w==, tarball: https://registry.npmjs.org/@eth-optimism/contracts/-/contracts-0.6.0.tgz}
@@ -1420,6 +1426,8 @@ snapshots:
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
       - supports-color
+
+  '@eth-optimism/contracts-bedrock@0.17.2': {}
 
   '@eth-optimism/contracts@0.6.0(ethers@5.8.0)':
     dependencies:
