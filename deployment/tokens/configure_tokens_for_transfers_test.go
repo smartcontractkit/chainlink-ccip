@@ -1158,6 +1158,17 @@ func (r *transfersTest_MockTokenAdminRegistryReader) GetTokenAdminRegistryRef(_ 
 	return datastore.AddressRef{ChainSelector: chainSelector}, nil
 }
 
+func (r *transfersTest_MockTokenAdminRegistryReader) UnregisterToken() *cldf_ops.Sequence[tokens.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"mock:unregister-token",
+		utils.Version_1_0_0,
+		"Mock unregister token",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokens.UnregisterTokenSequenceInput) (sequences.OnChainOutput, error) {
+			return sequences.OnChainOutput{}, nil
+		},
+	)
+}
+
 // transfersTest_IdentityNormalizer passes addresses through unchanged. It is registered for the
 // EVM family only in tests that need to reach the auto-migrate discovery path (which requires an
 // address normalizer). It is safe for sibling tests, which use non-hexaddresses that would trip a
@@ -1198,7 +1209,7 @@ func TestAutoMigrate_NonMigratableSourceSkips(t *testing.T) {
 	mockAdapter := &transfersTest_MockTokenAdapter{}
 	tokenRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.5.0"), mockAdapter)
 	tokenRegistry.RegisterTokenRefResolver("evm", mockAdapter)
-	tokenRegistry.RegisterTokenAdminRegistryReader("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
+	tokenRegistry.RegisterTokenAdminRegistryManager("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
 	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, transfersTest_IdentityNormalizer{})
 	changesets.GetRegistry().RegisterMCMSReader("evm", &MockReader{})
 
@@ -1281,7 +1292,7 @@ func TestAutoMigrate_V2TargetRequired(t *testing.T) {
 	mockAdapter := &transfersTest_MigratingMockTokenAdapter{transfersTest_MockTokenAdapter: &transfersTest_MockTokenAdapter{}}
 	tokenRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), mockAdapter)
 	tokenRegistry.RegisterTokenRefResolver("evm", mockAdapter)
-	tokenRegistry.RegisterTokenAdminRegistryReader("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
+	tokenRegistry.RegisterTokenAdminRegistryManager("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
 	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, transfersTest_IdentityNormalizer{})
 	changesets.GetRegistry().RegisterMCMSReader("evm", &MockReader{})
 
