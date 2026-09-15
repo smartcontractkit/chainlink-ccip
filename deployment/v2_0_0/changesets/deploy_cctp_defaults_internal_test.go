@@ -78,6 +78,28 @@ func TestApplyCCTPDefaults_NonCanonicalIsUntouched(t *testing.T) {
 	require.Zero(t, got.Chains[chainSel].TokenDecimals)
 }
 
+func TestApplyCCTPDefaults_NonCanonicalRemoteDomainIsDefaulted(t *testing.T) {
+	localSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	remoteSel := chain_selectors.AVALANCHE_TESTNET_FUJI.Selector
+	cfg := DeployCCTPChainsConfig{
+		Chains: map[uint64]CCTPChainConfig{
+			localSel: {
+				USDCType: adapters.NonCanonical,
+				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+					remoteSel: {},
+				},
+			},
+		},
+	}
+
+	got := applyCCTPDefaults(nil, cfg)
+
+	// Address defaults must not be applied for non-canonical chains, but the
+	// remote domain identifier must still be resolved.
+	require.Empty(t, got.Chains[localSel].USDCToken)
+	require.Equal(t, uint32(1), got.Chains[localSel].RemoteChains[remoteSel].DomainIdentifier)
+}
+
 func TestApplyCCTPDefaults_UnknownChainIsUntouched(t *testing.T) {
 	const chainSel uint64 = 1234567890
 	cfg := DeployCCTPChainsConfig{

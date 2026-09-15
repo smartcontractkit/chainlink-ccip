@@ -108,24 +108,27 @@ func findDeployerContract(ds datastore.DataStore, chainSel uint64) string {
 func withCCTPChainDefaults(chainSel uint64, chainCfg CCTPChainConfig) CCTPChainConfig {
 	// Circle-defined addresses only apply to canonical USDC chains. Non-canonical
 	// chains use their own token and do not interact with Circle's contracts.
-	if chainCfg.USDCType != adapters.Canonical {
-		return chainCfg
+	if chainCfg.USDCType == adapters.Canonical {
+		if defaults, ok := config.GetCCTPChainDefaults(chainSel); ok {
+			if chainCfg.TokenMessengerV1 == "" {
+				chainCfg.TokenMessengerV1 = defaults.TokenMessengerV1
+			}
+			if chainCfg.TokenMessengerV2 == "" {
+				chainCfg.TokenMessengerV2 = defaults.TokenMessengerV2
+			}
+			if chainCfg.USDCToken == "" {
+				chainCfg.USDCToken = defaults.USDCToken
+			}
+			// Canonical USDC is 6-decimal on every CCTP-enabled EVM chain and Solana.
+			if chainCfg.TokenDecimals == 0 {
+				chainCfg.TokenDecimals = config.CanonicalUSDCDecimals
+			}
+		}
 	}
-	if defaults, ok := config.GetCCTPChainDefaults(chainSel); ok {
-		if chainCfg.TokenMessengerV1 == "" {
-			chainCfg.TokenMessengerV1 = defaults.TokenMessengerV1
-		}
-		if chainCfg.TokenMessengerV2 == "" {
-			chainCfg.TokenMessengerV2 = defaults.TokenMessengerV2
-		}
-		if chainCfg.USDCToken == "" {
-			chainCfg.USDCToken = defaults.USDCToken
-		}
-		// Canonical USDC is 6-decimal on every CCTP-enabled EVM chain and Solana.
-		if chainCfg.TokenDecimals == 0 {
-			chainCfg.TokenDecimals = config.CanonicalUSDCDecimals
-		}
-	}
+	// Domain identifiers are CCTP routing metadata rather than Circle contract
+	// addresses, so they are defaulted for every USDC type. Skipping this for
+	// non-canonical chains would silently leave an omitted domain as 0 (Ethereum),
+	// producing incorrect routing with no error.
 	if len(chainCfg.RemoteChains) > 0 {
 		remoteChains := make(map[uint64]adapters.RemoteCCTPChainConfig, len(chainCfg.RemoteChains))
 		for remoteSel, remoteCfg := range chainCfg.RemoteChains {
