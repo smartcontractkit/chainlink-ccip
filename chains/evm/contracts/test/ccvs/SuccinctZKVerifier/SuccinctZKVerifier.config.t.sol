@@ -10,10 +10,9 @@ import {SuccinctZKVerifierSetup} from "./SuccinctZKVerifierSetup.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
-/// @notice Covers the functions that only forward to BaseVerifier or FeeTokenHandler, which have their own tests.
 contract SuccinctZKVerifier_config is SuccinctZKVerifierSetup {
   function test_forwardToVerifier() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _messageWithId();
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createMessageWithId();
 
     vm.stopPrank();
     vm.prank(s_onRamp);
@@ -23,7 +22,7 @@ contract SuccinctZKVerifier_config is SuccinctZKVerifierSetup {
   }
 
   function test_forwardToVerifier_RevertWhen_CursedByRMN() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _messageWithId();
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createMessageWithId();
     _setMockRMNChainCurse(DEST_CHAIN_SELECTOR, true);
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
@@ -31,7 +30,7 @@ contract SuccinctZKVerifier_config is SuccinctZKVerifierSetup {
   }
 
   function test_forwardToVerifier_RevertWhen_SenderNotAllowed() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _messageWithId();
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _createMessageWithId();
     BaseVerifier.AllowlistConfigArgs[] memory allowlistConfigs = new BaseVerifier.AllowlistConfigArgs[](1);
     allowlistConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, new address[](0), new address[](0));
     s_zkVerifier.applyAllowlistUpdates(allowlistConfigs);
@@ -47,7 +46,7 @@ contract SuccinctZKVerifier_config is SuccinctZKVerifierSetup {
   function test_getFee_RevertWhen_FinalityNotRequested() public {
     Client.EVM2AnyMessage memory message;
 
-    // Only finalized blocks can be proven, so the default finality config is never changed.
+    // SP1Helios only anchors finalized blocks.
     vm.expectRevert(
       abi.encodeWithSelector(
         FinalityCodec.InvalidRequestedFinality.selector,

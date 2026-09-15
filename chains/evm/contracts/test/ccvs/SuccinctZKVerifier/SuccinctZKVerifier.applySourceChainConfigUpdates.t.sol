@@ -6,6 +6,7 @@ import {ISP1Helios} from "../../../interfaces/succinct/ISP1Helios.sol";
 import {SuccinctZKVerifier} from "../../../ccvs/SuccinctZKVerifier.sol";
 import {MockSP1Helios} from "../../mocks/MockSP1Helios.sol";
 import {SuccinctZKVerifierSetup} from "./SuccinctZKVerifierSetup.t.sol";
+
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
 contract SuccinctZKVerifier_applySourceChainConfigUpdates is SuccinctZKVerifierSetup {
@@ -36,8 +37,8 @@ contract SuccinctZKVerifier_applySourceChainConfigUpdates is SuccinctZKVerifierS
 
     SuccinctZKVerifier.SourceChainConfig memory config = s_zkVerifier.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(address(otherHelios), address(config.helios));
-    assertEq(keccak256("otherLightClientVkey"), config.lightClientVkey);
-    assertEq(keccak256("otherExecutionHeaderVkey"), config.executionHeaderVkey);
+    assertEq(sourceChainConfigs[0].lightClientVkey, config.lightClientVkey);
+    assertEq(sourceChainConfigs[0].executionHeaderVkey, config.executionHeaderVkey);
 
     config = s_zkVerifier.getSourceChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(address(0), address(config.helios));
@@ -46,7 +47,7 @@ contract SuccinctZKVerifier_applySourceChainConfigUpdates is SuccinctZKVerifierS
   // Reverts
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroSelector() public {
-    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _sourceChainConfig();
+    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _getSourceChainConfigArgs();
     sourceChainConfigs[0].sourceChainSelector = 0;
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidSourceChainConfig.selector, 0));
@@ -54,7 +55,7 @@ contract SuccinctZKVerifier_applySourceChainConfigUpdates is SuccinctZKVerifierS
   }
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroVkey() public {
-    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _sourceChainConfig();
+    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _getSourceChainConfigArgs();
     sourceChainConfigs[0].lightClientVkey = bytes32(0);
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidSourceChainConfig.selector, SOURCE_CHAIN_SELECTOR));
@@ -75,7 +76,7 @@ contract SuccinctZKVerifier_applySourceChainConfigUpdates is SuccinctZKVerifierS
     s_zkVerifier.applySourceChainConfigUpdates(new SuccinctZKVerifier.SourceChainConfigArgs[](0));
   }
 
-  function _sourceChainConfig()
+  function _getSourceChainConfigArgs()
     internal
     view
     returns (SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs)

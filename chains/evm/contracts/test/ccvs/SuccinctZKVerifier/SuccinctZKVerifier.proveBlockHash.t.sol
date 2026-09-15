@@ -13,7 +13,7 @@ contract SuccinctZKVerifier_proveBlockHash is SuccinctZKVerifierSetup {
   function setUp() public override {
     super.setUp();
 
-    (, bytes32 messageId) = _messageWithId();
+    (, bytes32 messageId) = _createMessageWithId();
     s_headers = _buildWitness(_encodeMessageSentReceipt(s_sourceOnRamp, messageId), HEADER_COUNT).headers;
   }
 

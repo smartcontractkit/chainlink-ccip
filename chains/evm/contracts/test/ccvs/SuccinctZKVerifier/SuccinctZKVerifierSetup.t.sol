@@ -65,8 +65,7 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return abi.encodePacked(VERSION_TAG_V0_0_1, abi.encode(witness));
   }
 
-  /// @notice Builds a witness for the receipt of transaction 0 in a block reached through headerCount headers from
-  /// the anchored block. The last header is the message block, the first one is the anchored block itself.
+  /// @notice Builds a receipt proof for transaction 0 and a header chain from the anchor to the message block.
   function _buildWitness(
     bytes memory receipt,
     uint256 headerCount
@@ -85,9 +84,8 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     });
   }
 
-  /// @notice Builds a receipts trie holding the receipt at transaction 0 and an empty receipt at transaction 1, and
-  /// returns the proof of transaction 0. The keys RLP(0) = 0x80 and RLP(1) = 0x01 differ in their first nibble, so
-  /// the root is a branch node with a leaf under nibble 8 and a leaf under nibble 0.
+  /// @notice Builds a two-receipt trie and returns the proof for transaction 0.
+  /// @dev Transaction indices 0 and 1 encode as 0x80 and 0x01. Their first nibbles select branches 8 and 0.
   function _buildReceiptsTrie(
     bytes memory receipt
   ) internal pure returns (bytes[] memory proofNodes, bytes32 receiptsRoot) {
@@ -118,8 +116,7 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return RLPWriter.writeList(fields);
   }
 
-  /// @notice Encodes a block header with the field layout of a Prague block. The verifier only reads parentHash and
-  /// receiptsRoot, the other fields hold placeholder values of the right size.
+  /// @notice Encodes a Prague block header with placeholder values for fields the verifier does not read.
   function _encodeHeader(
     bytes32 parentHash,
     bytes32 receiptsRoot,
@@ -160,7 +157,7 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return bytes.concat(EIP1559_TRANSACTION_TYPE, _encodeReceipt(true, logs));
   }
 
-  /// @notice Encodes a receipt as RLP([status, cumulativeGasUsed, logsBloom, logs]).
+  /// @notice Encodes the receipt status, cumulative gas used, bloom and logs using RLP.
   function _encodeReceipt(
     bool success,
     bytes[] memory encodedLogs
@@ -173,7 +170,7 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return RLPWriter.writeList(fields);
   }
 
-  /// @notice Encodes a log as RLP([emitter, topics, data]).
+  /// @notice Encodes a log with empty data using RLP.
   function _encodeLog(
     address emitter,
     bytes[] memory encodedTopics
@@ -185,8 +182,6 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return RLPWriter.writeList(fields);
   }
 
-  /// @notice Encodes the topics of CCIPMessageSent: the event signature, then the indexed destChainSelector, sender
-  /// and messageId.
   function _encodeMessageSentTopics(
     bytes32 messageId
   ) internal pure returns (bytes[] memory) {
@@ -198,7 +193,7 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return topics;
   }
 
-  function _messageWithId() internal pure returns (MessageV1Codec.MessageV1 memory message, bytes32 messageId) {
+  function _createMessageWithId() internal pure returns (MessageV1Codec.MessageV1 memory message, bytes32 messageId) {
     message = _createBasicMessageV1(SOURCE_CHAIN_SELECTOR);
     return (message, keccak256(MessageV1Codec._encodeMessageV1(message)));
   }

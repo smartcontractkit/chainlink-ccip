@@ -20,30 +20,30 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
   function setUp() public override {
     super.setUp();
 
-    (, s_messageId) = _messageWithId();
+    (, s_messageId) = _createMessageWithId();
     s_receipt = _encodeMessageSentReceipt(s_sourceOnRamp, s_messageId);
   }
 
-  function _message() internal pure returns (MessageV1Codec.MessageV1 memory message) {
-    (message,) = _messageWithId();
+  function _createMessage() internal pure returns (MessageV1Codec.MessageV1 memory message) {
+    (message,) = _createMessageWithId();
     return message;
   }
 
   function test_verifyMessage_HeaderChain() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
 
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_MessageBlockIsAnchored() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, 1);
 
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_ProvenBlock() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
-    // Prove the block above the message block from the anchored block, then start the witness from there.
+    // Cache the message block hash so verification only needs that block's header.
     bytes[] memory provingHeaders = new bytes[](HEADER_COUNT - 1);
     for (uint256 i = 0; i < provingHeaders.length; ++i) {
       provingHeaders[i] = witness.headers[i];
@@ -55,7 +55,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     witness.anchorBlockNumber = ANCHOR_BLOCK_NUMBER - provingHeaders.length;
     witness.headers = headers;
 
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_LegacyReceipt() public {
@@ -63,7 +63,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     logs[0] = _encodeLog(s_sourceOnRamp, _encodeMessageSentTopics(s_messageId));
     SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceipt(true, logs), HEADER_COUNT);
 
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_LastOfManyLogs() public {
@@ -75,12 +75,11 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceipt(true, logs), HEADER_COUNT);
     witness.logIndex = logs.length - 1;
 
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_SkipsItemsOfEveryRLPSizeClass() public {
-    // The logs list walk must step over every RLP item by its length prefix. A real logs list only holds long
-    // lists, so items of the other size classes are placed in front of the log to cover each prefix branch.
+    // Use synthetic list items to cover RLP prefixes that do not occur in receipt logs.
     bytes[] memory logs = new bytes[](5);
     logs[0] = hex"01"; // single byte
     logs[1] = RLPWriter.writeBytes(hex"0102"); // short string
@@ -90,12 +89,12 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceipt(true, logs), HEADER_COUNT);
     witness.logIndex = 4;
 
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_OnRampEvent() public {
     // The event is emitted by this contract, so the message must name it as the OnRamp.
-    MessageV1Codec.MessageV1 memory message = _message();
+    MessageV1Codec.MessageV1 memory message = _createMessage();
     message.onRampAddress = abi.encode(address(this));
     bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
 
@@ -134,7 +133,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR, true);
 
     vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_SourceChainNotSupported() public {
@@ -142,12 +141,12 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     _setSourceChainConfig(MockSP1Helios(address(0)));
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.SourceChainNotSupported.selector, SOURCE_CHAIN_SELECTOR));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidVerifierResults() public {
     vm.expectRevert(SuccinctZKVerifier.InvalidVerifierResults.selector);
-    s_zkVerifier.verifyMessage(_message(), s_messageId, hex"0102");
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, hex"0102");
   }
 
   function test_verifyMessage_RevertWhen_InvalidCCVVersion() public {
@@ -157,7 +156,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     vm.expectRevert(
       abi.encodeWithSelector(SuccinctZKVerifier.InvalidCCVVersion.selector, VERSION_TAG_V0_0_1, bytes4(verifierResults))
     );
-    s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidVkey_LightClient() public {
@@ -166,7 +165,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_mockHelios.setVkeys(otherVkey, EXECUTION_HEADER_VKEY);
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidVkey.selector, LIGHT_CLIENT_VKEY, otherVkey));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidVkey_ExecutionHeader() public {
@@ -175,7 +174,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_mockHelios.setVkeys(LIGHT_CLIENT_VKEY, otherVkey);
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidVkey.selector, EXECUTION_HEADER_VKEY, otherVkey));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_BlockNotAnchored() public {
@@ -187,7 +186,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
         SuccinctZKVerifier.BlockNotAnchored.selector, SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER + 1
       )
     );
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_EmptyHeaderChain() public {
@@ -195,7 +194,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     witness.headers = new bytes[](0);
 
     vm.expectRevert(SuccinctZKVerifier.EmptyHeaderChain.selector);
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidHeaderHash_FirstHeader() public {
@@ -208,7 +207,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
         SuccinctZKVerifier.InvalidHeaderHash.selector, 0, anchorHash, keccak256(witness.headers[0])
       )
     );
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidHeaderHash_MiddleHeader() public {
@@ -221,7 +220,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
         SuccinctZKVerifier.InvalidHeaderHash.selector, 1, parentHash, keccak256(witness.headers[1])
       )
     );
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidRootNode() public {
@@ -229,7 +228,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     witness.proofNodes[0][40] ^= 0x01;
 
     vm.expectRevert("MerkleTrie: invalid root hash");
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidLeafNode() public {
@@ -237,7 +236,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     witness.proofNodes[1][40] ^= 0x01;
 
     vm.expectRevert("MerkleTrie: invalid large internal hash");
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidTxIndex() public {
@@ -245,7 +244,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     witness.txIndex = 1;
 
     vm.expectRevert("MerkleTrie: invalid large internal hash");
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_ReceiptNotSuccessful() public {
@@ -254,7 +253,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceipt(false, logs), HEADER_COUNT);
 
     vm.expectRevert(SuccinctZKVerifier.ReceiptNotSuccessful.selector);
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_LogIndexOutOfRange() public {
@@ -262,7 +261,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     witness.logIndex = 1;
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.LogIndexOutOfRange.selector, 1, 1));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidLogEmitter() public {
@@ -275,13 +274,13 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
         SuccinctZKVerifier.InvalidLogEmitter.selector, s_sourceOnRamp, abi.encodePacked(otherEmitter)
       )
     );
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidLogEmitter_MessageNamesOtherOnRamp() public {
     bytes memory verifierResults = _encodeVerifierResults(_buildWitness(s_receipt, HEADER_COUNT));
     address otherOnRamp = makeAddr("otherOnRamp");
-    MessageV1Codec.MessageV1 memory message = _message();
+    MessageV1Codec.MessageV1 memory message = _createMessage();
     message.onRampAddress = abi.encode(otherOnRamp);
 
     vm.expectRevert(
@@ -297,22 +296,22 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     topics[0] = RLPWriter.writeBytes(abi.encodePacked(CCIP_MESSAGE_SENT_TOPIC));
     topics[1] = RLPWriter.writeBytes(abi.encodePacked(bytes32(uint256(DEST_CHAIN_SELECTOR))));
     topics[2] = RLPWriter.writeBytes(abi.encodePacked(s_messageId));
-    SuccinctZKVerifier.Witness memory witness = _buildWitness(_receiptWithTopics(topics), HEADER_COUNT);
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceiptWithTopics(topics), HEADER_COUNT);
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidTopicCount.selector, 3));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidLogTopic() public {
     bytes32 otherTopic = keccak256("OtherEvent()");
     bytes[] memory topics = _encodeMessageSentTopics(s_messageId);
     topics[0] = RLPWriter.writeBytes(abi.encodePacked(otherTopic));
-    SuccinctZKVerifier.Witness memory witness = _buildWitness(_receiptWithTopics(topics), HEADER_COUNT);
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceiptWithTopics(topics), HEADER_COUNT);
 
     vm.expectRevert(
       abi.encodeWithSelector(SuccinctZKVerifier.InvalidLogTopic.selector, CCIP_MESSAGE_SENT_TOPIC, otherTopic)
     );
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageId() public {
@@ -320,19 +319,19 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidMessageId.selector, otherMessageId, s_messageId));
-    s_zkVerifier.verifyMessage(_message(), otherMessageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), otherMessageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_RevertWhen_InvalidFieldLength() public {
     bytes[] memory topics = _encodeMessageSentTopics(s_messageId);
     topics[0] = RLPWriter.writeBytes(hex"0102");
-    SuccinctZKVerifier.Witness memory witness = _buildWitness(_receiptWithTopics(topics), HEADER_COUNT);
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceiptWithTopics(topics), HEADER_COUNT);
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidFieldLength.selector, 32, 2));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+    s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function _receiptWithTopics(
+  function _encodeReceiptWithTopics(
     bytes[] memory encodedTopics
   ) internal view returns (bytes memory) {
     bytes[] memory logs = new bytes[](1);
