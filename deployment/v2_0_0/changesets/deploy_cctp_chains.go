@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/config"
 )
 
 // CCTPChainConfig specifies configuration required for a chain to deploy CCTP.
@@ -59,8 +60,61 @@ func DeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistr
 	return cldf.CreateChangeSet(makeApplyDeployCCTPChains(cctpChainRegistry, mcmsRegistry), makeVerifyDeployCCTPChains(cctpChainRegistry, mcmsRegistry))
 }
 
+// applyCCTPDefaults fills in any unset CCTPChainConfig fields with the
+// Circle-defined defaults for the chain and its remote chains. Values that are
+// explicitly provided take precedence, which allows test environments with
+// their own chain selectors and mock CCTP/USDC contracts to override them. If
+// no defaults exist for a chain, the input is left unchanged.
+func applyCCTPDefaults(cfg DeployCCTPChainsConfig) DeployCCTPChainsConfig {
+	chains := make(map[uint64]CCTPChainConfig, len(cfg.Chains))
+	for chainSel, chainCfg := range cfg.Chains {
+		chains[chainSel] = withCCTPChainDefaults(chainSel, chainCfg)
+	}
+	cfg.Chains = chains
+	return cfg
+}
+
+func withCCTPChainDefaults(chainSel uint64, chainCfg CCTPChainConfig) CCTPChainConfig {
+	// Circle-defined addresses only apply to canonical USDC chains. Non-canonical
+	// chains use their own token and do not interact with Circle's contracts.
+	if chainCfg.USDCType != adapters.Canonical {
+		return chainCfg
+	}
+	if defaults, ok := config.GetCCTPChainDefaults(chainSel); ok {
+		if chainCfg.TokenMessengerV1 == "" {
+			chainCfg.TokenMessengerV1 = defaults.TokenMessengerV1
+		}
+		if chainCfg.TokenMessengerV2 == "" {
+			chainCfg.TokenMessengerV2 = defaults.TokenMessengerV2
+		}
+		if chainCfg.USDCToken == "" {
+			chainCfg.USDCToken = defaults.USDCToken
+		}
+		// Canonical USDC is 6-decimal on every CCTP-enabled EVM chain and Solana.
+		if chainCfg.TokenDecimals == 0 {
+			chainCfg.TokenDecimals = config.CanonicalUSDCDecimals
+		}
+	}
+	if len(chainCfg.RemoteChains) > 0 {
+		remoteChains := make(map[uint64]adapters.RemoteCCTPChainConfig, len(chainCfg.RemoteChains))
+		for remoteSel, remoteCfg := range chainCfg.RemoteChains {
+			// A zero domain identifier is treated as unset. This is safe because
+			// domain 0 (Ethereum) resolves to the same value from the defaults.
+			if remoteCfg.DomainIdentifier == 0 {
+				if remoteDefaults, ok := config.GetCCTPChainDefaults(remoteSel); ok {
+					remoteCfg.DomainIdentifier = remoteDefaults.DomainIdentifier
+				}
+			}
+			remoteChains[remoteSel] = remoteCfg
+		}
+		chainCfg.RemoteChains = remoteChains
+	}
+	return chainCfg
+}
+
 func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) error {
 	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) error {
+		cfg = applyCCTPDefaults(cfg)
 		if cfg.MCMS != nil {
 			err := cfg.MCMS.Validate()
 			if err != nil {
@@ -108,6 +162,7 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 
 func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
+		cfg = applyCCTPDefaults(cfg)
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
