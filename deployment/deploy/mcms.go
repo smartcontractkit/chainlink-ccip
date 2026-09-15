@@ -67,9 +67,13 @@ type UpdateMCMSConfigInputPerChainWithSelector struct {
 }
 
 type UpdateMCMSConfigInputPerChain struct {
-	MCMConfig    mcmstypes.Config
-	MCMContracts []datastore.AddressRef
+	MCMConfig      mcmstypes.Config
+	MCMContracts   []datastore.AddressRef
+	PartialRollout bool
 }
+
+// PartialRolloutSignerBatchSize is the maximum number of new signers added per rollout.
+const PartialRolloutSignerBatchSize = 20
 
 type UpdateMCMSConfigInput struct {
 	Chains         map[uint64]UpdateMCMSConfigInputPerChain `json:"chains"`
@@ -125,6 +129,9 @@ func updateMCMSConfigApply(d *DeployerRegistry, mcmsRegistry *changesets.MCMSRea
 			family, err := chain_selectors.GetSelectorFamily(selector)
 			if err != nil {
 				return cldf.ChangesetOutput{}, err
+			}
+			if chainCfg.PartialRollout && family != chain_selectors.FamilyEVM {
+				return cldf.ChangesetOutput{}, fmt.Errorf("partial MCMS rollout is only supported on EVM chains, got %s for chain %d", family, selector)
 			}
 			deployer, exists := d.GetDeployer(family, cfg.AdapterVersion)
 			if !exists {
