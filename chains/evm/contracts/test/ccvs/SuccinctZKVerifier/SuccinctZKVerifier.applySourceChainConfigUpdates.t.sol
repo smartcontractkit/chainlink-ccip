@@ -11,58 +11,86 @@ import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2
 contract SuccinctZKVerifier_applySourceChainConfigUpdates is SuccinctZKVerifierSetup {
   function test_applySourceChainConfigUpdates() public {
     MockSP1Helios otherHelios = new MockSP1Helios();
-    address otherOnRamp = makeAddr("otherOnRamp");
+    address[] memory otherOnRamps = new address[](2);
+    otherOnRamps[0] = makeAddr("otherOnRamp1");
+    otherOnRamps[1] = makeAddr("otherOnRamp2");
     SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs =
       new SuccinctZKVerifier.SourceChainConfigArgs[](2);
     sourceChainConfigs[0] = SuccinctZKVerifier.SourceChainConfigArgs({
-      helios: otherHelios, sourceChainSelector: SOURCE_CHAIN_SELECTOR, maxHeaderChainLength: 32, onRamp: otherOnRamp
+      helios: otherHelios,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      maxHeaderChainLength: 32,
+      lightClientVkey: keccak256("otherLightClientVkey"),
+      executionHeaderVkey: keccak256("otherExecutionHeaderVkey"),
+      onRamps: otherOnRamps
     });
-    // A zero light client pauses the chain.
+    // A zero light client pauses the chain, so no vkeys or OnRamps are needed.
     sourceChainConfigs[1] = SuccinctZKVerifier.SourceChainConfigArgs({
       helios: ISP1Helios(address(0)),
       sourceChainSelector: DEST_CHAIN_SELECTOR,
       maxHeaderChainLength: 1,
-      onRamp: s_onRamp
+      lightClientVkey: bytes32(0),
+      executionHeaderVkey: bytes32(0),
+      onRamps: new address[](0)
     });
 
     vm.expectEmit();
-    emit SuccinctZKVerifier.SourceChainConfigSet(SOURCE_CHAIN_SELECTOR, address(otherHelios), otherOnRamp, 32);
+    emit SuccinctZKVerifier.SourceChainConfigSet(SOURCE_CHAIN_SELECTOR, sourceChainConfigs[0]);
     vm.expectEmit();
-    emit SuccinctZKVerifier.SourceChainConfigSet(DEST_CHAIN_SELECTOR, address(0), s_onRamp, 1);
+    emit SuccinctZKVerifier.SourceChainConfigSet(DEST_CHAIN_SELECTOR, sourceChainConfigs[1]);
 
     s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
 
-    SuccinctZKVerifier.SourceChainConfig memory config = s_zkVerifier.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
+    (SuccinctZKVerifier.SourceChainConfig memory config, address[] memory onRamps) =
+      s_zkVerifier.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
     assertEq(address(otherHelios), address(config.helios));
-    assertEq(otherOnRamp, config.onRamp);
     assertEq(32, config.maxHeaderChainLength);
+    assertEq(keccak256("otherLightClientVkey"), config.lightClientVkey);
+    assertEq(keccak256("otherExecutionHeaderVkey"), config.executionHeaderVkey);
+    // The previous OnRamp is no longer accepted.
+    assertEq(otherOnRamps, onRamps);
 
-    config = s_zkVerifier.getSourceChainConfig(DEST_CHAIN_SELECTOR);
+    (config, onRamps) = s_zkVerifier.getSourceChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(address(0), address(config.helios));
-    assertEq(s_onRamp, config.onRamp);
     assertEq(1, config.maxHeaderChainLength);
+    assertEq(0, onRamps.length);
   }
 
   // Reverts
 
   function test_applySourceChainConfigUpdates_RevertWhen_ZeroSelector() public {
-    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _sourceChainConfig(0, 32, s_onRamp);
+    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _sourceChainConfig();
+    sourceChainConfigs[0].sourceChainSelector = 0;
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidSourceChainConfig.selector, 0));
     s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
-  function test_applySourceChainConfigUpdates_RevertWhen_ZeroOnRamp() public {
-    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs =
-      _sourceChainConfig(SOURCE_CHAIN_SELECTOR, 32, address(0));
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroMaxHeaderChainLength() public {
+    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _sourceChainConfig();
+    sourceChainConfigs[0].maxHeaderChainLength = 0;
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidSourceChainConfig.selector, SOURCE_CHAIN_SELECTOR));
     s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
-  function test_applySourceChainConfigUpdates_RevertWhen_ZeroMaxHeaderChainLength() public {
-    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs =
-      _sourceChainConfig(SOURCE_CHAIN_SELECTOR, 0, s_onRamp);
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroVkey() public {
+    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _sourceChainConfig();
+    sourceChainConfigs[0].lightClientVkey = bytes32(0);
+
+    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidSourceChainConfig.selector, SOURCE_CHAIN_SELECTOR));
+    s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
+
+    sourceChainConfigs[0].lightClientVkey = LIGHT_CLIENT_VKEY;
+    sourceChainConfigs[0].executionHeaderVkey = bytes32(0);
+
+    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidSourceChainConfig.selector, SOURCE_CHAIN_SELECTOR));
+    s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
+  }
+
+  function test_applySourceChainConfigUpdates_RevertWhen_ZeroOnRamp() public {
+    SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs = _sourceChainConfig();
+    sourceChainConfigs[0].onRamps[0] = address(0);
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidSourceChainConfig.selector, SOURCE_CHAIN_SELECTOR));
     s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
@@ -76,17 +104,21 @@ contract SuccinctZKVerifier_applySourceChainConfigUpdates is SuccinctZKVerifierS
     s_zkVerifier.applySourceChainConfigUpdates(new SuccinctZKVerifier.SourceChainConfigArgs[](0));
   }
 
-  function _sourceChainConfig(
-    uint64 sourceChainSelector,
-    uint16 maxHeaderChainLength,
-    address onRamp
-  ) internal view returns (SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs) {
+  function _sourceChainConfig()
+    internal
+    view
+    returns (SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs)
+  {
+    address[] memory onRamps = new address[](1);
+    onRamps[0] = s_sourceOnRamp;
     sourceChainConfigs = new SuccinctZKVerifier.SourceChainConfigArgs[](1);
     sourceChainConfigs[0] = SuccinctZKVerifier.SourceChainConfigArgs({
       helios: s_mockHelios,
-      sourceChainSelector: sourceChainSelector,
-      maxHeaderChainLength: maxHeaderChainLength,
-      onRamp: onRamp
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      maxHeaderChainLength: MAX_HEADER_CHAIN_LENGTH,
+      lightClientVkey: LIGHT_CLIENT_VKEY,
+      executionHeaderVkey: EXECUTION_HEADER_VKEY,
+      onRamps: onRamps
     });
     return sourceChainConfigs;
   }

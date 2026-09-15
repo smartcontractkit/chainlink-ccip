@@ -15,18 +15,22 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
   bytes4 internal constant VERSION_TAG_V0_0_1 = bytes4(keccak256("SuccinctZKVerifier 0.0.1-dev"));
   bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
     0x371bc2ff0a006f4ef863b1d27a065d4e9f938b6d883eb154572b4aea593b32cc;
+  bytes32 internal constant LIGHT_CLIENT_VKEY = keccak256("lightClientVkey");
+  bytes32 internal constant EXECUTION_HEADER_VKEY = keccak256("executionHeaderVkey");
   bytes1 internal constant EIP1559_TRANSACTION_TYPE = 0x02;
   uint16 internal constant MAX_HEADER_CHAIN_LENGTH = 8;
   uint256 internal constant ANCHOR_BLOCK_NUMBER = 1_000_000;
 
   SuccinctZKVerifier internal s_zkVerifier;
   MockSP1Helios internal s_mockHelios;
-  address internal s_sourceOnRamp = makeAddr("sourceOnRamp");
+  address internal s_sourceOnRamp;
 
   function setUp() public virtual override {
     super.setUp();
 
+    s_sourceOnRamp = abi.decode(_createBasicMessageV1(SOURCE_CHAIN_SELECTOR).onRampAddress, (address));
     s_mockHelios = new MockSP1Helios();
+    s_mockHelios.setVkeys(LIGHT_CLIENT_VKEY, EXECUTION_HEADER_VKEY);
     s_zkVerifier = new SuccinctZKVerifier(
       SuccinctZKVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
       s_storageLocations,
@@ -47,13 +51,17 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     address onRamp,
     uint16 maxHeaderChainLength
   ) internal {
+    address[] memory onRamps = new address[](1);
+    onRamps[0] = onRamp;
     SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs =
       new SuccinctZKVerifier.SourceChainConfigArgs[](1);
     sourceChainConfigs[0] = SuccinctZKVerifier.SourceChainConfigArgs({
       helios: helios,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       maxHeaderChainLength: maxHeaderChainLength,
-      onRamp: onRamp
+      lightClientVkey: LIGHT_CLIENT_VKEY,
+      executionHeaderVkey: EXECUTION_HEADER_VKEY,
+      onRamps: onRamps
     });
     s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -64,55 +72,88 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return abi.encodePacked(VERSION_TAG_V0_0_1, abi.encode(witness));
   }
 
-  /// @notice Builds a witness for a block with a single transaction, whose receipts trie is one leaf node. The block is
-  /// anchored on the mock light client either directly or through headerCount headers.
+  /// @notice Builds a witness for the receipt of transaction 0 in a block reached through headerCount headers from
+  /// the anchored block. The last header is the message block, the first one is the anchored block itself.
   function _buildWitness(
     bytes memory receipt,
     uint256 headerCount
   ) internal returns (SuccinctZKVerifier.Witness memory) {
-    bytes[] memory proofNodes = new bytes[](1);
-    proofNodes[0] = _encodeLeaf(receipt);
-    bytes32 receiptsRoot = keccak256(proofNodes[0]);
+    (bytes[] memory proofNodes, bytes32 receiptsRoot) = _buildReceiptsTrie(receipt);
 
     bytes[] memory headers = new bytes[](headerCount);
-    if (headerCount == 0) {
-      s_mockHelios.setAnchor(ANCHOR_BLOCK_NUMBER, bytes32(0), receiptsRoot);
-    } else {
-      // The last header is the message block. Each header before it is the parent of the one after it.
-      headers[headerCount - 1] = _encodeHeader(keccak256("parent"), receiptsRoot);
-      for (uint256 i = headerCount - 1; i > 0; --i) {
-        headers[i - 1] = _encodeHeader(keccak256(headers[i]), keccak256("otherReceiptsRoot"));
-      }
-      s_mockHelios.setAnchor(ANCHOR_BLOCK_NUMBER, keccak256(headers[0]), bytes32(0));
+    headers[headerCount - 1] = _encodeHeader(keccak256("parent"), receiptsRoot, ANCHOR_BLOCK_NUMBER - headerCount + 1);
+    for (uint256 i = headerCount - 1; i > 0; --i) {
+      headers[i - 1] = _encodeHeader(keccak256(headers[i]), keccak256("otherReceiptsRoot"), ANCHOR_BLOCK_NUMBER - i + 1);
     }
+    s_mockHelios.setExecutionBlockHash(ANCHOR_BLOCK_NUMBER, keccak256(headers[0]));
 
     return SuccinctZKVerifier.Witness({
       anchorBlockNumber: ANCHOR_BLOCK_NUMBER, headers: headers, txIndex: 0, logIndex: 0, proofNodes: proofNodes
     });
   }
 
-  /// @notice Encodes the leaf node of a receipts trie holding only transaction 0. The key is RLP(0), which is 0x80,
-  /// so the leaf path is the two nibbles 8 and 0 with the even length leaf prefix 0x20.
-  function _encodeLeaf(
+  /// @notice Builds a receipts trie holding the receipt at transaction 0 and an empty receipt at transaction 1, and
+  /// returns the proof of transaction 0. The keys RLP(0) = 0x80 and RLP(1) = 0x01 differ in their first nibble, so
+  /// the root is a branch node with a leaf under nibble 8 and a leaf under nibble 0.
+  function _buildReceiptsTrie(
     bytes memory receipt
+  ) internal pure returns (bytes[] memory proofNodes, bytes32 receiptsRoot) {
+    // The leaf path holds the remaining odd nibble behind the leaf prefix 0x3.
+    bytes memory leaf = _encodeLeaf(hex"30", receipt);
+    bytes memory otherLeaf = _encodeLeaf(hex"31", _encodeReceipt(true, new bytes[](0)));
+
+    bytes[] memory branch = new bytes[](17);
+    for (uint256 i = 0; i < branch.length; ++i) {
+      branch[i] = RLPWriter.writeBytes("");
+    }
+    branch[8] = RLPWriter.writeBytes(abi.encodePacked(keccak256(leaf)));
+    branch[0] = RLPWriter.writeBytes(abi.encodePacked(keccak256(otherLeaf)));
+
+    proofNodes = new bytes[](2);
+    proofNodes[0] = RLPWriter.writeList(branch);
+    proofNodes[1] = leaf;
+    return (proofNodes, keccak256(proofNodes[0]));
+  }
+
+  function _encodeLeaf(
+    bytes memory path,
+    bytes memory value
   ) internal pure returns (bytes memory) {
     bytes[] memory fields = new bytes[](2);
-    fields[0] = RLPWriter.writeBytes(hex"2080");
-    fields[1] = RLPWriter.writeBytes(receipt);
+    fields[0] = RLPWriter.writeBytes(path);
+    fields[1] = RLPWriter.writeBytes(value);
     return RLPWriter.writeList(fields);
   }
 
-  /// @notice Encodes a block header with only the fields the verifier reads set: parentHash and receiptsRoot.
+  /// @notice Encodes a block header with the field layout of a Prague block. The verifier only reads parentHash and
+  /// receiptsRoot, the other fields hold placeholder values of the right size.
   function _encodeHeader(
     bytes32 parentHash,
-    bytes32 receiptsRoot
+    bytes32 receiptsRoot,
+    uint256 blockNumber
   ) internal pure returns (bytes memory) {
-    bytes[] memory fields = new bytes[](6);
+    bytes[] memory fields = new bytes[](21);
     fields[0] = RLPWriter.writeBytes(abi.encodePacked(parentHash));
-    for (uint256 i = 1; i < 5; ++i) {
-      fields[i] = RLPWriter.writeUint(0);
-    }
+    fields[1] = RLPWriter.writeBytes(abi.encodePacked(keccak256("ommersHash")));
+    fields[2] = RLPWriter.writeBytes(new bytes(20)); // coinbase
+    fields[3] = RLPWriter.writeBytes(abi.encodePacked(keccak256("stateRoot")));
+    fields[4] = RLPWriter.writeBytes(abi.encodePacked(keccak256("transactionsRoot")));
     fields[5] = RLPWriter.writeBytes(abi.encodePacked(receiptsRoot));
+    fields[6] = RLPWriter.writeBytes(new bytes(256)); // logsBloom
+    fields[7] = RLPWriter.writeUint(0); // difficulty
+    fields[8] = RLPWriter.writeUint(blockNumber);
+    fields[9] = RLPWriter.writeUint(30_000_000); // gasLimit
+    fields[10] = RLPWriter.writeUint(21_000); // gasUsed
+    fields[11] = RLPWriter.writeUint(1_700_000_000); // timestamp
+    fields[12] = RLPWriter.writeBytes(""); // extraData
+    fields[13] = RLPWriter.writeBytes(abi.encodePacked(keccak256("mixHash")));
+    fields[14] = RLPWriter.writeBytes(new bytes(8)); // nonce
+    fields[15] = RLPWriter.writeUint(1 gwei); // baseFeePerGas
+    fields[16] = RLPWriter.writeBytes(abi.encodePacked(keccak256("withdrawalsRoot")));
+    fields[17] = RLPWriter.writeUint(0); // blobGasUsed
+    fields[18] = RLPWriter.writeUint(0); // excessBlobGas
+    fields[19] = RLPWriter.writeBytes(abi.encodePacked(keccak256("parentBeaconBlockRoot")));
+    fields[20] = RLPWriter.writeBytes(abi.encodePacked(keccak256("requestsHash")));
     return RLPWriter.writeList(fields);
   }
 
@@ -151,8 +192,8 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return RLPWriter.writeList(fields);
   }
 
-  /// @notice Encodes the topics of CCIPMessageSent(uint64 indexed destChainSelector, bytes indexed sender, bytes32
-  /// indexed messageId, bytes encodedMessage).
+  /// @notice Encodes the topics of CCIPMessageSent: the event signature, then the indexed destChainSelector, sender
+  /// and messageId.
   function _encodeMessageSentTopics(
     bytes32 messageId
   ) internal pure returns (bytes[] memory) {

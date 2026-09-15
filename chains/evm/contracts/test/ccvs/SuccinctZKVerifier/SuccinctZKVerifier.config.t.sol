@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {SuccinctZKVerifier} from "../../../ccvs/SuccinctZKVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
+import {Client} from "../../../libraries/Client.sol";
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
 import {SuccinctZKVerifierSetup} from "./SuccinctZKVerifierSetup.t.sol";
@@ -19,6 +20,42 @@ contract SuccinctZKVerifier_config is SuccinctZKVerifierSetup {
     bytes memory verifierData = s_zkVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
 
     assertEq(abi.encodePacked(VERSION_TAG_V0_0_1), verifierData);
+  }
+
+  function test_forwardToVerifier_RevertWhen_CursedByRMN() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _messageWithId();
+    _setMockRMNChainCurse(DEST_CHAIN_SELECTOR, true);
+
+    vm.expectRevert(abi.encodeWithSelector(BaseVerifier.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
+    s_zkVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+  }
+
+  function test_forwardToVerifier_RevertWhen_SenderNotAllowed() public {
+    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) = _messageWithId();
+    BaseVerifier.AllowlistConfigArgs[] memory allowlistConfigs = new BaseVerifier.AllowlistConfigArgs[](1);
+    allowlistConfigs[0] = _getAllowlistConfig(DEST_CHAIN_SELECTOR, true, new address[](0), new address[](0));
+    s_zkVerifier.applyAllowlistUpdates(allowlistConfigs);
+
+    vm.stopPrank();
+    vm.prank(s_onRamp);
+    vm.expectRevert(
+      abi.encodeWithSelector(BaseVerifier.SenderNotAllowed.selector, abi.decode(message.sender, (address)))
+    );
+    s_zkVerifier.forwardToVerifier(message, messageId, address(0), 0, "");
+  }
+
+  function test_getFee_RevertWhen_FinalityNotRequested() public {
+    Client.EVM2AnyMessage memory message;
+
+    // Only finalized blocks can be proven, so the default finality config is never changed.
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        FinalityCodec.InvalidRequestedFinality.selector,
+        FinalityCodec._encodeBlockDepth(1),
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      )
+    );
+    s_zkVerifier.getFee(DEST_CHAIN_SELECTOR, message, "", FinalityCodec._encodeBlockDepth(1));
   }
 
   function test_setDynamicConfig() public {
@@ -49,12 +86,6 @@ contract SuccinctZKVerifier_config is SuccinctZKVerifierSetup {
 
     (, address[] memory allowedSenders) = s_zkVerifier.getRemoteChainConfig(DEST_CHAIN_SELECTOR);
     assertEq(senders, allowedSenders);
-  }
-
-  function test_setAllowedFinalityConfig() public {
-    s_zkVerifier.setAllowedFinalityConfig(FinalityCodec.WAIT_FOR_FINALITY_FLAG);
-
-    assertEq(FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_zkVerifier.getAllowedFinalityConfig());
   }
 
   function test_updateStorageLocations() public {

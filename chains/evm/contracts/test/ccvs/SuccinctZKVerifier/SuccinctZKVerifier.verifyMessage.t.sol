@@ -4,10 +4,12 @@ pragma solidity ^0.8.24;
 import {SuccinctZKVerifier} from "../../../ccvs/SuccinctZKVerifier.sol";
 import {BaseVerifier} from "../../../ccvs/components/BaseVerifier.sol";
 import {MessageV1Codec} from "../../../libraries/MessageV1Codec.sol";
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {MockSP1Helios} from "../../mocks/MockSP1Helios.sol";
 import {SuccinctZKVerifierSetup} from "./SuccinctZKVerifierSetup.t.sol";
 
 import {RLPWriter} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPWriter.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
   uint256 internal constant HEADER_COUNT = 3;
@@ -33,14 +35,31 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_DirectAnchor() public {
-    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, 0);
+  function test_verifyMessage_MessageBlockIsAnchored() public {
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, 1);
 
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
   function test_verifyMessage_HeaderChainAtMaxLength() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, MAX_HEADER_CHAIN_LENGTH);
+
+    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+  }
+
+  function test_verifyMessage_ProvenBlock() public {
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
+    // Prove the block above the message block from the anchored block, then start the witness from there.
+    bytes[] memory provingHeaders = new bytes[](HEADER_COUNT - 1);
+    for (uint256 i = 0; i < provingHeaders.length; ++i) {
+      provingHeaders[i] = witness.headers[i];
+    }
+    s_zkVerifier.proveBlockHash(SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER, provingHeaders);
+
+    bytes[] memory headers = new bytes[](1);
+    headers[0] = witness.headers[HEADER_COUNT - 1];
+    witness.anchorBlockNumber = ANCHOR_BLOCK_NUMBER - provingHeaders.length;
+    witness.headers = headers;
 
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
@@ -53,14 +72,66 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_SecondLog() public {
-    bytes[] memory logs = new bytes[](2);
-    logs[0] = _encodeLog(makeAddr("otherEmitter"), _encodeMessageSentTopics(keccak256("otherMessageId")));
-    logs[1] = _encodeLog(s_sourceOnRamp, _encodeMessageSentTopics(s_messageId));
+  function test_verifyMessage_LastOfManyLogs() public {
+    bytes[] memory logs = new bytes[](100);
+    for (uint256 i = 0; i < logs.length - 1; ++i) {
+      logs[i] = _encodeLog(makeAddr("otherEmitter"), _encodeMessageSentTopics(keccak256("otherMessageId")));
+    }
+    logs[logs.length - 1] = _encodeLog(s_sourceOnRamp, _encodeMessageSentTopics(s_messageId));
     SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceipt(true, logs), HEADER_COUNT);
-    witness.logIndex = 1;
+    witness.logIndex = logs.length - 1;
 
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+  }
+
+  function test_verifyMessage_SkipsItemsOfEveryRLPSizeClass() public {
+    // The logs list walk must step over every RLP item by its length prefix. A real logs list only holds long
+    // lists, so items of the other size classes are placed in front of the log to cover each prefix branch.
+    bytes[] memory logs = new bytes[](5);
+    logs[0] = hex"01"; // single byte
+    logs[1] = RLPWriter.writeBytes(hex"0102"); // short string
+    logs[2] = RLPWriter.writeBytes(new bytes(64)); // long string
+    logs[3] = RLPWriter.writeList(new bytes[](0)); // short list
+    logs[4] = _encodeLog(s_sourceOnRamp, _encodeMessageSentTopics(s_messageId)); // long list
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceipt(true, logs), HEADER_COUNT);
+    witness.logIndex = 4;
+
+    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+  }
+
+  function test_verifyMessage_OnRampEvent() public {
+    // The event is emitted by this contract, so the message must name it as the OnRamp.
+    MessageV1Codec.MessageV1 memory message = _message();
+    message.onRampAddress = abi.encode(address(this));
+    bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
+    _setSourceChainConfig(s_mockHelios, address(this), MAX_HEADER_CHAIN_LENGTH);
+
+    vm.recordLogs();
+    emit OnRamp.CCIPMessageSent({
+      destChainSelector: message.destChainSelector,
+      sender: abi.decode(message.sender, (address)),
+      messageId: messageId,
+      feeToken: address(0),
+      tokenAmountBeforeTokenPoolFees: 0,
+      encodedMessage: MessageV1Codec._encodeMessageV1(message),
+      receipts: new OnRamp.Receipt[](0),
+      verifierBlobs: new bytes[](0)
+    });
+    Vm.Log memory recordedLog = vm.getRecordedLogs()[0];
+
+    bytes[] memory topics = new bytes[](recordedLog.topics.length);
+    for (uint256 i = 0; i < topics.length; ++i) {
+      topics[i] = RLPWriter.writeBytes(abi.encodePacked(recordedLog.topics[i]));
+    }
+    bytes[] memory fields = new bytes[](3);
+    fields[0] = RLPWriter.writeBytes(abi.encodePacked(recordedLog.emitter));
+    fields[1] = RLPWriter.writeList(topics);
+    fields[2] = RLPWriter.writeBytes(recordedLog.data);
+    bytes[] memory logs = new bytes[](1);
+    logs[0] = RLPWriter.writeList(fields);
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(_encodeReceipt(true, logs), HEADER_COUNT);
+
+    s_zkVerifier.verifyMessage(message, messageId, _encodeVerifierResults(witness));
   }
 
   // Reverts
@@ -81,6 +152,15 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
   }
 
+  function test_verifyMessage_RevertWhen_InvalidOnRamp() public {
+    bytes memory verifierResults = _encodeVerifierResults(_buildWitness(s_receipt, HEADER_COUNT));
+    MessageV1Codec.MessageV1 memory message = _message();
+    message.onRampAddress = abi.encode(makeAddr("otherOnRamp"));
+
+    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidOnRamp.selector, message.onRampAddress));
+    s_zkVerifier.verifyMessage(message, s_messageId, verifierResults);
+  }
+
   function test_verifyMessage_RevertWhen_InvalidVerifierResults() public {
     vm.expectRevert(SuccinctZKVerifier.InvalidVerifierResults.selector);
     s_zkVerifier.verifyMessage(_message(), s_messageId, hex"0102");
@@ -96,32 +176,50 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
   }
 
-  function test_verifyMessage_RevertWhen_BlockNotAnchored_HeaderChain() public {
+  function test_verifyMessage_RevertWhen_InvalidVkey_LightClient() public {
+    bytes memory verifierResults = _encodeVerifierResults(_buildWitness(s_receipt, HEADER_COUNT));
+    bytes32 otherVkey = keccak256("otherVkey");
+    s_mockHelios.setVkeys(otherVkey, EXECUTION_HEADER_VKEY);
+
+    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidVkey.selector, LIGHT_CLIENT_VKEY, otherVkey));
+    s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidVkey_ExecutionHeader() public {
+    bytes memory verifierResults = _encodeVerifierResults(_buildWitness(s_receipt, HEADER_COUNT));
+    bytes32 otherVkey = keccak256("otherVkey");
+    s_mockHelios.setVkeys(LIGHT_CLIENT_VKEY, otherVkey);
+
+    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidVkey.selector, EXECUTION_HEADER_VKEY, otherVkey));
+    s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
+  }
+
+  function test_verifyMessage_RevertWhen_BlockNotAnchored() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
-    s_mockHelios.setAnchor(ANCHOR_BLOCK_NUMBER, bytes32(0), bytes32(0));
+    witness.anchorBlockNumber = ANCHOR_BLOCK_NUMBER + 1;
 
     vm.expectRevert(
-      abi.encodeWithSelector(SuccinctZKVerifier.BlockNotAnchored.selector, SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER)
+      abi.encodeWithSelector(
+        SuccinctZKVerifier.BlockNotAnchored.selector, SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER + 1
+      )
     );
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_RevertWhen_BlockNotAnchored_DirectAnchor() public {
-    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, 0);
-    s_mockHelios.setAnchor(ANCHOR_BLOCK_NUMBER, bytes32(0), bytes32(0));
+  function test_verifyMessage_RevertWhen_InvalidHeaderCount_NoHeaders() public {
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
+    witness.headers = new bytes[](0);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(SuccinctZKVerifier.BlockNotAnchored.selector, SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER)
-    );
+    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidHeaderCount.selector, 0, MAX_HEADER_CHAIN_LENGTH));
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_RevertWhen_HeaderChainTooLong() public {
+  function test_verifyMessage_RevertWhen_InvalidHeaderCount_TooLong() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, MAX_HEADER_CHAIN_LENGTH + 1);
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        SuccinctZKVerifier.HeaderChainTooLong.selector, MAX_HEADER_CHAIN_LENGTH + 1, MAX_HEADER_CHAIN_LENGTH
+        SuccinctZKVerifier.InvalidHeaderCount.selector, MAX_HEADER_CHAIN_LENGTH + 1, MAX_HEADER_CHAIN_LENGTH
       )
     );
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
@@ -153,7 +251,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_RevertWhen_InvalidProofNode() public {
+  function test_verifyMessage_RevertWhen_InvalidRootNode() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
     witness.proofNodes[0][40] ^= 0x01;
 
@@ -161,11 +259,19 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
+  function test_verifyMessage_RevertWhen_InvalidLeafNode() public {
+    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
+    witness.proofNodes[1][40] ^= 0x01;
+
+    vm.expectRevert("MerkleTrie: invalid large internal hash");
+    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+  }
+
   function test_verifyMessage_RevertWhen_InvalidTxIndex() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
     witness.txIndex = 1;
 
-    vm.expectRevert("MerkleTrie: path remainder must share all nibbles with key");
+    vm.expectRevert("MerkleTrie: invalid large internal hash");
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
@@ -211,7 +317,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
   }
 
   function test_verifyMessage_RevertWhen_InvalidLogTopic() public {
-    bytes32 otherTopic = keccak256("OtherEvent(uint64,bytes,bytes32,bytes)");
+    bytes32 otherTopic = keccak256("OtherEvent()");
     bytes[] memory topics = _encodeMessageSentTopics(s_messageId);
     topics[0] = RLPWriter.writeBytes(abi.encodePacked(otherTopic));
     SuccinctZKVerifier.Witness memory witness = _buildWitness(_receiptWithTopics(topics), HEADER_COUNT);
