@@ -18,7 +18,6 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
   bytes32 internal constant LIGHT_CLIENT_VKEY = keccak256("lightClientVkey");
   bytes32 internal constant EXECUTION_HEADER_VKEY = keccak256("executionHeaderVkey");
   bytes1 internal constant EIP1559_TRANSACTION_TYPE = 0x02;
-  uint16 internal constant MAX_HEADER_CHAIN_LENGTH = 8;
   uint256 internal constant ANCHOR_BLOCK_NUMBER = 1_000_000;
 
   SuccinctZKVerifier internal s_zkVerifier;
@@ -43,25 +42,19 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     s_zkVerifier.applyRemoteChainConfigUpdates(remoteChainConfigs);
     vm.mockCall(address(s_router), abi.encodeCall(IRouter.getOnRamp, (DEST_CHAIN_SELECTOR)), abi.encode(s_onRamp));
 
-    _setSourceChainConfig(s_mockHelios, s_sourceOnRamp, MAX_HEADER_CHAIN_LENGTH);
+    _setSourceChainConfig(s_mockHelios);
   }
 
   function _setSourceChainConfig(
-    MockSP1Helios helios,
-    address onRamp,
-    uint16 maxHeaderChainLength
+    MockSP1Helios helios
   ) internal {
-    address[] memory onRamps = new address[](1);
-    onRamps[0] = onRamp;
     SuccinctZKVerifier.SourceChainConfigArgs[] memory sourceChainConfigs =
       new SuccinctZKVerifier.SourceChainConfigArgs[](1);
     sourceChainConfigs[0] = SuccinctZKVerifier.SourceChainConfigArgs({
       helios: helios,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      maxHeaderChainLength: maxHeaderChainLength,
       lightClientVkey: LIGHT_CLIENT_VKEY,
-      executionHeaderVkey: EXECUTION_HEADER_VKEY,
-      onRamps: onRamps
+      executionHeaderVkey: EXECUTION_HEADER_VKEY
     });
     s_zkVerifier.applySourceChainConfigUpdates(sourceChainConfigs);
   }

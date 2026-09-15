@@ -46,7 +46,7 @@ contract SuccinctZKVerifier_proveBlockHash is SuccinctZKVerifierSetup {
 
     MockSP1Helios otherHelios = new MockSP1Helios();
     otherHelios.setVkeys(LIGHT_CLIENT_VKEY, EXECUTION_HEADER_VKEY);
-    _setSourceChainConfig(otherHelios, s_sourceOnRamp, MAX_HEADER_CHAIN_LENGTH);
+    _setSourceChainConfig(otherHelios);
 
     assertEq(bytes32(0), s_zkVerifier.getProvenBlockHash(SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER - HEADER_COUNT));
   }
@@ -54,7 +54,7 @@ contract SuccinctZKVerifier_proveBlockHash is SuccinctZKVerifierSetup {
   // Reverts
 
   function test_proveBlockHash_RevertWhen_SourceChainNotSupported() public {
-    _setSourceChainConfig(MockSP1Helios(address(0)), s_sourceOnRamp, MAX_HEADER_CHAIN_LENGTH);
+    _setSourceChainConfig(MockSP1Helios(address(0)));
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.SourceChainNotSupported.selector, SOURCE_CHAIN_SELECTOR));
     s_zkVerifier.proveBlockHash(SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER, s_headers);

@@ -14,7 +14,6 @@ import {Bytes} from "@eth-optimism/contracts-bedrock/src/libraries/Bytes.sol";
 import {RLPReader} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPReader.sol";
 import {RLPWriter} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPWriter.sol";
 import {MerkleTrie} from "@eth-optimism/contracts-bedrock/src/libraries/trie/MerkleTrie.sol";
-import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice The SuccinctZKVerifier verifies a message by proving that its CCIPMessageSent receipt is included in a
 /// source chain block anchored by the SP1Helios light client on this chain.
@@ -24,10 +23,12 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// @dev SP1Helios anchors a single finalized block per update and never anchors an older block later. A message block
 /// that is not anchored is reached through a chain of block headers from an anchored block. Any block can be reached
 /// this way, so a message stays verifiable no matter how far the light client has moved on. See proveBlockHash.
+/// @dev This verifier proves that the OnRamp named in the message emitted CCIPMessageSent for the message. It does not
+/// know whether that address is a valid and active CCIP OnRamp. The OffRamp checks the OnRamp against its own allowlist
+/// before it calls any verifier, so this verifier relies on the OffRamp for that check.
 /// @dev Only EVM source chains are supported, as the proof is built from EVM block headers and receipts.
 /// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
 contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, BaseVerifier {
-  using EnumerableSet for EnumerableSet.AddressSet;
   using RLPReader for RLPReader.RLPItem;
   using RLPReader for bytes;
 
@@ -35,10 +36,9 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   error InvalidCCVVersion(bytes4 expected, bytes4 got);
   error InvalidSourceChainConfig(uint64 sourceChainSelector);
   error SourceChainNotSupported(uint64 sourceChainSelector);
-  error InvalidOnRamp(bytes got);
   error InvalidVkey(bytes32 expected, bytes32 got);
   error BlockNotAnchored(uint64 sourceChainSelector, uint256 blockNumber);
-  error InvalidHeaderCount(uint256 headerCount, uint256 maxHeaderChainLength);
+  error EmptyHeaderChain();
   error InvalidHeaderHash(uint256 headerIndex, bytes32 expected, bytes32 got);
   error InvalidFieldLength(uint256 expected, uint256 got);
   error ReceiptNotSuccessful();
@@ -58,17 +58,14 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   }
 
   struct SourceChainConfigArgs {
-    ISP1Helios helios; // ───────────╮ The light client anchoring this source chain. Can be zero to pause the chain.
-    uint64 sourceChainSelector; // ──│ Source chain selector.
-    uint16 maxHeaderChainLength; // ─╯ Max number of headers in a header chain, bounds gas and calldata.
+    ISP1Helios helios; // ─────────╮ The light client anchoring this source chain. Can be zero to pause the chain.
+    uint64 sourceChainSelector; // ╯ Source chain selector.
     bytes32 lightClientVkey; // The vkey the light client must verify beacon chain updates with.
     bytes32 executionHeaderVkey; // The vkey the light client must verify execution block anchors with.
-    address[] onRamps; // The OnRamps on the source chain that emit CCIPMessageSent.
   }
 
   struct SourceChainConfig {
-    ISP1Helios helios; // ───────────╮ The light client anchoring this source chain. Zero means paused.
-    uint16 maxHeaderChainLength; // ─╯ Max number of headers in a header chain, bounds gas and calldata.
+    ISP1Helios helios; // The light client anchoring this source chain. Zero means paused.
     bytes32 lightClientVkey; // The vkey the light client must verify beacon chain updates with.
     bytes32 executionHeaderVkey; // The vkey the light client must verify execution block anchors with.
   }
@@ -109,7 +106,6 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   DynamicConfig private s_dynamicConfig;
 
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
-  mapping(uint64 sourceChainSelector => EnumerableSet.AddressSet onRamps) private s_onRamps;
 
   // STATE
   /// @dev Block hashes proven from an anchored block through a header chain. They are keyed by the light client they
@@ -154,9 +150,8 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
     if (address(sourceChainConfig.helios) == address(0)) revert SourceChainNotSupported(message.sourceChainSelector);
 
     // For EVM, onRampAddress is abi encoded. The message names the OnRamp that emitted it, so the proven log must
-    // come from that OnRamp and that OnRamp must be one this verifier accepts for the source chain.
+    // come from that address. Whether it is an allowed OnRamp is checked by the OffRamp.
     address onRamp = abi.decode(message.onRampAddress, (address));
-    if (!s_onRamps[message.sourceChainSelector].contains(onRamp)) revert InvalidOnRamp(message.onRampAddress);
 
     if (verifierResults.length < VERIFIER_VERSION_BYTES) revert InvalidVerifierResults();
 
@@ -168,8 +163,7 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
 
     bytes32 anchorHash =
       _getAnchoredBlockHash(message.sourceChainSelector, sourceChainConfig, witness.anchorBlockNumber);
-    RLPReader.RLPItem[] memory messageBlockHeader =
-      _readHeaderChain(anchorHash, witness.headers, sourceChainConfig.maxHeaderChainLength);
+    RLPReader.RLPItem[] memory messageBlockHeader = _readHeaderChain(anchorHash, witness.headers);
     bytes32 receiptsRoot = _readBytes32(messageBlockHeader[HEADER_RECEIPTS_ROOT_INDEX]);
 
     // Receipts are keyed by the RLP encoded transaction index. This reverts unless the proof nodes hash up to the
@@ -183,8 +177,8 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
 
   /// @notice Proves the hash of a source chain block that lies below an anchored block, so that messages in blocks
   /// the light client skipped stay verifiable. Anyone can call this.
-  /// @dev A single call walks back at most maxHeaderChainLength blocks. Repeated calls walk back any distance, each
-  /// one starting from the block proven by the one before.
+  /// @dev The number of headers per call is only bounded by gas. Repeated calls walk back any distance, each one
+  /// starting from the block proven by the one before.
   /// @param sourceChainSelector The source chain selector.
   /// @param anchorBlockNumber The number of an anchored or proven block.
   /// @param headers RLP headers from the anchor block down to the block above the one being proven, both included.
@@ -197,8 +191,7 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
     if (address(sourceChainConfig.helios) == address(0)) revert SourceChainNotSupported(sourceChainSelector);
 
     bytes32 anchorHash = _getAnchoredBlockHash(sourceChainSelector, sourceChainConfig, anchorBlockNumber);
-    RLPReader.RLPItem[] memory lastHeader =
-      _readHeaderChain(anchorHash, headers, sourceChainConfig.maxHeaderChainLength);
+    RLPReader.RLPItem[] memory lastHeader = _readHeaderChain(anchorHash, headers);
 
     // Each header is the parent of the one before it, so the parent of the last header is headers.length blocks
     // below the anchor.
@@ -234,16 +227,12 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   /// @return lastHeader The RLP fields of the last header in the chain.
   function _readHeaderChain(
     bytes32 anchorHash,
-    bytes[] memory headers,
-    uint256 maxHeaderChainLength
+    bytes[] memory headers
   ) internal pure returns (RLPReader.RLPItem[] memory lastHeader) {
-    uint256 headerCount = headers.length;
-    if (headerCount == 0 || headerCount > maxHeaderChainLength) {
-      revert InvalidHeaderCount(headerCount, maxHeaderChainLength);
-    }
+    if (headers.length == 0) revert EmptyHeaderChain();
 
     bytes32 expectedHash = anchorHash;
-    for (uint256 i = 0; i < headerCount; ++i) {
+    for (uint256 i = 0; i < headers.length; ++i) {
       bytes32 headerHash = keccak256(headers[i]);
       if (headerHash != expectedHash) revert InvalidHeaderHash(i, expectedHash, headerHash);
 
@@ -389,11 +378,10 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   /// @notice Returns the config of a source chain.
   /// @param sourceChainSelector The source chain selector.
   /// @return sourceChainConfig The source chain config.
-  /// @return onRamps The OnRamps accepted for the source chain.
   function getSourceChainConfig(
     uint64 sourceChainSelector
-  ) external view returns (SourceChainConfig memory sourceChainConfig, address[] memory onRamps) {
-    return (s_sourceChainConfigs[sourceChainSelector], s_onRamps[sourceChainSelector].values());
+  ) external view returns (SourceChainConfig memory sourceChainConfig) {
+    return s_sourceChainConfigs[sourceChainSelector];
   }
 
   /// @notice Updates source chain specific configs.
@@ -403,9 +391,7 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   ) external onlyOwner {
     for (uint256 i = 0; i < sourceChainConfigArgs.length; ++i) {
       SourceChainConfigArgs calldata args = sourceChainConfigArgs[i];
-      if (args.sourceChainSelector == 0 || args.maxHeaderChainLength == 0) {
-        revert InvalidSourceChainConfig(args.sourceChainSelector);
-      }
+      if (args.sourceChainSelector == 0) revert InvalidSourceChainConfig(args.sourceChainSelector);
       // The light client can be zero to pause the source chain. Otherwise both of its vkeys must be pinned.
       if (
         address(args.helios) != address(0)
@@ -414,18 +400,8 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
         revert InvalidSourceChainConfig(args.sourceChainSelector);
       }
 
-      EnumerableSet.AddressSet storage onRamps = s_onRamps[args.sourceChainSelector];
-      onRamps.clear();
-      for (uint256 j = 0; j < args.onRamps.length; ++j) {
-        if (args.onRamps[j] == address(0)) revert InvalidSourceChainConfig(args.sourceChainSelector);
-        onRamps.add(args.onRamps[j]);
-      }
-
       s_sourceChainConfigs[args.sourceChainSelector] = SourceChainConfig({
-        helios: args.helios,
-        maxHeaderChainLength: args.maxHeaderChainLength,
-        lightClientVkey: args.lightClientVkey,
-        executionHeaderVkey: args.executionHeaderVkey
+        helios: args.helios, lightClientVkey: args.lightClientVkey, executionHeaderVkey: args.executionHeaderVkey
       });
 
       emit SourceChainConfigSet(args.sourceChainSelector, args);

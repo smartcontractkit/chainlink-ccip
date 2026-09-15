@@ -41,12 +41,6 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_HeaderChainAtMaxLength() public {
-    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, MAX_HEADER_CHAIN_LENGTH);
-
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
-  }
-
   function test_verifyMessage_ProvenBlock() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
     // Prove the block above the message block from the anchored block, then start the witness from there.
@@ -104,7 +98,6 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     MessageV1Codec.MessageV1 memory message = _message();
     message.onRampAddress = abi.encode(address(this));
     bytes32 messageId = keccak256(MessageV1Codec._encodeMessageV1(message));
-    _setSourceChainConfig(s_mockHelios, address(this), MAX_HEADER_CHAIN_LENGTH);
 
     vm.recordLogs();
     emit OnRamp.CCIPMessageSent({
@@ -146,19 +139,10 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
 
   function test_verifyMessage_RevertWhen_SourceChainNotSupported() public {
     bytes memory verifierResults = _encodeVerifierResults(_buildWitness(s_receipt, HEADER_COUNT));
-    _setSourceChainConfig(MockSP1Helios(address(0)), s_sourceOnRamp, MAX_HEADER_CHAIN_LENGTH);
+    _setSourceChainConfig(MockSP1Helios(address(0)));
 
     vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.SourceChainNotSupported.selector, SOURCE_CHAIN_SELECTOR));
     s_zkVerifier.verifyMessage(_message(), s_messageId, verifierResults);
-  }
-
-  function test_verifyMessage_RevertWhen_InvalidOnRamp() public {
-    bytes memory verifierResults = _encodeVerifierResults(_buildWitness(s_receipt, HEADER_COUNT));
-    MessageV1Codec.MessageV1 memory message = _message();
-    message.onRampAddress = abi.encode(makeAddr("otherOnRamp"));
-
-    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidOnRamp.selector, message.onRampAddress));
-    s_zkVerifier.verifyMessage(message, s_messageId, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidVerifierResults() public {
@@ -206,22 +190,11 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_RevertWhen_InvalidHeaderCount_NoHeaders() public {
+  function test_verifyMessage_RevertWhen_EmptyHeaderChain() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
     witness.headers = new bytes[](0);
 
-    vm.expectRevert(abi.encodeWithSelector(SuccinctZKVerifier.InvalidHeaderCount.selector, 0, MAX_HEADER_CHAIN_LENGTH));
-    s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
-  }
-
-  function test_verifyMessage_RevertWhen_InvalidHeaderCount_TooLong() public {
-    SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, MAX_HEADER_CHAIN_LENGTH + 1);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        SuccinctZKVerifier.InvalidHeaderCount.selector, MAX_HEADER_CHAIN_LENGTH + 1, MAX_HEADER_CHAIN_LENGTH
-      )
-    );
+    vm.expectRevert(SuccinctZKVerifier.EmptyHeaderChain.selector);
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
   }
 
@@ -303,6 +276,20 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
       )
     );
     s_zkVerifier.verifyMessage(_message(), s_messageId, _encodeVerifierResults(witness));
+  }
+
+  function test_verifyMessage_RevertWhen_InvalidLogEmitter_MessageNamesOtherOnRamp() public {
+    bytes memory verifierResults = _encodeVerifierResults(_buildWitness(s_receipt, HEADER_COUNT));
+    address otherOnRamp = makeAddr("otherOnRamp");
+    MessageV1Codec.MessageV1 memory message = _message();
+    message.onRampAddress = abi.encode(otherOnRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        SuccinctZKVerifier.InvalidLogEmitter.selector, otherOnRamp, abi.encodePacked(s_sourceOnRamp)
+      )
+    );
+    s_zkVerifier.verifyMessage(message, s_messageId, verifierResults);
   }
 
   function test_verifyMessage_RevertWhen_InvalidTopicCount() public {
