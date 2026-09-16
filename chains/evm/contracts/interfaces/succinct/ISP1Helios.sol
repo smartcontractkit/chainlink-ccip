@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 /// @notice SP1Helios light client methods used by SuccinctZKVerifier.
-/// @dev Anchored execution block hashes must be finalized and immutable.
+/// @dev Proven execution block hashes must be finalized and immutable.
 interface ISP1Helios {
-  /// @notice Returns the execution block hash anchored for a source chain block number, or zero if none.
+  /// @notice Returns the execution block hash proven for a source chain block number, or zero if none.
   function executionBlockHashes(
     uint256 blockNumber
   ) external view returns (bytes32);

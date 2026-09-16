@@ -35,7 +35,7 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
 
-  function test_verifyMessage_MessageBlockIsAnchored() public {
+  function test_verifyMessage_MessageBlockIsProven() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, 1);
 
     s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
@@ -48,11 +48,11 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     for (uint256 i = 0; i < provingHeaders.length; ++i) {
       provingHeaders[i] = witness.headers[i];
     }
-    s_zkVerifier.proveBlockHash(SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER, provingHeaders);
+    s_zkVerifier.proveBlockHash(SOURCE_CHAIN_SELECTOR, PROVEN_BLOCK_NUMBER, provingHeaders);
 
     bytes[] memory headers = new bytes[](1);
     headers[0] = witness.headers[HEADER_COUNT - 1];
-    witness.anchorBlockNumber = ANCHOR_BLOCK_NUMBER - provingHeaders.length;
+    witness.provenBlockNumber = PROVEN_BLOCK_NUMBER - provingHeaders.length;
     witness.headers = headers;
 
     s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
@@ -177,14 +177,12 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
     s_zkVerifier.verifyMessage(_createMessage(), s_messageId, verifierResults);
   }
 
-  function test_verifyMessage_RevertWhen_BlockNotAnchored() public {
+  function test_verifyMessage_RevertWhen_BlockNotProven() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
-    witness.anchorBlockNumber = ANCHOR_BLOCK_NUMBER + 1;
+    witness.provenBlockNumber = PROVEN_BLOCK_NUMBER + 1;
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        SuccinctZKVerifier.BlockNotAnchored.selector, SOURCE_CHAIN_SELECTOR, ANCHOR_BLOCK_NUMBER + 1
-      )
+      abi.encodeWithSelector(SuccinctZKVerifier.BlockNotProven.selector, SOURCE_CHAIN_SELECTOR, PROVEN_BLOCK_NUMBER + 1)
     );
     s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));
   }
@@ -199,12 +197,12 @@ contract SuccinctZKVerifier_verifyMessage is SuccinctZKVerifierSetup {
 
   function test_verifyMessage_RevertWhen_InvalidHeaderHash_FirstHeader() public {
     SuccinctZKVerifier.Witness memory witness = _buildWitness(s_receipt, HEADER_COUNT);
-    bytes32 anchorHash = keccak256(witness.headers[0]);
+    bytes32 provenBlockHash = keccak256(witness.headers[0]);
     witness.headers[0][40] ^= 0x01;
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        SuccinctZKVerifier.InvalidHeaderHash.selector, 0, anchorHash, keccak256(witness.headers[0])
+        SuccinctZKVerifier.InvalidHeaderHash.selector, 0, provenBlockHash, keccak256(witness.headers[0])
       )
     );
     s_zkVerifier.verifyMessage(_createMessage(), s_messageId, _encodeVerifierResults(witness));

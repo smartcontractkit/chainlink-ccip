@@ -18,7 +18,7 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
   bytes32 internal constant LIGHT_CLIENT_VKEY = keccak256("lightClientVkey");
   bytes32 internal constant EXECUTION_HEADER_VKEY = keccak256("executionHeaderVkey");
   bytes1 internal constant EIP1559_TRANSACTION_TYPE = 0x02;
-  uint256 internal constant ANCHOR_BLOCK_NUMBER = 1_000_000;
+  uint256 internal constant PROVEN_BLOCK_NUMBER = 1_000_000;
 
   SuccinctZKVerifier internal s_zkVerifier;
   MockSP1Helios internal s_mockHelios;
@@ -65,7 +65,7 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     return abi.encodePacked(VERSION_TAG_V0_0_1, abi.encode(witness));
   }
 
-  /// @notice Builds a receipt proof for transaction 0 and a header chain from the anchor to the message block.
+  /// @notice Builds a receipt proof for transaction 0 and a header chain from the proven block to the message block.
   function _buildWitness(
     bytes memory receipt,
     uint256 headerCount
@@ -73,14 +73,14 @@ contract SuccinctZKVerifierSetup is BaseVerifierSetup {
     (bytes[] memory proofNodes, bytes32 receiptsRoot) = _buildReceiptsTrie(receipt);
 
     bytes[] memory headers = new bytes[](headerCount);
-    headers[headerCount - 1] = _encodeHeader(keccak256("parent"), receiptsRoot, ANCHOR_BLOCK_NUMBER - headerCount + 1);
+    headers[headerCount - 1] = _encodeHeader(keccak256("parent"), receiptsRoot, PROVEN_BLOCK_NUMBER - headerCount + 1);
     for (uint256 i = headerCount - 1; i > 0; --i) {
-      headers[i - 1] = _encodeHeader(keccak256(headers[i]), keccak256("otherReceiptsRoot"), ANCHOR_BLOCK_NUMBER - i + 1);
+      headers[i - 1] = _encodeHeader(keccak256(headers[i]), keccak256("otherReceiptsRoot"), PROVEN_BLOCK_NUMBER - i + 1);
     }
-    s_mockHelios.setExecutionBlockHash(ANCHOR_BLOCK_NUMBER, keccak256(headers[0]));
+    s_mockHelios.setExecutionBlockHash(PROVEN_BLOCK_NUMBER, keccak256(headers[0]));
 
     return SuccinctZKVerifier.Witness({
-      anchorBlockNumber: ANCHOR_BLOCK_NUMBER, headers: headers, txIndex: 0, logIndex: 0, proofNodes: proofNodes
+      provenBlockNumber: PROVEN_BLOCK_NUMBER, headers: headers, txIndex: 0, logIndex: 0, proofNodes: proofNodes
     });
   }
 

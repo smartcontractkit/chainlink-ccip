@@ -46,7 +46,7 @@ contract SuccinctZKVerifier_config is SuccinctZKVerifierSetup {
   function test_getFee_RevertWhen_FinalityNotRequested() public {
     Client.EVM2AnyMessage memory message;
 
-    // SP1Helios only anchors finalized blocks.
+    // SP1Helios only proves finalized blocks.
     vm.expectRevert(
       abi.encodeWithSelector(
         FinalityCodec.InvalidRequestedFinality.selector,

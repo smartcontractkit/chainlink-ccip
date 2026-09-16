@@ -16,6 +16,8 @@ import {RLPWriter} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPWr
 import {MerkleTrie} from "@eth-optimism/contracts-bedrock/src/libraries/trie/MerkleTrie.sol";
 
 /// @notice Verifies CCIPMessageSent receipt inclusion in EVM source blocks proven via the SP1Helios light client.
+/// @dev SP1Helios contract validates the zk proof that the offchain program validating the commitee signatures executed correctly.
+/// The program is identified by the "vkey". This verifier pins the vkey it trusts.
 /// @dev The proveBlockHash function caches block hashes, allowing callers to bridge large gaps between consecutive proven blocks.
 /// @dev The log emitter must match message.onRampAddress. Callers must validate the OnRamp and compute messageId from the message.
 /// The OffRamp handles both before calling this verifier.
@@ -28,7 +30,7 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   error InvalidSourceChainConfig(uint64 sourceChainSelector);
   error SourceChainNotSupported(uint64 sourceChainSelector);
   error InvalidVkey(bytes32 expected, bytes32 got);
-  error BlockNotAnchored(uint64 sourceChainSelector, uint256 blockNumber);
+  error BlockNotProven(uint64 sourceChainSelector, uint256 blockNumber);
   error EmptyHeaderChain();
   error InvalidHeaderHash(uint256 headerIndex, bytes32 expected, bytes32 got);
   error InvalidFieldLength(uint256 expected, uint256 got);
@@ -66,8 +68,8 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   ///     * witness                    dynamic    Witness    4
   /// The witness is ABI encoded.
   struct Witness {
-    uint256 anchorBlockNumber; // Source block anchored by SP1Helios or proven through proveBlockHash.
-    bytes[] headers; // RLP headers from the anchor block down to the message block, both included.
+    uint256 provenBlockNumber; // Source block proven by SP1Helios or through proveBlockHash.
+    bytes[] headers; // RLP headers from the proven block down to the message block, both included.
     uint256 txIndex; // Index of the transaction in the message block.
     uint256 logIndex; // Index of the CCIPMessageSent log in the receipt.
     bytes[] proofNodes; // Receipts trie proof, root node first.
@@ -176,9 +178,9 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
 
     Witness memory witness = abi.decode(verifierResults[VERIFIER_VERSION_BYTES:], (Witness));
 
-    bytes32 anchorHash =
-      _getAnchoredBlockHash(message.sourceChainSelector, sourceChainConfig, witness.anchorBlockNumber);
-    RLPReader.RLPItem[] memory messageBlockHeader = _readHeaderChain(anchorHash, witness.headers);
+    bytes32 provenBlockHash = _getProvenBlockHash(sourceChainConfig, witness.provenBlockNumber);
+    if (provenBlockHash == bytes32(0)) revert BlockNotProven(message.sourceChainSelector, witness.provenBlockNumber);
+    RLPReader.RLPItem[] memory messageBlockHeader = _readHeaderChain(provenBlockHash, witness.headers);
     bytes32 receiptsRoot = _readBytes32(messageBlockHeader[HEADER_RECEIPTS_ROOT_INDEX]);
 
     // The receipts trie is keyed by the RLP encoded transaction index.
@@ -191,30 +193,31 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   /// @notice Proves and stores a block hash from a chain of headers starting at a proven block.
   /// @dev Calls can start from a previously proven block to traverse gaps larger than the gas limit allows in one call.
   /// @param sourceChainSelector The source chain selector.
-  /// @param anchorBlockNumber The number of a proven block.
-  /// @param headers RLP headers from the anchor block down to the block above the one being proven, both included.
+  /// @param provenBlockNumber The number of a proven block.
+  /// @param headers RLP headers from the proven block down to the block above the one being proven, both included.
   function proveBlockHash(
     uint64 sourceChainSelector,
-    uint256 anchorBlockNumber,
+    uint256 provenBlockNumber,
     bytes[] memory headers
   ) external {
     SourceChainConfig memory sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
     if (address(sourceChainConfig.helios) == address(0)) revert SourceChainNotSupported(sourceChainSelector);
 
-    bytes32 anchorHash = _getAnchoredBlockHash(sourceChainSelector, sourceChainConfig, anchorBlockNumber);
-    RLPReader.RLPItem[] memory lastHeader = _readHeaderChain(anchorHash, headers);
+    bytes32 provenBlockHash = _getProvenBlockHash(sourceChainConfig, provenBlockNumber);
+    if (provenBlockHash == bytes32(0)) revert BlockNotProven(sourceChainSelector, provenBlockNumber);
+    RLPReader.RLPItem[] memory lastHeader = _readHeaderChain(provenBlockHash, headers);
 
-    // The parent of the last header is headers.length blocks before the anchor.
-    uint256 blockNumber = anchorBlockNumber - headers.length;
+    // The parent of the last header is headers.length blocks before the proven block.
+    uint256 blockNumber = provenBlockNumber - headers.length;
     bytes32 blockHash = _readBytes32(lastHeader[HEADER_PARENT_HASH_INDEX]);
     s_provenBlockHashes[sourceChainConfig.helios][blockNumber] = blockHash;
 
     emit BlockHashProven(sourceChainSelector, blockNumber, blockHash);
   }
 
-  /// @notice Returns an anchored or proven block hash after checking the light client's vkeys.
-  function _getAnchoredBlockHash(
-    uint64 sourceChainSelector,
+  /// @notice Returns a block hash proven by SP1Helios or through proveBlockHash after checking the light client's
+  /// vkeys. Returns zero when the block is not proven.
+  function _getProvenBlockHash(
     SourceChainConfig memory sourceChainConfig,
     uint256 blockNumber
   ) internal view returns (bytes32 blockHash) {
@@ -225,20 +228,19 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
 
     blockHash = sourceChainConfig.helios.executionBlockHashes(blockNumber);
     if (blockHash == bytes32(0)) blockHash = s_provenBlockHashes[sourceChainConfig.helios][blockNumber];
-    if (blockHash == bytes32(0)) revert BlockNotAnchored(sourceChainSelector, blockNumber);
     return blockHash;
   }
 
-  /// @notice Validates a chain of RLP block headers against an anchor hash.
+  /// @notice Validates a chain of RLP block headers against a proven block hash.
   /// @dev Each subsequent header must hash to the previous header's parent hash.
   /// @return lastHeader The RLP fields of the last header in the chain.
   function _readHeaderChain(
-    bytes32 anchorHash,
+    bytes32 provenBlockHash,
     bytes[] memory headers
   ) internal pure returns (RLPReader.RLPItem[] memory lastHeader) {
     if (headers.length == 0) revert EmptyHeaderChain();
 
-    bytes32 expectedHash = anchorHash;
+    bytes32 expectedHash = provenBlockHash;
     for (uint256 i = 0; i < headers.length; ++i) {
       bytes32 headerHash = keccak256(headers[i]);
       if (headerHash != expectedHash) revert InvalidHeaderHash(i, expectedHash, headerHash);
@@ -368,14 +370,17 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
     emit DynamicConfigSet(dynamicConfig);
   }
 
-  /// @notice Returns the hash of a source chain block proven through proveBlockHash, or zero if none.
+  /// @notice Returns the hash of a source chain block proven by SP1Helios or through proveBlockHash, or zero if none.
   /// @param sourceChainSelector The source chain selector.
   /// @param blockNumber The source chain block number.
   function getProvenBlockHash(
     uint64 sourceChainSelector,
     uint256 blockNumber
   ) external view returns (bytes32 blockHash) {
-    return s_provenBlockHashes[s_sourceChainConfigs[sourceChainSelector].helios][blockNumber];
+    SourceChainConfig memory sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+    if (address(sourceChainConfig.helios) == address(0)) revert SourceChainNotSupported(sourceChainSelector);
+
+    return _getProvenBlockHash(sourceChainConfig, blockNumber);
   }
 
   /// @notice Returns the config of a source chain.
