@@ -52,7 +52,14 @@ type HTTPClient interface {
 // Therefore AttestationClient is a higher level abstraction that uses httpClient to fetch attestations and can be more
 // oriented around caching/processing the attestation data instead of handling the API specifics.
 type httpClient struct {
+	// lggr is guarded by lggrMu because the instance is cached process-wide by API URL (see
+	// GetHTTPClient) and therefore outlives whichever caller happened to construct it. Holding
+	// the first caller's logger forever is a real hazard: in tests that logger is bound to a
+	// *testing.T, so a later caller reaching the same cached client logs into a test that has
+	// already finished, which the testing package turns into a process-wide panic. Later
+	// callers refresh it via setLogger instead.
 	lggr       logger.Logger
+	lggrMu     sync.RWMutex
 	apiURL     *url.URL
 	apiTimeout time.Duration
 	rate       *rate.Limiter
@@ -65,7 +72,7 @@ type httpClient struct {
 }
 
 var (
-	clientInstances = make(map[string]HTTPClient)
+	clientInstances = make(map[string]*httpClient)
 	mutex           sync.Mutex
 )
 
@@ -85,6 +92,10 @@ func GetHTTPClient(
 	defer mutex.Unlock()
 
 	if client, exists := clientInstances[api]; exists {
+		// Adopt the current caller's logger. The rate limiter and cool-down state are what this
+		// cache exists to share; the logger is not, and keeping the original one alive outlives
+		// its owner.
+		client.setLogger(lggr)
 		return client, nil
 	}
 
@@ -103,7 +114,7 @@ func newHTTPClient(
 	apiInterval time.Duration,
 	apiTimeout time.Duration,
 	coolDownDuration time.Duration,
-) (HTTPClient, error) {
+) (*httpClient, error) {
 	u, err := url.ParseRequestURI(api)
 	if err != nil {
 		return nil, err
@@ -118,6 +129,22 @@ func newHTTPClient(
 	}, nil
 }
 
+// logger returns the client's current logger.
+func (h *httpClient) logger() logger.Logger {
+	h.lggrMu.RLock()
+	defer h.lggrMu.RUnlock()
+
+	return h.lggr
+}
+
+// setLogger points the client at a new logger. See the note on httpClient.lggr.
+func (h *httpClient) setLogger(lggr logger.Logger) {
+	h.lggrMu.Lock()
+	defer h.lggrMu.Unlock()
+
+	h.lggr = lggr
+}
+
 // splitPathAndQuery splits requestPath on the first "?" so the path and query
 // can be set on url.URL separately, ensuring the "?" is not escaped in the path.
 func splitPathAndQuery(requestPath string) (pathPart, rawQuery string) {
@@ -128,7 +155,7 @@ func splitPathAndQuery(requestPath string) (pathPart, rawQuery string) {
 }
 
 func (h *httpClient) Get(ctx context.Context, requestPath string) (cciptypes.Bytes, HTTPStatus, error) {
-	lggr := logutil.WithContextValues(ctx, h.lggr)
+	lggr := logutil.WithContextValues(ctx, h.logger())
 
 	requestURL := *h.apiURL
 	pathPart, rawQuery := splitPathAndQuery(requestPath)
@@ -151,7 +178,7 @@ func (h *httpClient) Post(
 	requestPath string,
 	requestData cciptypes.Bytes,
 ) (cciptypes.Bytes, HTTPStatus, error) {
-	lggr := logutil.WithContextValues(ctx, h.lggr)
+	lggr := logutil.WithContextValues(ctx, h.logger())
 
 	requestURL := *h.apiURL
 	pathPart, rawQuery := splitPathAndQuery(requestPath)
@@ -159,7 +186,7 @@ func (h *httpClient) Post(
 	requestURL.RawQuery = rawQuery
 
 	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodPost, requestURL, bytes.NewBuffer(requestData))
-	h.lggr.Debugw(
+	lggr.Debugw(
 		"Response from attestation API",
 		"Method", "POST",
 		"requestURL", requestURL.String(),
