@@ -84,7 +84,7 @@ func TestSetTokenTransferFeeV1_6_0(t *testing.T) {
 	MergeAddresses(t, env, output.DataStore)
 
 	// Connect the chains so that srcRouter.getOnRamp(dst) works
-	output, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*env, lanes.ConnectChainsConfig{
+	output, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*env, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: utils.Version_1_6_0,
@@ -269,7 +269,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	MergeAddresses(t, e, out.DataStore)
 
 	// Connect the chains so that srcRouter.getOnRamp(dst) works
-	connectOut, err := lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+	connectOut, err := lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: utils.Version_1_6_0,
