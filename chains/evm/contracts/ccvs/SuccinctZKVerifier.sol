@@ -65,7 +65,11 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
     bytes32 executionHeaderVkey; // Expected vkey for execution block proofs.
   }
 
-  /// @dev ABI encoded proof following the version tag in verifierResults.
+  /// @dev Verifier results format.
+  ///     * Field                      Bytes      Type       Index
+  ///     * verifierVersion            4          bytes4     0
+  ///     * witness                    dynamic    Witness    4
+  /// The witness is ABI encoded.
   struct Witness {
     uint256 anchorBlockNumber; // Source block anchored by SP1Helios or proven through proveBlockHash.
     bytes[] headers; // RLP headers from the anchor block down to the message block, both included.
@@ -82,13 +86,38 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   /// @dev keccak256("CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])").
   bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
     0x371bc2ff0a006f4ef863b1d27a065d4e9f938b6d883eb154572b4aea593b32cc;
-  /// @dev The event signature and three indexed fields: destChainSelector, sender and messageId.
+  /// @dev CCIPMessageSent log topics. The event has three indexed fields, which follow the signature.
+  ///     * Field                      Bytes      Type       Index
+  ///     * signature                  32         bytes32    0
+  ///     * destChainSelector          32         uint64     1
+  ///     * sender                     32         address    2
+  ///     * messageId                  32         bytes32    3
   uint256 internal constant CCIP_MESSAGE_SENT_TOPIC_COUNT = 4;
   uint256 internal constant MESSAGE_ID_TOPIC_INDEX = 3;
-  /// @dev Field positions in an RLP encoded block header.
+  /// @dev Block header format. The header is an RLP list and the index is the position in that list. Fields after
+  /// receiptsRoot depend on the fork and are not read.
+  ///     * Field                      Bytes      Type       Index
+  ///     * parentHash                 32         bytes32    0
+  ///     * ommersHash                 32         bytes32    1
+  ///     * beneficiary                20         address    2
+  ///     * stateRoot                  32         bytes32    3
+  ///     * transactionsRoot           32         bytes32    4
+  ///     * receiptsRoot               32         bytes32    5
+  ///     * ...
   uint256 internal constant HEADER_PARENT_HASH_INDEX = 0;
   uint256 internal constant HEADER_RECEIPTS_ROOT_INDEX = 5;
-  /// @dev Field positions in an RLP encoded receipt and log.
+  /// @dev Receipt format. A typed receipt is the transaction type byte followed by the RLP list. A legacy receipt is
+  /// the RLP list alone. The index is the position in that list.
+  ///     * Field                      Bytes      Type       Index
+  ///     * status                     1          uint8      0
+  ///     * cumulativeGasUsed          dynamic    uint256    1
+  ///     * logsBloom                  256        bytes      2
+  ///     * logs                       dynamic    Log[]      3
+  /// @dev Log format. Each log is an RLP list and the index is the position in that list.
+  ///     * Field                      Bytes      Type       Index
+  ///     * emitter                    20         address    0
+  ///     * topics                     dynamic    bytes32[]  1
+  ///     * data                       dynamic    bytes      2
   uint256 internal constant RECEIPT_STATUS_INDEX = 0;
   uint256 internal constant RECEIPT_LOGS_INDEX = 3;
   uint256 internal constant LOG_EMITTER_INDEX = 0;
