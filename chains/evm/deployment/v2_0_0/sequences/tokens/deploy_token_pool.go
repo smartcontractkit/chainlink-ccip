@@ -238,16 +238,6 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		// Deploy the desired pool contract
 		output := sequences.OnChainOutput{}
 		switch {
-		// NOTE: this reject must precede the burn-mint case below, because
-		// utils.IsBurnMintPoolType reports true for BurnMintTokenPoolAndProxy (the v1.5.0
-		// burn-mint pool needs the same token role grant). That type has no v2.0.0 contract, so
-		// without this case a request for it would silently deploy a plain v2.0.0
-		// BurnMintTokenPool instead of failing.
-		case tokenPoolType == datastore.ContractType(utils.BurnMintTokenPoolAndProxy):
-			return sequences.OnChainOutput{}, fmt.Errorf(
-				"token pool type '%s' only exists at v1.5.0 and cannot be deployed at v2.0.0 (chain selector %d)",
-				input.PoolType, chain.Selector,
-			)
 		// NOTE: the siloed case must precede the lock-release case below, because
 		// utils.IsLockReleasePoolType deliberately reports true for the siloed type. The siloed pool
 		// has a distinct constructor (no lockbox argument) and needs one lockbox per silo group, so
