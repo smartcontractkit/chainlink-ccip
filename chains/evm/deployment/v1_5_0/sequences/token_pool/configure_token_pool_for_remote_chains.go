@@ -133,6 +133,19 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains: %w", err)
 		}
+		chainSupported := slices.Contains(sc, input.RemoteChainSelector)
+
+		// Read the currently configured remote token up front: whether it is changing decides both
+		// how the rate limits are resolved below and whether ApplyChainUpdates has to remove the
+		// existing lane config first.
+		var remoteTokenChanged bool
+		if chainSupported {
+			onchainRemoteToken, err := tp.GetRemoteToken(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
+			}
+			remoteTokenChanged = !bytes.Equal(onchainRemoteToken, input.RemoteChainConfig.RemoteToken)
+		}
 
 		// v1.5.0 pools have no getTokenDecimals(); read the token's own ERC20 decimals() instead.
 		// Both the token address and its decimals are immutable, so ExecuteOperation (and its
@@ -182,7 +195,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			)
 
 		case !outboundOk && !inboundOk:
-			if slices.Contains(sc, input.RemoteChainSelector) {
+			if chainSupported {
 				// Idempotent behavior: if we're re-calling this sequence and no rate limits are
 				// specified, then we re-use whatever is currently onchain to avoid accidentally
 				// overwriting existing onchain config
@@ -194,6 +207,18 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", input.RemoteChainSelector, err)
 				}
+
+				// Carrying the existing buckets forward is only safe while the lane keeps pointing at
+				// the same remote token. See tokensapi.ErrInboundRateLimitNotPortable for why, and
+				// DoesPoolUseLocalDecimals for which pools are affected (v1.5.0 always is, but the
+				// predicate is asked rather than assumed so this stays correct if that changes).
+				if remoteTokenChanged && onchainInboundBucket.IsEnabled &&
+					!tokensapi.DoesPoolUseLocalDecimals(chain.Family(), tvReport.Output.Version, tvReport.Output.Type.String()) {
+					return sequences.OnChainOutput{}, tokensapi.ErrInboundRateLimitNotPortable(
+						input.RemoteChainSelector, onchainInboundBucket.Capacity, onchainInboundBucket.Rate,
+					)
+				}
+
 				inputORL = tokensapi.RateLimiterConfig{
 					IsEnabled: onchainOutboundBucket.IsEnabled,
 					Capacity:  onchainOutboundBucket.Capacity,
@@ -234,15 +259,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// in the code.
 		reportWrites := []contract.WriteOutput{}
 		removeRemoteFirst := false
-		if slices.Contains(sc, input.RemoteChainSelector) {
-			remoteToken, err := tp.GetRemoteToken(&bind.CallOpts{Context: b.GetContext()}, input.RemoteChainSelector)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
-			}
-
+		if chainSupported {
 			// Token pool remote chain configuration can also vary depending on whether the
 			// remote token matches or not - see comment further below for more details.
-			if !bytes.Equal(remoteToken, input.RemoteChainConfig.RemoteToken) {
+			if remoteTokenChanged {
 				// If the remote token onchain is different from the one provided as input, then we
 				// need to ensure that ApplyChainUpdates removes any existing config for the remote
 				// chain before a new one is added. v1.5.0 expresses that as an allowed=false entry
