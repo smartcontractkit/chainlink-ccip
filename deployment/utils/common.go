@@ -49,10 +49,8 @@ const (
 	BurnMintWithExternalMinterTokenPool cldf.ContractType = "BurnMintWithExternalMinterTokenPool"
 	HybridWithExternalMinterTokenPool   cldf.ContractType = "HybridWithExternalMinterTokenPool"
 	BurnMintTokenPool                   cldf.ContractType = "BurnMintTokenPool"
-	// BurnMintTokenPoolAndProxy is the v1.5.0 burn-mint pool, which is its own proxy (one
-	// contract, one address). It has no equivalent at v1.5.1 or later.
-	BurnMintTokenPoolAndProxy cldf.ContractType = "BurnMintTokenPoolAndProxy"
-	LockReleaseTokenPool      cldf.ContractType = "LockReleaseTokenPool"
+	BurnMintTokenPoolAndProxy           cldf.ContractType = "BurnMintTokenPoolAndProxy"
+	LockReleaseTokenPool                cldf.ContractType = "LockReleaseTokenPool"
 	BurnMintWithLockReleaseFlag         cldf.ContractType = "BurnMintWithLockReleaseFlag"
 	TokenGovernor                       cldf.ContractType = "TokenGovernor"
 	ERC20LockBox                        cldf.ContractType = "ERC20LockBox"
