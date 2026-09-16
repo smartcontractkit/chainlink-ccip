@@ -6,9 +6,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	eth_types "github.com/ethereum/go-ethereum/core/types"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -16,10 +18,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_transparent"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	bnm_transparent_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20_transparent"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -243,15 +247,202 @@ func TestTokenSupportsAdminRole(t *testing.T) {
 	t.Parallel()
 
 	tokenTypes := map[cldf.ContractType]bool{
-		burn_mint_erc20_with_drip.ContractType: true,
-		burn_mint_erc20.ContractType:           true,
-		utils.ERC677TokenHelper:                false,
-		utils.BurnMintToken:                    false,
-		tip20.ContractType:                     true,
-		erc20.ContractType:                     false,
+		burn_mint_erc20_with_drip.ContractType:   true,
+		burn_mint_erc20.ContractType:             true,
+		utils.ERC677TokenHelper:                  false,
+		utils.BurnMintToken:                      false,
+		tip20.ContractType:                       true,
+		erc20.ContractType:                       false,
+		burn_mint_erc20_transparent.ContractType: false, // TODO(CCIP-13516): see Capabilities doc on tokenBurnMintERC20Transparent
 	}
 
 	for tt, supportsAdmin := range tokenTypes {
 		require.Equal(t, supportsAdmin, tokenimpl.Capabilities(tt).SupportsAdminRole, "Token type %s admin role support mismatch", tt)
 	}
+}
+
+// TestEVMTokenDeployment_BurnMintERC20TransparentToken exercises the composite deploy (impl +
+// TransparentUpgradeableProxy + initialize) via the DeployToken sequence, using its own
+// assertions rather than the shared BurnMintERC20 test loop above: this token type has a
+// different capability set (no SupportsAdminRole yet - see the adapter's Capabilities doc) and
+// a different admin/preMint/ccipAdmin resolution path (all three default to the deployer via
+// initialize's defaultAdmin argument, then move to their intended holders exactly like
+// BurnMintERC20's constructor-implicit msg.sender pattern).
+func TestEVMTokenDeployment_BurnMintERC20TransparentToken(t *testing.T) {
+	t.Parallel()
+
+	evmChains := []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}
+
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, evmChains))
+	require.NoError(t, err, "Failed to create test environment")
+
+	chain := e.BlockChains.EVMChains()[chain_selectors.ETHEREUM_MAINNET.Selector]
+	deployerAddr := chain.DeployerKey.From
+
+	externalAdmin := "0x3333333333333333333333333333333333333333" // proxy admin / upgrade authority
+	sender := "0x4444444444444444444444444444444444444444"        // pre-mint recipient
+	maxSupply := uint64(1_000_000_000)
+	preMint := uint64(1_000_000)
+
+	tokenInput := tokensapi.DeployTokenInput{
+		Name:              "Test BurnMint ERC20 Transparent",
+		Symbol:            "TBMTRANS",
+		Decimals:          18,
+		Type:              burn_mint_erc20_transparent.ContractType,
+		ExternalAdmin:     externalAdmin,
+		Senders:           []string{sender},
+		Supply:            &maxSupply,
+		PreMint:           &preMint,
+		ChainSelector:     chain_selectors.ETHEREUM_MAINNET.Selector,
+		ExistingDataStore: e.DataStore,
+	}
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployToken, e.BlockChains, tokenInput)
+	require.NoError(t, err, "Failed to execute DeployToken sequence")
+	require.Len(t, report.Output.Addresses, 1, "DeployToken should return exactly one address ref (the proxy)")
+
+	proxyRef := report.Output.Addresses[0]
+	require.Equal(t, datastore.ContractType(burn_mint_erc20_transparent.ContractType), proxyRef.Type)
+	require.Equal(t, tokenInput.Symbol, proxyRef.Qualifier)
+	require.NotEmpty(t, proxyRef.Address)
+
+	proxyAddr := common.HexToAddress(proxyRef.Address)
+	token, err := bnm_transparent_bindings.NewBurnMintERC20Transparent(proxyAddr, chain.Client)
+	require.NoError(t, err, "Failed to bind to proxy address")
+
+	onChainName, err := token.Name(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, tokenInput.Name, onChainName)
+
+	onChainSymbol, err := token.Symbol(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, tokenInput.Symbol, onChainSymbol)
+
+	onChainDecimals, err := token.Decimals(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, tokenInput.Decimals, onChainDecimals)
+
+	expectedMaxSupply := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(maxSupply), tokenInput.Decimals)
+	onChainMaxSupply, err := token.MaxSupply(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, expectedMaxSupply.String(), onChainMaxSupply.String())
+
+	expectedPreMint := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(preMint), tokenInput.Decimals)
+	onChainTotalSupply, err := token.TotalSupply(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String())
+
+	// preMint was minted to the deployer inside initialize, then moved to Senders[0] by the
+	// generic sequence's Transfer step - mirroring BurnMintERC20's flow.
+	senderBalance, err := token.BalanceOf(&bind.CallOpts{}, common.HexToAddress(sender))
+	require.NoError(t, err)
+	require.Equal(t, expectedPreMint.String(), senderBalance.String(), "pre-mint recipient should hold the pre-minted tokens")
+
+	deployerBalance, err := token.BalanceOf(&bind.CallOpts{}, deployerAddr)
+	require.NoError(t, err)
+	require.Equal(t, "0", deployerBalance.String(), "deployer should have transferred away the pre-mint amount")
+
+	// ccipAdmin defaults to ExternalAdmin (see sequences/token.go), set via the generic SetCCIPAdmin step.
+	onChainCCIPAdmin, err := token.GetCCIPAdmin(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(externalAdmin), onChainCCIPAdmin)
+
+	// DEFAULT_ADMIN_ROLE is NOT transferred to ExternalAdmin - SupportsAdminRole is false for
+	// this type (see the adapter's Capabilities doc), so the deployer key retains it.
+	defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{})
+	require.NoError(t, err)
+	deployerHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, deployerAddr)
+	require.NoError(t, err)
+	require.True(t, deployerHasRole, "deployer should retain DEFAULT_ADMIN_ROLE")
+	externalAdminHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin))
+	require.NoError(t, err)
+	require.False(t, externalAdminHasRole, "external admin should NOT have DEFAULT_ADMIN_ROLE yet (2-step transfer not implemented)")
+}
+
+// renounceRoleForPipelineDemo is a test-local write op wrapping the standard AccessControl
+// renounceRole(bytes32,address) - it exists only to demonstrate a proposed (and rejected)
+// mapping, so it is NOT added to the production burn_mint_erc20_transparent operations package.
+type renounceRoleArgs struct {
+	Role    [32]byte
+	Account common.Address
+}
+
+var renounceRoleForPipelineDemo = contract.NewWrite(contract.WriteParams[renounceRoleArgs, *bnm_transparent_bindings.BurnMintERC20Transparent]{
+	Name:         "burn_mint_erc20_transparent:renounce-role-demo",
+	Version:      utils.Version_1_0_0,
+	Description:  "DEMO ONLY: renounceRole, to show it cannot stand in for RevokeAdminRole",
+	ContractType: burn_mint_erc20_transparent.ContractType,
+	ContractABI:  bnm_transparent_bindings.BurnMintERC20TransparentABI,
+	NewContract:  bnm_transparent_bindings.NewBurnMintERC20Transparent,
+	IsAllowedCaller: func(token *bnm_transparent_bindings.BurnMintERC20Transparent, opts *bind.CallOpts, caller common.Address, input renounceRoleArgs) (bool, error) {
+		// Vanilla AccessControl semantics: renounceRole only requires caller == account (self-service).
+		return caller == input.Account, nil
+	},
+	Validate: func(renounceRoleArgs) error { return nil },
+	CallContract: func(token *bnm_transparent_bindings.BurnMintERC20Transparent, opts *bind.TransactOpts, input renounceRoleArgs) (*eth_types.Transaction, error) {
+		return token.RenounceRole(opts, input.Role, input.Account)
+	},
+})
+
+// TestPipeline_ProposedGrantRevokeMapping_RevokeStepRevertsOnChain demonstrates - using the same
+// contract.NewWrite/ExecuteOperation machinery every other token op uses, against a simulated
+// chain, not a hand-written Solidity-only test - that mapping the shared tokenimpl.Token
+// interface's GrantAdminRole/RevokeAdminRole to beginDefaultAdminTransfer/renounceRole (to mirror
+// EVMPoolAdapter.TidyTokenRoles's "grant(timelock) then revoke(deployer)" synchronous pairing used
+// for the plain BurnMintERC20) fails: the second step's on-chain transaction reverts and that
+// revert surfaces as a genuine Go error out of the deployment pipeline, exactly as it would if
+// TidyTokenRoles were wired this way for real.
+func TestPipeline_ProposedGrantRevokeMapping_RevokeStepRevertsOnChain(t *testing.T) {
+	t.Parallel()
+
+	evmChains := []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, evmChains))
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chain_selectors.ETHEREUM_MAINNET.Selector]
+	deployerAddr := chain.DeployerKey.From
+	timelockStandIn := common.HexToAddress("0x5555555555555555555555555555555555555555")
+
+	maxSupply := uint64(1_000_000_000)
+	tokenInput := tokensapi.DeployTokenInput{
+		Name:              "Pipeline Demo Token",
+		Symbol:            "PIPEDEMO",
+		Decimals:          18,
+		Type:              burn_mint_erc20_transparent.ContractType,
+		ExternalAdmin:     timelockStandIn.Hex(),
+		Supply:            &maxSupply,
+		ChainSelector:     chain_selectors.ETHEREUM_MAINNET.Selector,
+		ExistingDataStore: e.DataStore,
+	}
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployToken, e.BlockChains, tokenInput)
+	require.NoError(t, err, "token deploy itself must succeed")
+	proxyAddr := common.HexToAddress(report.Output.Addresses[0].Address)
+
+	// Step 1: "GrantAdminRole(timelock)" as proposed => beginDefaultAdminTransfer(timelock).
+	// This step succeeds - the deployer still holds DEFAULT_ADMIN_ROLE, but the transfer is pending.
+	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, burn_mint_erc20_transparent.BeginDefaultAdminTransfer, chain,
+		contract.FunctionInput[common.Address]{
+			ChainSelector: chain.Selector,
+			Address:       proxyAddr,
+			Args:          timelockStandIn,
+		},
+	)
+	require.NoError(t, err, "beginDefaultAdminTransfer(timelock) should succeed")
+
+	// Step 2: "RevokeAdminRole(deployer)" as proposed => renounceRole(DEFAULT_ADMIN_ROLE, deployer).
+	// This is the step that TidyTokenRoles (and the standalone revoke-token-admin-role changeset)
+	// call immediately after grant, expecting it to succeed synchronously as the plain
+	// BurnMintERC20 does. Here, the underlying transaction reverts on-chain, and that revert
+	// propagates as a genuine error through ExecuteOperation - not a silent no-op, not a delayed
+	// success, an actual pipeline failure.
+	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, renounceRoleForPipelineDemo, chain,
+		contract.FunctionInput[renounceRoleArgs]{
+			ChainSelector: chain.Selector,
+			Address:       proxyAddr,
+			Args:          renounceRoleArgs{Role: [32]byte{}, Account: deployerAddr},
+		},
+	)
+	require.Error(t, err, "renounceRole(deployer) must fail while a transfer to timelock is pending - "+
+		"this is what TidyTokenRoles's grant-then-revoke pairing would hit in production")
+	t.Logf("pipeline error (expected): %v", err)
 }
