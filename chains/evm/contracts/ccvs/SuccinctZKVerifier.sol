@@ -15,14 +15,10 @@ import {RLPReader} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPRe
 import {RLPWriter} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPWriter.sol";
 import {MerkleTrie} from "@eth-optimism/contracts-bedrock/src/libraries/trie/MerkleTrie.sol";
 
-/// @notice Verifies CCIPMessageSent receipt inclusion in EVM source blocks anchored by the SP1Helios light client.
-/// @dev Trusts the SP1 proof programs, verifier gateway and SP1Helios guardian, who can rotate the program vkeys.
-/// Both vkeys are pinned in the source chain config. A rotation pauses verification until the owner updates the config.
-/// @dev Header chains connect message blocks to anchored blocks. The proveBlockHash function caches block hashes
-/// along the chain, allowing callers to bridge gaps over multiple transactions when the light client skips blocks.
-/// @dev The log emitter must match message.onRampAddress. Callers must validate the OnRamp and compute messageId from
-/// the message. The OffRamp handles both before calling this verifier.
-/// @dev Source and destination responsibilities are combined to enable a single proxy address for a CCV on each chain.
+/// @notice Verifies CCIPMessageSent receipt inclusion in EVM source blocks proven via the SP1Helios light client.
+/// @dev The proveBlockHash function caches block hashes, allowing callers to bridge large gaps between consecutive proven blocks.
+/// @dev The log emitter must match message.onRampAddress. Callers must validate the OnRamp and compute messageId from the message.
+/// The OffRamp handles both before calling this verifier.
 contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, BaseVerifier {
   using RLPReader for RLPReader.RLPItem;
   using RLPReader for bytes;
@@ -47,20 +43,19 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfigArgs sourceChainConfigArgs);
   event BlockHashProven(uint64 indexed sourceChainSelector, uint256 indexed blockNumber, bytes32 blockHash);
 
-  /// @dev Defines upgradeable configuration parameters.
   struct DynamicConfig {
     address feeAggregator; // The entity receiving the withdrawn fees.
   }
 
   struct SourceChainConfigArgs {
-    ISP1Helios helios; // ─────────╮ The light client anchoring this source chain. Can be zero to pause the chain.
-    uint64 sourceChainSelector; // ╯ Source chain selector.
+    ISP1Helios helios; // ──────────╮ The light client proving this source chain. Can be zero to pause the chain.
+    uint64 sourceChainSelector; // ─╯ Source chain selector.
     bytes32 lightClientVkey; // Expected vkey for beacon chain update proofs.
     bytes32 executionHeaderVkey; // Expected vkey for execution block proofs.
   }
 
   struct SourceChainConfig {
-    ISP1Helios helios; // The light client anchoring this source chain. Zero means paused.
+    ISP1Helios helios; // The light client proving this source chain. Zero means paused.
     bytes32 lightClientVkey; // Expected vkey for beacon chain update proofs.
     bytes32 executionHeaderVkey; // Expected vkey for execution block proofs.
   }
@@ -81,7 +76,6 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
   // STATIC CONFIG
   string public constant override typeAndVersion = "SuccinctZKVerifier 0.0.1-dev";
 
-  /// @dev The number of bytes allocated to encoding the verifier version.
   uint256 internal constant VERIFIER_VERSION_BYTES = 4;
   /// @dev keccak256("CCIPMessageSent(uint64,address,bytes32,address,uint256,bytes,(address,uint32,uint32,uint256,bytes)[],bytes[])").
   bytes32 internal constant CCIP_MESSAGE_SENT_TOPIC =
@@ -131,7 +125,6 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
 
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
-  // STATE
   /// @dev Keyed by light client so a replacement cannot use hashes proven under the previous client.
   mapping(ISP1Helios helios => mapping(uint256 blockNumber => bytes32 blockHash)) private s_provenBlockHashes;
 
@@ -195,10 +188,10 @@ contract SuccinctZKVerifier is Ownable2StepMsgSender, ICrossChainVerifierV1, Bas
     _validateLog(receipt, witness.logIndex, onRamp, messageId);
   }
 
-  /// @notice Proves and stores a block hash from a chain of headers starting at an anchored block. Anyone can call this.
+  /// @notice Proves and stores a block hash from a chain of headers starting at a proven block.
   /// @dev Calls can start from a previously proven block to traverse gaps larger than the gas limit allows in one call.
   /// @param sourceChainSelector The source chain selector.
-  /// @param anchorBlockNumber The number of an anchored or proven block.
+  /// @param anchorBlockNumber The number of a proven block.
   /// @param headers RLP headers from the anchor block down to the block above the one being proven, both included.
   function proveBlockHash(
     uint64 sourceChainSelector,
