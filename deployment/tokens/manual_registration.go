@@ -64,6 +64,7 @@ type RegisterTokenConfig struct {
 
 type SVMExtraArgs struct {
 	CustomerMintAuthorities []solana.PublicKey `yaml:"customerMintAuthorities,omitempty" json:"customerMintAuthorities,omitempty"`
+	TransferMintAuthority   bool               `yaml:"transferMintAuthority" json:"transferMintAuthority"`
 	SkipTokenPoolInit       bool               `yaml:"skipTokenPoolInit" json:"skipTokenPoolInit"`
 }
 

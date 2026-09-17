@@ -183,6 +183,10 @@ type ExecutorDestChainConfig struct {
 type ConnectChainsConfig struct {
 	Lanes []LaneConfig
 	MCMS  mcms.Input
+	// AllowDowngrade permits reconfiguring a lane to a lower version than the one currently
+	// on chain. Off by default: a lane already on a newer version is left alone, so a stale
+	// pipeline payload cannot silently downgrade it.
+	AllowDowngrade bool
 }
 type LaneConfig struct {
 	ChainA       ChainDefinition
