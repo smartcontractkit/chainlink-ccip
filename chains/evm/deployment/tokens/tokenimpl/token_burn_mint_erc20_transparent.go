@@ -26,29 +26,35 @@ func (tokenBurnMintERC20Transparent) ContractType() deployment.ContractType {
 func (tokenBurnMintERC20Transparent) Capabilities() CapabilitySet {
 	return CapabilitySet{
 		ParticipatesInPoolRoleGrant: true,
-		// TODO(CCIP-13516): BurnMintERC20Transparent uses OZ's AccessControlDefaultAdminRulesUpgradeable,
-		// where grantRole/revokeRole revert unconditionally for DEFAULT_ADMIN_ROLE. Transferring that
-		// role requires the 2-step beginDefaultAdminTransfer (by the current admin) + delayed
-		// acceptDefaultAdminTransfer (signed by the *new* admin themselves) - it cannot complete
-		// synchronously within this deploy sequence the way the plain BurnMintERC20's grantRole can.
-		// Until that flow is implemented (likely a separate op/changeset), the deployer key retains
-		// DEFAULT_ADMIN_ROLE and RevokeAdminRole/HasAdminRole/GrantAdminRole are unsupported here.
-		SupportsAdminRole: false,
-		SupportsCCIPAdmin: true,
-		SupportsPreMint:   true,
+		// BurnMintERC20Transparent uses OZ's AccessControlDefaultAdminRulesUpgradeable, where
+		// grantRole/revokeRole revert unconditionally for DEFAULT_ADMIN_ROLE. The role can only
+		// move via beginDefaultAdminTransfer (GrantAdminRole, deployer-signed) followed by
+		// acceptDefaultAdminTransfer (AcceptAdminRole, signed by the new admin themselves) - see
+		// UsesAsyncRoleManagement. RevokeAdminRole has no faithful equivalent here and stays
+		// unsupported: revokeRole/renounceRole for DEFAULT_ADMIN_ROLE only succeed when
+		// abandoning adminship entirely (pending transfer target == address(0)), not when
+		// removing one holder while another is mid-transfer.
+		SupportsAdminRole:       true,
+		UsesAsyncRoleManagement: true,
+		SupportsCCIPAdmin:       true,
+		SupportsPreMint:         true,
 	}
 }
 
 func (tokenBurnMintERC20Transparent) RevokeAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
-	return nil, fmt.Errorf("RevokeAdminRole is not supported for BurnMintERC20TransparentToken: DEFAULT_ADMIN_ROLE transfer requires the 2-step beginDefaultAdminTransfer/acceptDefaultAdminTransfer flow (see Capabilities.SupportsAdminRole)")
+	return nil, fmt.Errorf("RevokeAdminRole is not supported for BurnMintERC20TransparentToken: DEFAULT_ADMIN_ROLE transfer requires the 2-step beginDefaultAdminTransfer/acceptDefaultAdminTransfer flow (see Capabilities.UsesAsyncRoleManagement)")
 }
 
 func (tokenBurnMintERC20Transparent) HasAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) (bool, error) {
-	return false, fmt.Errorf("HasAdminRole is not supported for BurnMintERC20TransparentToken (see Capabilities.SupportsAdminRole)")
+	return hasDefaultAdminRoleBurnMintERC20Transparent(b, chain, token, user)
 }
 
 func (tokenBurnMintERC20Transparent) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
-	return nil, fmt.Errorf("GrantAdminRole is not supported for BurnMintERC20TransparentToken: DEFAULT_ADMIN_ROLE transfer requires the 2-step beginDefaultAdminTransfer/acceptDefaultAdminTransfer flow (see Capabilities.SupportsAdminRole)")
+	return beginDefaultAdminTransferBurnMintERC20Transparent(b, chain, token, externalAdmin)
+}
+
+func (tokenBurnMintERC20Transparent) AcceptAdminRole(b operations.Bundle, chain evm.Chain, token common.Address) ([]contract.WriteOutput, error) {
+	return acceptDefaultAdminTransferBurnMintERC20Transparent(b, chain, token)
 }
 
 func (tokenBurnMintERC20Transparent) GrantPoolRoles(b operations.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {

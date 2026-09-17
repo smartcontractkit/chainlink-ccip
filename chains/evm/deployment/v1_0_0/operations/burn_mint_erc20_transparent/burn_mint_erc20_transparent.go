@@ -177,6 +177,22 @@ var GetCCIPAdmin = contract.NewRead(contract.ReadParams[struct{}, common.Address
 	},
 })
 
+type RoleAssignment struct {
+	Role [32]byte
+	To   common.Address
+}
+
+var HasRole = contract.NewRead(contract.ReadParams[RoleAssignment, bool, *burn_mint_erc20_transparent.BurnMintERC20Transparent]{
+	Name:         "burn_mint_erc20_transparent:has-role",
+	Version:      utils.Version_1_0_0,
+	Description:  "Checks if an address has a specific role on a BurnMintERC20Transparent token proxy",
+	ContractType: ContractType,
+	NewContract:  burn_mint_erc20_transparent.NewBurnMintERC20Transparent,
+	CallContract: func(token *burn_mint_erc20_transparent.BurnMintERC20Transparent, opts *bind.CallOpts, input RoleAssignment) (bool, error) {
+		return token.HasRole(opts, input.Role, input.To)
+	},
+})
+
 // BeginDefaultAdminTransfer starts the 2-step DEFAULT_ADMIN_ROLE transfer required by
 // AccessControlDefaultAdminRulesUpgradeable (grantRole/revokeRole revert unconditionally for
 // DEFAULT_ADMIN_ROLE on this contract). It is onlyRole(DEFAULT_ADMIN_ROLE), so the deployer -

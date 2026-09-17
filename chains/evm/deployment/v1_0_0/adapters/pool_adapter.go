@@ -549,6 +549,21 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
 	}
+
+	// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the transfer
+	// above; grantRole/revokeRole revert unconditionally for their admin role, so RevokeAdminRole
+	// has no equivalent here. Instead, queue AcceptDefaultAdminTransfer into the batch: this
+	// function always grants to the CLL timelock specifically (never a customer address), so once
+	// the resulting MCMS proposal is executed, the timelock itself is the caller, which completes
+	// the transfer and atomically revokes the deployer - no separate revoke step needed or possible.
+	if tokenCaps.UsesAsyncRoleManagement {
+		acceptWrites, err := tokenImpl.AcceptAdminRole(b, chain, tokenAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare accept of timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		return append(grantWrites, acceptWrites...), nil
+	}
+
 	revokeWrites, err := tokenImpl.RevokeAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to revoke deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)

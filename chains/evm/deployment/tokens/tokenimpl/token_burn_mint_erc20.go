@@ -39,6 +39,10 @@ func (tokenBurnMintERC20) HasAdminRole(b operations.Bundle, chain evm.Chain, tok
 	return hasDefaultAdminRoleBurnMintERC20(b, chain, token, user)
 }
 
+func (tokenBurnMintERC20) AcceptAdminRole(_ operations.Bundle, _ evm.Chain, _ common.Address) ([]contract.WriteOutput, error) {
+	return nil, nil
+}
+
 func (tokenBurnMintERC20) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
 	return grantDefaultAdminRoleBurnMintERC20(b, chain, token, externalAdmin)
 }

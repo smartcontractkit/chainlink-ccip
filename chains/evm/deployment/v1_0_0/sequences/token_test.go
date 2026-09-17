@@ -253,11 +253,29 @@ func TestTokenSupportsAdminRole(t *testing.T) {
 		utils.BurnMintToken:                      false,
 		tip20.ContractType:                       true,
 		erc20.ContractType:                       false,
-		burn_mint_erc20_transparent.ContractType: false, // TODO(CCIP-13516): see Capabilities doc on tokenBurnMintERC20Transparent
+		burn_mint_erc20_transparent.ContractType: true,
 	}
 
 	for tt, supportsAdmin := range tokenTypes {
 		require.Equal(t, supportsAdmin, tokenimpl.Capabilities(tt).SupportsAdminRole, "Token type %s admin role support mismatch", tt)
+	}
+}
+
+func TestTokenUsesAsyncRoleManagement(t *testing.T) {
+	t.Parallel()
+
+	tokenTypes := map[cldf.ContractType]bool{
+		burn_mint_erc20_with_drip.ContractType:   false,
+		burn_mint_erc20.ContractType:             false,
+		utils.ERC677TokenHelper:                  false,
+		utils.BurnMintToken:                      false,
+		tip20.ContractType:                       false,
+		erc20.ContractType:                       false,
+		burn_mint_erc20_transparent.ContractType: true,
+	}
+
+	for tt, usesAsync := range tokenTypes {
+		require.Equal(t, usesAsync, tokenimpl.Capabilities(tt).UsesAsyncRoleManagement, "Token type %s async role management mismatch", tt)
 	}
 }
 
@@ -347,16 +365,23 @@ func TestEVMTokenDeployment_BurnMintERC20TransparentToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, common.HexToAddress(externalAdmin), onChainCCIPAdmin)
 
-	// DEFAULT_ADMIN_ROLE is NOT transferred to ExternalAdmin - SupportsAdminRole is false for
-	// this type (see the adapter's Capabilities doc), so the deployer key retains it.
+	// DEFAULT_ADMIN_ROLE transfer to ExternalAdmin is only *begun* here (beginDefaultAdminTransfer),
+	// not completed: UsesAsyncRoleManagement tokens require a separate accept call signed by the
+	// new admin, and this test's ExternalAdmin is a plain address, not the timelock
+	// (ExternalAdminIsTimelock is false), so the sequence does not auto-queue that accept. The
+	// deployer key retains the role until ExternalAdmin calls acceptDefaultAdminTransfer itself.
 	defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{})
 	require.NoError(t, err)
 	deployerHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, deployerAddr)
 	require.NoError(t, err)
-	require.True(t, deployerHasRole, "deployer should retain DEFAULT_ADMIN_ROLE")
+	require.True(t, deployerHasRole, "deployer should retain DEFAULT_ADMIN_ROLE until ExternalAdmin accepts")
 	externalAdminHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin))
 	require.NoError(t, err)
-	require.False(t, externalAdminHasRole, "external admin should NOT have DEFAULT_ADMIN_ROLE yet (2-step transfer not implemented)")
+	require.False(t, externalAdminHasRole, "external admin should NOT have DEFAULT_ADMIN_ROLE yet (has not accepted)")
+
+	pending, err := token.PendingDefaultAdmin(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(externalAdmin), pending.NewAdmin, "external admin should be the pending default admin (begin step ran)")
 }
 
 // renounceRoleForPipelineDemo is a test-local write op wrapping the standard AccessControl
@@ -445,4 +470,56 @@ func TestPipeline_ProposedGrantRevokeMapping_RevokeStepRevertsOnChain(t *testing
 	require.Error(t, err, "renounceRole(deployer) must fail while a transfer to timelock is pending - "+
 		"this is what TidyTokenRoles's grant-then-revoke pairing would hit in production")
 	t.Logf("pipeline error (expected): %v", err)
+}
+
+// TestEVMTokenDeployment_BurnMintERC20TransparentToken_ExternalAdminIsTimelock verifies the
+// deploy-time auto-accept path: when ExternalAdmin was defaulted from the timelock
+// (ExternalAdminIsTimelock), the sequence queues AcceptDefaultAdminTransfer into the batch
+// alongside the (synchronously executed) begin-transfer, rather than requiring an out-of-band
+// accept as it would for a customer-provided ExternalAdmin.
+func TestEVMTokenDeployment_BurnMintERC20TransparentToken_ExternalAdminIsTimelock(t *testing.T) {
+	t.Parallel()
+
+	evmChains := []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, evmChains))
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chain_selectors.ETHEREUM_MAINNET.Selector]
+	timelockStandIn := "0x6666666666666666666666666666666666666666"
+
+	maxSupply := uint64(1_000_000_000)
+	tokenInput := tokensapi.DeployTokenInput{
+		Name:                    "Timelock Admin Token",
+		Symbol:                  "TLADMIN",
+		Decimals:                18,
+		Type:                    burn_mint_erc20_transparent.ContractType,
+		ExternalAdmin:           timelockStandIn,
+		ExternalAdminIsTimelock: true,
+		Supply:                  &maxSupply,
+		ChainSelector:           chain_selectors.ETHEREUM_MAINNET.Selector,
+		ExistingDataStore:       e.DataStore,
+	}
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployToken, e.BlockChains, tokenInput)
+	require.NoError(t, err)
+	proxyAddr := common.HexToAddress(report.Output.Addresses[0].Address)
+
+	token, err := bnm_transparent_bindings.NewBurnMintERC20Transparent(proxyAddr, chain.Client)
+	require.NoError(t, err)
+
+	// The begin-transfer step executed synchronously (deployer-signed).
+	pending, err := token.PendingDefaultAdmin(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(timelockStandIn), pending.NewAdmin)
+
+	// The accept step was NOT executed directly (deployer isn't the pending admin) - it must be
+	// queued into the batch for the timelock to execute itself.
+	defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{})
+	require.NoError(t, err)
+	deployerHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, chain.DeployerKey.From)
+	require.NoError(t, err)
+	require.True(t, deployerHasRole, "deployer should still hold the role until the queued accept executes")
+
+	require.Len(t, report.Output.BatchOps, 1, "the unexecuted accept call should be queued in a batch")
+	require.Len(t, report.Output.BatchOps[0].Transactions, 1, "batch should contain exactly the accept call")
+	require.Equal(t, proxyAddr.Hex(), report.Output.BatchOps[0].Transactions[0].To)
 }

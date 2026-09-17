@@ -211,6 +211,28 @@ func grantMintAndBurnRolesBurnMintERC20Transparent(b cldf_ops.Bundle, chain evm.
 	return []contract.WriteOutput{report.Output}, nil
 }
 
+// hasDefaultAdminRoleBurnMintERC20Transparent checks DEFAULT_ADMIN_ROLE (the zero bytes32
+// constant for every OZ AccessControl contract, so no read is needed to look it up).
+func hasDefaultAdminRoleBurnMintERC20Transparent(b cldf_ops.Bundle, chain evm.Chain, token, user common.Address) (bool, error) {
+	report, err := cldf_ops.ExecuteOperation(
+		b, burn_mint_erc20_transparent.HasRole, chain,
+		contract.FunctionInput[burn_mint_erc20_transparent.RoleAssignment]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args: burn_mint_erc20_transparent.RoleAssignment{
+				Role: [32]byte{},
+				To:   user,
+			},
+		},
+		cldf_ops.WithRetryConfig(getRetryConfig[burn_mint_erc20_transparent.RoleAssignment](b, chain, token.Hex())),
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to check default admin role for %s: %w", user.Hex(), err)
+	}
+
+	return report.Output, nil
+}
+
 // beginDefaultAdminTransferBurnMintERC20Transparent starts the 2-step DEFAULT_ADMIN_ROLE
 // transfer. It always executes synchronously (deployer-signed): it's onlyRole(DEFAULT_ADMIN_ROLE)
 // and the deployer holds that role right after Initialize.

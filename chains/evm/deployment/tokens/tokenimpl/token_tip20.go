@@ -55,6 +55,10 @@ func (tokenTIP20) HasAdminRole(b operations.Bundle, chain evm.Chain, token, user
 	return hasRole, nil
 }
 
+func (tokenTIP20) AcceptAdminRole(_ operations.Bundle, _ evm.Chain, _ common.Address) ([]contract.WriteOutput, error) {
+	return nil, nil
+}
+
 func (tokenTIP20) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) ([]contract.WriteOutput, error) {
 	report, err := operations.ExecuteOperation(b, tip20.GrantAdminRole, chain, contract.FunctionInput[common.Address]{
 		ChainSelector: chain.Selector,
