@@ -77,6 +77,16 @@ type Token interface {
 	// false); callers should consult that flag first.
 	AcceptAdminRole(b cldf_ops.Bundle, chain evm.Chain, token common.Address) ([]contract.WriteOutput, error)
 
+	// PendingAdminRoleTarget returns the target of an in-flight (begun but not yet accepted)
+	// admin transfer for UsesAsyncRoleManagement tokens, or the zero address if none is pending.
+	// Callers that may run alongside another GrantAdminRole/AcceptAdminRole caller within the same
+	// deploy (e.g. EVMPoolAdapter.TidyTokenRoles running after the deploy-time admin grant) must
+	// consult this first and skip re-granting/re-queuing acceptance if a transfer to the intended
+	// target is already pending - otherwise a second, redundant AcceptAdminRole write will revert
+	// on-chain once the first one completes the transfer. Always returns the zero address for
+	// token types where UsesAsyncRoleManagement is false.
+	PendingAdminRoleTarget(b cldf_ops.Bundle, chain evm.Chain, token common.Address) (common.Address, error)
+
 	// GrantPoolRoles emits the writes that authorize a freshly-deployed pool
 	// to mint/burn (or its TIP-20 issuer-role equivalent) against this token.
 	// proposalExecutor is the MCMS timelock (or zero when unused); BurnMintERC677

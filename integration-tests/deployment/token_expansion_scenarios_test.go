@@ -18,6 +18,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	bnmTransparentOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_transparent"
 	erc20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
@@ -49,6 +50,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	bnmTransparentGen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20_transparent"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
@@ -967,6 +969,98 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		output, err = tokensapi.TokenExpansion().Apply(*env, connectInput)
 		require.NoError(t, err, "idempotent re-run must not revert with ChainAlreadyExists")
 		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+	})
+
+	// -----------------------------------------------------------------------------------------
+	// Scenario 6: Upgradeable BurnMintERC20Transparent token (impl + TransparentUpgradeableProxy)
+	// -----------------------------------------------------------------------------------------
+	t.Run("Scenario6_UpgradeableBurnMintTransparentToken", func(t *testing.T) {
+		tokenSymbol := "S6_TOK_TRANS"
+		poolQual := "S6_POOL_TRANS"
+
+		// ExternalAdmin is left unset, so TokenExpansion resolves it to the chain's CLL timelock
+		// (see deployment/tokens/token_expansion.go) and sets ExternalAdminIsTimelock, letting the
+		// deploy sequence queue the DEFAULT_ADMIN_ROLE acceptance into the same MCMS proposal that
+		// ProcessTimelockProposals executes below - completing the transfer end-to-end.
+		output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("Scenario 6"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				selA: {
+					TokenPoolVersion: v1_5_1_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name:     "Scenario6 Upgradeable Token",
+						Symbol:   tokenSymbol,
+						Decimals: 18,
+						Type:     bnmTransparentOps.ContractType,
+						Supply:   &defaultMaxSupply,
+						PreMint:  &defaultPreMint,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: poolQual,
+						PoolType:           bmPoolType.String(),
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, output.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+		// Token exists, deployed behind a proxy, with the expected ERC20 metadata.
+		tokAddr := assertTokenExists(t, env, selA, tokenSymbol, "Scenario6 Upgradeable Token", 18)
+
+		chainA := env.BlockChains.EVMChains()[selA]
+		token, err := bnmTransparentGen.NewBurnMintERC20Transparent(tokAddr, chainA.Client)
+		require.NoError(t, err)
+
+		// initialize(...) ran through the proxy: maxSupply/preMint were set correctly.
+		expectedMaxSupply := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(defaultMaxSupply), 18)
+		onChainMaxSupply, err := token.MaxSupply(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		require.Equal(t, expectedMaxSupply.String(), onChainMaxSupply.String())
+
+		expectedPreMint := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(defaultPreMint), 18)
+		onChainTotalSupply, err := token.TotalSupply(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String())
+
+		// Resolve the CLL timelock address for chain A the same way the deploy pipeline does.
+		timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: selA, Qualifier: cciputils.CLLQualifier}
+		timelockAddr, err := datastore_utils.FindAndFormatRef(env.DataStore, timelockFltr, selA, evm_datastore_utils.ToNonZeroEVMAddress)
+		require.NoError(t, err)
+
+		// ccipAdmin defaults to ExternalAdmin, i.e. the timelock (see sequences/token.go).
+		onChainCCIPAdmin, err := token.GetCCIPAdmin(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		require.Equal(t, timelockAddr, onChainCCIPAdmin)
+
+		// DEFAULT_ADMIN_ROLE: begin (deployer-signed) + accept (queued, executed by the timelock
+		// via the MCMS proposal above) should have completed the transfer atomically - the
+		// timelock now holds the role, and the deployer no longer does.
+		defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		timelockHasRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, timelockAddr)
+		require.NoError(t, err)
+		require.True(t, timelockHasRole, "timelock should hold DEFAULT_ADMIN_ROLE after the queued accept executes")
+		deployerHasRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, defaultAdminRole, chainA.DeployerKey.From)
+		require.NoError(t, err)
+		require.False(t, deployerHasRole, "deployer should no longer hold DEFAULT_ADMIN_ROLE once the timelock accepted")
+
+		// Pool minter/burner roles were granted (ParticipatesInPoolRoleGrant).
+		evmAdapter := evmseqV1_6_0.EVMAdapter{}
+		poolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: selA, Qualifier: poolQual, Type: datastore.ContractType(bmPoolType)})
+		require.NoError(t, err)
+		minterRole, err := token.MINTERROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		burnerRole, err := token.BURNERROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		hasMinterRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, minterRole, poolAddr)
+		require.NoError(t, err)
+		require.True(t, hasMinterRole, "pool should hold MINTER_ROLE")
+		hasBurnerRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, burnerRole, poolAddr)
+		require.NoError(t, err)
+		require.True(t, hasBurnerRole, "pool should hold BURNER_ROLE")
 	})
 }
 

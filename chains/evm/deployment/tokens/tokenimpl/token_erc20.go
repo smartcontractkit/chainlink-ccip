@@ -43,6 +43,10 @@ func (tokenERC20) AcceptAdminRole(_ operations.Bundle, _ evm.Chain, _ common.Add
 	return nil, nil
 }
 
+func (tokenERC20) PendingAdminRoleTarget(_ operations.Bundle, _ evm.Chain, _ common.Address) (common.Address, error) {
+	return common.Address{}, nil
+}
+
 func (tokenERC20) GrantAdminRole(_ operations.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
 	return nil, fmt.Errorf("admin role granting not supported for plain ERC20 token")
 }

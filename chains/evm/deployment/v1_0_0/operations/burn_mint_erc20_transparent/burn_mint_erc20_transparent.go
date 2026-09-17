@@ -63,16 +63,18 @@ var DeployProxy = contract.NewDeploy(contract.DeployParams[ProxyConstructorArgs]
 			EVM: common.FromHex(transparent_upgradeable_proxy.TransparentUpgradeableProxyBin),
 		},
 	},
-	Validate: func(args ProxyConstructorArgs) error {
-		if args.Logic == (common.Address{}) {
-			return fmt.Errorf("logic (implementation) address must not be the zero address")
-		}
-		if args.InitialOwner == (common.Address{}) {
-			return fmt.Errorf("initialOwner (proxy admin / upgrade authority) must not be the zero address")
-		}
-		return nil
-	},
+	Validate: validateProxyConstructorArgs,
 })
+
+func validateProxyConstructorArgs(args ProxyConstructorArgs) error {
+	if args.Logic == (common.Address{}) {
+		return fmt.Errorf("logic (implementation) address must not be the zero address")
+	}
+	if args.InitialOwner == (common.Address{}) {
+		return fmt.Errorf("initialOwner (proxy admin / upgrade authority) must not be the zero address")
+	}
+	return nil
+}
 
 // InitializeArgs mirrors BurnMintERC20Transparent.initialize's parameters.
 // DefaultAdmin receives DEFAULT_ADMIN_ROLE, the default ccipAdmin, and any
@@ -102,15 +104,7 @@ var Initialize = contract.NewWrite(contract.WriteParams[InitializeArgs, *burn_mi
 		// this operation immediately after deploy - is allowed to call it.
 		return true, nil
 	},
-	Validate: func(args InitializeArgs) error {
-		if args.DefaultAdmin == (common.Address{}) {
-			return fmt.Errorf("defaultAdmin must not be the zero address")
-		}
-		if args.PreMint != nil && args.MaxSupply != nil && args.MaxSupply.Sign() > 0 && args.PreMint.Cmp(args.MaxSupply) > 0 {
-			return fmt.Errorf("preMint (%s) exceeds maxSupply (%s)", args.PreMint, args.MaxSupply)
-		}
-		return nil
-	},
+	Validate: validateInitializeArgs,
 	CallContract: func(token *burn_mint_erc20_transparent.BurnMintERC20Transparent, opts *bind.TransactOpts, input InitializeArgs) (*types.Transaction, error) {
 		maxSupply := input.MaxSupply
 		if maxSupply == nil {
@@ -123,6 +117,16 @@ var Initialize = contract.NewWrite(contract.WriteParams[InitializeArgs, *burn_mi
 		return token.Initialize(opts, input.Name, input.Symbol, input.Decimals, maxSupply, preMint, input.DefaultAdmin)
 	},
 })
+
+func validateInitializeArgs(args InitializeArgs) error {
+	if args.DefaultAdmin == (common.Address{}) {
+		return fmt.Errorf("defaultAdmin must not be the zero address")
+	}
+	if args.PreMint != nil && args.MaxSupply != nil && args.MaxSupply.Sign() > 0 && args.PreMint.Cmp(args.MaxSupply) > 0 {
+		return fmt.Errorf("preMint (%s) exceeds maxSupply (%s)", args.PreMint, args.MaxSupply)
+	}
+	return nil
+}
 
 var SetCCIPAdmin = contract.NewWrite(contract.WriteParams[string, *burn_mint_erc20_transparent.BurnMintERC20Transparent]{
 	Name:         "burn_mint_erc20_transparent:set-ccip-admin",
@@ -193,6 +197,25 @@ var HasRole = contract.NewRead(contract.ReadParams[RoleAssignment, bool, *burn_m
 	},
 })
 
+// PendingDefaultAdmin returns the address of a pending (not yet accepted) DEFAULT_ADMIN_ROLE
+// transfer, or the zero address if none is pending. Used to make callers that may run alongside
+// each other in the same deploy (e.g. the deploy-time admin grant and EVMPoolAdapter.TidyTokenRoles)
+// idempotent: if a transfer to the intended target is already pending, don't begin/queue another.
+var PendingDefaultAdmin = contract.NewRead(contract.ReadParams[struct{}, common.Address, *burn_mint_erc20_transparent.BurnMintERC20Transparent]{
+	Name:         "burn_mint_erc20_transparent:pending-default-admin",
+	Version:      utils.Version_1_0_0,
+	Description:  "Gets the pending (not yet accepted) DEFAULT_ADMIN_ROLE transfer target on a BurnMintERC20Transparent token proxy",
+	ContractType: ContractType,
+	NewContract:  burn_mint_erc20_transparent.NewBurnMintERC20Transparent,
+	CallContract: func(token *burn_mint_erc20_transparent.BurnMintERC20Transparent, opts *bind.CallOpts, input struct{}) (common.Address, error) {
+		pending, err := token.PendingDefaultAdmin(opts)
+		if err != nil {
+			return common.Address{}, err
+		}
+		return pending.NewAdmin, nil
+	},
+})
+
 // BeginDefaultAdminTransfer starts the 2-step DEFAULT_ADMIN_ROLE transfer required by
 // AccessControlDefaultAdminRulesUpgradeable (grantRole/revokeRole revert unconditionally for
 // DEFAULT_ADMIN_ROLE on this contract). It is onlyRole(DEFAULT_ADMIN_ROLE), so the deployer -
@@ -212,16 +235,18 @@ var BeginDefaultAdminTransfer = contract.NewWrite(contract.WriteParams[common.Ad
 		}
 		return token.HasRole(opts, defaultAdminRole, caller)
 	},
-	Validate: func(newAdmin common.Address) error {
-		if newAdmin == (common.Address{}) {
-			return fmt.Errorf("newAdmin must not be the zero address")
-		}
-		return nil
-	},
+	Validate: validateBeginDefaultAdminTransferArgs,
 	CallContract: func(token *burn_mint_erc20_transparent.BurnMintERC20Transparent, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
 		return token.BeginDefaultAdminTransfer(opts, input)
 	},
 })
+
+func validateBeginDefaultAdminTransferArgs(newAdmin common.Address) error {
+	if newAdmin == (common.Address{}) {
+		return fmt.Errorf("newAdmin must not be the zero address")
+	}
+	return nil
+}
 
 // AcceptDefaultAdminTransfer completes the transfer started by BeginDefaultAdminTransfer.
 // acceptDefaultAdminTransfer() has no role gate - it only requires msg.sender == pendingDefaultAdmin.

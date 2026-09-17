@@ -45,6 +45,10 @@ func (tokenBurnMintERC677) AcceptAdminRole(_ operations.Bundle, _ evm.Chain, _ c
 	return nil, nil
 }
 
+func (tokenBurnMintERC677) PendingAdminRoleTarget(_ operations.Bundle, _ evm.Chain, _ common.Address) (common.Address, error) {
+	return common.Address{}, nil
+}
+
 func (tokenBurnMintERC677) GrantAdminRole(_ operations.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {
 	return nil, fmt.Errorf("admin role grant not supported for BurnMintERC677 token type")
 }

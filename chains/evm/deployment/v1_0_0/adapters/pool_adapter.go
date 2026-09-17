@@ -545,18 +545,31 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
 		return nil, nil
 	}
-	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
-	}
-
-	// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the transfer
-	// above; grantRole/revokeRole revert unconditionally for their admin role, so RevokeAdminRole
-	// has no equivalent here. Instead, queue AcceptDefaultAdminTransfer into the batch: this
-	// function always grants to the CLL timelock specifically (never a customer address), so once
-	// the resulting MCMS proposal is executed, the timelock itself is the caller, which completes
-	// the transfer and atomically revokes the deployer - no separate revoke step needed or possible.
+	// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the grant below;
+	// grantRole/revokeRole revert unconditionally for their admin role, so RevokeAdminRole has no
+	// equivalent here. Instead, queue AcceptDefaultAdminTransfer into the batch: this function
+	// always grants to the CLL timelock specifically (never a customer address), so once the
+	// resulting MCMS proposal is executed, the timelock itself is the caller, which completes the
+	// transfer and atomically revokes the deployer - no separate revoke step needed or possible.
+	//
+	// A transfer to timelockAddr may already be pending from elsewhere in the same deploy (e.g.
+	// DeployToken's own admin grant, when ExternalAdmin resolved to this same timelock) - in that
+	// case this function must not re-grant or re-queue acceptance: a second AcceptDefaultAdminTransfer
+	// would revert on-chain once the first one completes the transfer and clears the pending state.
 	if tokenCaps.UsesAsyncRoleManagement {
+		pending, err := tokenImpl.PendingAdminRoleTarget(b, chain, tokenAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check pending admin role target for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		if pending == timelockAddr {
+			b.Logger.Infof("token %q on chain %d already has a pending admin transfer to timelock %q; skipping redundant tidy", tokenAddr.Hex(), input.ChainSelector, timelockAddr.Hex())
+			return nil, nil
+		}
+
+		grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
 		acceptWrites, err := tokenImpl.AcceptAdminRole(b, chain, tokenAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare accept of timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
@@ -564,6 +577,10 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 		return append(grantWrites, acceptWrites...), nil
 	}
 
+	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
 	revokeWrites, err := tokenImpl.RevokeAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to revoke deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)

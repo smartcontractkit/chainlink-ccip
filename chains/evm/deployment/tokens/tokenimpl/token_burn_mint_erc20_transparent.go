@@ -57,6 +57,10 @@ func (tokenBurnMintERC20Transparent) AcceptAdminRole(b operations.Bundle, chain 
 	return acceptDefaultAdminTransferBurnMintERC20Transparent(b, chain, token)
 }
 
+func (tokenBurnMintERC20Transparent) PendingAdminRoleTarget(b operations.Bundle, chain evm.Chain, token common.Address) (common.Address, error) {
+	return pendingDefaultAdminBurnMintERC20Transparent(b, chain, token)
+}
+
 func (tokenBurnMintERC20Transparent) GrantPoolRoles(b operations.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
 	return grantMintAndBurnRolesBurnMintERC20Transparent(b, chain, token, pool)
 }

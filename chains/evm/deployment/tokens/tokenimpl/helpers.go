@@ -276,6 +276,23 @@ func acceptDefaultAdminTransferBurnMintERC20Transparent(b cldf_ops.Bundle, chain
 	return []contract.WriteOutput{report.Output}, nil
 }
 
+func pendingDefaultAdminBurnMintERC20Transparent(b cldf_ops.Bundle, chain evm.Chain, token common.Address) (common.Address, error) {
+	report, err := cldf_ops.ExecuteOperation(
+		b, burn_mint_erc20_transparent.PendingDefaultAdmin, chain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          struct{}{},
+		},
+		cldf_ops.WithRetryConfig(getRetryConfig[struct{}](b, chain, token.Hex())),
+	)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to get pending default admin: %w", err)
+	}
+
+	return report.Output, nil
+}
+
 // NOTE: transferTokensERC20 is intentionally NOT retried. Transfer moves value and is not idempotent
 // by value - a retry after an unclear outcome *risks transferring twice*. The retry path is reserved
 // for idempotent role-assignment writes and reads.

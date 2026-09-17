@@ -42,6 +42,10 @@ func (tokenBurnMintERC20WithDripV1_5_0) AcceptAdminRole(_ operations.Bundle, _ e
 	return nil, nil
 }
 
+func (tokenBurnMintERC20WithDripV1_5_0) PendingAdminRoleTarget(_ operations.Bundle, _ evm.Chain, _ common.Address) (common.Address, error) {
+	return common.Address{}, nil
+}
+
 func (tokenBurnMintERC20WithDripV1_5_0) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
 	return grantDefaultAdminRoleBurnMintERC20(b, chain, token, externalAdmin)
 }
