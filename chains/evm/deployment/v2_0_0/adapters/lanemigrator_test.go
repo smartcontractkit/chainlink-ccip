@@ -1,6 +1,7 @@
 package adapters_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -79,6 +80,14 @@ func TestLaneMigrator(t *testing.T) {
 										MaxDataBytes:              new(uint32(20_000)),
 										MaxPerMsgGasLimit:         new(uint32(3_000_000)),
 										DestGasPerPayloadByteBase: new(uint8(16)),
+										USDPerUnitGas:             big.NewInt(20_000),
+									},
+								},
+							},
+							ChainBOverrides: &v2changesets.ChainOverrides{
+								RemoteChainCfg: v2changesets.PartialRemoteChainConfig{
+									FeeQuoterDestChainConfig: ccvadapters.FeeQuoterDestChainConfigOverrides{
+										USDPerUnitGas: big.NewInt(20_000),
 									},
 								},
 							},

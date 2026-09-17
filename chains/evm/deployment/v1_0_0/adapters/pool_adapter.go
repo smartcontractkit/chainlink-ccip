@@ -39,12 +39,13 @@ type PoolOps interface {
 	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
-	// SetAdmins updates the admin roles on the pool. A nil pointer means "leave this
-	// admin unchanged". Implementations own version-specific semantics: pre-2.0 pools
-	// reject a non-nil feeAdmin (no such concept on the contract); v2.0+ sets both
-	// admins in a single SetDynamicConfig write. Returns no writes when on-chain
-	// state already matches.
-	SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
+	// SetDynamicPoolConfigs updates the router and the admin roles on the pool. A nil
+	// pointer means "leave this value unchanged". Implementations own version-specific
+	// semantics: pre-2.0 pools reject a non-nil feeAdmin (no such concept on the
+	// contract) and set the router via setRouter, while v2.0+ sets router and both
+	// admins in a single SetDynamicConfig write. Returns no writes when on-chain state
+	// already matches.
+	SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
 	// RemoveRemotePools removes the given remote pool entries from the pool. Implementations
 	// read the current on-chain remote pools for each remote chain and return a clear error when
@@ -199,17 +200,17 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 	)
 }
 
-// SetTokenPoolAdmins updates the admin roles on an EVM token pool. Version-specific
-// capability lives in PoolOps.SetAdmins: pre-2.0 pools support only the rate limit
-// admin (a non-nil FeeAdmin is rejected there), while v2.0+ pools set both admins in
-// a single SetDynamicConfig write. No-op (zero BatchOps) when the desired values
-// already match on-chain state.
-func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+// SetTokenPoolDynamicConfig updates the router, rate limit admin, and fee admin on an EVM
+// token pool. Nil fields are left unchanged. Pre-2.0 pools only support the router (via
+// setRouter) and the rate limit admin (a non-nil FeeAdmin is rejected there), while v2.0+
+// pools set router and both admins in a single SetDynamicConfig write. No-op (zero BatchOps)
+// when the desired values already match on-chain state.
+func (a *EVMPoolAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokensapi.SetTokenPoolDynamicConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"evm-pool-adapter:set-token-pool-admins",
+		"evm-pool-adapter:set-token-pool-dynamic-config",
 		a.Ops.Version(),
-		"Updates the admin roles on an EVM token pool; no-op when the values already match",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
+		"Updates the router and admin roles on an EVM token pool; no-op when the values already match",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.SetTokenPoolDynamicConfigSequenceInput) (sequences.OnChainOutput, error) {
 			chain, ok := chains.EVMChains()[input.Selector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
@@ -219,6 +220,20 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 			}
 			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
 
+			var router *common.Address
+			if input.Router != nil {
+				if !common.IsHexAddress(*input.Router) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid router address for chain %d: %s", input.Selector, *input.Router)
+				}
+				addr := common.HexToAddress(*input.Router)
+				// A zero router always reverts on-chain (ZeroAddressNotAllowed on pre-2.0
+				// setRouter, ZeroAddressInvalid on 2.0+ setDynamicConfig), so reject it here
+				// rather than emit a transaction or proposal that is certain to fail.
+				if addr == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("router address for chain %d must not be the zero address", input.Selector)
+				}
+				router = &addr
+			}
 			var rateLimitAdmin *common.Address
 			if input.RateLimitAdmin != nil {
 				if !common.IsHexAddress(*input.RateLimitAdmin) {
@@ -235,13 +250,13 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 				addr := common.HexToAddress(*input.FeeAdmin)
 				feeAdmin = &addr
 			}
-			if rateLimitAdmin == nil && feeAdmin == nil {
+			if router == nil && rateLimitAdmin == nil && feeAdmin == nil {
 				return sequences.OnChainOutput{}, nil
 			}
 
-			writes, err := a.Ops.SetAdmins(b, chain, poolAddr, rateLimitAdmin, feeAdmin)
+			writes, err := a.Ops.SetDynamicPoolConfigs(b, chain, poolAddr, router, rateLimitAdmin, feeAdmin)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set admins on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
 			}
 			if len(writes) == 0 {
 				return sequences.OnChainOutput{}, nil
@@ -458,7 +473,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 						return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
 					}
 					rlAdminAddr := common.HexToAddress(rlAdminHex)
-					output, err := a.Ops.SetAdmins(b, chain, poolAddr, &rlAdminAddr, nil)
+					output, err := a.Ops.SetDynamicPoolConfigs(b, chain, poolAddr, nil, &rlAdminAddr, nil)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
 					}
