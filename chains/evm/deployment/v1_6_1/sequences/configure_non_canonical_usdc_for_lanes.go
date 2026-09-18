@@ -58,9 +58,8 @@ var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(
 			remoteToken = common.LeftPadBytes(remoteToken, 32)
 			remotePool = common.LeftPadBytes(remotePool, 32)
 
-			feeConfig := tokens.PartialTokenTransferFeeConfig{}.Populate(remoteChainConfig.TokenTransferFeeConfig)
 			remoteChains[remoteChainSelector] = tokens.RemoteChainConfig[[]byte, string]{
-				TokenTransferFeeConfig:    &feeConfig,
+				TokenTransferFeeConfig:    remoteChainConfig.TokenTransferFeeConfig,
 				RemoteToken:               remoteToken,
 				RemotePool:                remotePool,
 				InboundRateLimiterConfig:  &remoteChainConfig.InboundRateLimiterConfig,
@@ -81,6 +80,29 @@ var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool: %w", err)
 		}
 		batchOps = append(batchOps, configureTokenPoolReport.Output.BatchOps...)
+
+		// A v1.6 pool carries no token transfer fee config of its own, so a non-canonical
+		// lane's fee config lives on the FeeQuoter. The v1.6.1 token pool configure path does
+		// not apply it, so apply it here on the FeeQuoter.
+		feeTokenRef := datastore.AddressRef{ChainSelector: input.ChainSelector, Address: input.USDCToken}
+		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
+			if remoteChainConfig.TokenTransferFeeConfig == nil {
+				continue
+			}
+			feeBatchOps, _, err := tokens.ApplyTokenTransferFeeConfigOnFeeQuoter(
+				b,
+				dep.BlockChains,
+				dep.DataStore,
+				input.ChainSelector,
+				remoteChainSelector,
+				feeTokenRef,
+				*remoteChainConfig.TokenTransferFeeConfig,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config for remote chain %d: %w", remoteChainSelector, err)
+			}
+			batchOps = append(batchOps, feeBatchOps...)
+		}
 
 		return sequences.OnChainOutput{
 			Addresses: addresses,

@@ -13,6 +13,7 @@ import (
 	sol_utils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/cctp_token_pool"
 	sol_token_utils "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -166,8 +167,31 @@ func (c *SolanaCCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequen
 				}
 			}
 
+			// Apply token transfer fee configs on the Solana FeeQuoter for every lane, mirroring the
+			// EVM paths so the advertised per-lane fee behavior is symmetric across families.
+			feeTokenRef := datastore.AddressRef{ChainSelector: input.ChainSelector, Address: input.USDCToken}
+			feeBatchOps := make([]types.BatchOperation, 0)
+			for remoteChainSelector, remoteChainCfg := range input.RemoteChains {
+				if remoteChainCfg.TokenTransferFeeConfig == nil {
+					continue
+				}
+				ops, _, err := tokens_core.ApplyTokenTransferFeeConfigOnFeeQuoter(
+					b,
+					deps.BlockChains,
+					deps.DataStore,
+					input.ChainSelector,
+					remoteChainSelector,
+					feeTokenRef,
+					*remoteChainCfg.TokenTransferFeeConfig,
+				)
+				if err != nil {
+					return seq_core.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config for remote chain %d: %w", remoteChainSelector, err)
+				}
+				feeBatchOps = append(feeBatchOps, ops...)
+			}
+
 			if len(instructions) == 0 {
-				return seq_core.OnChainOutput{}, nil
+				return seq_core.OnChainOutput{BatchOps: feeBatchOps}, nil
 			}
 
 			if authority != solChain.DeployerKey.PublicKey() {
@@ -180,13 +204,13 @@ func (c *SolanaCCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequen
 				if err != nil {
 					return seq_core.OnChainOutput{}, fmt.Errorf("failed to build Solana MCMS batch operation: %w", err)
 				}
-				return seq_core.OnChainOutput{BatchOps: []types.BatchOperation{batchOp}}, nil
+				return seq_core.OnChainOutput{BatchOps: append([]types.BatchOperation{batchOp}, feeBatchOps...)}, nil
 			}
 
 			if err := solChain.Confirm(instructions); err != nil {
 				return seq_core.OnChainOutput{}, fmt.Errorf("failed to confirm Solana CCTP instructions: %w", err)
 			}
-			return seq_core.OnChainOutput{}, nil
+			return seq_core.OnChainOutput{BatchOps: feeBatchOps}, nil
 		},
 	)
 }
@@ -240,6 +264,19 @@ func (c *SolanaCCTPChainAdapter) MintRecipientOnDest(d datastore.DataStore, b ch
 // USDCType returns the type of the USDC on the chain.
 func (c *SolanaCCTPChainAdapter) USDCType() adapters.USDCType {
 	return adapters.Canonical
+}
+
+// TokenDecimals returns the number of decimals of the SPL token mint on the chain.
+func (c *SolanaCCTPChainAdapter) TokenDecimals(bundle operations.Bundle, ds datastore.DataStore, chains chain.BlockChains, selector uint64, token string) (uint8, error) {
+	solChain, ok := chains.SolanaChains()[selector]
+	if !ok {
+		return 0, fmt.Errorf("Solana chain with selector %d not found", selector)
+	}
+	mint, err := solana.PublicKeyFromBase58(token)
+	if err != nil {
+		return 0, fmt.Errorf("invalid SPL token mint %q: %w", token, err)
+	}
+	return sol_utils.GetTokenDecimals(solChain, mint)
 }
 
 // PoolAddress returns the Solana pool config PDA bytes. The pool config PDA is the canonical
