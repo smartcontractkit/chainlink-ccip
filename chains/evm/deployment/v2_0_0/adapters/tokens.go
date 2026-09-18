@@ -474,10 +474,16 @@ func (p *poolOpsV200) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, 
 func (p *poolOpsV200) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokens.RemotePoolToRemove) ([]contract.WriteOutput, error) {
 	var writes []contract.WriteOutput
 	for _, remote := range remotes {
-		if !common.IsHexAddress(remote.Remote.Address) {
-			return nil, fmt.Errorf("invalid remote pool address for chain %d: %s", remote.Selector, remote.Remote.Address)
+		var target []byte
+		if common.IsHexAddress(remote.Remote.Address) {
+			target = common.LeftPadBytes(common.HexToAddress(remote.Remote.Address).Bytes(), 32)
+		} else {
+			remoteBytes, err := deployops.StringToBytes(remote.Selector, remote.Remote.Address)
+			if err != nil {
+				return nil, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remote.Selector, remote.Remote.Address, err)
+			}
+			target = remoteBytes
 		}
-		target := common.LeftPadBytes(common.HexToAddress(remote.Remote.Address).Bytes(), 32)
 
 		poolsReport, err := cldf_ops.ExecuteOperation(
 			b, token_pool.GetRemotePools, chain,
@@ -489,10 +495,8 @@ func (p *poolOpsV200) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, pool
 		}
 
 		if !slices.ContainsFunc(poolsReport.Output, func(p []byte) bool { return bytes.Equal(p, target) }) {
-			return nil, fmt.Errorf(
-				"remote pool %s is not configured for remote chain %d on pool %s (chain %d)",
-				remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector,
-			)
+			b.Logger.Warnf("skipping removal of remote pool %s for remote chain %d from pool %s on chain %d: pairing already absent", remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector)
+			continue
 		}
 
 		removeReport, err := cldf_ops.ExecuteOperation(

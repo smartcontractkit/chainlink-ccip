@@ -70,10 +70,8 @@ func removeRemotePoolTokenPool(
 		remaining = append(remaining, base_token_pool.RemoteAddress{Address: addr.Address})
 	}
 	if !found {
-		return sequences.OnChainOutput{}, fmt.Errorf(
-			"remote pool %x is not configured for remote chain %d on pool %s (chain %d)",
-			target, input.RemoteSelector, input.TokenPool.String(), chain.Selector,
-		)
+		b.Logger.Warnf("skipping removal of remote pool %x for remote chain %d from pool %s on chain %d: pairing already absent", target, input.RemoteSelector, input.TokenPool.String(), chain.Selector)
+		return sequences.OnChainOutput{}, nil
 	}
 
 	remoteConfig := base_token_pool.RemoteConfig{
