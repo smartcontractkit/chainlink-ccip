@@ -16,10 +16,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_transparent"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/tip20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	bnm_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	bnm_transparent_bindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20_transparent"
 
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -243,15 +245,191 @@ func TestTokenSupportsAdminRole(t *testing.T) {
 	t.Parallel()
 
 	tokenTypes := map[cldf.ContractType]bool{
-		burn_mint_erc20_with_drip.ContractType: true,
-		burn_mint_erc20.ContractType:           true,
-		utils.ERC677TokenHelper:                false,
-		utils.BurnMintToken:                    false,
-		tip20.ContractType:                     true,
-		erc20.ContractType:                     false,
+		burn_mint_erc20_with_drip.ContractType:   true,
+		burn_mint_erc20.ContractType:             true,
+		utils.ERC677TokenHelper:                  false,
+		utils.BurnMintToken:                      false,
+		tip20.ContractType:                       true,
+		erc20.ContractType:                       false,
+		burn_mint_erc20_transparent.ContractType: true,
 	}
 
 	for tt, supportsAdmin := range tokenTypes {
 		require.Equal(t, supportsAdmin, tokenimpl.Capabilities(tt).SupportsAdminRole, "Token type %s admin role support mismatch", tt)
 	}
+}
+
+func TestTokenUsesAsyncRoleManagement(t *testing.T) {
+	t.Parallel()
+
+	tokenTypes := map[cldf.ContractType]bool{
+		burn_mint_erc20_with_drip.ContractType:   false,
+		burn_mint_erc20.ContractType:             false,
+		utils.ERC677TokenHelper:                  false,
+		utils.BurnMintToken:                      false,
+		tip20.ContractType:                       false,
+		erc20.ContractType:                       false,
+		burn_mint_erc20_transparent.ContractType: true,
+	}
+
+	for tt, usesAsync := range tokenTypes {
+		require.Equal(t, usesAsync, tokenimpl.Capabilities(tt).UsesAsyncRoleManagement, "Token type %s async role management mismatch", tt)
+	}
+}
+
+// TestEVMTokenDeployment_BurnMintERC20TransparentToken exercises the composite deploy (impl +
+// TransparentUpgradeableProxy + initialize) via the DeployToken sequence, using its own
+// assertions rather than the shared BurnMintERC20 test loop above: this token type has a
+// different capability set (no SupportsAdminRole yet - see the adapter's Capabilities doc) and
+// a different admin/preMint/ccipAdmin resolution path (all three default to the deployer via
+// initialize's defaultAdmin argument, then move to their intended holders exactly like
+// BurnMintERC20's constructor-implicit msg.sender pattern).
+func TestEVMTokenDeployment_BurnMintERC20TransparentToken(t *testing.T) {
+	t.Parallel()
+
+	evmChains := []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}
+
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, evmChains))
+	require.NoError(t, err, "Failed to create test environment")
+
+	chain := e.BlockChains.EVMChains()[chain_selectors.ETHEREUM_MAINNET.Selector]
+	deployerAddr := chain.DeployerKey.From
+
+	externalAdmin := "0x3333333333333333333333333333333333333333" // proxy admin / upgrade authority
+	sender := "0x4444444444444444444444444444444444444444"        // pre-mint recipient
+	maxSupply := uint64(1_000_000_000)
+	preMint := uint64(1_000_000)
+
+	tokenInput := tokensapi.DeployTokenInput{
+		Name:              "Test BurnMint ERC20 Transparent",
+		Symbol:            "TBMTRANS",
+		Decimals:          18,
+		Type:              burn_mint_erc20_transparent.ContractType,
+		ExternalAdmin:     externalAdmin,
+		Senders:           []string{sender},
+		Supply:            &maxSupply,
+		PreMint:           &preMint,
+		ChainSelector:     chain_selectors.ETHEREUM_MAINNET.Selector,
+		ExistingDataStore: e.DataStore,
+	}
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployToken, e.BlockChains, tokenInput)
+	require.NoError(t, err, "Failed to execute DeployToken sequence")
+	require.Len(t, report.Output.Addresses, 1, "DeployToken should return exactly one address ref (the proxy)")
+
+	proxyRef := report.Output.Addresses[0]
+	require.Equal(t, datastore.ContractType(burn_mint_erc20_transparent.ContractType), proxyRef.Type)
+	require.Equal(t, tokenInput.Symbol, proxyRef.Qualifier)
+	require.NotEmpty(t, proxyRef.Address)
+
+	proxyAddr := common.HexToAddress(proxyRef.Address)
+	token, err := bnm_transparent_bindings.NewBurnMintERC20Transparent(proxyAddr, chain.Client)
+	require.NoError(t, err, "Failed to bind to proxy address")
+
+	onChainName, err := token.Name(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, tokenInput.Name, onChainName)
+
+	onChainSymbol, err := token.Symbol(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, tokenInput.Symbol, onChainSymbol)
+
+	onChainDecimals, err := token.Decimals(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, tokenInput.Decimals, onChainDecimals)
+
+	expectedMaxSupply := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(maxSupply), tokenInput.Decimals)
+	onChainMaxSupply, err := token.MaxSupply(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, expectedMaxSupply.String(), onChainMaxSupply.String())
+
+	expectedPreMint := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(preMint), tokenInput.Decimals)
+	onChainTotalSupply, err := token.TotalSupply(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String())
+
+	// preMint was minted to the deployer inside initialize, then moved to Senders[0] by the
+	// generic sequence's Transfer step - mirroring BurnMintERC20's flow.
+	senderBalance, err := token.BalanceOf(&bind.CallOpts{}, common.HexToAddress(sender))
+	require.NoError(t, err)
+	require.Equal(t, expectedPreMint.String(), senderBalance.String(), "pre-mint recipient should hold the pre-minted tokens")
+
+	deployerBalance, err := token.BalanceOf(&bind.CallOpts{}, deployerAddr)
+	require.NoError(t, err)
+	require.Equal(t, "0", deployerBalance.String(), "deployer should have transferred away the pre-mint amount")
+
+	// ccipAdmin defaults to ExternalAdmin (see sequences/token.go), set via the generic SetCCIPAdmin step.
+	onChainCCIPAdmin, err := token.GetCCIPAdmin(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(externalAdmin), onChainCCIPAdmin)
+
+	// DEFAULT_ADMIN_ROLE transfer to ExternalAdmin is only *begun* here (beginDefaultAdminTransfer),
+	// not completed: UsesAsyncRoleManagement tokens require a separate accept call signed by the
+	// new admin, and this test's ExternalAdmin is a plain address, not the timelock
+	// (TimelockAddress is unset), so the sequence does not auto-queue that accept. The deployer
+	// key retains the role until ExternalAdmin calls acceptDefaultAdminTransfer itself.
+	defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{})
+	require.NoError(t, err)
+	deployerHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, deployerAddr)
+	require.NoError(t, err)
+	require.True(t, deployerHasRole, "deployer should retain DEFAULT_ADMIN_ROLE until ExternalAdmin accepts")
+	externalAdminHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, common.HexToAddress(externalAdmin))
+	require.NoError(t, err)
+	require.False(t, externalAdminHasRole, "external admin should NOT have DEFAULT_ADMIN_ROLE yet (has not accepted)")
+
+	pending, err := token.PendingDefaultAdmin(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(externalAdmin), pending.NewAdmin, "external admin should be the pending default admin (begin step ran)")
+}
+
+// TestEVMTokenDeployment_BurnMintERC20TransparentToken_ExternalAdminIsTimelock verifies the
+// deploy-time auto-accept path: when ExternalAdmin matches TimelockAddress (resolved from the
+// MCMS config by TokenExpansion), the sequence queues AcceptDefaultAdminTransfer into the batch
+// alongside the (synchronously executed) begin-transfer, rather than requiring an out-of-band
+// accept as it would for a customer-provided ExternalAdmin.
+func TestEVMTokenDeployment_BurnMintERC20TransparentToken_ExternalAdminIsTimelock(t *testing.T) {
+	t.Parallel()
+
+	evmChains := []uint64{chain_selectors.ETHEREUM_MAINNET.Selector}
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, evmChains))
+	require.NoError(t, err)
+
+	chain := e.BlockChains.EVMChains()[chain_selectors.ETHEREUM_MAINNET.Selector]
+	timelockStandIn := "0x6666666666666666666666666666666666666666"
+
+	maxSupply := uint64(1_000_000_000)
+	tokenInput := tokensapi.DeployTokenInput{
+		Name:              "Timelock Admin Token",
+		Symbol:            "TLADMIN",
+		Decimals:          18,
+		Type:              burn_mint_erc20_transparent.ContractType,
+		ExternalAdmin:     timelockStandIn,
+		TimelockAddress:   timelockStandIn,
+		Supply:            &maxSupply,
+		ChainSelector:     chain_selectors.ETHEREUM_MAINNET.Selector,
+		ExistingDataStore: e.DataStore,
+	}
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployToken, e.BlockChains, tokenInput)
+	require.NoError(t, err)
+	proxyAddr := common.HexToAddress(report.Output.Addresses[0].Address)
+
+	token, err := bnm_transparent_bindings.NewBurnMintERC20Transparent(proxyAddr, chain.Client)
+	require.NoError(t, err)
+
+	// The begin-transfer step executed synchronously (deployer-signed).
+	pending, err := token.PendingDefaultAdmin(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.HexToAddress(timelockStandIn), pending.NewAdmin)
+
+	// The accept step was NOT executed directly (deployer isn't the pending admin) - it must be
+	// queued into the batch for the timelock to execute itself.
+	defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{})
+	require.NoError(t, err)
+	deployerHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, chain.DeployerKey.From)
+	require.NoError(t, err)
+	require.True(t, deployerHasRole, "deployer should still hold the role until the queued accept executes")
+
+	require.Len(t, report.Output.BatchOps, 1, "the unexecuted accept call should be queued in a batch")
+	require.Len(t, report.Output.BatchOps[0].Transactions, 1, "batch should contain exactly the accept call")
+	require.Equal(t, proxyAddr.Hex(), report.Output.BatchOps[0].Transactions[0].To)
 }
