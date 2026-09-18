@@ -94,3 +94,19 @@ func TestRebaseRateLimiterConfig(t *testing.T) {
 		})
 	}
 }
+
+// TestErrInboundRateLimitNotPortable pins the message that the v1.5.0, v1.5.1 and v1.6.x configure
+// sequences surface when a lane is retargeted to a different remote token while its inbound rate
+// limiter is enabled. Which pools reach it is decided by DoesPoolUseLocalDecimals (see the cases in
+// TestDoesPoolUseLocalDecimals): only pools that denominate inbound in remote decimals are affected.
+func TestErrInboundRateLimitNotPortable(t *testing.T) {
+	err := ErrInboundRateLimitNotPortable(1234, big.NewInt(110_000_000), big.NewInt(11_000_000))
+	require.Error(t, err)
+
+	// The operator needs to know which lane, what is currently stored, and what to do about it.
+	require.ErrorContains(t, err, "remote chain 1234")
+	require.ErrorContains(t, err, "capacity 110000000")
+	require.ErrorContains(t, err, "rate 11000000")
+	require.ErrorContains(t, err, "cannot be reinterpreted for the new one")
+	require.ErrorContains(t, err, "Specify the rate limits explicitly")
+}

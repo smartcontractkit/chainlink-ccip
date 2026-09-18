@@ -143,6 +143,25 @@ func (r *LaneVersionResolver) DeriveLaneVersionsForChain(e cldf.Environment, cha
 	return laneVersionForRemoteChain, versionList, nil
 }
 
+// LaneVersionForRemoteChain returns the version of the lane from chainSel to remoteChain, read
+// from the router's onRamp for that remote. It returns nil when no lane is configured to the
+// remote, so callers can distinguish "no lane yet" from "lane on version X".
+func (r *LaneVersionResolver) LaneVersionForRemoteChain(e cldf.Environment, chainSel, remoteChain uint64) (*semver.Version, error) {
+	routerAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		Type:          datastore.ContractType(routerops.ContractType),
+		Version:       routerops.Version,
+		ChainSelector: chainSel,
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	if err != nil {
+		return nil, err
+	}
+	chain, ok := e.BlockChains.EVMChains()[chainSel]
+	if !ok {
+		return nil, fmt.Errorf("EVM chain with selector %d not found in environment", chainSel)
+	}
+	return GetLaneVersionForRemoteChain(e.GetContext(), chain, remoteChain, routerAddr)
+}
+
 func GetLaneVersionForRemoteChain(ctx context.Context, chain evm.Chain, remoteChain uint64, routerAddr common.Address) (*semver.Version, error) {
 	routerC, err := router.NewRouter(routerAddr, chain.Client)
 	if err != nil {
