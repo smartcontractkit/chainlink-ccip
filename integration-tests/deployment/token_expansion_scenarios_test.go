@@ -979,9 +979,9 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		poolQual := "S6_POOL_TRANS"
 
 		// ExternalAdmin is left unset, so TokenExpansion resolves it to the chain's CLL timelock
-		// (see deployment/tokens/token_expansion.go) and sets ExternalAdminIsTimelock, letting the
-		// deploy sequence queue the DEFAULT_ADMIN_ROLE acceptance into the same MCMS proposal that
-		// ProcessTimelockProposals executes below - completing the transfer end-to-end.
+		// and sets TimelockAddress to the same value (see deployment/tokens/token_expansion.go),
+		// letting the deploy sequence queue the DEFAULT_ADMIN_ROLE acceptance into the same MCMS
+		// proposal that ProcessTimelockProposals executes below - completing the transfer end-to-end.
 		output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
 			ChainAdapterVersion: v1_6_0_scenarios,
 			MCMS:                NewDefaultInputForMCMS("Scenario 6"),

@@ -366,8 +366,8 @@ func TestEVMTokenDeployment_BurnMintERC20TransparentToken(t *testing.T) {
 	// DEFAULT_ADMIN_ROLE transfer to ExternalAdmin is only *begun* here (beginDefaultAdminTransfer),
 	// not completed: UsesAsyncRoleManagement tokens require a separate accept call signed by the
 	// new admin, and this test's ExternalAdmin is a plain address, not the timelock
-	// (ExternalAdminIsTimelock is false), so the sequence does not auto-queue that accept. The
-	// deployer key retains the role until ExternalAdmin calls acceptDefaultAdminTransfer itself.
+	// (TimelockAddress is unset), so the sequence does not auto-queue that accept. The deployer
+	// key retains the role until ExternalAdmin calls acceptDefaultAdminTransfer itself.
 	defaultAdminRole, err := token.DEFAULTADMINROLE(&bind.CallOpts{})
 	require.NoError(t, err)
 	deployerHasRole, err := token.HasRole(&bind.CallOpts{}, defaultAdminRole, deployerAddr)
@@ -383,8 +383,8 @@ func TestEVMTokenDeployment_BurnMintERC20TransparentToken(t *testing.T) {
 }
 
 // TestEVMTokenDeployment_BurnMintERC20TransparentToken_ExternalAdminIsTimelock verifies the
-// deploy-time auto-accept path: when ExternalAdmin was defaulted from the timelock
-// (ExternalAdminIsTimelock), the sequence queues AcceptDefaultAdminTransfer into the batch
+// deploy-time auto-accept path: when ExternalAdmin matches TimelockAddress (resolved from the
+// MCMS config by TokenExpansion), the sequence queues AcceptDefaultAdminTransfer into the batch
 // alongside the (synchronously executed) begin-transfer, rather than requiring an out-of-band
 // accept as it would for a customer-provided ExternalAdmin.
 func TestEVMTokenDeployment_BurnMintERC20TransparentToken_ExternalAdminIsTimelock(t *testing.T) {
@@ -399,15 +399,15 @@ func TestEVMTokenDeployment_BurnMintERC20TransparentToken_ExternalAdminIsTimeloc
 
 	maxSupply := uint64(1_000_000_000)
 	tokenInput := tokensapi.DeployTokenInput{
-		Name:                    "Timelock Admin Token",
-		Symbol:                  "TLADMIN",
-		Decimals:                18,
-		Type:                    burn_mint_erc20_transparent.ContractType,
-		ExternalAdmin:           timelockStandIn,
-		ExternalAdminIsTimelock: true,
-		Supply:                  &maxSupply,
-		ChainSelector:           chain_selectors.ETHEREUM_MAINNET.Selector,
-		ExistingDataStore:       e.DataStore,
+		Name:              "Timelock Admin Token",
+		Symbol:            "TLADMIN",
+		Decimals:          18,
+		Type:              burn_mint_erc20_transparent.ContractType,
+		ExternalAdmin:     timelockStandIn,
+		TimelockAddress:   timelockStandIn,
+		Supply:            &maxSupply,
+		ChainSelector:     chain_selectors.ETHEREUM_MAINNET.Selector,
+		ExistingDataStore: e.DataStore,
 	}
 	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployToken, e.BlockChains, tokenInput)
 	require.NoError(t, err)

@@ -108,11 +108,14 @@ var DeployToken = cldf_ops.NewSequence(
 			// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the
 			// transfer above; completing it requires a separate accept call signed by the new
 			// admin. We can only queue that automatically when ExternalAdmin is our own timelock
-			// (ExternalAdminIsTimelock, set when it was defaulted from the timelock rather than
-			// explicitly provided - see token_expansion.go) - the resulting MCMS proposal makes
-			// the timelock itself the caller when executed, satisfying the accept check. A
-			// customer-provided ExternalAdmin must still accept out-of-band.
-			if caps.UsesAsyncRoleManagement && input.ExternalAdminIsTimelock {
+			// (TimelockAddress, resolved from the MCMS config by TokenExpansion - see
+			// token_expansion.go) - the resulting MCMS proposal makes the timelock itself the
+			// caller when executed, satisfying the accept check. A customer-provided ExternalAdmin
+			// must still accept out-of-band. Comparing here (rather than trusting a bool set only
+			// when ExternalAdmin was defaulted) also covers the case where the caller explicitly
+			// passes the timelock's own address as ExternalAdmin.
+			if caps.UsesAsyncRoleManagement && input.TimelockAddress != "" && common.IsHexAddress(input.TimelockAddress) &&
+				externalAdmin == common.HexToAddress(input.TimelockAddress) {
 				acceptWrites, err := tokenImpl.AcceptAdminRole(b, chain, tokenAddr)
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to prepare accept of admin role for %s: %w", input.ExternalAdmin, err)

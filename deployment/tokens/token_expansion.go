@@ -72,14 +72,15 @@ type DeployTokenInput struct {
 	TokenMetadata *TokenMetadata `yaml:"tokenMetadata,omitempty" json:"tokenMetadata,omitempty"`
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector uint64
-	// ExternalAdminIsTimelock is true when ExternalAdmin was left empty by the caller and was
-	// defaulted to the chain's timelock below, rather than explicitly provided. EVM adapters that
-	// support a 2-step admin transfer (e.g. upgradeable BurnMintERC20 variants using
-	// AccessControlDefaultAdminRulesUpgradeable) use this to decide whether the second step
-	// (acceptance) can be safely queued into an MCMS proposal for the timelock to execute itself,
-	// versus a customer-provided address, where acceptance must happen out-of-band.
-	ExternalAdminIsTimelock bool
-	ExistingDataStore       datastore.DataStore
+	ExistingDataStore datastore.DataStore
+	// TimelockAddress is always resolved from the MCMS config by TokenExpansion, mirroring
+	// DeployTokenPoolInput.TimelockAddress. EVM adapters that support a 2-step admin transfer
+	// (e.g. upgradeable BurnMintERC20 variants using AccessControlDefaultAdminRulesUpgradeable)
+	// compare it against ExternalAdmin to decide whether the second step (acceptance) can be
+	// safely queued into an MCMS proposal for the timelock to execute itself, versus a
+	// customer-provided address, where acceptance must happen out-of-band.
+	// Users should not set this field in durable pipeline inputs.
+	TimelockAddress string `yaml:"-" json:"-"`
 }
 
 // Right now this is only used for Solana tokens but we can extend this to other VMs if needed in the future
@@ -293,9 +294,9 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					if datastore_utils.IsAddressRefEmpty(timelockRef) {
 						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter is expected to provide fallbacks for ExternalAdmin and/or CCIPAdmin", selector)
 					} else {
+						deployTokenInput.TimelockAddress = timelockRef.Address
 						if deployTokenInput.ExternalAdmin == "" {
 							deployTokenInput.ExternalAdmin = timelockRef.Address
-							deployTokenInput.ExternalAdminIsTimelock = true
 						}
 						if deployTokenInput.CCIPAdmin == "" {
 							deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
