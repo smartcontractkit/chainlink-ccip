@@ -118,12 +118,45 @@ var Initialize = contract.NewWrite(contract.WriteParams[InitializeArgs, *burn_mi
 	},
 })
 
+// EncodeInitializeCallData ABI-encodes a call to initialize(...), for passing as the `_data`
+// argument to TransparentUpgradeableProxy's constructor: OZ's ERC1967Proxy delegatecalls `_data`
+// to the implementation immediately during construction when it's non-empty, so deploying the
+// proxy and initializing it become a single atomic transaction (matching how the Solidity test
+// suite itself deploys this contract) instead of two separate, non-atomic steps.
+func EncodeInitializeCallData(args InitializeArgs) ([]byte, error) {
+	if err := validateInitializeArgs(args); err != nil {
+		return nil, err
+	}
+	maxSupply := args.MaxSupply
+	if maxSupply == nil {
+		maxSupply = big.NewInt(0)
+	}
+	preMint := args.PreMint
+	if preMint == nil {
+		preMint = big.NewInt(0)
+	}
+	parsedABI, err := burn_mint_erc20_transparent.BurnMintERC20TransparentMetaData.GetAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse BurnMintERC20Transparent ABI: %w", err)
+	}
+	data, err := parsedABI.Pack("initialize", args.Name, args.Symbol, args.Decimals, maxSupply, preMint, args.DefaultAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode initialize call data: %w", err)
+	}
+	return data, nil
+}
+
 func validateInitializeArgs(args InitializeArgs) error {
 	if args.DefaultAdmin == (common.Address{}) {
 		return fmt.Errorf("defaultAdmin must not be the zero address")
 	}
-	if args.PreMint != nil && args.MaxSupply != nil && args.MaxSupply.Sign() > 0 && args.PreMint.Cmp(args.MaxSupply) > 0 {
-		return fmt.Errorf("preMint (%s) exceeds maxSupply (%s)", args.PreMint, args.MaxSupply)
+	if args.PreMint != nil && args.PreMint.Sign() > 0 {
+		if args.MaxSupply == nil || args.MaxSupply.Sign() == 0 {
+			return fmt.Errorf("preMint requires a bounded maxSupply: preMint (%s) cannot be minted against unlimited supply", args.PreMint)
+		}
+		if args.PreMint.Cmp(args.MaxSupply) > 0 {
+			return fmt.Errorf("preMint (%s) exceeds maxSupply (%s)", args.PreMint, args.MaxSupply)
+		}
 	}
 	return nil
 }

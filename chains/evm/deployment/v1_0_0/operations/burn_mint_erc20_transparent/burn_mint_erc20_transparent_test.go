@@ -85,12 +85,18 @@ func TestValidateInitializeArgs(t *testing.T) {
 			wantErr: "preMint (1001) exceeds maxSupply (1000)",
 		},
 		{
-			name: "preMint set but maxSupply nil (unlimited supply) does not trigger the exceeds-check",
-			args: InitializeArgs{DefaultAdmin: validAdmin, PreMint: big.NewInt(500)},
+			name:    "preMint set but maxSupply nil (unlimited supply) is rejected",
+			args:    InitializeArgs{DefaultAdmin: validAdmin, PreMint: big.NewInt(500)},
+			wantErr: "preMint requires a bounded maxSupply: preMint (500) cannot be minted against unlimited supply",
 		},
 		{
-			name: "maxSupply zero (unlimited) with preMint set does not trigger the exceeds-check",
-			args: InitializeArgs{DefaultAdmin: validAdmin, MaxSupply: big.NewInt(0), PreMint: big.NewInt(500)},
+			name:    "maxSupply zero (unlimited) with preMint set is rejected",
+			args:    InitializeArgs{DefaultAdmin: validAdmin, MaxSupply: big.NewInt(0), PreMint: big.NewInt(500)},
+			wantErr: "preMint requires a bounded maxSupply: preMint (500) cannot be minted against unlimited supply",
+		},
+		{
+			name: "preMint zero with maxSupply nil (unlimited supply, no pre-mint) is valid",
+			args: InitializeArgs{DefaultAdmin: validAdmin, PreMint: big.NewInt(0)},
 		},
 	}
 

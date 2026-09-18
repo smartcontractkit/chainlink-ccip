@@ -45,28 +45,120 @@ func (tokenBurnMintERC20Transparent) RevokeAdminRole(b operations.Bundle, chain 
 	return nil, fmt.Errorf("RevokeAdminRole is not supported for BurnMintERC20TransparentToken: DEFAULT_ADMIN_ROLE transfer requires the 2-step beginDefaultAdminTransfer/acceptDefaultAdminTransfer flow (see Capabilities.UsesAsyncRoleManagement)")
 }
 
+// HasAdminRole checks DEFAULT_ADMIN_ROLE (the zero bytes32 constant for every OZ AccessControl
+// contract, so no read is needed to look it up).
 func (tokenBurnMintERC20Transparent) HasAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) (bool, error) {
-	return hasDefaultAdminRoleBurnMintERC20Transparent(b, chain, token, user)
+	report, err := operations.ExecuteOperation(
+		b, burn_mint_erc20_transparent.HasRole, chain,
+		contract.FunctionInput[burn_mint_erc20_transparent.RoleAssignment]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args: burn_mint_erc20_transparent.RoleAssignment{
+				Role: [32]byte{},
+				To:   user,
+			},
+		},
+		operations.WithRetryConfig(getRetryConfig[burn_mint_erc20_transparent.RoleAssignment](b, chain, token.Hex())),
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to check default admin role for %s: %w", user.Hex(), err)
+	}
+
+	return report.Output, nil
 }
 
+// GrantAdminRole starts the 2-step DEFAULT_ADMIN_ROLE transfer. It always executes synchronously
+// (deployer-signed): it's onlyRole(DEFAULT_ADMIN_ROLE) and the deployer holds that role right
+// after Initialize.
 func (tokenBurnMintERC20Transparent) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {
-	return beginDefaultAdminTransferBurnMintERC20Transparent(b, chain, token, externalAdmin)
+	report, err := operations.ExecuteOperation(
+		b, burn_mint_erc20_transparent.BeginDefaultAdminTransfer, chain,
+		contract.FunctionInput[common.Address]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          externalAdmin,
+		},
+		operations.WithRetryConfig(getRetryConfig[common.Address](b, chain, token.Hex())),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin default admin transfer: %w", err)
+	}
+
+	return []contract.WriteOutput{report.Output}, nil
 }
 
+// AcceptAdminRole prepares (but, when called by the deployer, never directly executes) the
+// acceptDefaultAdminTransfer() call. Callers must only invoke this when the pending transfer
+// target is the chain's timelock - see Capabilities.UsesAsyncRoleManagement callers. The
+// resulting WriteOutput is left unexecuted (folded into the caller's MCMS batch/proposal) so the
+// timelock can execute it itself, since only it can satisfy the pendingDefaultAdmin check.
+// NOTE: intentionally NOT retried - retrying an unexecuted, proposal-only write is meaningless
+// (there's nothing to retry: the deployer was never going to sign it in the first place).
 func (tokenBurnMintERC20Transparent) AcceptAdminRole(b operations.Bundle, chain evm.Chain, token common.Address) ([]contract.WriteOutput, error) {
-	return acceptDefaultAdminTransferBurnMintERC20Transparent(b, chain, token)
+	report, err := operations.ExecuteOperation(
+		b, burn_mint_erc20_transparent.AcceptDefaultAdminTransfer, chain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          struct{}{},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare accept default admin transfer: %w", err)
+	}
+
+	return []contract.WriteOutput{report.Output}, nil
 }
 
 func (tokenBurnMintERC20Transparent) PendingAdminRoleTarget(b operations.Bundle, chain evm.Chain, token common.Address) (common.Address, error) {
-	return pendingDefaultAdminBurnMintERC20Transparent(b, chain, token)
+	report, err := operations.ExecuteOperation(
+		b, burn_mint_erc20_transparent.PendingDefaultAdmin, chain,
+		contract.FunctionInput[struct{}]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          struct{}{},
+		},
+		operations.WithRetryConfig(getRetryConfig[struct{}](b, chain, token.Hex())),
+	)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to get pending default admin: %w", err)
+	}
+
+	return report.Output, nil
 }
 
 func (tokenBurnMintERC20Transparent) GrantPoolRoles(b operations.Bundle, chain evm.Chain, token, pool, _ common.Address) ([]contract.WriteOutput, error) {
-	return grantMintAndBurnRolesBurnMintERC20Transparent(b, chain, token, pool)
+	report, err := operations.ExecuteOperation(
+		b, burn_mint_erc20_transparent.GrantMintAndBurnRoles, chain,
+		contract.FunctionInput[common.Address]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          pool,
+		},
+		operations.WithRetryConfig(getRetryConfig[common.Address](b, chain, token.Hex())),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to grant mint and burn roles: %w", err)
+	}
+
+	return []contract.WriteOutput{report.Output}, nil
 }
 
 func (tokenBurnMintERC20Transparent) SetCCIPAdmin(b operations.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
-	return setCCIPAdminBurnMintERC20Transparent(b, chain, token, ccipAdmin)
+	report, err := operations.ExecuteOperation(
+		b, burn_mint_erc20_transparent.SetCCIPAdmin, chain,
+		contract.FunctionInput[string]{
+			ChainSelector: chain.Selector,
+			Address:       token,
+			Args:          ccipAdmin.Hex(),
+		},
+		operations.WithRetryConfig(getRetryConfig[string](b, chain, token.Hex())),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set CCIP admin: %w", err)
+	}
+
+	return []contract.WriteOutput{report.Output}, nil
 }
 
 func (tokenBurnMintERC20Transparent) Transfer(b operations.Bundle, chain evm.Chain, token, to common.Address, scaledAmount *big.Int) ([]contract.WriteOutput, error) {
@@ -76,10 +168,12 @@ func (tokenBurnMintERC20Transparent) Transfer(b operations.Bundle, chain evm.Cha
 	return transferTokensERC20(b, chain, token, to, scaledAmount)
 }
 
-// Deploy performs the 3-step composite deploy described in CCIP-13516: deploy the
-// BurnMintERC20Transparent implementation, deploy a TransparentUpgradeableProxy pointing at
-// it, then call initialize(...) through the proxy. The returned AddressRef points at the
-// proxy address - that's what token/pool refs resolve to, per the ticket's deploy shape.
+// Deploy performs the composite deploy described in CCIP-13516: deploy the
+// BurnMintERC20Transparent implementation, then deploy a TransparentUpgradeableProxy pointing at
+// it with ABI-encoded initialize(...) call data as the proxy constructor's `_data` argument - OZ's
+// ERC1967Proxy delegatecalls that to the implementation immediately during construction, so the
+// proxy is deployed and initialized atomically in one transaction. The returned AddressRef points
+// at the proxy address - that's what token/pool refs resolve to, per the ticket's deploy shape.
 func (tokenBurnMintERC20Transparent) Deploy(b operations.Bundle, chain evm.Chain, in tokensapi.DeployTokenInput) (datastore.AddressRef, []contract.WriteOutput, error) {
 	maxSupply := big.NewInt(0)
 	if in.Supply != nil {
@@ -119,6 +213,22 @@ func (tokenBurnMintERC20Transparent) Deploy(b operations.Bundle, chain evm.Chain
 		return datastore.AddressRef{}, nil, fmt.Errorf("invalid implementation address reference: %w", err)
 	}
 
+	// defaultAdmin mirrors what BurnMintERC20's constructor implicitly does for msg.sender (the
+	// deployer): it becomes the DEFAULT_ADMIN_ROLE holder, the default ccipAdmin, and the preMint
+	// recipient. The generic DeployToken sequence then moves preMint/ccipAdmin to their intended
+	// holders (Transfer/SetCCIPAdmin) exactly as it does for BurnMintERC20.
+	initData, err := burn_mint_erc20_transparent.EncodeInitializeCallData(burn_mint_erc20_transparent.InitializeArgs{
+		Name:         in.Name,
+		Symbol:       in.Symbol,
+		Decimals:     in.Decimals,
+		MaxSupply:    maxSupply,
+		PreMint:      preMint,
+		DefaultAdmin: chain.DeployerKey.From,
+	})
+	if err != nil {
+		return datastore.AddressRef{}, nil, fmt.Errorf("failed to encode initialize call data: %w", err)
+	}
+
 	proxyRef, err := contract.MaybeDeployContract(b, burn_mint_erc20_transparent.DeployProxy, chain,
 		contract.DeployInput[burn_mint_erc20_transparent.ProxyConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_transparent.ContractType, *utils.Version_1_0_0),
@@ -127,7 +237,7 @@ func (tokenBurnMintERC20Transparent) Deploy(b operations.Bundle, chain evm.Chain
 			Args: burn_mint_erc20_transparent.ProxyConstructorArgs{
 				Logic:        implAddr,
 				InitialOwner: proxyAdmin,
-				Data:         []byte{},
+				Data:         initData,
 			},
 		},
 		nil,
@@ -135,148 +245,6 @@ func (tokenBurnMintERC20Transparent) Deploy(b operations.Bundle, chain evm.Chain
 	if err != nil {
 		return datastore.AddressRef{}, nil, fmt.Errorf("failed to deploy TransparentUpgradeableProxy: %w", err)
 	}
-	proxyAddr, err := datastore_utils_evm.ToEVMAddress(proxyRef)
-	if err != nil {
-		return datastore.AddressRef{}, nil, fmt.Errorf("invalid proxy address reference: %w", err)
-	}
 
-	// defaultAdmin mirrors what BurnMintERC20's constructor implicitly does for msg.sender (the
-	// deployer): it becomes the DEFAULT_ADMIN_ROLE holder, the default ccipAdmin, and the preMint
-	// recipient. The generic DeployToken sequence then moves preMint/ccipAdmin to their intended
-	// holders (Transfer/SetCCIPAdmin) exactly as it does for BurnMintERC20.
-	initReport, err := operations.ExecuteOperation(b, burn_mint_erc20_transparent.Initialize, chain,
-		contract.FunctionInput[burn_mint_erc20_transparent.InitializeArgs]{
-			ChainSelector: chain.Selector,
-			Address:       proxyAddr,
-			Args: burn_mint_erc20_transparent.InitializeArgs{
-				Name:         in.Name,
-				Symbol:       in.Symbol,
-				Decimals:     in.Decimals,
-				MaxSupply:    maxSupply,
-				PreMint:      preMint,
-				DefaultAdmin: chain.DeployerKey.From,
-			},
-		},
-	)
-	if err != nil {
-		return datastore.AddressRef{}, nil, fmt.Errorf("failed to initialize BurnMintERC20Transparent proxy: %w", err)
-	}
-
-	return proxyRef, []contract.WriteOutput{initReport.Output}, nil
-}
-
-func setCCIPAdminBurnMintERC20Transparent(b operations.Bundle, chain evm.Chain, token, ccipAdmin common.Address) ([]contract.WriteOutput, error) {
-	report, err := operations.ExecuteOperation(
-		b, burn_mint_erc20_transparent.SetCCIPAdmin, chain,
-		contract.FunctionInput[string]{
-			ChainSelector: chain.Selector,
-			Address:       token,
-			Args:          ccipAdmin.Hex(),
-		},
-		operations.WithRetryConfig(getRetryConfig[string](b, chain, token.Hex())),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set CCIP admin: %w", err)
-	}
-
-	return []contract.WriteOutput{report.Output}, nil
-}
-
-func grantMintAndBurnRolesBurnMintERC20Transparent(b operations.Bundle, chain evm.Chain, token, pool common.Address) ([]contract.WriteOutput, error) {
-	report, err := operations.ExecuteOperation(
-		b, burn_mint_erc20_transparent.GrantMintAndBurnRoles, chain,
-		contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       token,
-			Args:          pool,
-		},
-		operations.WithRetryConfig(getRetryConfig[common.Address](b, chain, token.Hex())),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to grant mint and burn roles: %w", err)
-	}
-
-	return []contract.WriteOutput{report.Output}, nil
-}
-
-// hasDefaultAdminRoleBurnMintERC20Transparent checks DEFAULT_ADMIN_ROLE (the zero bytes32
-// constant for every OZ AccessControl contract, so no read is needed to look it up).
-func hasDefaultAdminRoleBurnMintERC20Transparent(b operations.Bundle, chain evm.Chain, token, user common.Address) (bool, error) {
-	report, err := operations.ExecuteOperation(
-		b, burn_mint_erc20_transparent.HasRole, chain,
-		contract.FunctionInput[burn_mint_erc20_transparent.RoleAssignment]{
-			ChainSelector: chain.Selector,
-			Address:       token,
-			Args: burn_mint_erc20_transparent.RoleAssignment{
-				Role: [32]byte{},
-				To:   user,
-			},
-		},
-		operations.WithRetryConfig(getRetryConfig[burn_mint_erc20_transparent.RoleAssignment](b, chain, token.Hex())),
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to check default admin role for %s: %w", user.Hex(), err)
-	}
-
-	return report.Output, nil
-}
-
-// beginDefaultAdminTransferBurnMintERC20Transparent starts the 2-step DEFAULT_ADMIN_ROLE
-// transfer. It always executes synchronously (deployer-signed): it's onlyRole(DEFAULT_ADMIN_ROLE)
-// and the deployer holds that role right after Initialize.
-func beginDefaultAdminTransferBurnMintERC20Transparent(b operations.Bundle, chain evm.Chain, token, newAdmin common.Address) ([]contract.WriteOutput, error) {
-	report, err := operations.ExecuteOperation(
-		b, burn_mint_erc20_transparent.BeginDefaultAdminTransfer, chain,
-		contract.FunctionInput[common.Address]{
-			ChainSelector: chain.Selector,
-			Address:       token,
-			Args:          newAdmin,
-		},
-		operations.WithRetryConfig(getRetryConfig[common.Address](b, chain, token.Hex())),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin default admin transfer: %w", err)
-	}
-
-	return []contract.WriteOutput{report.Output}, nil
-}
-
-// acceptDefaultAdminTransferBurnMintERC20Transparent prepares (but, when called by the deployer,
-// never directly executes) the acceptDefaultAdminTransfer() call. Callers must only invoke this
-// when newAdmin is the chain's timelock - see tokenBurnMintERC20Transparent.GrantAdminRole. The
-// resulting WriteOutput is left unexecuted (folded into the caller's MCMS batch/proposal) so the
-// timelock can execute it itself, since only it can satisfy the pendingDefaultAdmin check.
-// NOTE: intentionally NOT retried - retrying an unexecuted, proposal-only write is meaningless
-// (there's nothing to retry: the deployer was never going to sign it in the first place).
-func acceptDefaultAdminTransferBurnMintERC20Transparent(b operations.Bundle, chain evm.Chain, token common.Address) ([]contract.WriteOutput, error) {
-	report, err := operations.ExecuteOperation(
-		b, burn_mint_erc20_transparent.AcceptDefaultAdminTransfer, chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       token,
-			Args:          struct{}{},
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare accept default admin transfer: %w", err)
-	}
-
-	return []contract.WriteOutput{report.Output}, nil
-}
-
-func pendingDefaultAdminBurnMintERC20Transparent(b operations.Bundle, chain evm.Chain, token common.Address) (common.Address, error) {
-	report, err := operations.ExecuteOperation(
-		b, burn_mint_erc20_transparent.PendingDefaultAdmin, chain,
-		contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       token,
-			Args:          struct{}{},
-		},
-		operations.WithRetryConfig(getRetryConfig[struct{}](b, chain, token.Hex())),
-	)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get pending default admin: %w", err)
-	}
-
-	return report.Output, nil
+	return proxyRef, nil, nil
 }
