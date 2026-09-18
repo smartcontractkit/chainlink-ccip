@@ -184,8 +184,11 @@ func TestDownloadProgramArtifacts_ContextCancellation(t *testing.T) {
 func TestDownloadProgramArtifacts_InvalidURL(t *testing.T) {
 	tempDir := t.TempDir()
 
-	err := downloadProgramArtifacts(t.Context(), "http://invalid-url", tempDir, logger.Test(t))
-	require.ErrorContains(t, err, "dial tcp: lookup invalid-url: no such host")
+	err := downloadProgramArtifacts(t.Context(), "http://invalid-url.invalid", tempDir, logger.Test(t))
+	// Only that the failure names the host is asserted. The resolver's wording is
+	// environment-specific: a stock resolver says "no such host", while the systemd-resolved stub
+	// on GitHub runners says "server misbehaving" for the same lookup.
+	require.ErrorContains(t, err, "invalid-url.invalid")
 }
 
 func TestDownloadProgramArtifacts_NonExistentTargetDir(t *testing.T) {
