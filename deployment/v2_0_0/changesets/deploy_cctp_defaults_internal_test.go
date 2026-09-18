@@ -4,13 +4,19 @@ import (
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
+
+var emptyBlockChains = cldf_chain.NewBlockChains(nil)
 
 func TestApplyCCTPDefaults_FillsEmptyCanonicalChain(t *testing.T) {
 	chainSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
@@ -20,12 +26,14 @@ func TestApplyCCTPDefaults_FillsEmptyCanonicalChain(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Equal(t, "0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5", got.Chains[chainSel].TokenMessengerV1)
 	require.Equal(t, "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA", got.Chains[chainSel].TokenMessengerV2)
 	require.Equal(t, "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", got.Chains[chainSel].USDCToken)
-	require.Equal(t, uint8(6), got.Chains[chainSel].TokenDecimals)
+	// TokenDecimals is no longer defaulted by applyCCTPDefaults: it is only consumed by the
+	// non-canonical deploy and resolved on-chain (see makeApplyDeployCCTPChains).
+	require.Zero(t, got.Chains[chainSel].TokenDecimals)
 }
 
 func TestApplyCCTPDefaults_ExplicitTokenDecimalsTakePrecedence(t *testing.T) {
@@ -36,7 +44,7 @@ func TestApplyCCTPDefaults_ExplicitTokenDecimalsTakePrecedence(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Equal(t, uint8(7), got.Chains[chainSel].TokenDecimals)
 }
@@ -54,7 +62,7 @@ func TestApplyCCTPDefaults_ExplicitValuesTakePrecedence(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Equal(t, "0x1111111111111111111111111111111111111111", got.Chains[chainSel].TokenMessengerV1)
 	require.Equal(t, "0x2222222222222222222222222222222222222222", got.Chains[chainSel].TokenMessengerV2)
@@ -69,7 +77,7 @@ func TestApplyCCTPDefaults_NonCanonicalIsUntouched(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Empty(t, got.Chains[chainSel].TokenMessengerV1)
 	require.Empty(t, got.Chains[chainSel].TokenMessengerV2)
@@ -92,7 +100,7 @@ func TestApplyCCTPDefaults_NonCanonicalRemoteDomainIsDefaulted(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	// Address defaults must not be applied for non-canonical chains, but the
 	// remote domain identifier must still be resolved.
@@ -108,7 +116,7 @@ func TestApplyCCTPDefaults_UnknownChainIsUntouched(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Empty(t, got.Chains[chainSel].TokenMessengerV1)
 	require.Empty(t, got.Chains[chainSel].TokenMessengerV2)
@@ -129,7 +137,7 @@ func TestApplyCCTPDefaults_FillsRemoteDomainIdentifier(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Equal(t, uint32(1), got.Chains[localSel].RemoteChains[remoteSel].DomainIdentifier)
 }
@@ -149,7 +157,7 @@ func TestApplyCCTPDefaults_ResolvesDeployerContractFromDatastore(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(ds.Seal(), cfg)
+	got := applyCCTPDefaults(emptyBlockChains, ds.Seal(), cfg)
 
 	require.Equal(t, "0x000000000000000000000000000000000000c2f2", got.Chains[chainSel].DeployerContract)
 }
@@ -169,7 +177,7 @@ func TestApplyCCTPDefaults_ExplicitDeployerContractTakesPrecedence(t *testing.T)
 		},
 	}
 
-	got := applyCCTPDefaults(ds.Seal(), cfg)
+	got := applyCCTPDefaults(emptyBlockChains, ds.Seal(), cfg)
 
 	require.Equal(t, "0x1111111111111111111111111111111111111111", got.Chains[chainSel].DeployerContract)
 }
@@ -189,7 +197,7 @@ func TestApplyCCTPDefaults_MissingDeployerContractLeavesItEmpty(t *testing.T) {
 		},
 	}
 
-	got := applyCCTPDefaults(ds.Seal(), cfg)
+	got := applyCCTPDefaults(emptyBlockChains, ds.Seal(), cfg)
 
 	require.Empty(t, got.Chains[chainSel].DeployerContract)
 }
@@ -208,7 +216,38 @@ func TestApplyCCTPDefaults_ExplicitRemoteDomainIdentifierTakesPrecedence(t *test
 		},
 	}
 
-	got := applyCCTPDefaults(nil, cfg)
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Equal(t, uint32(99), got.Chains[localSel].RemoteChains[remoteSel].DomainIdentifier)
+}
+
+func TestApplyCCTPDefaults_DefaultFeeAggregatorFromDeployerKey(t *testing.T) {
+	chainSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	deployer := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	blockChains := cldf_chain.NewBlockChains(map[uint64]cldf_chain.BlockChain{
+		chainSel: &evm.Chain{Selector: chainSel, DeployerKey: &bind.TransactOpts{From: deployer}},
+	})
+	cfg := DeployCCTPChainsConfig{
+		Chains: map[uint64]CCTPChainConfig{
+			chainSel: {USDCType: adapters.Canonical},
+		},
+	}
+
+	got := applyCCTPDefaults(blockChains, nil, cfg)
+
+	require.Equal(t, deployer.Hex(), got.Chains[chainSel].FeeAggregator)
+}
+
+func TestApplyCCTPDefaults_FeeAggregatorUnsetWithoutDeployerKey(t *testing.T) {
+	chainSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	cfg := DeployCCTPChainsConfig{
+		Chains: map[uint64]CCTPChainConfig{
+			chainSel: {USDCType: adapters.Canonical},
+		},
+	}
+
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
+
+	// No deployer key in the environment => FeeAggregator stays unset, no error.
+	require.Empty(t, got.Chains[chainSel].FeeAggregator)
 }

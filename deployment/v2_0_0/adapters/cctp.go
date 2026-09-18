@@ -41,8 +41,10 @@ type RemoteCCTPChainConfig struct {
 	LockOrBurnMechanism string
 	// DomainIdentifier is the identifier of the remote domain.
 	DomainIdentifier uint32
-	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
-	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
+	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this
+	// remote chain. Optional: a nil value is a true no-op (leave the on-chain config unchanged),
+	// while a partial value merges with the current/default config.
+	TokenTransferFeeConfig *tokens.PartialTokenTransferFeeConfig
 	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
 	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
 	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
@@ -114,6 +116,10 @@ type RemoteCCTPChain interface {
 	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error)
 	// TokenAddress returns the address of the token on the remote chain in bytes.
 	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// TokenDecimals returns the number of decimals of the token at the given address on the
+	// chain. Used to resolve a token's decimals from its address rather than assuming a
+	// hardcoded value.
+	TokenDecimals(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, token string) (uint8, error)
 	// USDCType returns the type of the USDC on the remote chain.
 	USDCType() USDCType
 	// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V1.

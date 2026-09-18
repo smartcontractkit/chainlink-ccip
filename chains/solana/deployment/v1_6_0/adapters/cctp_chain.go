@@ -242,6 +242,19 @@ func (c *SolanaCCTPChainAdapter) USDCType() adapters.USDCType {
 	return adapters.Canonical
 }
 
+// TokenDecimals returns the number of decimals of the SPL token mint on the chain.
+func (c *SolanaCCTPChainAdapter) TokenDecimals(bundle operations.Bundle, ds datastore.DataStore, chains chain.BlockChains, selector uint64, token string) (uint8, error) {
+	solChain, ok := chains.SolanaChains()[selector]
+	if !ok {
+		return 0, fmt.Errorf("Solana chain with selector %d not found", selector)
+	}
+	mint, err := solana.PublicKeyFromBase58(token)
+	if err != nil {
+		return 0, fmt.Errorf("invalid SPL token mint %q: %w", token, err)
+	}
+	return sol_utils.GetTokenDecimals(solChain, mint)
+}
+
 // PoolAddress returns the Solana pool config PDA bytes. The pool config PDA is the canonical
 // pool identifier encoded in CCIP cross-chain messages and must be registered as the remote
 // pool address on counterpart EVM token pools.
