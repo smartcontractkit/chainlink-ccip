@@ -553,14 +553,53 @@ func LoadChainStateSolana(chain cldf_solana.Chain, addresses map[string]cldf.Typ
 	return ccipChainState, nil
 }
 
+// FindSolanaAddress returns the address recorded for tv, or the zero pubkey if there is none.
+//
+// Matching is exact first. Failing that it falls back to matching on type and generation --
+// major.minor with the patch component ignored. The datastore records a generation (a "1.6-era
+// off-ramp" is written as 1.6.0) while the deployed program reports its true build, and an audit
+// of the four live environments found the two disagree for every program that answers: routers on
+// 1.6.2, off-ramps and RMN remotes on 1.6.3, a fee quoter on 1.6.4, all recorded as 1.6.0. An
+// exact-only match silently returns the zero pubkey for every one of those.
+//
+// The fallback deliberately does not ignore the prerelease component. 0.1.0-dev is a different
+// generation from 1.6.0, not a patch of it, so the token pools running -dev builds are not rescued
+// here -- those rows are miskeyed and need re-keying, which is a migration rather than a lookup.
+//
+// A fallback match must be unique. If several rows share the type and generation there is no
+// principled way to choose between them, and returning an arbitrary one would hand back a
+// plausible-looking address for the wrong program, so the zero pubkey is returned instead.
 func FindSolanaAddress(tv cldf.TypeAndVersion, addresses map[string]cldf.TypeAndVersion) solana.PublicKey {
-	for address, tvStr := range addresses {
-		if tv.String() == tvStr.String() {
-			pub := solana.MustPublicKeyFromBase58(address)
-			return pub
+	for address, candidate := range addresses {
+		if tv.String() == candidate.String() {
+			return solana.MustPublicKeyFromBase58(address)
 		}
 	}
-	return solana.PublicKey{}
+
+	var match solana.PublicKey
+	found := 0
+	for address, candidate := range addresses {
+		if candidate.Type != tv.Type {
+			continue
+		}
+		if !sameGeneration(tv.Version, candidate.Version) {
+			continue
+		}
+		match = solana.MustPublicKeyFromBase58(address)
+		found++
+	}
+	if found != 1 {
+		return solana.PublicKey{}
+	}
+	return match
+}
+
+// sameGeneration reports whether two versions belong to the same generation: equal major, minor
+// and prerelease, with the patch component ignored.
+func sameGeneration(a, b semver.Version) bool {
+	return a.Major() == b.Major() &&
+		a.Minor() == b.Minor() &&
+		a.Prerelease() == b.Prerelease()
 }
 
 func ValidateOwnershipSolana(
