@@ -66,7 +66,7 @@ func (c *NonCanonicalUSDCChainAdapter) MintRecipientOnDest(d datastore.DataStore
 	return nil, fmt.Errorf("chain with selector %d does not support CCTP", chainSelector)
 }
 
-// USDCType returns the type of the USDC on the chain.
+// TokenDecimals returns the number of decimals of the token at the given address on the chain.
 func (c *NonCanonicalUSDCChainAdapter) TokenDecimals(bundle operations.Bundle, ds datastore.DataStore, chains chain.BlockChains, selector uint64, token string) (uint8, error) {
 	evmChain, ok := chains.EVMChains()[selector]
 	if !ok {
@@ -82,6 +82,7 @@ func (c *NonCanonicalUSDCChainAdapter) TokenDecimals(bundle operations.Bundle, d
 	return report.Output, nil
 }
 
+// USDCType returns the type of the USDC on the chain.
 func (c *NonCanonicalUSDCChainAdapter) USDCType() adapters.USDCType {
 	return adapters.NonCanonical
 }
