@@ -950,14 +950,18 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 		})
 		cs := changesets.ConfigureChainsForLanesFromTopology(
 			committeeRegistry,
-			adapters.NewChainFamilyRegistry(),
+			laneReadyChainFamilyRegistry(localSelector, remoteSelector),
 			changesetscore.GetRegistry(),
 		)
 		err := cs.VerifyPreconditions(env, lanesTopologyConfig(
 			&offchain.EnvironmentTopology{
 				IndexerAddress: []string{"http://indexer:8080"},
 				NOPTopology: &offchain.NOPTopology{
-					NOPs: []offchain.NOPConfig{{Alias: "nop-1", Name: "nop-1-name"}},
+					NOPs: []offchain.NOPConfig{{
+						Alias:                 "nop-1",
+						Name:                  "nop-1-name",
+						SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner-1"},
+					}},
 					Committees: map[string]offchain.CommitteeConfig{
 						"default": {
 							Qualifier: "default",
@@ -988,7 +992,11 @@ func TestConfigureChainsForLanesFromTopology_VerifyPreconditions(t *testing.T) {
 			&offchain.EnvironmentTopology{
 				IndexerAddress: []string{"http://indexer:8080"},
 				NOPTopology: &offchain.NOPTopology{
-					NOPs: []offchain.NOPConfig{{Alias: "nop-1", Name: "nop-1-name"}},
+					NOPs: []offchain.NOPConfig{{
+						Alias:                 "nop-1",
+						Name:                  "nop-1-name",
+						SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner-1"},
+					}},
 					Committees: map[string]offchain.CommitteeConfig{
 						"default": {
 							Qualifier: "default",
@@ -1281,4 +1289,352 @@ func TestConfigureChainsForLanesFromTopology_CVPointerOverridesReplaceDefaults(t
 	remoteCfg := cv.RemoteChains[remoteSelector]
 	assert.True(t, remoteCfg.AllowlistEnabled, "override AllowlistEnabled=true")
 	assert.Equal(t, []string{"0xallowed"}, remoteCfg.AddedAllowlistedSenders)
+}
+
+// topologyWithExecutorPools builds a topology that passes the shared validation, with
+// committee coverage for both lane chains and the given executor pools.
+func topologyWithExecutorPools(
+	localSelector, remoteSelector uint64,
+	pools map[string]offchain.ExecutorPoolConfig,
+) *offchain.EnvironmentTopology {
+	return &offchain.EnvironmentTopology{
+		IndexerAddress: []string{"http://indexer:8080"},
+		ExecutorPools:  pools,
+		NOPTopology: &offchain.NOPTopology{
+			NOPs: []offchain.NOPConfig{{
+				Alias:                 "nop-1",
+				Name:                  "nop-1-name",
+				SignerAddressByFamily: map[string]string{chainsel.FamilyEVM: "0xsigner-1"},
+			}},
+			Committees: map[string]offchain.CommitteeConfig{
+				"default": {
+					Qualifier: "default",
+					Aggregators: []offchain.AggregatorConfig{
+						{Name: "agg-1", Address: "http://aggregator:8080"},
+					},
+					ChainConfigs: map[string]offchain.ChainCommitteeConfig{
+						fmt.Sprintf("%d", localSelector):  {NOPAliases: []string{"nop-1"}, Threshold: 1},
+						fmt.Sprintf("%d", remoteSelector): {NOPAliases: []string{"nop-1"}, Threshold: 1},
+					},
+				},
+			},
+		},
+	}
+}
+
+func executorPool(selectors ...uint64) offchain.ExecutorPoolConfig {
+	chainConfigs := make(map[string]offchain.ChainExecutorPoolConfig, len(selectors))
+	for _, selector := range selectors {
+		chainConfigs[fmt.Sprintf("%d", selector)] = offchain.ChainExecutorPoolConfig{
+			NOPAliases: []string{"nop-1"},
+		}
+	}
+	return offchain.ExecutorPoolConfig{ChainConfigs: chainConfigs}
+}
+
+func TestConfigureChainsForLanesFromTopology_VerifyPreconditionsExecutorPoolCoverage(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	tests := []struct {
+		name    string
+		pools   map[string]offchain.ExecutorPoolConfig
+		wantErr error
+	}{
+		{
+			name:  "Success - pool covers the in-environment lane chain",
+			pools: map[string]offchain.ExecutorPoolConfig{"default": executorPool(localSelector, remoteSelector)},
+		},
+		{
+			name:  "Success - topology declares no executor pools",
+			pools: nil,
+		},
+		{
+			name:    "Failure - pool omits the in-environment lane chain",
+			pools:   map[string]offchain.ExecutorPoolConfig{"default": executorPool(remoteSelector)},
+			wantErr: changesets.ErrChainMissingFromExecutorPools,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+			ds := datastore.NewMemoryDataStore()
+			addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+			env.DataStore = ds.Seal()
+
+			committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+			committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+				contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+					fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+				},
+			})
+
+			cs := changesets.ConfigureChainsForLanesFromTopology(
+				committeeRegistry,
+				laneReadyChainFamilyRegistry(localSelector, remoteSelector),
+				changesetscore.GetRegistry(),
+			)
+			err := cs.VerifyPreconditions(env, lanesTopologyConfig(
+				topologyWithExecutorPools(localSelector, remoteSelector, tc.pools),
+				[]changesets.CrossFamilyLanePair{{ChainA: localSelector, ChainB: remoteSelector}},
+			))
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				require.Contains(t, err.Error(), fmt.Sprintf("%d", localSelector))
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+// laneReadyChainFamilyRegistry registers an EVM adapter whose addresses resolve for both
+// sides of a lane, which is what VerifyPreconditions requires before an apply.
+func laneReadyChainFamilyRegistry(localSelector, remoteSelector uint64) *adapters.ChainFamilyRegistry {
+	adapter := newMockAdapter("local:", map[uint64]map[string][]byte{
+		localSelector: {
+			"Router":     {0xaa, 0x01},
+			"TestRouter": {0xaa, 0x02},
+			"OnRamp":     {0xbb, 0x02},
+			"FeeQuoter":  {0xcc, 0x03},
+			"OffRamp":    {0xdd, 0x04},
+		},
+		remoteSelector: {
+			"OnRamp":  {0xee, 0x11},
+			"OffRamp": {0xee, 0x22},
+		},
+	}, map[uint64]map[string]string{
+		localSelector: {"default": "0xexecutor"},
+	})
+
+	registry := adapters.NewChainFamilyRegistry()
+	registry.RegisterChainFamily(chainsel.FamilyEVM, adapter)
+	return registry
+}
+
+func TestConfigureChainsForLanesFromTopology_VerifyPreconditionsAddressResolution(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	// Address sets are keyed by chain, so dropping one entry models a chain that has not
+	// finished deploying its v2 contracts.
+	localAddresses := func(omit string) map[string][]byte {
+		all := map[string][]byte{
+			"Router":     {0xaa, 0x01},
+			"TestRouter": {0xaa, 0x02},
+			"OnRamp":     {0xbb, 0x02},
+			"FeeQuoter":  {0xcc, 0x03},
+			"OffRamp":    {0xdd, 0x04},
+		}
+		delete(all, omit)
+		return all
+	}
+	remoteAddresses := func(omit string) map[string][]byte {
+		all := map[string][]byte{
+			"OnRamp":  {0xee, 0x11},
+			"OffRamp": {0xee, 0x22},
+		}
+		delete(all, omit)
+		return all
+	}
+
+	tests := []struct {
+		name          string
+		local         map[string][]byte
+		remote        map[string][]byte
+		executors     map[string]string
+		useTestRouter bool
+		registerEVM   bool
+		wantErr       error
+		wantErrSub    string
+	}{
+		{
+			name:        "Success - every lane address resolves",
+			local:       localAddresses(""),
+			remote:      remoteAddresses(""),
+			executors:   map[string]string{"default": "0xexecutor"},
+			registerEVM: true,
+		},
+		{
+			name:        "Failure - local onRamp not deployed",
+			local:       localAddresses("OnRamp"),
+			remote:      remoteAddresses(""),
+			executors:   map[string]string{"default": "0xexecutor"},
+			registerEVM: true,
+			wantErr:     changesets.ErrLaneAddressUnresolved,
+			wantErrSub:  "onRamp",
+		},
+		{
+			name:        "Failure - local feeQuoter not deployed",
+			local:       localAddresses("FeeQuoter"),
+			remote:      remoteAddresses(""),
+			executors:   map[string]string{"default": "0xexecutor"},
+			registerEVM: true,
+			wantErr:     changesets.ErrLaneAddressUnresolved,
+			wantErrSub:  "feeQuoter",
+		},
+		{
+			name:          "Failure - test router requested but not deployed",
+			local:         localAddresses("TestRouter"),
+			remote:        remoteAddresses(""),
+			executors:     map[string]string{"default": "0xexecutor"},
+			useTestRouter: true,
+			registerEVM:   true,
+			wantErr:       changesets.ErrLaneAddressUnresolved,
+			wantErrSub:    "testRouter",
+		},
+		{
+			name:        "Failure - remote offRamp not deployed",
+			local:       localAddresses(""),
+			remote:      remoteAddresses("OffRamp"),
+			executors:   map[string]string{"default": "0xexecutor"},
+			registerEVM: true,
+			wantErr:     changesets.ErrLaneAddressUnresolved,
+			wantErrSub:  "offRamp",
+		},
+		{
+			name:        "Failure - executor missing for the default qualifier",
+			local:       localAddresses(""),
+			remote:      remoteAddresses(""),
+			executors:   nil,
+			registerEVM: true,
+			wantErr:     changesets.ErrLaneAddressUnresolved,
+			wantErrSub:  "executor",
+		},
+		{
+			name:        "Failure - no adapter registered for the chain family",
+			local:       localAddresses(""),
+			remote:      remoteAddresses(""),
+			executors:   map[string]string{"default": "0xexecutor"},
+			registerEVM: false,
+			wantErr:     changesets.ErrNoChainFamilyAdapter,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newConfigureChainsTestEnv(t, []uint64{localSelector}, nil)
+			ds := datastore.NewMemoryDataStore()
+			addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+			env.DataStore = ds.Seal()
+
+			committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+			committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+				contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+					fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+				},
+			})
+
+			familyRegistry := adapters.NewChainFamilyRegistry()
+			if tc.registerEVM {
+				familyRegistry.RegisterChainFamily(chainsel.FamilyEVM, newMockAdapter("local:",
+					map[uint64]map[string][]byte{localSelector: tc.local, remoteSelector: tc.remote},
+					map[uint64]map[string]string{localSelector: tc.executors},
+				))
+			}
+
+			cs := changesets.ConfigureChainsForLanesFromTopology(
+				committeeRegistry, familyRegistry, changesetscore.GetRegistry(),
+			)
+			err := cs.VerifyPreconditions(env, lanesTopologyConfig(
+				topologyWithExecutorPools(localSelector, remoteSelector, nil),
+				[]changesets.CrossFamilyLanePair{{ChainA: localSelector, ChainB: remoteSelector}},
+				withTestRouter(tc.useTestRouter),
+			))
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				if tc.wantErrSub != "" {
+					require.Contains(t, err.Error(), tc.wantErrSub)
+				}
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestConfigureChainsForLanesFromTopology_VerifyPreconditionsSignerResolution(t *testing.T) {
+	localSelector := chainsel.TEST_90000001.Selector
+	remoteSelector := chainsel.TEST_90000002.Selector
+
+	jdWithSigner := func(signer string) *jdMockOffchain {
+		return &jdMockOffchain{
+			listNodesFn: func(_ context.Context, _ *nodev1.ListNodesRequest, _ ...grpc.CallOption) (*nodev1.ListNodesResponse, error) {
+				return &nodev1.ListNodesResponse{Nodes: []*nodev1.Node{{Id: "node-1", Name: "nop-1"}}}, nil
+			},
+			listNodeChainConfigsFn: func(_ context.Context, _ *nodev1.ListNodeChainConfigsRequest, _ ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
+				return &nodev1.ListNodeChainConfigsResponse{
+					ChainConfigs: []*nodev1.ChainConfig{{
+						NodeId: "node-1",
+						Chain:  &nodev1.Chain{Type: nodev1.ChainType_CHAIN_TYPE_EVM},
+						Ocr2Config: &nodev1.OCR2Config{
+							OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{OnchainSigningAddress: signer},
+						},
+					}},
+				}, nil
+			},
+		}
+	}
+
+	tests := []struct {
+		name           string
+		topologySigner string
+		offchain       cldf_offchain.Client
+		wantErr        error
+	}{
+		{
+			name:           "Success - signer comes from the topology",
+			topologySigner: "0xsigner-1",
+		},
+		{
+			name:     "Success - signer falls back to the JD-registered key",
+			offchain: jdWithSigner("0xjd-signer"),
+		},
+		{
+			name:    "Failure - no signer in topology and no JD client",
+			wantErr: changesets.ErrNOPMissingSigner,
+		},
+		{
+			name:     "Failure - JD has the node but no signing key",
+			offchain: jdWithSigner(""),
+			wantErr:  changesets.ErrNOPMissingSigner,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newConfigureChainsTestEnv(t, []uint64{localSelector}, tc.offchain)
+			ds := datastore.NewMemoryDataStore()
+			addAddress(t, ds, testRef(localSelector, "0xverifier", "CommitteeVerifier"))
+			env.DataStore = ds.Seal()
+
+			committeeRegistry := adapters.NewCommitteeVerifierContractRegistry()
+			committeeRegistry.Register(chainsel.FamilyEVM, &mockCommitteeVerifierContractAdapter{
+				contractsByChainAndQualifier: map[string][]datastore.AddressRef{
+					fmt.Sprintf("%d:default", localSelector): {testRef(localSelector, "0xverifier", "CommitteeVerifier")},
+				},
+			})
+
+			topology := topologyWithExecutorPools(localSelector, remoteSelector, nil)
+			if tc.topologySigner == "" {
+				topology.NOPTopology.NOPs[0].SignerAddressByFamily = nil
+			}
+
+			cs := changesets.ConfigureChainsForLanesFromTopology(
+				committeeRegistry,
+				laneReadyChainFamilyRegistry(localSelector, remoteSelector),
+				changesetscore.GetRegistry(),
+			)
+			err := cs.VerifyPreconditions(env, lanesTopologyConfig(
+				topology,
+				[]changesets.CrossFamilyLanePair{{ChainA: localSelector, ChainB: remoteSelector}},
+			))
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
