@@ -58,7 +58,7 @@ func testUpdateFQDestsEVMOnly(t *testing.T) {
 	require.NoError(t, err)
 	MergeAddresses(t, e, out.DataStore)
 
-	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: v1_6_0,
@@ -154,7 +154,7 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 	require.NoError(t, err)
 	MergeAddresses(t, e, out.DataStore)
 
-	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: v1_6_0,

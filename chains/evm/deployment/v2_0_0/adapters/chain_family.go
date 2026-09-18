@@ -8,6 +8,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -35,6 +36,27 @@ var _ ccvadapters.ChainFamily = (*ChainFamilyAdapter)(nil)
 // ConfigureChainForLanes returns the sequence for configuring an EVM chain for multiple remote lanes.
 func (a *ChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence[ccvadapters.ConfigureChainForLanesInput, seq_core.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.ConfigureChainForLanes
+}
+
+// ValidateGasPricesForLanes implements ccvadapters.GasPriceValidator. It runs the same
+// gas-price check the sequence applies, but read-only and up front, so a missing or invalid
+// price on any remote chain fails before any chain is written.
+func (a *ChainFamilyAdapter) ValidateGasPricesForLanes(
+	e deployment.Environment,
+	chainSelector uint64,
+	feeQuoter []byte,
+	remoteChains map[uint64]ccvadapters.RemoteChainConfig[[]byte, string],
+) error {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return fmt.Errorf("chain with selector %d not found", chainSelector)
+	}
+	return sequences.ValidateGasPricesForLanes(
+		e.OperationsBundle,
+		chain,
+		common.BytesToAddress(feeQuoter),
+		remoteChains,
+	)
 }
 
 // GetOnRampAddress returns the OnRamp address the way EVM puts it on the wire:

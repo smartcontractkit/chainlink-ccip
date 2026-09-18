@@ -264,7 +264,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 	}
 
 	// Connect all chains
-	connectOut, err := lanes.ConnectChains(lanesRegistry, mcmsRegistry).Apply(*env, lanes.ConnectChainsConfig{
+	connectOut, err := lanes.ConnectChains(lanesRegistry, mcmsRegistry, nil).Apply(*env, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: cciputils.Version_1_6_0,
