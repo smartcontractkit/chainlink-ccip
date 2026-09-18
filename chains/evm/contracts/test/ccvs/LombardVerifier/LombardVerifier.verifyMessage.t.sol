@@ -113,7 +113,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
-  function test_verifyMessage_RevertWhen_UnsupportedMsgBodyLength() public {
+  function test_verifyMessage_RevertWhen_InvalidBridgeMessageLength_UnsupportedMsgBodyLength() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
 
@@ -131,7 +131,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
-  function test_verifyMessage_RevertWhen_UnsupportedReturnedMessageLength() public {
+  function test_verifyMessage_RevertWhen_InvalidBridgeMessageLength_UnsupportedReturnedMessageLength() public {
     (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
       _createForwardMessage(address(s_testToken), address(12));
 
