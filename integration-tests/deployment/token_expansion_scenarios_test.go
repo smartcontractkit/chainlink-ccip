@@ -1574,7 +1574,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		// Wire the full triangle of CCIP lanes (evm1<->sol, evm2<->sol, evm1<->evm2). Required for legacy fee
 		// import during auto-migrate (ResolveFeeAdapter / FeeQuoter reads on each source chain).
 		env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
-		laneConnectOut, err := lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), changesets.GetRegistry()).Apply(*env, lanes.ConnectChainsConfig{
+		laneConnectOut, err := lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), changesets.GetRegistry(), nil).Apply(*env, lanes.ConnectChainsConfig{
 			MCMS: NewDefaultInputForMCMS("Scenario 6 lanes"),
 			Lanes: []lanes.LaneConfig{
 				{Version: v1_6_0_scenarios, ChainA: lanes.ChainDefinition{Selector: solChainSel}, ChainB: lanes.ChainDefinition{Selector: evm1ChainSel}},

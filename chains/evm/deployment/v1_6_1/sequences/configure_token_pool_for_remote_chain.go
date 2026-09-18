@@ -77,6 +77,23 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get type and version of token pool: %w", err)
 		}
 
+		chainSupported := slices.Contains(supportedChainsReport.Output, input.RemoteChainSelector)
+
+		// Read the currently configured remote token up front: whether it is changing decides both
+		// how the rate limits are resolved below and whether the chain has to be removed and re-added.
+		var remoteTokenChanged bool
+		if chainSupported {
+			getRemoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemoteToken, chain, evm_contract.FunctionInput[uint64]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+				Args:          input.RemoteChainSelector,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
+			}
+			remoteTokenChanged = !bytes.Equal(getRemoteTokenReport.Output, input.RemoteChainConfig.RemoteToken)
+		}
+
 		// Get outbound and inbound rate limits from the input
 		outboundRL, outboundOk := input.RemoteChainConfig.GetOutboundRateLimitBuckets().DefaultBucket()
 		inboundRL, inboundOk := input.RemoteChainConfig.GetInboundRateLimitBuckets().DefaultBucket()
@@ -99,7 +116,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			)
 
 		case !outboundOk && !inboundOk:
-			if slices.Contains(supportedChainsReport.Output, input.RemoteChainSelector) {
+			if chainSupported {
 				// Idempotent behavior: if we're re-calling this sequence and no rate limits are
 				// specified, then we re-use whatever is currently onchain to avoid accidentally
 				// overwriting existing onchain config
@@ -119,6 +136,21 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to get inbound rate limiter state for remote chain %d: %w", input.RemoteChainSelector, err)
 				}
+				// Carrying the existing buckets forward is only safe while the lane keeps pointing at
+				// the same remote token. See tokens.ErrInboundRateLimitNotPortable for why.
+				//
+				// This sequence serves v1.6.0, v1.6.1 and v1.6.2 pools, and only the pre-1.6.1 ones
+				// denominate the inbound bucket in the remote token's decimals - so the check is
+				// gated on DoesPoolUseLocalDecimals rather than applied unconditionally. That also
+				// correctly exempts the two v1.6.0 external-minter pool types, which scale by local
+				// decimals despite their version.
+				if remoteTokenChanged && onchainInboundReport.Output.IsEnabled &&
+					!tokens.DoesPoolUseLocalDecimals(chain.Family(), tvReport.Output.Version, tvReport.Output.Type.String()) {
+					return sequences.OnChainOutput{}, tokens.ErrInboundRateLimitNotPortable(
+						input.RemoteChainSelector, onchainInboundReport.Output.Capacity, onchainInboundReport.Output.Rate,
+					)
+				}
+
 				outboundConfig = tokens.RateLimiterConfig{
 					IsEnabled: onchainOutboundReport.Output.IsEnabled,
 					Capacity:  onchainOutboundReport.Output.Capacity,
@@ -149,17 +181,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// 2. Check existing rate limiters and update if necessary
 		// 3. Check existing remote pools and add requested remote pool if it does not exist
 		removes := make([]uint64, 0, 1) // Cap == 1 because we may need to remove the chain if the remote token is different
-		if slices.Contains(supportedChainsReport.Output, input.RemoteChainSelector) {
-			// Check existing remote token
-			getRemoteTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetRemoteToken, chain, evm_contract.FunctionInput[uint64]{
-				ChainSelector: input.ChainSelector,
-				Address:       input.TokenPoolAddress,
-				Args:          input.RemoteChainSelector,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token: %w", err)
-			}
-			if !bytes.Equal(getRemoteTokenReport.Output, input.RemoteChainConfig.RemoteToken) {
+		if chainSupported {
+			if remoteTokenChanged {
 				removes = append(removes, input.RemoteChainSelector)
 			}
 

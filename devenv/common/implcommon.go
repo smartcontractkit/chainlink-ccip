@@ -386,7 +386,7 @@ func ConnectContractsWithSelectors(ctx context.Context, e *deployment.Environmen
 			Selector:    destSelector,
 			TokenPrices: chainBTokenPrices,
 		}
-		connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 			Lanes: []lanesapi.LaneConfig{
 				{
 					Version: version,

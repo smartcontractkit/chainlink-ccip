@@ -2,6 +2,7 @@ package adapters_test
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -149,6 +150,27 @@ func deployLaneContractsToDatastore(
 
 	requireExecutorProxyTargetInitialized(t, e.OperationsBundle, evmChain, out.executor)
 	return out
+}
+
+// laneWithSeededGasPrice builds a lane pair that supplies a destination gas price on both
+// sides. Lane configuration requires one, since a FeeQuoter with no gas price for the
+// destination reverts with NoGasPriceAvailable on the first send.
+func laneWithSeededGasPrice(chainA, chainB uint64) v2changesets.CrossFamilyLanePair {
+	overrides := func() *v2changesets.ChainOverrides {
+		return &v2changesets.ChainOverrides{
+			RemoteChainCfg: v2changesets.PartialRemoteChainConfig{
+				FeeQuoterDestChainConfig: ccvadapters.FeeQuoterDestChainConfigOverrides{
+					USDPerUnitGas: big.NewInt(20_000),
+				},
+			},
+		}
+	}
+	return v2changesets.CrossFamilyLanePair{
+		ChainA:          chainA,
+		ChainB:          chainB,
+		ChainAOverrides: overrides(),
+		ChainBOverrides: overrides(),
+	}
 }
 
 func bidirectionalLaneTopology(signer string, chainSelectors ...uint64) *offchain.EnvironmentTopology {
@@ -311,7 +333,7 @@ func TestChainFamilyAdapter_DefaultsAppliedOnChainViaConfigureChainsForLanesFrom
 		Topology: bidirectionalLaneTopology(deployer, localSelector, remoteSelector),
 		BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
 			Lanes: []v2changesets.CrossFamilyLanePair{
-				{ChainA: localSelector, ChainB: remoteSelector},
+				laneWithSeededGasPrice(localSelector, remoteSelector),
 			},
 			MCMS: mcms.Input{},
 		},
