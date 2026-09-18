@@ -111,6 +111,11 @@ type LaneVersionResolver interface {
 	// IsSupportedChain checks if the given chain selector corresponds to a chain that is supported by this lane version resolver.
 	IsSupportedChain(e cldf.Environment, chainSel uint64) bool
 	DeriveLaneVersionsForChain(e cldf.Environment, chainSel uint64) (map[uint64]*semver.Version, []*semver.Version, error)
+	// LaneVersionForRemoteChain returns the version of the lane from chainSel to remoteChain,
+	// read from on-chain state, or nil when no lane is configured to that remote. Unlike
+	// DeriveLaneVersionsForChain it does not error when the chain has no lanes yet, so callers
+	// can use it to compare a requested version against the one currently on chain.
+	LaneVersionForRemoteChain(e cldf.Environment, chainSel, remoteChain uint64) (*semver.Version, error)
 }
 
 // AddressNormalizer canonicalizes VM-specific address strings so datastore lookups

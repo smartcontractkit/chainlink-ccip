@@ -53,6 +53,16 @@ func (f *fakeLaneVersionResolver) DeriveLaneVersionsForChain(_ cldf.Environment,
 	return f.lanes[sel], nil, nil
 }
 
+func (f *fakeLaneVersionResolver) LaneVersionForRemoteChain(_ cldf.Environment, sel, remote uint64) (*semver.Version, error) {
+	if perChainErr, ok := f.errs[sel]; ok {
+		return nil, perChainErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.lanes[sel][remote], nil
+}
+
 // fakeConfigImporter is a stand-in for a family/version ConfigImporter, reporting a canned set of
 // supported tokens per remote chain.
 type fakeConfigImporter struct {

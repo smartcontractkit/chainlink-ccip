@@ -14,6 +14,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmERC20DripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	bmtpapOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evmtokensseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -40,6 +41,7 @@ import (
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
@@ -52,9 +54,48 @@ const (
 	migDecimalsB = 6
 )
 
+// legacyPairSpec captures what differs between legacy pool generations when standing up the
+// starting state for an upgrade test.
+type legacyPairSpec struct {
+	poolType   deployment.ContractType
+	tokenType  deployment.ContractType
+	decimalsA  uint8
+	decimalsB  uint8
+	singlePool bool
+}
+
+// legacyPairSpecFor derives the spec from the legacy pool version.
+//
+// v1.5.0's burn-mint pool is BurnMintTokenPoolAndProxy - one contract that is its own proxy - and
+// is paired with BurnMintERC20WithDrip, whose decimals are fixed at 18 by its constructor. So the
+// v1.5.0 case cannot carry the 18/6 decimal mismatch that the v1.5.1 and v1.6.1 cases use to
+// exercise pre-1.6.1 inbound rate-limit rebasing; that path stays covered by those cases. What
+// v1.5.0 adds instead is the narrower pool ABI (see singlePool).
+func legacyPairSpecFor(oldPoolVersion *semver.Version) legacyPairSpec {
+	if oldPoolVersion.Equal(cciputils.Version_1_5_0) {
+		return legacyPairSpec{
+			poolType:  cciputils.BurnMintTokenPoolAndProxy,
+			tokenType: bnmERC20DripOps.ContractType,
+			decimalsA: 18,
+			decimalsB: 18,
+			// v1.5.0 stores exactly ONE remote pool per lane: it has getRemotePool(uint64) and no
+			// getRemotePools(). Retargeting therefore replaces rather than appends.
+			singlePool: true,
+		}
+	}
+
+	return legacyPairSpec{
+		poolType:  cciputils.BurnMintTokenPool,
+		tokenType: bnmERC20ops.ContractType,
+		decimalsA: migDecimalsA,
+		decimalsB: migDecimalsB,
+	}
+}
+
 // legacyBnMPair is the result of deploying and connecting a legacy BurnMint pool pair across two chains,
 // used as the starting point for v2.0 upgrade tests.
 type legacyBnMPair struct {
+	spec         legacyPairSpec
 	env          *deployment.Environment
 	selA, selB   uint64
 	tokAddrA     common.Address
@@ -74,13 +115,41 @@ type autoMigrateUpgradeOpts struct {
 // TestTokenExpansionMigration_AutoMigrate exercises AutoMigrateRemoteChains upgrades from legacy BnM
 // pools to v2.0.0: full remote discovery from an empty RemoteChains map, partial YAML fee cfg merge,
 // explicit remote token/pool refs, and no legacy fee import when legacy FQ lane fees aren't enabled.
-// v1.5.1 and v1.6.1 are covered (inbound RL decimal rebasing vs the native local decimals).
+// v1.5.0, v1.5.1 and v1.6.1 are covered. v1.5.1 vs v1.6.1 contrast inbound RL decimal rebasing
+// against native local decimals; v1.5.0 additionally covers the BurnMintTokenPoolAndProxy ABI,
+// whose single-remote-pool-per-lane storage makes reverse propagation a replace rather than an
+// append.
 func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 	cases := []struct {
 		name           string
 		oldPoolVersion *semver.Version
 		autoMigrateOpt *autoMigrateUpgradeOpts
 	}{
+		{
+			name:           "v1_5_0_to_v2_0_0/full_discovery",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: nil,
+		},
+		{
+			name:           "v1_5_0_to_v2_0_0/explicit_remote_refs",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{explicitRemote: true},
+		},
+		{
+			name:           "v1_5_0_to_v2_0_0/no_legacy_fees",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{skipLegacyFeeSeed: true},
+		},
+		{
+			name:           "v1_5_0_to_v2_0_0/partial_yaml_fee_merge",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{
+				feeOverrideCfg: &tokensapi.PartialTokenTransferFeeConfig{
+					IsEnabled:                  cciputils.NewOptional(true),
+					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
+				},
+			},
+		},
 		{
 			name:           "v1_5_1_to_v2_0_0/full_discovery",
 			oldPoolVersion: cciputils.Version_1_5_1,
@@ -275,7 +344,8 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 
 	// Deploy a legacy BurnMint pool pair (token + pool on each chain), connect them, and register in TAR.
 	tokenPoolRL := tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}
-	bnmPoolType := cciputils.BurnMintTokenPool
+	spec := legacyPairSpecFor(oldPoolVersion)
+	bnmPoolType := spec.poolType
 	oldOut, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		ChainAdapterVersion: cciputils.Version_1_6_0,
 		MCMS:                mcms.Input{},
@@ -284,8 +354,8 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 				SkipOwnershipTransfer: true,
 				TokenPoolVersion:      oldPoolVersion,
 				DeployTokenInput: &tokensapi.DeployTokenInput{
-					Name: "Migration Token A", Symbol: tokenSymbolA, Decimals: migDecimalsA,
-					Type: bnmERC20ops.ContractType, Supply: nil,
+					Name: "Migration Token A", Symbol: tokenSymbolA, Decimals: spec.decimalsA,
+					Type: spec.tokenType, Supply: nil,
 				},
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: oldPoolQualA,
@@ -301,8 +371,8 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 				SkipOwnershipTransfer: true,
 				TokenPoolVersion:      oldPoolVersion,
 				DeployTokenInput: &tokensapi.DeployTokenInput{
-					Name: "Migration Token B", Symbol: tokenSymbolB, Decimals: migDecimalsB,
-					Type: bnmERC20ops.ContractType, Supply: nil,
+					Name: "Migration Token B", Symbol: tokenSymbolB, Decimals: spec.decimalsB,
+					Type: spec.tokenType, Supply: nil,
 				},
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: oldPoolQualB,
@@ -349,6 +419,7 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 	require.Equal(t, oldPoolAddrA, cfgBefore.TokenPool, "active pool before upgrade should be the legacy pool")
 
 	return legacyBnMPair{
+		spec:         spec,
 		env:          e,
 		selA:         selA,
 		selB:         selB,
@@ -555,11 +626,30 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	// in its remote pool list for chain A. This is the counterpart direction of autoMigrateRemoteChains —
 	// handled by autoMigrateRemoteChains reverse propagation in processTokenConfigForChain.
 	chainB := e.BlockChains.EVMChains()[selB]
+	wantRemotePoolA := common.LeftPadBytes(newPoolAddrA.Bytes(), 32)
+	if s.spec.singlePool {
+		// A v1.5.0 pool has no getRemotePools() and holds a single remote pool per lane, so reverse
+		// propagation goes through setRemotePool and REPLACES the entry rather than appending to it.
+		// That is a real behavioural difference from v1.5.1+: there is no window in which the old and
+		// new pool A are both accepted by pool B, so messages already in flight from old pool A are
+		// rejected with InvalidSourcePoolAddress. Asserted here so the cutover is pinned, not implied.
+		oldPoolB, err := bmtpapOps.NewBurnMintTokenPoolAndProxyContract(s.oldPoolAddrB, chainB.Client)
+		require.NoError(t, err)
+		gotRemotePoolB, err := oldPoolB.GetRemotePool(&bind.CallOpts{Context: t.Context()}, selA)
+		require.NoError(t, err)
+		require.Equal(t, wantRemotePoolA, gotRemotePoolB,
+			"reverse propagation: v1.5.0 pool B should now point at new pool A for chain A")
+		require.NotEqual(t, common.LeftPadBytes(s.oldPoolAddrA.Bytes(), 32), gotRemotePoolB,
+			"v1.5.0 stores one remote pool per lane, so the old pool A entry must have been replaced")
+
+		return
+	}
+
 	oldPoolB, err := tokenpoolV2_0_0.NewTokenPool(s.oldPoolAddrB, chainB.Client)
 	require.NoError(t, err)
 	gotRemotePoolsB, err := oldPoolB.GetRemotePools(&bind.CallOpts{Context: t.Context()}, selA)
 	require.NoError(t, err)
-	require.Contains(t, gotRemotePoolsB, common.LeftPadBytes(newPoolAddrA.Bytes(), 32),
+	require.Contains(t, gotRemotePoolsB, wantRemotePoolA,
 		"reverse propagation: legacy pool B should have new pool A in remote pools for chain A")
 }
 

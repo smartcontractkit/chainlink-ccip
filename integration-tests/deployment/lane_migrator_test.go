@@ -86,7 +86,7 @@ func TestMigrateTo1_6_0(t *testing.T) {
 		GasPrice: big.NewInt(1e9),
 		Router:   testRouterRefChain2.Bytes(),
 	}
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
