@@ -73,6 +73,17 @@ func WithMultipleReports(enabled bool) Option {
 	}
 }
 
+// WithMetrics supplies the observability reporter for message skips, build errors, and
+// report rejections. When omitted, a no-op reporter is installed.
+func WithMetrics(m Metrics) Option {
+	return func(erb *execReportBuilder) {
+		if m == nil {
+			return
+		}
+		erb.metrics = m
+	}
+}
+
 func newBuilderInternal(
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
@@ -96,6 +107,7 @@ func newBuilderInternal(
 		estimateProvider:  estimateProvider,
 		destChainSelector: destChainSelector,
 		addressCodec:      addressCodec,
+		metrics:           NoopMetrics{},
 	}
 
 	for _, option := range options {
@@ -141,6 +153,7 @@ type execReportBuilder struct {
 	hasher           cciptypes.MessageHasher
 	estimateProvider cciptypes.EstimateProvider
 	addressCodec     cciptypes.AddressCodec
+	metrics          Metrics
 
 	// Config
 	checks                 []Check
@@ -257,6 +270,9 @@ func (b *execReportBuilder) tryBuildReport(
 	if err != nil {
 		// If the report is empty, we handle it separately especially when multiple reports are enabled.
 		if errors.Is(err, ErrEmptyReport) {
+			// Ready messages existed, per-message checks passed, yet nothing could be built:
+			// the strongest possible "report builder is wedged" signal.
+			b.metrics.TrackReportBuildError(commitReport.SourceChain, buildErrorEmptyReport)
 			return b.handleEmptyReport(ctx, commitReport, readyMessages)
 		}
 		return commitReport, false, fmt.Errorf("unable to add a single chain report: %w", err)
