@@ -197,9 +197,6 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 		BlockChains:  e.BlockChains,
 		DataStore:    e.DataStore,
 		RemoteChains: remoteChainsDeps,
-	}, adapters.ConfigureCCTPChainForLanesInput{
-		ChainSelector: chainASelector,
-		USDCToken:     setupA.USDCToken.Hex(),
 		RegisteredPoolRef: datastore.AddressRef{
 			Type:    datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType),
 			Version: burn_mint_with_lock_release_flag_token_pool.Version,
@@ -207,6 +204,9 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 		RemoteRegisteredPoolRefs: map[uint64]datastore.AddressRef{
 			chainBSelector: poolRefB,
 		},
+	}, adapters.ConfigureCCTPChainForLanesInput{
+		ChainSelector: chainASelector,
+		USDCToken:     setupA.USDCToken.Hex(),
 		RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 			chainBSelector: nonCanonicalRemoteChainConfig(),
 		},
@@ -218,9 +218,6 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 		BlockChains:  e.BlockChains,
 		DataStore:    e.DataStore,
 		RemoteChains: remoteChainsDeps,
-	}, adapters.ConfigureCCTPChainForLanesInput{
-		ChainSelector: chainBSelector,
-		USDCToken:     setupB.USDCToken.Hex(),
 		RegisteredPoolRef: datastore.AddressRef{
 			Type:    datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType),
 			Version: burn_mint_with_lock_release_flag_token_pool.Version,
@@ -228,6 +225,9 @@ func TestNonCanonicalUSDCChain_TwoChainsConnected(t *testing.T) {
 		RemoteRegisteredPoolRefs: map[uint64]datastore.AddressRef{
 			chainASelector: poolRefA,
 		},
+	}, adapters.ConfigureCCTPChainForLanesInput{
+		ChainSelector: chainBSelector,
+		USDCToken:     setupB.USDCToken.Hex(),
 		RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 			chainASelector: nonCanonicalRemoteChainConfig(),
 		},

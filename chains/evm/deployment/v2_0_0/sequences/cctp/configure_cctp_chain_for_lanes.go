@@ -96,7 +96,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		allowedFinality := defaultAllowedFinalityForChain(chain.Selector)
 
 		// Resolve address refs
-		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, input.RegisteredPoolRef)
+		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, dep.RegisteredPoolRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -514,7 +514,7 @@ func maybeAddRemotePoolUSDCTokenPoolV162(
 func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (map[uint64]tokens_core.RemoteChainConfig[[]byte, string], error) {
 	configs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string], len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, input.RemoteRegisteredPoolRefs[remoteChainSelector])
+		remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, dep.RemoteRegisteredPoolRefs[remoteChainSelector])
 		if err != nil {
 			return nil, fmt.Errorf("failed to get remote pool address: %w", err)
 		}

@@ -52,6 +52,12 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
 
+		// registeredPoolRef is the pool the CCTP changeset registers on the TokenAdminRegistry for
+		// this chain. It is returned as the FIRST entry of Addresses so the configure phase can
+		// derive it from the deploy output.
+		var registeredPoolRef datastore.AddressRef
+		var cctpV1PoolRef datastore.AddressRef
+
 		// Resolve chain and existing addresses
 		existingAddresses := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
@@ -212,6 +218,7 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPool on %s: %w", chain, err)
 			}
 			addresses = append(addresses, cctpV1PoolAddressRef)
+			cctpV1PoolRef = cctpV1PoolAddressRef
 			cctpV1PoolAddress = common.HexToAddress(cctpV1PoolAddressRef.Address)
 		}
 
@@ -258,6 +265,18 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, usdcTokenPoolProxyRef)
 		usdcTokenPoolProxyAddress := common.HexToAddress(usdcTokenPoolProxyRef.Address)
+
+		// The pool registered on the TokenAdminRegistry differs by role: home chains register the
+		// USDCTokenPoolProxy (which routes to the underlying pools), non-home chains register the
+		// CCTP V1 pool directly.
+		if isHomeChain || datastore_utils.IsAddressRefEmpty(cctpV1PoolRef) {
+			registeredPoolRef = usdcTokenPoolProxyRef
+		} else {
+			registeredPoolRef = cctpV1PoolRef
+		}
+		if datastore_utils.IsAddressRefEmpty(registeredPoolRef) {
+			return sequences.OnChainOutput{}, fmt.Errorf("could not determine the pool to register on chain %d", input.ChainSelector)
+		}
 
 		// Configure proxy and authorized callers
 		if isHomeChain {
@@ -319,8 +338,18 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			batchOps = append(batchOps, chainBatchOp)
 		}
 
+		// Addresses[0] is the registered pool ref (convention used by the configure phase).
+		// Dedupe it from the rest of the list.
+		orderedAddresses := make([]datastore.AddressRef, 0, len(addresses)+1)
+		orderedAddresses = append(orderedAddresses, registeredPoolRef)
+		for _, r := range addresses {
+			if r.Address == registeredPoolRef.Address && r.Type == registeredPoolRef.Type {
+				continue
+			}
+			orderedAddresses = append(orderedAddresses, r)
+		}
 		return sequences.OnChainOutput{
-			Addresses: addresses,
+			Addresses: orderedAddresses,
 			BatchOps:  batchOps,
 		}, nil
 	},

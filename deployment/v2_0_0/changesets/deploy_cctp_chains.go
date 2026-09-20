@@ -39,8 +39,6 @@ type CCTPChainConfig struct {
 	StorageLocations []string
 	// FeeAggregator is the address to which fees are withdrawn.
 	FeeAggregator string
-	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain.
-	RegisteredPoolRef datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]adapters.RemoteCCTPChainConfig
 	// USDCType specifies the type of the USDC on the chain.
@@ -235,6 +233,10 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 
 		// Deploy across all chains.
 		newDS := datastore.NewMemoryDataStore()
+		// registeredPoolRefs maps chain selector -> the pool that should be registered on the
+		// chain's TokenAdminRegistry. It is derived from each chain's CCTP deploy output, whose
+		// first address is, by convention, the registered pool ref.
+		registeredPoolRefs := make(map[uint64]datastore.AddressRef, len(cfg.Chains))
 		for chainSel, chainCfg := range cfg.Chains {
 			dep := adapters.DeployCCTPChainDeps{
 				BlockChains: e.BlockChains,
@@ -275,6 +277,11 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
 			}
+			// The deploy output's first address is the registered pool ref (convention).
+			if len(deployCCTPChainReport.Output.Addresses) == 0 {
+				return cldf.ChangesetOutput{}, fmt.Errorf("CCTP deploy for chain %d produced no addresses; cannot derive the registered pool ref", chainSel)
+			}
+			registeredPoolRefs[chainSel] = deployCCTPChainReport.Output.Addresses[0]
 		}
 
 		// Configure across all chains.
@@ -306,7 +313,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", remoteFamily, remoteUSDCType)
 				}
 				remoteChains[remoteChainSelector] = remoteAdapter
-				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef
+				remoteRegisteredPoolRefs[remoteChainSelector] = registeredPoolRefs[remoteChainSelector]
 
 				// Derive the inbound rate limiter configs from the counterpart's outbound rate limiter configs.
 				derived := remoteCfg
@@ -315,16 +322,16 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				remoteChainConfigs[remoteChainSelector] = derived
 			}
 			dep := adapters.ConfigureCCTPChainForLanesDeps{
-				BlockChains:  e.BlockChains,
-				DataStore:    combinedDS.Seal(),
-				RemoteChains: remoteChains,
+				BlockChains:              e.BlockChains,
+				DataStore:                combinedDS.Seal(),
+				RemoteChains:             remoteChains,
+				RegisteredPoolRef:        registeredPoolRefs[chainSel],
+				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
 			}
 			in := adapters.ConfigureCCTPChainForLanesInput{
-				ChainSelector:            chainSel,
-				USDCToken:                chainCfg.USDCToken,
-				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
-				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
-				RemoteChains:             remoteChainConfigs,
+				ChainSelector: chainSel,
+				USDCToken:     chainCfg.USDCToken,
+				RemoteChains:  remoteChainConfigs,
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {

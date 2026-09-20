@@ -39,15 +39,22 @@ type solanaCCTPState struct {
 
 const solanaCCTPV1Mechanism = "CCTP_V1"
 
-// DeployCCTPChain is a no-op for Solana. The Solana CCTP pool/program already exists and this changeset only wires
-// remote-chain configuration to it.
+// DeployCCTPChain is a no-op for Solana (the CCTP pool/program already exists). It returns the
+// pre-existing pool ref as the first address so the changeset can derive the registered pool ref
+// from the deploy output, following the same convention as the EVM adapters.
 func (c *SolanaCCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters.DeployCCTPInput, seq_core.OnChainOutput, adapters.DeployCCTPChainDeps] {
 	return operations.NewSequence(
 		"solana-cctp-chain:no-op-deploy",
 		common_utils.Version_1_6_0,
 		"Skips Solana CCTP deployment and only supports lane configuration",
 		func(b operations.Bundle, deps adapters.DeployCCTPChainDeps, input adapters.DeployCCTPInput) (seq_core.OnChainOutput, error) {
-			return seq_core.OnChainOutput{}, nil
+			poolRef, err := datastore_utils.FindAndFormatRef(deps.DataStore, datastore.AddressRef{
+				Type: datastore.ContractType(common_utils.CCTPTokenPool),
+			}, input.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return seq_core.OnChainOutput{}, fmt.Errorf("failed to resolve Solana CCTP token pool for chain %d: %w", input.ChainSelector, err)
+			}
+			return seq_core.OnChainOutput{Addresses: []datastore.AddressRef{poolRef}}, nil
 		},
 	)
 }
@@ -65,7 +72,7 @@ func (c *SolanaCCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequen
 				return seq_core.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 			}
 
-			tokenPool, err := datastore_utils.FindAndFormatRef(deps.DataStore, input.RegisteredPoolRef, input.ChainSelector, sol_utils.ToAddress)
+			tokenPool, err := datastore_utils.FindAndFormatRef(deps.DataStore, deps.RegisteredPoolRef, input.ChainSelector, sol_utils.ToAddress)
 			if err != nil {
 				return seq_core.OnChainOutput{}, fmt.Errorf("failed to resolve Solana CCTP token pool address: %w", err)
 			}
@@ -92,7 +99,7 @@ func (c *SolanaCCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequen
 					deps.DataStore,
 					deps.BlockChains,
 					remoteChainSelector,
-					input.RemoteRegisteredPoolRefs[remoteChainSelector],
+					deps.RemoteRegisteredPoolRefs[remoteChainSelector],
 				)
 				if err != nil {
 					return seq_core.OnChainOutput{}, fmt.Errorf("failed to resolve remote pool address for chain %d: %w", remoteChainSelector, err)

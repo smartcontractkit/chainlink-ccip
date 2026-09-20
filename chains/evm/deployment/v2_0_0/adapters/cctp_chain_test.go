@@ -468,10 +468,6 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				TokenMessengerV1: homeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: homeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        homeSetup.USDCToken.Hex(),
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
-					Version: usdc_token_pool_proxy.Version,
-				},
 				DeployerContract: homeCreate2FactoryRef.Address,
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
@@ -501,10 +497,6 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				TokenMessengerV1: nonHomeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: nonHomeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        nonHomeSetup.USDCToken.Hex(),
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType("USDCTokenPool"),
-					Version: semver.MustParse("1.6.5"),
-				},
 				DeployerContract: nonHomeCreate2FactoryRef.Address,
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
@@ -963,10 +955,6 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 				TokenMessengerV1: canonicalSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: canonicalSetup.TokenMessengerV2.Hex(),
 				USDCToken:        canonicalSetup.USDCToken.Hex(),
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
-					Version: usdc_token_pool_proxy.Version,
-				},
 				DeployerContract: canonicalCreate2FactoryRef.Address,
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
@@ -998,10 +986,6 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
 				FastFinalityBps:  100,
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType),
-					Version: burn_mint_with_lock_release_flag_token_pool.Version,
-				},
 				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 					canonicalChainSelector: remoteChainConfigForNonCanonical(),
 				},

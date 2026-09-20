@@ -59,10 +59,6 @@ type ConfigureCCTPChainForLanesInput struct {
 	ChainSelector uint64
 	// USDCToken is the address of the USDCToken contract.
 	USDCToken string
-	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain.
-	RegisteredPoolRef datastore.AddressRef
-	// RemoteRegisteredPoolRefs is a map of remote chain selectors to references to the pool that should be set on the registry on the remote chain.
-	RemoteRegisteredPoolRefs map[uint64]datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteCCTPChainConfig
 }
@@ -107,6 +103,12 @@ type ConfigureCCTPChainForLanesDeps struct {
 	DataStore datastore.DataStore
 	// RemoteChains are the remote chains in the environment.
 	RemoteChains map[uint64]RemoteCCTPChain
+	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain,
+	// derived by the changeset from the chain's CCTP deploy output (its first address).
+	RegisteredPoolRef datastore.AddressRef
+	// RemoteRegisteredPoolRefs maps remote chain selectors to references to the pool that should be
+	// set on the registry on the remote chain.
+	RemoteRegisteredPoolRefs map[uint64]datastore.AddressRef
 }
 
 // RemoteCCTPChain is a connectable remote CCTP chain.

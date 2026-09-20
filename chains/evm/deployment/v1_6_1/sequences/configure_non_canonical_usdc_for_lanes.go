@@ -51,7 +51,7 @@ var ConfigureNonCanonicalUSDCForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token address: %w", err)
 			}
-			remotePool, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, input.RemoteRegisteredPoolRefs[remoteChainSelector])
+			remotePool, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, dep.RemoteRegisteredPoolRefs[remoteChainSelector])
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote pool address: %w", err)
 			}
