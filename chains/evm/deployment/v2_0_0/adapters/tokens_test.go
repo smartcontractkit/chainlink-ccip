@@ -310,12 +310,6 @@ func TestTokenAdapter(t *testing.T) {
 					Version:       semver.MustParse("1.5.0"),
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
-				verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       committee_verifier.Version,
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
-				require.NoError(t, err, "Failed to find deployed verifier ref in datastore")
 
 				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
 					ChainSelector: chainSel,
@@ -361,19 +355,19 @@ func TestTokenAdapter(t *testing.T) {
 					requireRateLimiterScaled(t, cfg.OutboundRateLimiterConfig.Rate, cfg.OutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Rate, currentStates.OutboundRateLimiterState.Capacity, decimals, false)
 				}
 
-				// Chain A has a 2.0.0 token pool so should have set CCVs
+				// Chain A has a 2.0.0 token pool. TokenExpansion no longer deploys
+				// AdvancedPoolHooks, so the pool has no hooks contract wired in and no CCVs
+				// are configured through it.
 				if chainSel == chainA {
 					boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
 					require.NoError(t, err, "Failed to instantiate token pool contract")
 					inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, inbound)
 					require.NoError(t, err, "Failed to get inbound CCVs from token pool")
-					require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
-					require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
+					require.Empty(t, inboundCCVs, "No inbound CCVs should be required without AdvancedPoolHooks")
 
 					outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, outbound)
 					require.NoError(t, err, "Failed to get outbound CCVs from token pool")
-					require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
-					require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")
+					require.Empty(t, outboundCCVs, "No outbound CCVs should be required without AdvancedPoolHooks")
 				}
 			}
 		})
@@ -604,8 +598,8 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 
 	// 1. Fresh deploy via TokenExpansion (no reconcile opts).
 	type reconcileOpts struct {
-		routerRef     *datastore.AddressRef
-		feeAdmin string
+		routerRef *datastore.AddressRef
+		feeAdmin  string
 	}
 	expansion := func(opts reconcileOpts, deploy bool) tokens.TokenExpansionInputPerChain {
 		in := tokens.TokenExpansionInputPerChain{
@@ -615,7 +609,7 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 				PoolType:           string(burn_mint_token_pool.ContractType),
 				TokenPoolQualifier: symbol,
 				RouterRef:          opts.routerRef,
-				FeeAdmin:      opts.feeAdmin,
+				FeeAdmin:           opts.feeAdmin,
 				// On reconcile runs (no DeployTokenInput), TokenExpansion still
 				// needs a TokenRef to merge against. Point at the v1.0.0
 				// burn-mint-drip token deployed on the first run.

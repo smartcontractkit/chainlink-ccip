@@ -342,11 +342,10 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		tokens.DeployLockReleaseTokenPool,
 		chain,
 		tokens.DeployTokenPoolInput{
-			ChainSel:                         chainSel,
-			TokenPoolType:                    datastore.ContractType(new_lrtp.ContractType),
-			TokenPoolVersion:                 new_lrtp.Version,
-			TokenSymbol:                      "TEST",
-			ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+			ChainSel:         chainSel,
+			TokenPoolType:    datastore.ContractType(new_lrtp.ContractType),
+			TokenPoolVersion: new_lrtp.Version,
+			TokenSymbol:      "TEST",
 			ConstructorArgs: tokens.ConstructorArgs{
 				Token:    tokenAddr,
 				Decimals: 18,
@@ -357,7 +356,7 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 	)
 	require.NoError(t, err)
 	newPoolAddr := common.HexToAddress(newPoolReport.Output.Addresses[0].Address)
-	lockBoxAddr := common.HexToAddress(newPoolReport.Output.Addresses[2].Address)
+	lockBoxAddr := common.HexToAddress(newPoolReport.Output.Addresses[1].Address)
 
 	// Grant mint role to deployer and mint tokens into the old pool
 	_, err = operations.ExecuteOperation(
@@ -1880,9 +1879,9 @@ func TestMigrateSiloedPool_ExactAmounts(t *testing.T) {
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
-			ChainSelector:  chainSel,
-			OldPoolAddress: s.oldPoolAddr.Hex(),
-			NewPoolAddress: s.newPoolAddr.Hex(),
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
 			TimelockAddress: s.deployer.Hex(),
 			SiloExactAmounts: []tokens_core.SiloExactAmount{
 				{ChainSelector: siloed1, Amount: exactSilo1},
