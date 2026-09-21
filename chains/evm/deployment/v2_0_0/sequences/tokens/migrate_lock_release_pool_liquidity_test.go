@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	old_lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
 	tar "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	old_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	old_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
@@ -255,10 +256,29 @@ type migrationTestSetup struct {
 	lockBoxAddr common.Address
 }
 
+// oldPoolKind selects which legacy lock-release pool the migration test starts from.
+type oldPoolKind int
+
+const (
+	// oldPoolV1_6_1 is the plain v1.6.1 LockReleaseTokenPool.
+	oldPoolV1_6_1 oldPoolKind = iota
+	// oldPoolV1_5_0AndProxy is the v1.5.0 LockReleaseTokenPoolAndProxy - one contract that is its
+	// own proxy. Its getRebalancer/setRebalancer/withdrawLiquidity signatures are identical to
+	// v1.6.1's, which is why MigrateLockReleasePoolLiquidity can drive it through the v1.6.1
+	// bindings without a v1.5.0-specific path.
+	oldPoolV1_5_0AndProxy
+)
+
 // setupMigrationTest deploys all contracts needed for a migration test:
 // ERC20 token, old v1.6.1 LockReleaseTokenPool, and new v2.0 LockReleaseTokenPool
 // with its lockbox. Mints liquidityAmount tokens directly into the old pool.
 func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int) migrationTestSetup {
+	t.Helper()
+	return setupMigrationTestWithOldPool(t, chainSel, liquidityAmount, oldPoolV1_6_1)
+}
+
+// setupMigrationTestWithOldPool is setupMigrationTest with the legacy pool generation selectable.
+func setupMigrationTestWithOldPool(t *testing.T, chainSel uint64, liquidityAmount *big.Int, kind oldPoolKind) migrationTestSetup {
 	t.Helper()
 
 	e, err := environment.New(t.Context(),
@@ -318,24 +338,48 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 	require.NoError(t, err)
 	tokenAddr := common.HexToAddress(tokenReport.Output.Address)
 
-	oldPoolReport, err := operations.ExecuteOperation(
-		e.OperationsBundle,
-		old_lrtp.Deploy,
-		chain,
-		evm_contract.DeployInput[old_lrtp.ConstructorArgs]{
-			ChainSelector:  chainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(old_lrtp.ContractType, *old_lrtp.Version),
-			Args: old_lrtp.ConstructorArgs{
-				Token:              tokenAddr,
-				LocalTokenDecimals: 18,
-				Allowlist:          []common.Address{},
-				RmnProxy:           rmnProxyAddr,
-				Router:             routerAddr,
+	var oldPoolAddr common.Address
+	switch kind {
+	case oldPoolV1_5_0AndProxy:
+		// The v1.5.0 constructor has no localTokenDecimals and takes acceptLiquidity instead.
+		oldPoolReport, err := operations.ExecuteOperation(
+			e.OperationsBundle,
+			old_lrtpap.Deploy,
+			chain,
+			evm_contract.DeployInput[old_lrtpap.ConstructorArgs]{
+				ChainSelector:  chainSel,
+				TypeAndVersion: deployment.NewTypeAndVersion(old_lrtpap.ContractType, *old_lrtpap.Version),
+				Args: old_lrtpap.ConstructorArgs{
+					Token:           tokenAddr,
+					Allowlist:       []common.Address{},
+					RmnProxy:        rmnProxyAddr,
+					AcceptLiquidity: true,
+					Router:          routerAddr,
+				},
 			},
-		},
-	)
-	require.NoError(t, err)
-	oldPoolAddr := common.HexToAddress(oldPoolReport.Output.Address)
+		)
+		require.NoError(t, err)
+		oldPoolAddr = common.HexToAddress(oldPoolReport.Output.Address)
+	default:
+		oldPoolReport, err := operations.ExecuteOperation(
+			e.OperationsBundle,
+			old_lrtp.Deploy,
+			chain,
+			evm_contract.DeployInput[old_lrtp.ConstructorArgs]{
+				ChainSelector:  chainSel,
+				TypeAndVersion: deployment.NewTypeAndVersion(old_lrtp.ContractType, *old_lrtp.Version),
+				Args: old_lrtp.ConstructorArgs{
+					Token:              tokenAddr,
+					LocalTokenDecimals: 18,
+					Allowlist:          []common.Address{},
+					RmnProxy:           rmnProxyAddr,
+					Router:             routerAddr,
+				},
+			},
+		)
+		require.NoError(t, err)
+		oldPoolAddr = common.HexToAddress(oldPoolReport.Output.Address)
+	}
 
 	newPoolReport, err := operations.ExecuteSequence(
 		e.OperationsBundle,
@@ -636,6 +680,84 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Equal(t, 0, exactAmount.Cmp(lockboxBal.Output), "Lockbox should hold the exact migrated amount")
+}
+
+// TestMigrateLockReleasePoolLiquidity_V1_5_0AndProxyPool verifies the migration runs unchanged
+// against a v1.5.0 LockReleaseTokenPoolAndProxy. The sequence drives the old pool through the
+// v1.6.1 lock-release bindings, and v1.5.0 shares those signatures exactly, so no v1.5.0-specific
+// path exists - this test is what holds that assumption honest. It covers the full round trip:
+// rebalancer take-over, withdrawal, lockbox funding, and rebalancer restore.
+func TestMigrateLockReleasePoolLiquidity_V1_5_0AndProxyPool(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	totalLiquidity := big.NewInt(10000)
+	s := setupMigrationTestWithOldPool(t, chainSel, totalLiquidity, oldPoolV1_5_0AndProxy)
+	chain := s.env.BlockChains.EVMChains()[chainSel]
+
+	// Confirm we really are migrating off the v1.5.0 proxy-combined contract.
+	poolBinding, err := old_lrtpap.NewLockReleaseTokenPoolAndProxyContract(s.oldPoolAddr, chain.Client)
+	require.NoError(t, err)
+	canAccept, err := poolBinding.CanAcceptLiquidity(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.True(t, canAccept, "setup should have deployed the pool with acceptLiquidity=true")
+
+	// Start from a non-zero rebalancer so the restore step is observable.
+	originalRebalancer := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	_, err = operations.ExecuteOperation(
+		s.env.OperationsBundle,
+		old_lrtpap.SetRebalancer,
+		chain,
+		evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+			Args:          originalRebalancer,
+		},
+	)
+	require.NoError(t, err)
+
+	basisPoints := uint16(10000)
+	// Fresh reporter so the setup SetRebalancer report does not collide with the migration's
+	// restore-SetRebalancer call (same def+input hash).
+	executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			BasisPoints:     &basisPoints,
+		},
+	)
+
+	oldPoolBal, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		erc20.BalanceOf,
+		chain,
+		evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       s.tokenAddr,
+			Args:          s.oldPoolAddr,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, 0, oldPoolBal.Output.Sign(), "Old v1.5.0 pool should be fully drained")
+
+	lockboxBal, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		erc20.BalanceOf,
+		chain,
+		evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       s.tokenAddr,
+			Args:          s.lockBoxAddr,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, 0, totalLiquidity.Cmp(lockboxBal.Output), "Lockbox should hold the full migrated amount")
+
+	rebalancer, err := poolBinding.GetRebalancer(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, originalRebalancer, rebalancer, "Rebalancer should be restored on the v1.5.0 pool")
 }
 
 func TestMigrateLockReleasePoolLiquidity_RebalancerRestore(t *testing.T) {
@@ -1880,9 +2002,9 @@ func TestMigrateSiloedPool_ExactAmounts(t *testing.T) {
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
-			ChainSelector:  chainSel,
-			OldPoolAddress: s.oldPoolAddr.Hex(),
-			NewPoolAddress: s.newPoolAddr.Hex(),
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
 			TimelockAddress: s.deployer.Hex(),
 			SiloExactAmounts: []tokens_core.SiloExactAmount{
 				{ChainSelector: siloed1, Amount: exactSilo1},

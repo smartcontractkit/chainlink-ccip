@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -37,22 +38,24 @@ var (
 func TestTokenAdapter_MigratorReads(t *testing.T) {
 	t.Parallel()
 
-	e, poolAddr := setupConfiguredPool(t)
-	adapter := NewTokenAdapter()
-	poolBytes := poolAddr.Bytes()
+	forEachPoolType(t, func(t *testing.T, poolType string) {
+		e, poolAddr := setupConfiguredPool(t, poolType)
+		adapter := NewTokenAdapter()
+		poolBytes := poolAddr.Bytes()
 
-	supported, err := adapter.GetSupportedChains(*e, localSelector, poolBytes)
-	require.NoError(t, err)
-	require.Equal(t, []uint64{remoteSelector}, supported)
+		supported, err := adapter.GetSupportedChains(*e, localSelector, poolBytes)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{remoteSelector}, supported)
 
-	remoteToken, err := adapter.GetRemoteToken(*e, localSelector, poolBytes, remoteSelector)
-	require.NoError(t, err)
-	require.Equal(t, testRemoteToken.Bytes(), remoteToken)
+		remoteToken, err := adapter.GetRemoteToken(*e, localSelector, poolBytes, remoteSelector)
+		require.NoError(t, err)
+		require.Equal(t, testRemoteToken.Bytes(), remoteToken)
 
-	remotePools, err := adapter.GetRemotePools(*e, localSelector, poolBytes, remoteSelector)
-	require.NoError(t, err)
-	require.Len(t, remotePools, 1, "a v1.5.0 pool holds exactly one remote pool per lane")
-	require.Equal(t, common.LeftPadBytes(testRemotePool.Bytes(), 32), remotePools[0])
+		remotePools, err := adapter.GetRemotePools(*e, localSelector, poolBytes, remoteSelector)
+		require.NoError(t, err)
+		require.Len(t, remotePools, 1, "a v1.5.0 pool holds exactly one remote pool per lane")
+		require.Equal(t, common.LeftPadBytes(testRemotePool.Bytes(), 32), remotePools[0])
+	})
 }
 
 // TestTokenAdapter_GetRemotePools_UnconfiguredLane asserts the shim reports "none" rather than a
@@ -60,30 +63,48 @@ func TestTokenAdapter_MigratorReads(t *testing.T) {
 func TestTokenAdapter_GetRemotePools_UnconfiguredLane(t *testing.T) {
 	t.Parallel()
 
-	e, poolAddr := setupConfiguredPool(t)
-	adapter := NewTokenAdapter()
+	forEachPoolType(t, func(t *testing.T, poolType string) {
+		e, poolAddr := setupConfiguredPool(t, poolType)
+		adapter := NewTokenAdapter()
 
-	unconfigured := chain_selectors.POLYGON_MAINNET.Selector
-	remotePools, err := adapter.GetRemotePools(*e, localSelector, poolAddr.Bytes(), unconfigured)
-	require.NoError(t, err)
-	require.Empty(t, remotePools)
+		unconfigured := chain_selectors.POLYGON_MAINNET.Selector
+		remotePools, err := adapter.GetRemotePools(*e, localSelector, poolAddr.Bytes(), unconfigured)
+		require.NoError(t, err)
+		require.Empty(t, remotePools)
+	})
 }
 
 func TestTokenAdapter_DeriveTokenDecimals_ReadsFromToken(t *testing.T) {
 	t.Parallel()
 
-	e, poolAddr := setupConfiguredPool(t)
-	adapter := NewTokenAdapter()
+	forEachPoolType(t, func(t *testing.T, poolType string) {
+		e, poolAddr := setupConfiguredPool(t, poolType)
+		adapter := NewTokenAdapter()
 
-	poolRef := datastore.AddressRef{ChainSelector: localSelector, Address: poolAddr.Hex()}
-	tokenAddr, err := adapter.DeriveTokenAddress(*e, localSelector, poolRef)
-	require.NoError(t, err)
+		poolRef := datastore.AddressRef{ChainSelector: localSelector, Address: poolAddr.Hex()}
+		tokenAddr, err := adapter.DeriveTokenAddress(*e, localSelector, poolRef)
+		require.NoError(t, err)
 
-	// v1.5.0 pools have no getTokenDecimals(); the adapter must fall through to the token's own
-	// ERC20 decimals(). BurnMintERC20WithDrip is fixed at 18.
-	decimals, err := adapter.DeriveTokenDecimals(*e, localSelector, poolRef, common.HexToAddress(tokenAddr).Bytes())
-	require.NoError(t, err)
-	require.Equal(t, uint8(18), decimals)
+		// v1.5.0 pools have no getTokenDecimals(); the adapter must fall through to the token's own
+		// ERC20 decimals(). BurnMintERC20WithDrip is fixed at 18.
+		decimals, err := adapter.DeriveTokenDecimals(*e, localSelector, poolRef, common.HexToAddress(tokenAddr).Bytes())
+		require.NoError(t, err)
+		require.Equal(t, uint8(18), decimals)
+	})
+}
+
+// forEachPoolType runs fn against both v1.5.0 pool types. The adapter reads and writes only the
+// shared TokenPoolAndProxy surface, so nothing in it should behave differently between the two -
+// these subtests are what holds that claim honest.
+func forEachPoolType(t *testing.T, fn func(t *testing.T, poolType string)) {
+	t.Helper()
+
+	for _, poolType := range []string{string(bmtpap.ContractType), string(lrtpap.ContractType)} {
+		t.Run(poolType, func(t *testing.T) {
+			t.Parallel()
+			fn(t, poolType)
+		})
+	}
 }
 
 var (
@@ -91,9 +112,9 @@ var (
 	testRemotePool  = common.HexToAddress("0x00000000000000000000000000000000000000bb")
 )
 
-// setupConfiguredPool deploys a drip token and a BurnMintTokenPoolAndProxy, then wires one remote
-// chain onto it.
-func setupConfiguredPool(t *testing.T) (*cldf.Environment, common.Address) {
+// setupConfiguredPool deploys a drip token and a v1.5.0 pool of the given type, then wires one
+// remote chain onto it.
+func setupConfiguredPool(t *testing.T, poolType string) (*cldf.Environment, common.Address) {
 	t.Helper()
 
 	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{localSelector}))
@@ -129,12 +150,14 @@ func setupConfiguredPool(t *testing.T) (*cldf.Environment, common.Address) {
 	}))
 	e.DataStore = ds.Seal()
 
+	acceptLiquidity := true
 	deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tpSeq.DeployTokenPool, e.BlockChains, tokensapi.DeployTokenPoolInput{
 		TokenRef:          &tokenRef,
-		PoolType:          string(bmtpap.ContractType),
+		PoolType:          poolType,
 		TokenPoolVersion:  utils.Version_1_5_0,
 		ChainSelector:     localSelector,
 		ExistingDataStore: e.DataStore,
+		AcceptLiquidity:   &acceptLiquidity,
 	})
 	require.NoError(t, err)
 	require.Len(t, deployReport.Output.Addresses, 1)

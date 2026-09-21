@@ -11,7 +11,7 @@ import (
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
-	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	tpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -38,9 +38,16 @@ var (
 // overrides only ConfigureTokenForTransfersSequence which inlines
 // the v1.5.0-specific configure + register flow.
 //
-// Scope: BurnMintTokenPoolAndProxy only. The other v1.5.0 pool contracts
-// (lock-release and rebasing *AndProxy variants) have generated bindings but no
-// deployed footprint, and the deploy sequence rejects them.
+// Scope: BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy. Both are driven through
+// the shared TokenPoolAndProxy base ops, whose surface they share with byte-identical
+// signatures, so nothing here branches on pool type. The remaining v1.5.0 pool contracts
+// (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool) have generated
+// bindings but no deployed footprint, and the deploy sequence rejects them.
+//
+// Lock-release liquidity is deliberately not handled here: the v2.0.0
+// MigrateLockReleasePoolLiquidity sequence drives the old pool through the v1.6.1 lock-release
+// bindings, whose getRebalancer/setRebalancer/withdrawLiquidity signatures v1.5.0 shares, so a
+// v1.5.0 lock-release pool migrates through that path unchanged.
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }
@@ -59,7 +66,7 @@ func NewTokenAdapter() *TokenAdapter {
 func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[tokensapi.ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-v1.5.0-adapter:configure-token-for-transfers",
-		bmtpap.Version,
+		tpap.Version,
 		"Configure a v1.5.0 token pool for cross-chain transfers on an EVM chain",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
 			var result sequences.OnChainOutput
@@ -99,7 +106,7 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 				tpSeq.ConfigureTokenPoolForRemoteChains, chain,
 				tpSeq.ConfigureTokenPoolForRemoteChainsInput{
 					TokenPoolAddress: tpAddr,
-					TokenPoolVersion: bmtpap.Version,
+					TokenPoolVersion: tpap.Version,
 					RemoteChains:     input.RemoteChains,
 				},
 			)
@@ -139,7 +146,7 @@ func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelecto
 
 	report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		bmtpap.GetSupportedChains, evmChain,
+		tpap.GetSupportedChains, evmChain,
 		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr)},
 		cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
 	)
@@ -158,7 +165,7 @@ func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector ui
 
 	report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		bmtpap.GetRemoteToken, evmChain,
+		tpap.GetRemoteToken, evmChain,
 		evm_contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
 		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
 	)
@@ -186,7 +193,7 @@ func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector ui
 
 	report, err := cldf_ops.ExecuteOperation(
 		e.OperationsBundle,
-		bmtpap.GetRemotePool, evmChain,
+		tpap.GetRemotePool, evmChain,
 		evm_contract.FunctionInput[uint64]{ChainSelector: chainSelector, Address: common.BytesToAddress(poolAddr), Args: remoteSelector},
 		cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
 	)
@@ -201,13 +208,14 @@ func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector ui
 	return [][]byte{report.Output}, nil
 }
 
-// poolOpsV150 implements PoolOps using v1.5.0 BurnMintTokenPoolAndProxy bindings.
+// poolOpsV150 implements PoolOps against the shared v1.5.0 TokenPoolAndProxy base surface,
+// so it serves both BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy.
 type poolOpsV150 struct{}
 
 func (p *poolOpsV150) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
 	res, err := cldf_ops.ExecuteOperation(
 		b,
-		bmtpap.GetToken, chain,
+		tpap.GetToken, chain,
 		evm_contract.FunctionInput[struct{}]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
@@ -241,7 +249,7 @@ func (p *poolOpsV150) GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolA
 }
 
 func (p *poolOpsV150) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error) {
-	pool, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(poolAddr, chain.Client)
+	pool, err := tpap.NewTokenPoolAndProxyContract(poolAddr, chain.Client)
 	if err != nil {
 		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate v1.5.0 token pool contract at %s: %w", poolAddr.Hex(), err)
 	}
@@ -274,17 +282,17 @@ func (p *poolOpsV150) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 	}
 
 	report, err := cldf_ops.ExecuteOperation(b,
-		bmtpap.SetChainRateLimiterConfig, chain,
-		evm_contract.FunctionInput[bmtpap.SetChainRateLimiterConfigArgs]{
+		tpap.SetChainRateLimiterConfig, chain,
+		evm_contract.FunctionInput[tpap.SetChainRateLimiterConfigArgs]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
-			Args: bmtpap.SetChainRateLimiterConfigArgs{
-				OutboundConfig: bmtpap.Config{
+			Args: tpap.SetChainRateLimiterConfigArgs{
+				OutboundConfig: tpap.Config{
 					IsEnabled: outbound.IsEnabled,
 					Capacity:  outbound.Capacity,
 					Rate:      outbound.Rate,
 				},
-				InboundConfig: bmtpap.Config{
+				InboundConfig: tpap.Config{
 					IsEnabled: inbound.IsEnabled,
 					Capacity:  inbound.Capacity,
 					Rate:      inbound.Rate,
@@ -305,7 +313,7 @@ func (p *poolOpsV150) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, 
 		return nil, fmt.Errorf("fee admin is not supported on v1.5.0 token pools (pool %s on chain %d)", poolAddr.Hex(), chain.Selector)
 	}
 
-	pool, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(poolAddr, chain.Client)
+	pool, err := tpap.NewTokenPoolAndProxyContract(poolAddr, chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate v1.5.0 token pool contract at %s: %w", poolAddr.Hex(), err)
 	}
@@ -321,7 +329,7 @@ func (p *poolOpsV150) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, 
 			b.Logger.Infof("Router already matches desired value for pool %s on chain %d; skipping", poolAddr.Hex(), chain.Selector)
 		} else {
 			report, err := cldf_ops.ExecuteOperation(b,
-				bmtpap.SetRouter, chain,
+				tpap.SetRouter, chain,
 				evm_contract.FunctionInput[common.Address]{
 					ChainSelector: chain.Selector,
 					Address:       poolAddr,
@@ -343,7 +351,7 @@ func (p *poolOpsV150) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, 
 			b.Logger.Infof("Rate limit admin already matches desired value for pool %s on chain %d; skipping", poolAddr.Hex(), chain.Selector)
 		} else {
 			report, err := cldf_ops.ExecuteOperation(b,
-				bmtpap.SetRateLimitAdmin, chain,
+				tpap.SetRateLimitAdmin, chain,
 				evm_contract.FunctionInput[common.Address]{
 					ChainSelector: chain.Selector,
 					Address:       poolAddr,
@@ -379,7 +387,7 @@ func (p *poolOpsV150) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, p
 	}
 
 	outboundReport, err := cldf_ops.ExecuteOperation(b,
-		bmtpap.GetCurrentOutboundRateLimiterState, chain,
+		tpap.GetCurrentOutboundRateLimiterState, chain,
 		evm_contract.FunctionInput[uint64]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
@@ -391,7 +399,7 @@ func (p *poolOpsV150) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, p
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get outbound rate limiter state for remote chain %d: %w", remoteSelector, err)
 	}
 	inboundReport, err := cldf_ops.ExecuteOperation(b,
-		bmtpap.GetCurrentInboundRateLimiterState, chain,
+		tpap.GetCurrentInboundRateLimiterState, chain,
 		evm_contract.FunctionInput[uint64]{
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
@@ -418,5 +426,5 @@ func (p *poolOpsV150) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, p
 }
 
 func (p *poolOpsV150) Version() *semver.Version {
-	return bmtpap.Version
+	return tpap.Version
 }

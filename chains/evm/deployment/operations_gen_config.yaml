@@ -12,8 +12,23 @@ output:
 
 contracts:
   # 1.5.0
-  - contract_name: BurnMintTokenPoolAndProxy
+  #
+  # TokenPoolAndProxy is the shared base surface of the v1.5.0 *AndProxy pools. Its ABI is read
+  # from burn_mint_token_pool_and_proxy.json because BurnMintTokenPoolAndProxy declares no
+  # external functions of its own - that file IS the base ABI. LockReleaseTokenPoolAndProxy is a
+  # strict superset of it (adding only the liquidity functions), and every shared function is
+  # signature-identical, so both pool types are read and configured through this one package.
+  # The per-pool entries below carry only Deploy plus whatever is type-specific.
+  #
+  # NOTE: v1.5.0 pools expose a narrower surface than v1.5.1. There is no
+  # getTokenDecimals, no getRemotePools/addRemotePool/removeRemotePool (a
+  # v1.5.0 pool holds exactly one remote pool per lane, replaced via
+  # setRemotePool), and applyChainUpdates takes a single ChainUpdate[] with
+  # removals expressed as allowed=false entries.
+  - contract_name: TokenPoolAndProxy
     version: "1.5.0"
+    abi_file: "burn_mint_token_pool_and_proxy.json"
+    no_deployment: true
     functions:
       - name: getRemotePool
         access: public
@@ -23,11 +38,6 @@ contracts:
         access: public
       - name: getPreviousPool
         access: public
-      # NOTE: v1.5.0 pools expose a narrower surface than v1.5.1. There is no
-      # getTokenDecimals, no getRemotePools/addRemotePool/removeRemotePool (a
-      # v1.5.0 pool holds exactly one remote pool per lane, replaced via
-      # setRemotePool), and applyChainUpdates takes a single ChainUpdate[] with
-      # removals expressed as allowed=false entries.
       - name: getToken
         access: public
       - name: getSupportedChains
@@ -50,6 +60,31 @@ contracts:
         access: public
       - name: setRouter
         access: owner
+
+  # Deploy only. Every read/write on a deployed pool goes through TokenPoolAndProxy above.
+  - contract_name: BurnMintTokenPoolAndProxy
+    version: "1.5.0"
+    functions: []
+
+  # Deploy plus the liquidity surface that TokenPoolAndProxy does not cover. provideLiquidity
+  # and withdrawLiquidity are rebalancer-gated on-chain rather than onlyOwner, and there is no
+  # rebalancer access alias, so they are declared public and rely on that check - same treatment
+  # as SiloedLockReleaseTokenPool 1.6.1 below.
+  - contract_name: LockReleaseTokenPoolAndProxy
+    version: "1.5.0"
+    functions:
+      - name: canAcceptLiquidity
+        access: public
+      - name: getRebalancer
+        access: public
+      - name: setRebalancer
+        access: owner
+      - name: transferLiquidity
+        access: owner
+      - name: provideLiquidity
+        access: public
+      - name: withdrawLiquidity
+        access: public
 
   # 1.6.3
   - contract_name: FeeQuoter

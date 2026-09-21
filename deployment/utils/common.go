@@ -51,9 +51,13 @@ const (
 	BurnMintTokenPool                   cldf.ContractType = "BurnMintTokenPool"
 	BurnMintTokenPoolAndProxy           cldf.ContractType = "BurnMintTokenPoolAndProxy"
 	LockReleaseTokenPool                cldf.ContractType = "LockReleaseTokenPool"
-	BurnMintWithLockReleaseFlag         cldf.ContractType = "BurnMintWithLockReleaseFlag"
-	TokenGovernor                       cldf.ContractType = "TokenGovernor"
-	ERC20LockBox                        cldf.ContractType = "ERC20LockBox"
+	// LockReleaseTokenPoolAndProxy is the v1.5.0 lock-release pool, which is its own proxy (one
+	// contract, one address). Like BurnMintTokenPoolAndProxy it has no equivalent at v1.5.1 or
+	// later.
+	LockReleaseTokenPoolAndProxy cldf.ContractType = "LockReleaseTokenPoolAndProxy"
+	BurnMintWithLockReleaseFlag  cldf.ContractType = "BurnMintWithLockReleaseFlag"
+	TokenGovernor                cldf.ContractType = "TokenGovernor"
+	ERC20LockBox                 cldf.ContractType = "ERC20LockBox"
 
 	// CLL Identifiers
 	CLLQualifier         = "CLLCCIP"
@@ -66,9 +70,18 @@ const (
 // IsLockReleasePoolType reports whether poolType is a standard or siloed lock-release pool.
 // HybridLockReleaseUSDCTokenPool and BurnMintWithLockReleaseFlag are intentionally excluded:
 // the former uses the CCTP hybrid migration path; the latter is not a lock-release pool.
+//
+// LockReleaseTokenPoolAndProxy is included: it is the v1.5.0 lock-release pool (pool and proxy in
+// one contract) and behaves like one everywhere this predicate is consulted.
+//
+// ⚠️ It exists ONLY at v1.5.0. Callers that branch on this predicate to pick a contract to deploy
+// must reject it explicitly for later versions rather than relying on the predicate alone. The
+// v2.0.0 DeployTokenPool sequence does NOT do this today: asking it for either *AndProxy type
+// deploys the plain v2.0.0 pool instead of failing. Same caveat as IsBurnMintPoolType below.
 func IsLockReleasePoolType(poolType string) bool {
 	return poolType == LockReleaseTokenPool.String() ||
-		poolType == SiloedLockReleaseTokenPool.String()
+		poolType == SiloedLockReleaseTokenPool.String() ||
+		poolType == LockReleaseTokenPoolAndProxy.String()
 }
 
 // IsBurnMintPoolType reports whether poolType is a standard burn-mint pool variant.
