@@ -63,12 +63,11 @@ var DeployLockReleaseTokenPool = cldf_ops.NewSequence(
 		}
 
 		configureReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPool, chain, ConfigureTokenPoolInput{
-			ChainSelector:                    input.ChainSel,
-			TokenPoolAddress:                 common.HexToAddress(tpDeployReport.Output.Address),
-			RateLimitAdmin:                   input.RateLimitAdmin,
-			RouterAddress:                    input.ConstructorArgs.Router,
-			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
-			FeeAdmin:                         input.FeeAdmin,
+			ChainSelector:    input.ChainSel,
+			TokenPoolAddress: common.HexToAddress(tpDeployReport.Output.Address),
+			RateLimitAdmin:   input.RateLimitAdmin,
+			RouterAddress:    input.ConstructorArgs.Router,
+			FeeAdmin:         input.FeeAdmin,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", tpDeployReport.Output.Address, chain, err)

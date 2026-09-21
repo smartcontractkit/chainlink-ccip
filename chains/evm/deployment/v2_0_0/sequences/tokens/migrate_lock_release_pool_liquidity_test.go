@@ -342,11 +342,10 @@ func setupMigrationTest(t *testing.T, chainSel uint64, liquidityAmount *big.Int)
 		tokens.DeployLockReleaseTokenPool,
 		chain,
 		tokens.DeployTokenPoolInput{
-			ChainSel:                         chainSel,
-			TokenPoolType:                    datastore.ContractType(new_lrtp.ContractType),
-			TokenPoolVersion:                 new_lrtp.Version,
-			TokenSymbol:                      "TEST",
-			ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+			ChainSel:         chainSel,
+			TokenPoolType:    datastore.ContractType(new_lrtp.ContractType),
+			TokenPoolVersion: new_lrtp.Version,
+			TokenSymbol:      "TEST",
 			ConstructorArgs: tokens.ConstructorArgs{
 				Token:    tokenAddr,
 				Decimals: 18,

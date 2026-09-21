@@ -1,7 +1,6 @@
 package tokens_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -93,12 +92,11 @@ func setupSiloedPoolDeps(t *testing.T, chainSel uint64) (*deployment.Environment
 	}
 
 	return e, tokens.DeployTokenPoolInput{
-		ChainSel:                         chainSel,
-		TokenPoolType:                    datastore.ContractType(siloed_lock_release_token_pool.ContractType),
-		TokenPoolVersion:                 siloed_lock_release_token_pool.Version,
-		TokenSymbol:                      tokenReport.Input.Args.Symbol,
-		RateLimitAdmin:                   common.HexToAddress("0x01"),
-		ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+		ChainSel:         chainSel,
+		TokenPoolType:    datastore.ContractType(siloed_lock_release_token_pool.ContractType),
+		TokenPoolVersion: siloed_lock_release_token_pool.Version,
+		TokenSymbol:      tokenReport.Input.Args.Symbol,
+		RateLimitAdmin:   common.HexToAddress("0x01"),
 		ConstructorArgs: tokens.ConstructorArgs{
 			Token:    common.HexToAddress(tokenReport.Output.Address),
 			Decimals: 18,

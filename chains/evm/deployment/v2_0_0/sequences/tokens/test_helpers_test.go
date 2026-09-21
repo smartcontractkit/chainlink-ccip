@@ -77,9 +77,8 @@ func deployTokenAndPoolViaExpansionWithDecimals(
 					Type:          bnm_drip_v1_0.ContractType,
 				},
 				DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
-					PoolType:                         string(burn_mint_token_pool.ContractType),
-					TokenPoolQualifier:               "TEST",
-					ThresholdAmountForAdditionalCCVs: thresholdAmountForAdditionalCCVs.String(),
+					PoolType:           string(burn_mint_token_pool.ContractType),
+					TokenPoolQualifier: "TEST",
 				},
 			},
 		},

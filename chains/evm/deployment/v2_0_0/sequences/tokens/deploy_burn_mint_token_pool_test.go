@@ -1,7 +1,6 @@
 package tokens_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -47,13 +46,12 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.ContractType),
-					TokenPoolVersion:                 burn_mint_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					FeeAdmin:                         common.HexToAddress("0x03"),
+					ChainSel:         chainReport.Input.ChainSelector,
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenSymbol:      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:   common.HexToAddress("0x01"),
+					FeeAdmin:         common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
@@ -78,13 +76,12 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.ContractType),
-					TokenPoolVersion:                 burn_mint_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					FeeAdmin:                         common.HexToAddress("0x03"),
+					ChainSel:         chainReport.Input.ChainSelector,
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenSymbol:      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:   common.HexToAddress("0x01"),
+					FeeAdmin:         common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
@@ -187,33 +184,6 @@ func TestDeployTokenPool(t *testing.T) {
 			expectedErr: "router address must be defined",
 		},
 		{
-			desc: "threshold amount for additional ccvs not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
-				var rmnProxyAddress common.Address
-				var routerAddress common.Address
-				for _, addr := range chainReport.Output.Addresses {
-					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
-						rmnProxyAddress = common.HexToAddress(addr.Address)
-					}
-					if addr.Type == datastore.ContractType(router.ContractType) {
-						routerAddress = common.HexToAddress(addr.Address)
-					}
-				}
-				return tokens.DeployTokenPoolInput{
-					ChainSel:         chainReport.Input.ChainSelector,
-					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
-					TokenPoolVersion: burn_mint_token_pool.Version,
-					ConstructorArgs: tokens.ConstructorArgs{
-						Token:    common.HexToAddress(tokenReport.Output.Address),
-						RMNProxy: rmnProxyAddress,
-						Router:   routerAddress,
-					},
-				}
-			},
-			expectedErr: "threshold amount for additional ccvs must be defined",
-		},
-		{
 			desc: "happy path - burn to address mint",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
@@ -227,13 +197,12 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType("BurnToAddressMintTokenPool"),
-					TokenPoolVersion:                 burn_mint_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					FeeAdmin:                         common.HexToAddress("0x03"),
+					ChainSel:         chainReport.Input.ChainSelector,
+					TokenPoolType:    datastore.ContractType("BurnToAddressMintTokenPool"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenSymbol:      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:   common.HexToAddress("0x01"),
+					FeeAdmin:         common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:       common.HexToAddress(tokenReport.Output.Address),
 						Decimals:    18,
