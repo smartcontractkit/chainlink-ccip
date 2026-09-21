@@ -306,7 +306,13 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				}
 				remoteNormalizer, ok := normalizerRegistry.GetAddressNormalizer(remoteFamily)
 				if !ok {
-					return nil, nil, nil, fmt.Errorf("no address normalizer found for chain family %s of remote chain selector %d", remoteFamily, remoteSelector)
+					// Intentionally SKIP remote chains whose family has no registered address
+					// normalizer (e.g. non-EVM / non-Solana families the tooling API does not
+					// support) instead of failing the whole migration. This leaves those lanes
+					// disconnected (broken) by design. Remove/short-circuit this only after the
+					// unsupported family is added to the normalizer registry.
+					e.Logger.Infof("skipping remote chain selector %d of family %s during auto-migration: no address normalizer registered", remoteSelector, remoteFamily)
+					continue
 				}
 				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, remoteSelector)
 				if err != nil {
@@ -329,7 +335,10 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				} else {
 					remoteRegReader, ok := tokenRegistry.GetTokenAdminRegistryReader(remoteFamily)
 					if !ok {
-						return nil, nil, nil, fmt.Errorf("no admin registry reader for remote chain family %s", remoteFamily)
+						// Same rationale as above: skip remote chains whose family has no
+						// registered token admin registry reader instead of hard-failing.
+						e.Logger.Infof("skipping remote chain selector %d of family %s during auto-migration: no token admin registry reader registered", remoteSelector, remoteFamily)
+						continue
 					}
 					remotePoolBytes, err = remoteRegReader.GetActivePool(e, remoteSelector, datastore.AddressRef{Address: remoteTokenAddr})
 					if err != nil {
