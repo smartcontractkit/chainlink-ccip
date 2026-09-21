@@ -298,6 +298,7 @@ func applyCurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) 
 				curseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, curseDetail.curseAdapter.Curse(), e.BlockChains, CurseInput{
 					Subjects:      subjectsToCurse,
 					ChainSelector: selector,
+					MCMSQualifier: cfg.MCMS.Qualifier,
 				})
 				if err != nil {
 					return fmt.Errorf("failed to curse subjects on chain with selector %d: %w", selector, err)
@@ -376,6 +377,7 @@ func applyUncurse(cr *CurseRegistry, mcmsRegistry *changesets.MCMSReaderRegistry
 				unCurseReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.Uncurse(), e.BlockChains, CurseInput{
 					Subjects:      alreadyCursedSubjects,
 					ChainSelector: selector,
+					MCMSQualifier: cfg.MCMS.Qualifier,
 				})
 				if err != nil {
 					return fmt.Errorf("failed to uncurse subjects on chain with selector %d: %w", selector, err)
