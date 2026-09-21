@@ -119,11 +119,6 @@ type DeployTokenPoolInput struct {
 	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
 	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
 	TokenGovernor string `yaml:"tokenGovernor,omitempty" json:"tokenGovernor,omitempty"`
-	// ThresholdAmountForAdditionalCCVs is the transfer amount (in base units, as a decimal string)
-	// above which additional CCVs are required. Matches AdvancedPoolHooks'
-	// thresholdAmountForAdditionalCCVs. Applicable to EVM 2.0.0+ token pools.
-	// If empty or "0", no threshold is set.
-	ThresholdAmountForAdditionalCCVs string `yaml:"thresholdAmountForAdditionalCCVs,omitempty" json:"thresholdAmountForAdditionalCCVs,omitempty"`
 	// RouterRef optionally selects which router to wire into the pool. To target
 	// the test router, set Type to the chain's TestRouter contract type (e.g. on
 	// EVM: datastore.ContractType(router.TestRouterContractType)). An explicit

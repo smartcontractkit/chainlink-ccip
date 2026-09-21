@@ -641,6 +641,32 @@ func DoesPoolUseLocalDecimals(chainFamily string, poolVersion *semver.Version, p
 	return false
 }
 
+// ErrInboundRateLimitNotPortable reports that an existing inbound rate limiter bucket cannot be
+// carried across a change of remote token on the lane.
+//
+// Where DoesPoolUseLocalDecimals reports false (pre-1.6.1 EVM pools), the inbound bucket is
+// denominated in the REMOTE token's decimals, so the stored number only means what it says relative
+// to the remote token that was configured when it was written. Re-applying it verbatim to a
+// different remote token silently rescales the limit by 10^(oldRemoteDecimals-newRemoteDecimals):
+// tightening it towards zero in one direction and - the dangerous direction - loosening it by the
+// same factor in the other, effectively removing the limit.
+//
+// A configure sequence is scoped to the local chain and so cannot read the previous remote token's
+// decimals to rebase (contrast RebaseRateLimiterConfig, which is used on the auto-migrate path
+// where both decimal counts are known). It therefore has to refuse rather than guess.
+//
+// A disabled bucket is all zeroes and carries no denomination, so callers should only reach for this
+// when the on-chain inbound bucket is enabled.
+func ErrInboundRateLimitNotPortable(remoteChainSelector uint64, capacity, rate *big.Int) error {
+	return fmt.Errorf(
+		"remote chain %d is being retargeted to a different remote token while its inbound rate limiter is enabled, "+
+			"and no rate limits were supplied: the on-chain inbound bucket (capacity %s, rate %s) is denominated in the "+
+			"previous remote token's decimals and cannot be reinterpreted for the new one. Specify the rate limits "+
+			"explicitly for this lane (inbound is derived from the counterpart chain's outbound config)",
+		remoteChainSelector, capacity, rate,
+	)
+}
+
 // RebaseRateLimiterConfig rebases capacity and rate from fromDecimals to toDecimals.
 // Applied when importing inbound limits from pre-1.6.1 EVM pools, which stored them in
 // source/remote decimals, into a new pool that expects local/destination decimals.

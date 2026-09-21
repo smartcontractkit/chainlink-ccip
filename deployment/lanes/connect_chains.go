@@ -1,6 +1,7 @@
 package lanes
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -10,17 +11,34 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-// ConnectChains returns a changeset that configures CCIP lanes between chains using the provided lane and MCMS registries.
-func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) cldf.ChangeSetV2[ConnectChainsConfig] {
-	return cldf.CreateChangeSet(makeApply(laneRegistry, mcmsRegistry), makeVerify(laneRegistry, mcmsRegistry))
+// ErrLaneDowngrade means the requested lane version is lower than the version currently on
+// chain and AllowDowngrade was not set.
+var ErrLaneDowngrade = errors.New("refusing to downgrade lane")
+
+// LaneVersionResolverProvider supplies the per-family LaneVersionResolver for a chain selector.
+// The deploy-chain-contracts registry satisfies it; keeping it as an interface here avoids
+// coupling this package to that registry.
+type LaneVersionResolverProvider interface {
+	GetLaneVersionResolver(sel uint64) (deploy.LaneVersionResolver, bool)
 }
 
-func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConnectChainsConfig) error {
-	return func(_ cldf.Environment, cfg ConnectChainsConfig) error {
+// ConnectChains returns a changeset that configures CCIP lanes between chains using the provided lane and MCMS registries.
+//
+// versionResolvers is optional. When non-nil, the changeset refuses to reconfigure a lane to a
+// lower version than the one currently on chain unless the config sets AllowDowngrade. This
+// stops a stale pipeline payload (e.g. one still pinned to 1.6.0) from silently downgrading a
+// lane that has already been migrated to 2.0.
+func ConnectChains(laneRegistry *LaneAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry, versionResolvers LaneVersionResolverProvider) cldf.ChangeSetV2[ConnectChainsConfig] {
+	return cldf.CreateChangeSet(makeApply(laneRegistry, mcmsRegistry), makeVerify(laneRegistry, mcmsRegistry, versionResolvers))
+}
+
+func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegistry, versionResolvers LaneVersionResolverProvider) func(cldf.Environment, ConnectChainsConfig) error {
+	return func(e cldf.Environment, cfg ConnectChainsConfig) error {
 		for i, lane := range cfg.Lanes {
 			if lane.Version == nil {
 				return fmt.Errorf("lane %d: Version must not be nil", i)
@@ -40,9 +58,55 @@ func makeVerify(laneRegistry *LaneAdapterRegistry, _ *changesets.MCMSReaderRegis
 					return fmt.Errorf("lane %d chain %d: no LaneAdapter registered for chain family %q", i, sel, family)
 				}
 			}
+			if err := validateNoDowngrade(e, versionResolvers, lane, cfg.AllowDowngrade); err != nil {
+				return fmt.Errorf("lane %d: %w", i, err)
+			}
 		}
 		return nil
 	}
+}
+
+// validateNoDowngrade refuses to reconfigure a lane to a lower version than the one currently
+// on chain, unless allowDowngrade is set. Both directions of the lane are checked, since a
+// downgrade on either side leaves the lane inconsistent.
+//
+// A lane with no on-chain version yet (nil) is not a downgrade, so fresh lanes are unaffected.
+// Chains with no registered resolver are skipped: the resolver only knows how to read versions
+// for its own family, and other families are validated by their own adapters.
+func validateNoDowngrade(
+	e cldf.Environment,
+	versionResolvers LaneVersionResolverProvider,
+	lane LaneConfig,
+	allowDowngrade bool,
+) error {
+	if allowDowngrade || versionResolvers == nil {
+		return nil
+	}
+	for _, leg := range []struct {
+		local, remote uint64
+	}{
+		{lane.ChainA.Selector, lane.ChainB.Selector},
+		{lane.ChainB.Selector, lane.ChainA.Selector},
+	} {
+		resolver, ok := versionResolvers.GetLaneVersionResolver(leg.local)
+		if !ok || !resolver.IsSupportedChain(e, leg.local) {
+			continue
+		}
+		current, err := resolver.LaneVersionForRemoteChain(e, leg.local, leg.remote)
+		if err != nil {
+			return fmt.Errorf("failed to read current lane version for chain %d -> %d: %w", leg.local, leg.remote, err)
+		}
+		if current == nil {
+			continue
+		}
+		if lane.Version.LessThan(current) {
+			return fmt.Errorf(
+				"refusing to downgrade lane %d -> %d from %s to %s: %w",
+				leg.local, leg.remote, current, lane.Version, ErrLaneDowngrade,
+			)
+		}
+	}
+	return nil
 }
 
 // validateChainDefinition rejects input where the caller has set fields that

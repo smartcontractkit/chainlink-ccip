@@ -45,18 +45,18 @@ type committeeVerifierInputConfig struct {
 // PartialRemoteChainConfig is the internal per-remote chain input after lane expansion.
 // Unset fields use adapter defaults, datastore resolution, or CCV auto-resolution.
 type PartialRemoteChainConfig struct {
-	AllowTrafficFrom          *bool
-	DefaultExecutorQualifier  *string
-	DefaultInboundCCVs        []datastore.AddressRef
-	LaneMandatedInboundCCVs   []datastore.AddressRef
-	DefaultOutboundCCVs       []datastore.AddressRef
-	LaneMandatedOutboundCCVs  []datastore.AddressRef
-	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides
-	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig
-	BaseExecutionGasCost      *uint32
-	TokenReceiverAllowed      *bool
-	MessageNetworkFeeUSDCents *uint16
-	TokenNetworkFeeUSDCents   *uint16
+	AllowTrafficFrom          *bool                                      `json:"allowTrafficFrom,omitempty" yaml:"allowTrafficFrom,omitempty"`
+	DefaultExecutorQualifier  *string                                    `json:"defaultExecutorQualifier,omitempty" yaml:"defaultExecutorQualifier,omitempty"`
+	DefaultInboundCCVs        []datastore.AddressRef                     `json:"defaultInboundCCVs,omitempty" yaml:"defaultInboundCCVs,omitempty"`
+	LaneMandatedInboundCCVs   []datastore.AddressRef                     `json:"laneMandatedInboundCCVs,omitempty" yaml:"laneMandatedInboundCCVs,omitempty"`
+	DefaultOutboundCCVs       []datastore.AddressRef                     `json:"defaultOutboundCCVs,omitempty" yaml:"defaultOutboundCCVs,omitempty"`
+	LaneMandatedOutboundCCVs  []datastore.AddressRef                     `json:"laneMandatedOutboundCCVs,omitempty" yaml:"laneMandatedOutboundCCVs,omitempty"`
+	FeeQuoterDestChainConfig  adapters.FeeQuoterDestChainConfigOverrides `json:"feeQuoterDestChainConfig,omitempty" yaml:"feeQuoterDestChainConfig,omitempty"`
+	ExecutorDestChainConfig   *adapters.ExecutorDestChainConfig          `json:"executorDestChainConfig,omitempty" yaml:"executorDestChainConfig,omitempty"`
+	BaseExecutionGasCost      *uint32                                    `json:"baseExecutionGasCost,omitempty" yaml:"baseExecutionGasCost,omitempty"`
+	TokenReceiverAllowed      *bool                                      `json:"tokenReceiverAllowed,omitempty" yaml:"tokenReceiverAllowed,omitempty"`
+	MessageNetworkFeeUSDCents *uint16                                    `json:"messageNetworkFeeUSDCents,omitempty" yaml:"messageNetworkFeeUSDCents,omitempty"`
+	TokenNetworkFeeUSDCents   *uint16                                    `json:"tokenNetworkFeeUSDCents,omitempty" yaml:"tokenNetworkFeeUSDCents,omitempty"`
 }
 
 type partialChainConfig struct {
@@ -124,6 +124,13 @@ func ConfigureChainsForLanesFromTopology(
 		if len(chains) == 0 {
 			return fmt.Errorf("no lane chains are available in environment")
 		}
+		laneChainSelectors := make([]uint64, 0, len(chains))
+		for _, chainCfg := range chains {
+			laneChainSelectors = append(laneChainSelectors, chainCfg.ChainSelector)
+		}
+		if err := validateExecutorPoolCoverage(cfg.Topology, laneChainSelectors); err != nil {
+			return fmt.Errorf("executor pool validation failed: %w", err)
+		}
 		for _, chainCfg := range chains {
 			if !slices.Contains(e.BlockChains.ListChainSelectors(), chainCfg.ChainSelector) {
 				return fmt.Errorf("chain selector %d is not available in environment", chainCfg.ChainSelector)
@@ -138,6 +145,12 @@ func ConfigureChainsForLanesFromTopology(
 			if err := validateDefaultCCVsResolvable(chainCfg, committeeVerifierContractRegistry, e); err != nil {
 				return err
 			}
+		}
+		if err := validateLaneAddressesResolvable(e, chainFamilyRegistry, committeeVerifierContractRegistry, chains, cfg.UseTestRouter()); err != nil {
+			return fmt.Errorf("lane address validation failed: %w", err)
+		}
+		if err := validateLaneSignersResolvable(e, cfg.Topology, chains); err != nil {
+			return fmt.Errorf("lane signer validation failed: %w", err)
 		}
 		return nil
 	}
@@ -240,7 +253,7 @@ func ConfigureChainsForLanesFromTopology(
 			})
 		}
 
-		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter(), cfg.AllowOnrampOverride)
+		return applyConfigureChains(e, chainFamilyRegistry, mcmsRegistry, committeeVerifierContractRegistry, enriched, cfg.MCMS, cfg.UseTestRouter(), cfg.AllowOnrampOverride, cfg.AllowLoweringBaseExecutionGasCost)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)
@@ -266,99 +279,57 @@ func applyConfigureChains(
 	mcmsInput mcms.Input,
 	useTestRouter bool,
 	allowOnrampOverride bool,
+	allowLoweringBaseExecutionGasCost bool,
 ) (deployment.ChangesetOutput, error) {
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
 	ds := datastore.NewMemoryDataStore()
 
+	// ── Phase 2: Resolution ──────────────────────────────────────────────────
+	// Resolve every chain's config before dispatching any of them. Dispatch writes
+	// immediately in deployer-owned mode, so a failure discovered while resolving a later
+	// chain would otherwise leave earlier chains already configured.
+	resolved := make([]resolvedChainConfig, 0, len(chains))
 	for _, chainCfg := range chains {
-		// ── Phase 2: Resolution ──────────────────────────────────────────────
-		family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
+		rc, err := resolveChainConfig(e, chainFamilyRegistry, committeeVerifierContractRegistry, chainCfg, useTestRouter)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainCfg.ChainSelector, err)
+			return deployment.ChangesetOutput{}, err
 		}
-		adapter, ok := chainFamilyRegistry.GetChainFamily(family)
+		resolved = append(resolved, rc)
+	}
+
+	// ── Phase 2b: Gas-price preflight ────────────────────────────────────────
+	// The sequence enforces the gas-price rule per chain, but only when that chain is
+	// dispatched. Validate every chain up front so a missing or invalid price on a later
+	// chain fails before any chain is written.
+	for _, rc := range resolved {
+		validator, ok := rc.adapter.(adapters.GasPriceValidator)
 		if !ok {
-			return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for chain family %q", family)
+			continue
 		}
+		if err := validator.ValidateGasPricesForLanes(e, rc.chainCfg.ChainSelector, rc.feeQuoterBytes, rc.remoteChains); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("gas price validation failed for chain %d: %w", rc.chainCfg.ChainSelector, err)
+		}
+	}
 
-		var routerBytes []byte
-		if useTestRouter {
-			routerBytes, err = adapter.GetTestRouter(e.DataStore, chainCfg.ChainSelector)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve test router on chain %d: %w", chainCfg.ChainSelector, err)
-			}
-		} else {
-			routerBytes, err = adapter.GetRouterAddress(e.DataStore, chainCfg.ChainSelector)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve router on chain %d: %w", chainCfg.ChainSelector, err)
-			}
-		}
-
-		onRampBytes, err := adapter.GetOnRampAddress(e.DataStore, chainCfg.ChainSelector)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve onRamp on chain %d: %w", chainCfg.ChainSelector, err)
-		}
-		feeQuoterBytes, err := adapter.GetFQAddress(e.DataStore, chainCfg.ChainSelector)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve feeQuoter on chain %d: %w", chainCfg.ChainSelector, err)
-		}
-		offRampBytes, err := adapter.GetOffRampAddress(e.DataStore, chainCfg.ChainSelector)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve offRamp on chain %d: %w", chainCfg.ChainSelector, err)
-		}
-
-		committeeVerifiers := make([]adapters.CommitteeVerifierConfig[datastore.AddressRef], len(chainCfg.CommitteeVerifiers))
-		for i, verifier := range chainCfg.CommitteeVerifiers {
-			contracts := make([]datastore.AddressRef, 0, len(verifier.CommitteeVerifier))
-			for _, contractRef := range verifier.CommitteeVerifier {
-				resolvedContract, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, chainCfg.ChainSelector, datastore_utils.FullRef)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve committee verifier contract ref on chain with selector %d: %w", chainCfg.ChainSelector, err)
-				}
-				contracts = append(contracts, resolvedContract)
-			}
-			committeeVerifiers[i] = adapters.CommitteeVerifierConfig[datastore.AddressRef]{
-				CommitteeVerifier:     contracts,
-				RemoteChains:          verifier.RemoteChains,
-				AllowedFinalityConfig: verifier.AllowedFinalityConfig,
-			}
-		}
-
-		remoteChains := make(map[uint64]adapters.RemoteChainConfig[[]byte, string], len(chainCfg.RemoteChains))
-		for remoteSelector, remoteChainCfg := range chainCfg.RemoteChains {
-			remoteFamily, err := chainsel.GetSelectorFamily(remoteSelector)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
-			}
-			remoteAdapter, ok := chainFamilyRegistry.GetChainFamily(remoteFamily)
-			if !ok {
-				return deployment.ChangesetOutput{}, fmt.Errorf("no adapter registered for remote chain family %q", remoteFamily)
-			}
-
-			convertedRemoteConfig, err := resolveRemoteChainConfig(e, adapter, remoteAdapter, chainCfg.ChainSelector, remoteSelector, remoteChainCfg, committeeVerifierContractRegistry)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to process remote chain config for selector %d: %w", remoteSelector, err)
-			}
-			remoteChains[remoteSelector] = convertedRemoteConfig
-		}
-
-		// ── Phase 3: Dispatch ──────────────────────────────────────────────
-		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
-			ChainSelector: chainCfg.ChainSelector,
+	// ── Phase 3: Dispatch ────────────────────────────────────────────────────
+	for _, rc := range resolved {
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, rc.adapter.ConfigureChainForLanes(), e.BlockChains, adapters.ConfigureChainForLanesInput{
+			ChainSelector: rc.chainCfg.ChainSelector,
 			// Overriding an existing prod-router OnRamp mapping is allowed either implicitly on the
 			// test router or explicitly via AllowOnrampOverride (set by migrate_chain_lanes_to_v2).
-			AllowOnrampOverride: useTestRouter || allowOnrampOverride,
-			Router:              routerBytes,
-			OnRamp:              onRampBytes,
-			CommitteeVerifiers:  committeeVerifiers,
-			FeeQuoter:           feeQuoterBytes,
-			OffRamp:             offRampBytes,
-			RemoteChains:        remoteChains,
-			FamilyExtras:        chainCfg.FamilyExtras,
+			AllowOnrampOverride:               useTestRouter || allowOnrampOverride,
+			AllowLoweringBaseExecutionGasCost: allowLoweringBaseExecutionGasCost,
+			Router:                            rc.routerBytes,
+			OnRamp:                            rc.onRampBytes,
+			CommitteeVerifiers:                rc.committeeVerifiers,
+			FeeQuoter:                         rc.feeQuoterBytes,
+			OffRamp:                           rc.offRampBytes,
+			RemoteChains:                      rc.remoteChains,
+			FamilyExtras:                      rc.chainCfg.FamilyExtras,
 		})
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", chainCfg.ChainSelector, err)
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure chain with selector %d: %w", rc.chainCfg.ChainSelector, err)
 		}
 
 		batchOps = append(batchOps, report.Output.BatchOps...)
@@ -379,6 +350,109 @@ func applyConfigureChains(
 		WithDataStore(ds).
 		WithBatchOps(batchOps).
 		Build(mcmsInput)
+}
+
+// resolvedChainConfig is a chain's fully-resolved lane configuration, ready to dispatch.
+type resolvedChainConfig struct {
+	chainCfg           enrichedChainConfig
+	adapter            adapters.ChainFamily
+	routerBytes        []byte
+	onRampBytes        []byte
+	feeQuoterBytes     []byte
+	offRampBytes       []byte
+	committeeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
+	remoteChains       map[uint64]adapters.RemoteChainConfig[[]byte, string]
+}
+
+// resolveChainConfig resolves every contract address and remote-chain config a chain's lane
+// configuration needs, without writing anything.
+func resolveChainConfig(
+	e deployment.Environment,
+	chainFamilyRegistry *adapters.ChainFamilyRegistry,
+	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
+	chainCfg enrichedChainConfig,
+	useTestRouter bool,
+) (resolvedChainConfig, error) {
+	family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
+	if err != nil {
+		return resolvedChainConfig{}, fmt.Errorf("failed to get chain family for chain selector %d: %w", chainCfg.ChainSelector, err)
+	}
+	adapter, ok := chainFamilyRegistry.GetChainFamily(family)
+	if !ok {
+		return resolvedChainConfig{}, fmt.Errorf("no adapter registered for chain family %q", family)
+	}
+
+	var routerBytes []byte
+	if useTestRouter {
+		routerBytes, err = adapter.GetTestRouter(e.DataStore, chainCfg.ChainSelector)
+		if err != nil {
+			return resolvedChainConfig{}, fmt.Errorf("failed to resolve test router on chain %d: %w", chainCfg.ChainSelector, err)
+		}
+	} else {
+		routerBytes, err = adapter.GetRouterAddress(e.DataStore, chainCfg.ChainSelector)
+		if err != nil {
+			return resolvedChainConfig{}, fmt.Errorf("failed to resolve router on chain %d: %w", chainCfg.ChainSelector, err)
+		}
+	}
+
+	onRampBytes, err := adapter.GetOnRampAddress(e.DataStore, chainCfg.ChainSelector)
+	if err != nil {
+		return resolvedChainConfig{}, fmt.Errorf("failed to resolve onRamp on chain %d: %w", chainCfg.ChainSelector, err)
+	}
+	feeQuoterBytes, err := adapter.GetFQAddress(e.DataStore, chainCfg.ChainSelector)
+	if err != nil {
+		return resolvedChainConfig{}, fmt.Errorf("failed to resolve feeQuoter on chain %d: %w", chainCfg.ChainSelector, err)
+	}
+	offRampBytes, err := adapter.GetOffRampAddress(e.DataStore, chainCfg.ChainSelector)
+	if err != nil {
+		return resolvedChainConfig{}, fmt.Errorf("failed to resolve offRamp on chain %d: %w", chainCfg.ChainSelector, err)
+	}
+
+	committeeVerifiers := make([]adapters.CommitteeVerifierConfig[datastore.AddressRef], len(chainCfg.CommitteeVerifiers))
+	for i, verifier := range chainCfg.CommitteeVerifiers {
+		contracts := make([]datastore.AddressRef, 0, len(verifier.CommitteeVerifier))
+		for _, contractRef := range verifier.CommitteeVerifier {
+			resolvedContract, err := datastore_utils.FindAndFormatRef(e.DataStore, contractRef, chainCfg.ChainSelector, datastore_utils.FullRef)
+			if err != nil {
+				return resolvedChainConfig{}, fmt.Errorf("failed to resolve committee verifier contract ref on chain with selector %d: %w", chainCfg.ChainSelector, err)
+			}
+			contracts = append(contracts, resolvedContract)
+		}
+		committeeVerifiers[i] = adapters.CommitteeVerifierConfig[datastore.AddressRef]{
+			CommitteeVerifier:     contracts,
+			RemoteChains:          verifier.RemoteChains,
+			AllowedFinalityConfig: verifier.AllowedFinalityConfig,
+		}
+	}
+
+	remoteChains := make(map[uint64]adapters.RemoteChainConfig[[]byte, string], len(chainCfg.RemoteChains))
+	for remoteSelector, remoteChainCfg := range chainCfg.RemoteChains {
+		remoteFamily, err := chainsel.GetSelectorFamily(remoteSelector)
+		if err != nil {
+			return resolvedChainConfig{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
+		}
+		remoteAdapter, ok := chainFamilyRegistry.GetChainFamily(remoteFamily)
+		if !ok {
+			return resolvedChainConfig{}, fmt.Errorf("no adapter registered for remote chain family %q", remoteFamily)
+		}
+
+		convertedRemoteConfig, err := resolveRemoteChainConfig(e, adapter, remoteAdapter, chainCfg.ChainSelector, remoteSelector, remoteChainCfg, committeeVerifierContractRegistry)
+		if err != nil {
+			return resolvedChainConfig{}, fmt.Errorf("failed to process remote chain config for selector %d: %w", remoteSelector, err)
+		}
+		remoteChains[remoteSelector] = convertedRemoteConfig
+	}
+
+	return resolvedChainConfig{
+		chainCfg:           chainCfg,
+		adapter:            adapter,
+		routerBytes:        routerBytes,
+		onRampBytes:        onRampBytes,
+		feeQuoterBytes:     feeQuoterBytes,
+		offRampBytes:       offRampBytes,
+		committeeVerifiers: committeeVerifiers,
+		remoteChains:       remoteChains,
+	}, nil
 }
 
 // resolveRemoteChainConfig resolves a PartialRemoteChainConfig into the form expected by the

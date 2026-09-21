@@ -3,16 +3,13 @@ package tokens
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	adaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -74,33 +71,15 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 
 		// If the token pool is already deployed, then apply any dynamic configuration updates the
-		// caller gave (e.g. router, rate-limit admin, fee aggregator, additional-CCVs threshold).
-		// This allows the seq to be re-run idempotently with an updated config without needing to
-		// tear down and re-deploy the pool.
+		// caller gave (e.g. router, rate-limit admin, fee aggregator). This allows the seq to be
+		// re-run idempotently with an updated config without needing to tear down and re-deploy
+		// the pool.
 		if tokenPoolAddress != (common.Address{}) {
 			b.Logger.Infof("Token pool already deployed on chain %d at address %q - updating dynamic pool config if needed", chain.Selector, tokenPoolAddress.Hex())
 			configureInput := ConfigureTokenPoolInput{}
 
 			// Populate configureInput with any dynamic config fields that the caller entered.
 			// Empty/zero values are ignored and result in no change to those fields on-chain.
-			if input.ThresholdAmountForAdditionalCCVs != "" {
-				threshold, ok := new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10)
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs '%s': must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
-				}
-				report, err := cldf_ops.ExecuteOperation(b,
-					token_pool.GetAdvancedPoolHooks, chain,
-					contract.FunctionInput[struct{}]{
-						ChainSelector: chain.Selector,
-						Address:       tokenPoolAddress,
-					},
-				)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to read advanced pool hooks address from existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
-				}
-				configureInput.ThresholdAmountForAdditionalCCVs = threshold
-				configureInput.AdvancedPoolHooks = report.Output
-			}
 			if input.RateLimitAdmin != "" {
 				if !common.IsHexAddress(input.RateLimitAdmin) {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid RateLimitAdmin address '%s'", input.RateLimitAdmin)
@@ -193,14 +172,6 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				feeAdmin = common.HexToAddress(input.FeeAdmin)
 			}
 		}
-		thresholdCCV := big.NewInt(0)
-		if input.ThresholdAmountForAdditionalCCVs != "" {
-			if threshold, ok := new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10); !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs '%s': must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
-			} else {
-				thresholdCCV = threshold
-			}
-		}
 
 		// Build the pool deployment input
 		tokenPoolType := datastore.ContractType(input.PoolType)
@@ -215,13 +186,12 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 
 		internalInput := DeployTokenPoolInput{
-			TokenPoolVersion:                 input.TokenPoolVersion,
-			TokenPoolType:                    tokenPoolType,
-			ChainSel:                         chain.Selector,
-			TokenSymbol:                      poolQualifier,
-			RateLimitAdmin:                   rateLimitAdmin,
-			FeeAdmin:                         feeAdmin,
-			ThresholdAmountForAdditionalCCVs: thresholdCCV,
+			TokenPoolVersion: input.TokenPoolVersion,
+			TokenPoolType:    tokenPoolType,
+			ChainSel:         chain.Selector,
+			TokenSymbol:      poolQualifier,
+			RateLimitAdmin:   rateLimitAdmin,
+			FeeAdmin:         feeAdmin,
 			ConstructorArgs: ConstructorArgs{
 				Token:       tokenAddress,
 				Decimals:    tokenDecimals,

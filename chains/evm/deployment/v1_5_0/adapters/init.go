@@ -4,6 +4,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -12,4 +13,6 @@ func init() {
 
 	feeReg := fees.GetRegistry()
 	feeReg.RegisterFeeAdapter(chainsel.FamilyEVM, v, NewFeesAdapter())
+
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyEVM, v, NewTokenAdapter())
 }

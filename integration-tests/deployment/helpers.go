@@ -45,6 +45,7 @@ import (
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	v2changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
@@ -471,6 +472,10 @@ func NewLaneTopologyForV2(signer string, chainSelectors ...uint64) *offchain.Env
 // NewLaneOverridesForV2 pins the lane's CCVs to the committee verifier deployed under
 // LaneCommitteeQualifier. Without it the changeset auto-resolves CCVs under the "default"
 // qualifier, which CreateBasicContractParams does not deploy.
+//
+// It also supplies a USDPerUnitGas: ConfigureChainForLanes refuses to configure a lane whose
+// FeeQuoter has no gas price for the destination, so a lane built without one would fail the
+// gas-price preflight.
 func NewLaneOverridesForV2(chainSelector uint64) *v2changesets.ChainOverrides {
 	verifier := []datastore.AddressRef{
 		{
@@ -484,6 +489,9 @@ func NewLaneOverridesForV2(chainSelector uint64) *v2changesets.ChainOverrides {
 		RemoteChainCfg: v2changesets.PartialRemoteChainConfig{
 			DefaultInboundCCVs:  verifier,
 			DefaultOutboundCCVs: verifier,
+			FeeQuoterDestChainConfig: ccvadapters.FeeQuoterDestChainConfigOverrides{
+				USDPerUnitGas: big.NewInt(1e18),
+			},
 		},
 	}
 }
