@@ -603,6 +603,48 @@ contracts:
       - name: getFee
         access: public
 
+  - contract_name: LombardVerifier
+    version: "2.2.0"
+    functions:
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: setPath
+        access: owner
+      - name: updateSupportedTokens
+        access: owner
+      - name: setRemoteAdapters
+        access: owner
+      - name: setAllowedFinalityConfig
+        access: owner
+      - name: setDynamicConfig
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: removePaths
+        access: owner
+      - name: withdrawFeeTokens
+        access: owner
+      - name: versionTag
+        access: public
+      - name: getDynamicConfig
+        access: public
+      - name: getPath
+        access: public
+      - name: getRemoteAdapter
+        access: public
+      - name: getRemoteChainConfig
+        access: public
+      - name: getStorageLocations
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: getSupportedTokens
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: getFee
+        access: public
+
   - contract_name: CCTPVerifier
     version: "2.1.0"
     functions:
