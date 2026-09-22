@@ -235,6 +235,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				allRemoteSelectors    []uint64
 				activePoolRef         datastore.AddressRef
 				localDecimals         uint8
+				localTokenBytes       []byte
 			)
 			if len(activePool) > 0 {
 				targetPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
@@ -273,15 +274,15 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 										activePoolRef.Version, selector,
 									)
 								}
-								tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
+								localTokenBytes, err = legacyAdapter.AddressRefToBytes(fullTokenRef)
 								if err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
 								}
-								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
+								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, localTokenBytes)
 								if err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
 								}
-								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
+								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool, localTokenBytes); err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
 								} else {
 									allRemoteSelectors = supported
@@ -308,7 +309,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if !ok {
 					return nil, nil, nil, fmt.Errorf("no address normalizer found for chain family %s of remote chain selector %d", remoteFamily, remoteSelector)
 				}
-				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, remoteSelector)
+				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, localTokenBytes, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote token for remote chain selector %d: %w", remoteSelector, err)
 				}
@@ -344,7 +345,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for remote chain selector %d: %w", remoteSelector, err)
 				}
-				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, remoteSelector)
+				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, localTokenBytes, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
 				}

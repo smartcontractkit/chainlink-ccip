@@ -188,16 +188,20 @@ type UnregisterTokenSequenceInput struct {
 //
 // NOTE: a Solana pool implementing these reads is NOT a migration source. The auto-migrate gate requires
 // a v2.0.0+ target pool, which no Solana pool has, so Solana always bails at the graceful skip before the
-// TokenPoolMigrator assert. Solana's GetSupportedChains returns an error because supported chains cannot
-// be enumerated on-chain; callers must list remotes explicitly for Solana.
+// TokenPoolMigrator assert.
+//
+// tokenAddr is the token (mint) the pool serves, as raw on-chain bytes. EVM adapters ignore it (the pool
+// contract alone identifies the token), but Solana needs it to derive the pool config PDA, which is keyed
+// by (chain_selector, mint, program_id). poolAddr may be either the pool program ID or the pool config PDA
+// on Solana; implementations must accept both forms.
 type TokenPoolMigrator interface {
 	// GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
-	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error)
+	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte) ([]uint64, error)
 	// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
-	GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error)
+	GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([]byte, error)
 	// GetRemotePools returns the remote pools (raw bytes) the pool at poolAddr is linked to for remoteSelector.
 	// A pool may have more than one during a remote-side upgrade.
-	GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error)
+	GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([][]byte, error)
 }
 
 // TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.

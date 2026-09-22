@@ -15,6 +15,7 @@ import (
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -719,33 +720,67 @@ func (a *SolanaAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokenapi.RemoveRe
 
 // GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
 //
-// NOTE: Solana token pools store each remote chain config in a PDA keyed by (chain_selector,
-// mint, program_id) and have no on-chain master list of supported chains, so the full set cannot
-// be enumerated. This method therefore returns a clear error instructing the operator to list the
-// remotes explicitly. This is distinct from a migration source: a Solana pool implementing these
-// reads is NOT a migration source (the auto-migrate gate requires a v2.0.0+ target, which no
-// Solana pool has), so this error is only reachable from the remote-pool removal discovery path.
-func (a *SolanaAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
-	return nil, fmt.Errorf(
-		"supported chains cannot be enumerated on Solana pool %s (chain %d); list the remote pools to remove explicitly",
-		solana.PublicKeyFromBytes(poolAddr).String(), chainSelector,
-	)
-}
-
-// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
-func (a *SolanaAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+// Solana token pools store each remote chain config in a PDA keyed by (chain_selector, mint,
+// program_id) and have no on-chain master list of supported chains, so the full set cannot be
+// enumerated directly. Instead, we derive the chain-config PDA for every other chain in the
+// environment and treat the ones that exist as the pool's supported chains.
+//
+// NOTE: a Solana pool implementing these reads is NOT a migration source. The auto-migrate gate
+// requires a v2.0.0+ target pool, which no Solana pool has, so Solana always bails at the graceful
+// skip before the TokenPoolMigrator assert; this method is only reachable from the remote-pool
+// removal discovery path.
+func (a *SolanaAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte) ([]uint64, error) {
 	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	// poolAddr is the pool config PDA (which encodes the mint), not the program ID.
-	mint, programID, err := a.poolMintAndProgram(e, chainSelector, solana.PublicKeyFromBytes(poolAddr))
+	poolProgramID, mint, err := a.resolvePoolProgramAndMint(e, chainSelector, poolAddr, tokenAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, mint, programID)
+	candidates := e.BlockChains.ListChainSelectors(cldf_chain.WithChainSelectorsExclusion([]uint64{chainSelector}))
+	pdas := make(solana.PublicKeySlice, len(candidates))
+	for i, candidate := range candidates {
+		pda, _, err := tokens.TokenPoolChainConfigPDA(candidate, mint, poolProgramID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive remote chain config PDA for candidate chain selector %d: %w", candidate, err)
+		}
+		pdas[i] = pda
+	}
+
+	supported := []uint64{}
+	args := common.BatchGetAccountsArgs[burnmint_token_pool.ChainConfig]{
+		Commitment: cldf_solana.SolDefaultCommitment,
+		AccountMax: 100,
+		PDAs:       pdas,
+		OnFound: func(i int, _ burnmint_token_pool.ChainConfig) error {
+			supported = append(supported, candidates[i])
+			return nil
+		},
+	}
+
+	if err := common.BatchGetAccounts(e.GetContext(), chain.Client, args); err != nil {
+		return nil, fmt.Errorf("failed to check remote chain configs for pool %s on chain %d: %w", poolProgramID, chainSelector, err)
+	}
+
+	return supported, nil
+}
+
+// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
+func (a *SolanaAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([]byte, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+
+	poolProgramID, mint, err := a.resolvePoolProgramAndMint(e, chainSelector, poolAddr, tokenAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, mint, poolProgramID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
 	}
@@ -760,19 +795,18 @@ func (a *SolanaAdapter) GetRemoteToken(e deployment.Environment, chainSelector u
 
 // GetRemotePools returns the remote pools (raw bytes) the pool at poolAddr is linked to for
 // remoteSelector. A pool may have more than one during a remote-side upgrade.
-func (a *SolanaAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error) {
+func (a *SolanaAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([][]byte, error) {
 	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not defined", chainSelector)
 	}
 
-	// poolAddr is the pool config PDA (which encodes the mint), not the program ID.
-	mint, programID, err := a.poolMintAndProgram(e, chainSelector, solana.PublicKeyFromBytes(poolAddr))
+	poolProgramID, mint, err := a.resolvePoolProgramAndMint(e, chainSelector, poolAddr, tokenAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, mint, programID)
+	remoteChainConfigPDA, _, err := tokens.TokenPoolChainConfigPDA(remoteSelector, mint, poolProgramID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive remote chain config PDA: %w", err)
 	}
@@ -789,30 +823,33 @@ func (a *SolanaAdapter) GetRemotePools(e deployment.Environment, chainSelector u
 	return pools, nil
 }
 
-// poolMintAndProgram derives the token mint and program ID for a Solana pool config PDA. The
-// pool config PDA encodes the mint in its account data, and its owner is the pool program ID.
-func (a *SolanaAdapter) poolMintAndProgram(e deployment.Environment, chainSelector uint64, poolConfigPDA solana.PublicKey) (solana.PublicKey, solana.PublicKey, error) {
-	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
-	if !ok {
-		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("chain with selector %d not defined", chainSelector)
-	}
-
-	resp, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), poolConfigPDA, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+// resolvePoolProgramAndMint resolves the pool program ID and token mint for a Solana pool. The
+// pool address may be given either as the pool program ID or as the pool config PDA; both forms
+// are supported. The token mint is taken from tokenAddr, which callers must supply (a Solana pool
+// program ID is shared across mints, so the mint cannot be derived from the pool address alone).
+func (a *SolanaAdapter) resolvePoolProgramAndMint(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte) (solana.PublicKey, solana.PublicKey, error) {
+	// NOTE: this is either the pool program ID or the pool PDA - we make no assumptions here.
+	poolAddress, err := deployapi.BytesToString(chainSelector, poolAddr)
 	if err != nil {
-		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("failed to get account info for pool config PDA %s on chain %d: %w", poolConfigPDA, chainSelector, err)
-	}
-	if resp == nil || resp.Value == nil || resp.Value.Data == nil {
-		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("failed to get account info for pool config PDA %s on chain %d", poolConfigPDA, chainSelector)
+		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("failed to convert pool address bytes to string for chain %d: %w", chainSelector, err)
 	}
 
-	// LockRelease and BurnMint v1.6 pool config accounts share the same state layout, so the
-	// BurnMint binding decodes either pool type.
-	var state burnmint_token_pool.State
-	if err := bin.NewBorshDecoder(resp.Value.Data.GetBinary()).Decode(&state); err != nil {
-		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("failed to decode pool config PDA %s on chain %d: %w", poolConfigPDA, chainSelector, err)
+	fullPoolRef, err := a.ResolveTokenPoolRef(e.OperationsBundle, e.BlockChains, e.DataStore, chainSelector, poolAddress)
+	if err != nil {
+		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("failed to resolve token pool ref for pool address %s on chain %d: %w", poolAddress, chainSelector, err)
 	}
 
-	return state.Config.Mint, resp.Value.Owner, nil
+	poolProgramID, err := solana.PublicKeyFromBase58(fullPoolRef.Address)
+	if err != nil {
+		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("failed to parse pool program ID from resolved token pool ref address %s: %w", fullPoolRef.Address, err)
+	}
+
+	mint := solana.PublicKeyFromBytes(tokenAddr)
+	if mint.IsZero() {
+		return solana.PublicKey{}, solana.PublicKey{}, fmt.Errorf("invalid token mint address bytes for chain %d", chainSelector)
+	}
+
+	return poolProgramID, mint, nil
 }
 
 // SetTokenPoolDynamicConfig updates the rate limit admin on a Solana 1.6 token pool. Solana

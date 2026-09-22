@@ -165,7 +165,7 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 			}
 
 			// Resolve the set of remotes to remove in the forward pass.
-			remotesToRemove, err := resolveRemotesToRemove(e, adapter, family, selector, fullPoolRef, pool)
+			remotesToRemove, err := resolveRemotesToRemove(e, adapter, family, selector, fullPoolRef, fullTokenRef, pool)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve remotes to remove for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.Pool), selector, err)
 			}
@@ -230,6 +230,7 @@ func resolveRemotesToRemove(
 	family string,
 	selector uint64,
 	fullPoolRef datastore.AddressRef,
+	fullTokenRef datastore.AddressRef,
 	pool RemoveRemotePoolsPerPool,
 ) ([]RemotePoolToRemove, error) {
 	if !pool.AllRemotes && !pool.Deactivate {
@@ -247,14 +248,19 @@ func resolveRemotesToRemove(
 		return nil, fmt.Errorf("failed to convert pool ref to bytes on chain selector %d: %w", selector, err)
 	}
 
-	supportedChains, err := migrator.GetSupportedChains(e, selector, poolBytes)
+	tokenBytes, err := adapter.AddressRefToBytes(fullTokenRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
+	}
+
+	supportedChains, err := migrator.GetSupportedChains(e, selector, poolBytes, tokenBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover supported chains for pool on chain selector %d: %w", selector, err)
 	}
 
 	remotes := make([]RemotePoolToRemove, 0, len(supportedChains))
 	for _, remoteSelector := range supportedChains {
-		remotePools, err := migrator.GetRemotePools(e, selector, poolBytes, remoteSelector)
+		remotePools, err := migrator.GetRemotePools(e, selector, poolBytes, tokenBytes, remoteSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get remote pools for remote chain selector %d on chain selector %d: %w", remoteSelector, selector, err)
 		}
@@ -341,7 +347,11 @@ func removeRemotePoolsReverse(
 		if !ok {
 			return nil, nil, fmt.Errorf("adapter for remote chain selector %d does not support remote pool discovery", remoteSelector)
 		}
-		peerRemotes, err := peerMigrator.GetRemotePools(e, remoteSelector, activePool, selector)
+		peerTokenBytes, err := remoteAdapter.AddressRefToBytes(remoteTokenRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert peer token ref to bytes on remote chain selector %d: %w", remoteSelector, err)
+		}
+		peerRemotes, err := peerMigrator.GetRemotePools(e, remoteSelector, activePool, peerTokenBytes, selector)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read peer remote pools for chain selector %d on remote chain selector %d: %w", selector, remoteSelector, err)
 		}
