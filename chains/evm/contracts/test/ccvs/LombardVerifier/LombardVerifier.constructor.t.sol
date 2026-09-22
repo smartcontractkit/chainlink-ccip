@@ -11,7 +11,7 @@ import {LombardVerifierSetup, MockLombardBridge} from "./LombardVerifierSetup.t.
 contract LombardVerifier_constructor is LombardVerifierSetup {
   function test_constructor() public view {
     assertEq(address(s_lombardVerifier.i_bridge()), address(s_mockBridge));
-    assertEq(s_lombardVerifier.versionTag(), VERSION_TAG_V2_0_0);
+    assertEq(s_lombardVerifier.versionTag(), VERSION_TAG_V2_2_0);
   }
 
   function test_constructor_RevertWhen_ZeroBridge() public {
@@ -21,7 +21,7 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
       IBridgeV3(address(0)),
       s_storageLocations,
       address(s_mockRMNRemote),
-      VERSION_TAG_V2_0_0
+      VERSION_TAG_V2_2_0
     );
   }
 
@@ -37,7 +37,7 @@ contract LombardVerifier_constructor is LombardVerifierSetup {
       IBridgeV3(address(mockBridge)),
       s_storageLocations,
       address(s_mockRMNRemote),
-      VERSION_TAG_V2_0_0
+      VERSION_TAG_V2_2_0
     );
   }
 
