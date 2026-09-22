@@ -157,8 +157,14 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 		return nil, nil, nil, fmt.Errorf("failed to snapshot active pools for auto-migrate: %w", err)
 	}
 
-	// Process chains in deterministic (sorted) selector order (Go map iteration is randomized)
-	for _, selector := range slices.Sorted(maps.Keys(cfg)) {
+	// TEMP REORDER (revert before merge): process in DESCENDING selector order so the ETH Sepolia hub
+	// (largest selector) is handled first and gets the freshest credential window before the KMS TTL
+	// lapses. The changeset is order-independent (active-pool snapshot is taken pre-batch and the
+	// co-migration set is the input map), so this only changes scheduling, not the resulting on-chain
+	// state. Revert to ascending (slices.Sorted only) once this migration is complete.
+	orderedSelectors := slices.Sorted(maps.Keys(cfg))
+	slices.Reverse(orderedSelectors)
+	for _, selector := range orderedSelectors {
 		token := cfg[selector]
 
 		token.RegistryRef, err = deploy.TryNormalizeAddressRef(selector, token.RegistryRef)
