@@ -300,6 +300,14 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				}
 			}
 			for _, remoteSelector := range allRemoteSelectors {
+				deprecated, err := chain_selectors.IsDeprecated(remoteSelector)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to check if remote chain selector %d is deprecated: %w", remoteSelector, err)
+				}
+				if deprecated {
+					e.Logger.Infof("skipping deprecated remote chain selector %d", remoteSelector)
+					continue
+				}
 				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
