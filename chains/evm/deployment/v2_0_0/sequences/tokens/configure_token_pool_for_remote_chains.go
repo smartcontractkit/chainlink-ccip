@@ -7,6 +7,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
@@ -70,6 +73,13 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				if err == nil {
 					supportedChains := supportedChainsReport.Output
 					for _, sel := range supportedChains {
+						// Only require remoteChains to cover chains the tooling can actually
+						// migrate. Non-EVM/non-Solana remotes (e.g. SUI, Aptos) and deprecated
+						// (sunset/superseded) chains cannot be migrated, so they are excluded
+						// from this "must include all" requirement.
+						if !isMigratableRemoteChain(sel) {
+							continue
+						}
 						if _, ok := input.RemoteChains[sel]; !ok {
 							slices.Sort(supportedChains)
 							return sequences.OnChainOutput{}, fmt.Errorf("remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",
@@ -149,3 +159,24 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		return sequences.OnChainOutput{BatchOps: ops}, nil
 	},
 )
+
+// TODO: this was only added for emergency purposes and
+// should be removed. We need a better way to do this.
+//
+// isMigratableRemoteChain reports whether a remote chain selector from the active pool
+// should be required in remoteChains. Non-EVM/non-Solana chains (e.g. SUI, Aptos) and
+// deprecated (sunset/superseded) chains cannot be migrated by the tooling, so they are
+// excluded from the "remoteChains must include all active pool supported chains" check.
+func isMigratableRemoteChain(selector uint64) bool {
+	family, err := chain_selectors.GetSelectorFamily(selector)
+	if err != nil {
+		return false
+	}
+	if family != chain_selectors.FamilyEVM && family != chain_selectors.FamilySolana {
+		return false
+	}
+	if deprecated, err := chain_selectors.IsDeprecated(selector); err != nil || deprecated {
+		return false
+	}
+	return true
+}
