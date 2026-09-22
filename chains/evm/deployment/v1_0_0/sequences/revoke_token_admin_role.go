@@ -69,6 +69,15 @@ var RevokeTokenAdminRole = cldf_ops.NewSequence(
 		if !tokenImpl.Capabilities().SupportsAdminRole {
 			return sequences.OnChainOutput{}, fmt.Errorf("token %s on chain %d with type %s does not support admin role management", tokenAddress.Hex(), input.ChainSelector, input.TokenRef.Type)
 		}
+		// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) have no equivalent for an
+		// independent "revoke admin from address X" operation: grantRole/revokeRole revert
+		// unconditionally for their admin role, and completing a transfer via
+		// acceptDefaultAdminTransfer requires the *target* admin's own signature, which this
+		// sequence has no way to guarantee for an arbitrary AdminAddress/FallbackAddress. Fail
+		// clearly rather than attempting a synchronous revoke that would revert on-chain.
+		if tokenImpl.Capabilities().UsesAsyncRoleManagement {
+			return sequences.OnChainOutput{}, fmt.Errorf("token %s on chain %d with type %s uses async role management and does not support revoking an admin role via this changeset", tokenAddress.Hex(), input.ChainSelector, input.TokenRef.Type)
+		}
 
 		// This operation will be run by either timelock or the deployer key, so we need to ensure that
 		// the account running the operation has sufficient access to perform the operation. If this is
