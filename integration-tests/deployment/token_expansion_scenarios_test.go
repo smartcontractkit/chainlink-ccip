@@ -1140,6 +1140,9 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		poolHasPauserRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, pauserRole, poolAddr)
 		require.NoError(t, err)
 		require.False(t, poolHasPauserRole, "pool should not hold PAUSER_ROLE")
+		poolHasFreezerRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, freezerRole, poolAddr)
+		require.NoError(t, err)
+		require.False(t, poolHasFreezerRole, "pool should not hold FREEZER_ROLE")
 
 		// Pool minter/burner roles were granted (ParticipatesInPoolRoleGrant), same as Scenario6.
 		minterRole, err := token.MINTERROLE(&bind.CallOpts{Context: t.Context()})

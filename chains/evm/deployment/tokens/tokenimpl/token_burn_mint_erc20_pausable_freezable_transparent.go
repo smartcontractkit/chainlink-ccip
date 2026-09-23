@@ -28,7 +28,7 @@ func (tokenBurnMintERC20PausableFreezableTransparent) Capabilities() CapabilityS
 		ParticipatesInPoolRoleGrant: true,
 		// Same AccessControlDefaultAdminRulesUpgradeable-based admin-role transfer constraints as
 		// BurnMintERC20Transparent - see tokenBurnMintERC20Transparent.Capabilities for the full
-		// rationale. PAUSER_ROLE/FREEZER_ROLE management is not wired into the deploy pipeline yet.
+		// rationale. PAUSER_ROLE/FREEZER_ROLE are granted from DeployTokenInput during deployment.
 		SupportsAdminRole:       true,
 		UsesAsyncRoleManagement: true,
 		SupportsCCIPAdmin:       true,
@@ -243,7 +243,10 @@ func (tokenBurnMintERC20PausableFreezableTransparent) Deploy(b operations.Bundle
 
 	var writeOutputs []contract.WriteOutput
 
-	if common.IsHexAddress(in.Pauser) {
+	if in.Pauser != "" {
+		if !common.IsHexAddress(in.Pauser) {
+			return datastore.AddressRef{}, nil, fmt.Errorf("invalid pauser address %q", in.Pauser)
+		}
 		writeOutputs, err = grantPausableFreezableRole(b, chain, proxyRef, writeOutputs,
 			burn_mint_erc20_pausable_freezable_transparent.PauserRole, common.HexToAddress(in.Pauser), "PAUSER_ROLE")
 		if err != nil {
@@ -251,7 +254,10 @@ func (tokenBurnMintERC20PausableFreezableTransparent) Deploy(b operations.Bundle
 		}
 	}
 
-	if common.IsHexAddress(in.Freezer) {
+	if in.Freezer != "" {
+		if !common.IsHexAddress(in.Freezer) {
+			return datastore.AddressRef{}, nil, fmt.Errorf("invalid freezer address %q", in.Freezer)
+		}
 		writeOutputs, err = grantPausableFreezableRole(b, chain, proxyRef, writeOutputs,
 			burn_mint_erc20_pausable_freezable_transparent.FreezerRole, common.HexToAddress(in.Freezer), "FREEZER_ROLE")
 		if err != nil {
