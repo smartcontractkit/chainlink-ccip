@@ -16,6 +16,12 @@ func IfSubjectEqual(s, other Subject) bool {
 type CurseInput struct {
 	Subjects      []Subject
 	ChainSelector uint64
+	// MCMSQualifier is the qualifier of the MCMS stack that will execute the resulting
+	// proposal. Families whose RMN curse entrypoint takes an explicit caller argument
+	// (Stellar: curse(caller, subjects), where the caller must be the invoking timelock)
+	// need it to resolve that timelock at proposal-build time. Empty on direct /
+	// no-MCMS runs. Families that authorize by transaction sender ignore it.
+	MCMSQualifier string
 }
 
 // GlobalCurseSubject is defined here - https://github.com/smartcontractkit/chainlink-ccip/blob/main/chains/evm/contracts/rmn/RMNRemote.sol#L12

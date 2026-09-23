@@ -73,6 +73,14 @@ type DeployTokenInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
+	// TimelockAddress is always resolved from the MCMS config by TokenExpansion, mirroring
+	// DeployTokenPoolInput.TimelockAddress. EVM adapters that support a 2-step admin transfer
+	// (e.g. upgradeable BurnMintERC20 variants using AccessControlDefaultAdminRulesUpgradeable)
+	// compare it against ExternalAdmin to decide whether the second step (acceptance) can be
+	// safely queued into an MCMS proposal for the timelock to execute itself, versus a
+	// customer-provided address, where acceptance must happen out-of-band.
+	// Users should not set this field in durable pipeline inputs.
+	TimelockAddress string `yaml:"-" json:"-"`
 }
 
 // Right now this is only used for Solana tokens but we can extend this to other VMs if needed in the future
@@ -119,11 +127,6 @@ type DeployTokenPoolInput struct {
 	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
 	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
 	TokenGovernor string `yaml:"tokenGovernor,omitempty" json:"tokenGovernor,omitempty"`
-	// ThresholdAmountForAdditionalCCVs is the transfer amount (in base units, as a decimal string)
-	// above which additional CCVs are required. Matches AdvancedPoolHooks'
-	// thresholdAmountForAdditionalCCVs. Applicable to EVM 2.0.0+ token pools.
-	// If empty or "0", no threshold is set.
-	ThresholdAmountForAdditionalCCVs string `yaml:"thresholdAmountForAdditionalCCVs,omitempty" json:"thresholdAmountForAdditionalCCVs,omitempty"`
 	// RouterRef optionally selects which router to wire into the pool. To target
 	// the test router, set Type to the chain's TestRouter contract type (e.g. on
 	// EVM: datastore.ContractType(router.TestRouterContractType)). An explicit
@@ -263,36 +266,39 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenInput.ExistingDataStore = e.DataStore
 				deployTokenInput.ChainSelector = selector
 
+				// TimelockAddress is always resolved, regardless of whether ExternalAdmin/CCIPAdmin
+				// were explicitly provided: EVM adapters compare ExternalAdmin against it to decide
+				// whether a 2-step admin transfer's acceptance can be auto-queued (see
+				// DeployTokenInput.TimelockAddress) - if a caller happens to pass the timelock's own
+				// address as ExternalAdmin, that comparison must still work. GetTimelockRef never
+				// errors (it just returns an empty ref when MCMS/the timelock isn't set up), so
+				// resolving it unconditionally here is safe.
+				mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
+				}
+				timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
+				}
+				if datastore_utils.IsAddressRefEmpty(timelockRef) {
+					e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter is expected to provide fallbacks for ExternalAdmin and/or CCIPAdmin", selector)
+				} else {
+					deployTokenInput.TimelockAddress = timelockRef.Address
+				}
+
 				// External admin defaults to timelock admin if not provided. CCIP admin is
 				// only applicable for BnM ERC20 tokens. If unspecified, then it falls back
 				// to the same value as ExternalAdmin, and if ExternalAdmin is unspecified,
 				// then it falls back to timelock.
-				//
-				// Please note that the timelock ref is lazy loaded from the datastore. This
-				// is intentional as some tests may not setup MCMS (so querying the timelock
-				// ref too eagerly will cause failures in those tests).
 				if deployTokenInput.CCIPAdmin == "" && deployTokenInput.ExternalAdmin != "" {
 					deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
 				}
-				if deployTokenInput.CCIPAdmin == "" || deployTokenInput.ExternalAdmin == "" {
-					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
-					if !ok {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
-					}
-					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
-					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
-					}
-					if datastore_utils.IsAddressRefEmpty(timelockRef) {
-						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter is expected to provide fallbacks for ExternalAdmin and/or CCIPAdmin", selector)
-					} else {
-						if deployTokenInput.ExternalAdmin == "" {
-							deployTokenInput.ExternalAdmin = timelockRef.Address
-						}
-						if deployTokenInput.CCIPAdmin == "" {
-							deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
-						}
-					}
+				if deployTokenInput.ExternalAdmin == "" && deployTokenInput.TimelockAddress != "" {
+					deployTokenInput.ExternalAdmin = deployTokenInput.TimelockAddress
+				}
+				if deployTokenInput.CCIPAdmin == "" {
+					deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
 				}
 				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
 				if err != nil {
