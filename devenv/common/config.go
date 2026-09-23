@@ -164,6 +164,31 @@ func DeriveOCRParamsForExec(
 	return override(params)
 }
 
+func withTONOCRConfigOverrides(params CCIPOCRParams) CCIPOCRParams {
+	// Source of truth: chainlink-deployments/domains/ccip/shared/chainconfigs.go:1076
+	// TON offramp enforces one root per commit report + one message per exec report.
+	if params.CommitOffChainConfig != nil {
+		params.CommitOffChainConfig.MultipleReportsEnabled = true
+		params.CommitOffChainConfig.MaxMerkleRootsPerReport = 1
+		params.CommitOffChainConfig.MaxPricesPerReport = 3
+		params.CommitOffChainConfig.MaxMerkleTreeSize = 10
+		params.CommitOffChainConfig.TransmissionDelayMultiplier = 2 * time.Minute
+		params.CommitOffChainConfig.MaxReportTransmissionCheckAttempts = 2
+	}
+	if params.ExecuteOffChainConfig != nil {
+		params.ExecuteOffChainConfig.MaxReportMessages = 1
+		params.ExecuteOffChainConfig.MaxSingleChainReports = 1
+		params.ExecuteOffChainConfig.BatchGasLimit = 1_000_000
+		params.ExecuteOffChainConfig.TransmissionDelayMultiplier = 2 * time.Minute
+		params.ExecuteOffChainConfig.MaxCommitReportsToFetch = 250
+		params.ExecuteOffChainConfig.InflightCacheExpiry = *config.MustNewDuration(1 * time.Minute)
+		params.ExecuteOffChainConfig.MessageVisibilityInterval = *config.MustNewDuration(8 * time.Hour)
+		params.ExecuteOffChainConfig.RootSnoozeTime = *config.MustNewDuration(5 * time.Minute)
+		params.ExecuteOffChainConfig.MultipleReportsEnabled = true
+	}
+	return params
+}
+
 type ConfigType string
 
 const (
