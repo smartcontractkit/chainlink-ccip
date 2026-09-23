@@ -8,7 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
@@ -76,7 +76,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 						// Only require remoteChains to cover chains the tooling can actually
 						// migrate - sunset/superseded chains cannot be migrated, so they are
 						// excluded from this "must include all" requirement.
-						if isDeprecated, err := chain_selectors.IsDeprecated(sel); err != nil || isDeprecated {
+						if isDeprecated, err := chainsel.IsDeprecated(sel); err != nil || isDeprecated {
 							continue
 						}
 						if _, ok := input.RemoteChains[sel]; !ok {
