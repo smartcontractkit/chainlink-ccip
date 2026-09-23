@@ -524,6 +524,28 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 			)
 			return nil, nil
 		}
+		// Only emit the pool role grant if CLD can actually administer the token's
+		// roles: either the deployer EOA (direct execution) or the CLL timelock
+		// (MCMS execution) must currently hold the token admin role. For a
+		// 3rd-party-administered token neither holds it, so the grant would be
+		// rerouted into the MCMS batch and revert on-chain when the timelock (which
+		// lacks the admin role) executes it — skip it and rely on the external token
+		// admin to grant the pool's mint/burn roles after deploy. Gated on
+		// SupportsAdminRole so token types that grant via a different mechanism
+		// (e.g. BurnMintERC677) are unaffected.
+		if tokenCaps.SupportsAdminRole {
+			canAdmin, err := a.canAdministerTokenRoles(b, chain, input, tokenAddr, tokenImpl)
+			if err != nil {
+				return nil, err
+			}
+			if !canAdmin {
+				b.Logger.Warnf(
+					"neither deployer (%s) nor CLL timelock holds the admin role on token %q (type %q) on chain %d; skipping pool mint/burn role grant for pool %q — the external token admin must grant it after deploy",
+					chain.DeployerKey.From.Hex(), tokenAddr.Hex(), tokenImpl.ContractType().String(), input.ChainSelector, poolAddr.Hex(),
+				)
+				return nil, nil
+			}
+		}
 		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
 			return nil, fmt.Errorf("failed to grant pool roles for token with address %s and type %s and pool %s on chain %d: %w", tokenAddr.Hex(), tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
@@ -602,6 +624,27 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 		return append(grantWrites, acceptWrites...), nil
 	}
 
+	// The handover below (grant admin to timelock, then revoke it from the deployer)
+	// can only be performed by an account that currently holds the token admin role.
+	// GrantAdminRole/RevokeAdminRole are deployer-signed only when the deployer is an
+	// allowed caller; otherwise they are rerouted into the MCMS batch and executed by
+	// the timelock. If the deployer does not hold the admin role, the token is
+	// administered externally: there is nothing for CLD to hand over, and the emitted
+	// writes would revert (the timelock does not hold the admin role either). Skip and
+	// let the external admin perform any handover out-of-band. Mirrors the async path
+	// above.
+	deployerHasRole, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+	if !deployerHasRole {
+		b.Logger.Warnf(
+			"deployer (%s) does not hold the admin role on token %q (type %q) on chain %d; skipping admin-role handover to the timelock — token is externally administered and its admin must hand over out-of-band",
+			chain.DeployerKey.From.Hex(), tokenAddr.Hex(), tokenImpl.ContractType().String(), input.ChainSelector,
+		)
+		return nil, nil
+	}
+
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
@@ -612,4 +655,37 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	}
 
 	return append(grantWrites, revokeWrites...), nil
+}
+
+// canAdministerTokenRoles reports whether CLD can actually execute role changes on
+// the token: either the deployer EOA (direct execution) or the CLL timelock (MCMS
+// execution) currently holds the token admin role. When neither does (e.g. a
+// 3rd-party-administered TIP-20 whose DEFAULT_ADMIN is held by the token issuer),
+// any grant/revoke writes we emit would revert on-chain, so callers must skip
+// emitting them. Only call when tokenImpl.Capabilities().SupportsAdminRole is true.
+func (a *EVMPoolAdapter) canAdministerTokenRoles(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	input tokensapi.DeployTokenPoolInput,
+	tokenAddr common.Address,
+	tokenImpl tokenimpl.Token,
+) (bool, error) {
+	hasDeployerAdmin, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
+	if err != nil {
+		return false, fmt.Errorf("failed to check deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+	if hasDeployerAdmin {
+		return true, nil
+	}
+
+	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
+	if err != nil {
+		return false, nil // No CLL timelock resolvable; only the deployer path could have worked.
+	}
+	hasTimelockAdmin, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, timelockAddr)
+	if err != nil {
+		return false, fmt.Errorf("failed to check timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+
+	return hasTimelockAdmin, nil
 }
