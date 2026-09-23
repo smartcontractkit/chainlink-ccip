@@ -4,6 +4,14 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 )
 
+// CanonicalUSDCDecimals is the number of decimals used by canonical USDC on every
+// CCTP-enabled EVM chain (Circle's standard). It lets the CCTP deployment changeset
+// default TokenDecimals for canonical EVM chains without an on-chain decimals() call.
+// Solana and non-canonical tokens are not guaranteed to match this and are resolved
+// on-chain instead. Stellar is the documented exception, using 7 decimals, but it is
+// not supported by the CCTP deployment changeset.
+const CanonicalUSDCDecimals uint8 = 6
+
 // CCTPChainDefaults holds the Circle-defined CCTP contract addresses and the
 // Circle domain identifier for a chain. These values are sourced from Circle's
 // public documentation:

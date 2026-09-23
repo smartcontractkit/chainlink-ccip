@@ -721,7 +721,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.LeftPadBytes(nonHomeSetup.USDCToken.Bytes(), 32), homeCCTPV2RemoteToken, "CCTP V2 pool remote token should be non-home USDC on home chain")
 	homeCCTPV2RemotePools, err := homeCCTPV2TokenPool.GetRemotePools(nil, nonHomeChainSelector)
 	require.NoError(t, err, "Failed to get remote pools from CCTP V2 token pool on home chain")
-	require.Contains(t, homeCCTPV2RemotePools, common.LeftPadBytes(nonHomeCCTPV1Pool.Bytes(), 32), "CCTP V2 pool should have non-home CCTP V1 pool as remote pool on home chain")
+	require.Contains(t, homeCCTPV2RemotePools, common.LeftPadBytes(nonHomeUSDCTokenPoolProxyAddr.Bytes(), 32), "CCTP V2 pool should have non-home proxy as remote pool on home chain")
 
 	// Check CCTP V1 token pool remote chain config on home chain.
 	// This lane is configured as CCTP_V2_WITH_CCV, so CCTP V1 should not be configured.
@@ -774,7 +774,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 		},
 	)
 	require.NoError(t, err, "Failed to get token config from token admin registry on non-home chain")
-	require.Equal(t, nonHomeCCTPV1Pool, nonHomeTokenConfigReport.Output.TokenPool, "Token pool in registry should be the CCTP V1 pool on non-home chain")
+	require.Equal(t, nonHomeUSDCTokenPoolProxyAddr, nonHomeTokenConfigReport.Output.TokenPool, "Token pool in registry should be the USDCTokenPoolProxy on non-home chain")
 
 	// Check CCTPTokenPool dynamic config on non-home chain
 	nonHomeCCTPTokenPool, err := cctp_through_ccv_token_pool_bindings.NewCCTPThroughCCVTokenPool(nonHomeCCTPTokenPoolAddr, nonHomeChain.Client)

@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/config"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 )
@@ -31,9 +32,9 @@ func TestApplyCCTPDefaults_FillsEmptyCanonicalChain(t *testing.T) {
 	require.Equal(t, "0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5", got.Chains[chainSel].TokenMessengerV1)
 	require.Equal(t, "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA", got.Chains[chainSel].TokenMessengerV2)
 	require.Equal(t, "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", got.Chains[chainSel].USDCToken)
-	// TokenDecimals is no longer defaulted by applyCCTPDefaults: it is only consumed by the
-	// non-canonical deploy and resolved on-chain (see makeApplyDeployCCTPChains).
-	require.Zero(t, got.Chains[chainSel].TokenDecimals)
+	// Canonical EVM chains default to the CCTP-standard 6 decimals, avoiding an on-chain
+	// decimals() call (see makeApplyDeployCCTPChains).
+	require.Equal(t, config.CanonicalUSDCDecimals, got.Chains[chainSel].TokenDecimals)
 }
 
 func TestApplyCCTPDefaults_ExplicitTokenDecimalsTakePrecedence(t *testing.T) {

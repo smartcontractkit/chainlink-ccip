@@ -140,6 +140,15 @@ func withCCTPChainDefaults(blockChains cldf_chain.BlockChains, chainSel uint64, 
 				chainCfg.USDCToken = defaults.USDCToken
 			}
 		}
+		// Canonical USDC is 6-decimal on every CCTP-enabled EVM chain (the CCTP standard).
+		// Hardcoding this for EVM avoids an RPC round-trip to read decimals() on every deploy.
+		// Solana and non-canonical tokens are not guaranteed to be 6-decimal, so they still
+		// resolve decimals on-chain (see makeApplyDeployCCTPChains).
+		if family, err := chain_selectors.GetSelectorFamily(chainSel); err == nil && family == chain_selectors.FamilyEVM {
+			if chainCfg.TokenDecimals == 0 {
+				chainCfg.TokenDecimals = config.CanonicalUSDCDecimals
+			}
+		}
 	}
 	// Domain identifiers are CCTP routing metadata rather than Circle contract
 	// addresses, so they are defaulted for every USDC type. Skipping this for
@@ -244,8 +253,9 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 			}
 			// TokenDecimals is consumed by the CCTP token pool constructors on both the canonical
 			// and non-canonical EVM deploys, where it must equal the token's ERC20 decimals (the
-			// pool constructor reverts on a mismatch). Resolve it on-chain when it is not supplied
-			// rather than defaulting to a hardcoded value.
+			// pool constructor reverts on a mismatch). Canonical EVM chains already have this
+			// defaulted to 6 by applyCCTPDefaults; remaining cases (non-canonical, or Solana)
+			// resolve it on-chain here when it is not supplied.
 			tokenDecimals := chainCfg.TokenDecimals
 			if tokenDecimals == 0 {
 				resolvedDecimals, err := adaptersByChain[chainSel].TokenDecimals(e.OperationsBundle, e.DataStore, e.BlockChains, chainSel, chainCfg.USDCToken)

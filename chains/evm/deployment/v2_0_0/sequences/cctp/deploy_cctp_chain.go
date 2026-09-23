@@ -56,7 +56,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		// this chain. It is returned as the FIRST entry of Addresses so the configure phase can
 		// derive it from the deploy output.
 		var registeredPoolRef datastore.AddressRef
-		var cctpV1PoolRef datastore.AddressRef
 
 		// Resolve chain and existing addresses
 		existingAddresses := dep.DataStore.Addresses().Filter(
@@ -218,7 +217,6 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy USDCTokenPool on %s: %w", chain, err)
 			}
 			addresses = append(addresses, cctpV1PoolAddressRef)
-			cctpV1PoolRef = cctpV1PoolAddressRef
 			cctpV1PoolAddress = common.HexToAddress(cctpV1PoolAddressRef.Address)
 		}
 
@@ -266,14 +264,9 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		addresses = append(addresses, usdcTokenPoolProxyRef)
 		usdcTokenPoolProxyAddress := common.HexToAddress(usdcTokenPoolProxyRef.Address)
 
-		// The pool registered on the TokenAdminRegistry differs by role: home chains register the
-		// USDCTokenPoolProxy (which routes to the underlying pools), non-home chains register the
-		// CCTP V1 pool directly.
-		if isHomeChain || datastore_utils.IsAddressRefEmpty(cctpV1PoolRef) {
-			registeredPoolRef = usdcTokenPoolProxyRef
-		} else {
-			registeredPoolRef = cctpV1PoolRef
-		}
+		// The pool registered on the TokenAdminRegistry for CCTP canonical EVM chain is always the USDCTokenPoolProxy: it
+		// routes to the underlying per-mechanism pools, for both home and non-home chains.
+		registeredPoolRef = usdcTokenPoolProxyRef
 		if datastore_utils.IsAddressRefEmpty(registeredPoolRef) {
 			return sequences.OnChainOutput{}, fmt.Errorf("could not determine the pool to register on chain %d", input.ChainSelector)
 		}
