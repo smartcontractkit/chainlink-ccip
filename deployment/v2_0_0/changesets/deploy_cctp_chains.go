@@ -10,6 +10,7 @@ import (
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -38,8 +39,6 @@ type CCTPChainConfig struct {
 	StorageLocations []string
 	// FeeAggregator is the address to which fees are withdrawn.
 	FeeAggregator string
-	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain.
-	RegisteredPoolRef datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]adapters.RemoteCCTPChainConfig
 	// USDCType specifies the type of the USDC on the chain.
@@ -68,15 +67,16 @@ const create2FactoryContractType = datastore.ContractType("CREATE2Factory")
 var create2FactoryVersion = semver.MustParse("2.0.0")
 
 // applyCCTPDefaults fills in any unset CCTPChainConfig fields with the
-// Circle-defined defaults for the chain and its remote chains, and resolves the
-// DeployerContract from the datastore when omitted. Values that are explicitly
-// provided take precedence, which allows test environments with their own chain
-// selectors and mock CCTP/USDC contracts to override them. If no defaults exist
-// for a chain, the input is left unchanged.
-func applyCCTPDefaults(ds datastore.DataStore, cfg DeployCCTPChainsConfig) DeployCCTPChainsConfig {
+// Circle-defined defaults for the chain and its remote chains, defaults
+// FeeAggregator to the chain's deployer key when the environment provides one,
+// and resolves the DeployerContract from the datastore when omitted. Values that
+// are explicitly provided take precedence, which allows test environments with
+// their own chain selectors and mock CCTP/USDC contracts to override them. Fields
+// for which no default exists are left unchanged.
+func applyCCTPDefaults(blockChains cldf_chain.BlockChains, ds datastore.DataStore, cfg DeployCCTPChainsConfig) DeployCCTPChainsConfig {
 	chains := make(map[uint64]CCTPChainConfig, len(cfg.Chains))
 	for chainSel, chainCfg := range cfg.Chains {
-		normalized := withCCTPChainDefaults(chainSel, chainCfg)
+		normalized := withCCTPChainDefaults(blockChains, chainSel, chainCfg)
 		if normalized.DeployerContract == "" {
 			normalized.DeployerContract = findDeployerContract(ds, chainSel)
 		}
@@ -84,6 +84,20 @@ func applyCCTPDefaults(ds datastore.DataStore, cfg DeployCCTPChainsConfig) Deplo
 	}
 	cfg.Chains = chains
 	return cfg
+}
+
+// chainDeployerKey returns the hex (EVM) or base58 (Solana) deployer address for a chain, if the
+// environment carries a deployer key for it. Used to default FeeAggregator to the chain's own
+// deployer. Returns "" when the chain is absent from the environment or has no deployer key. A
+// present-but-zero deployer key yields the zero address rather than "".
+func chainDeployerKey(blockChains cldf_chain.BlockChains, chainSel uint64) string {
+	if evmChain, ok := blockChains.EVMChains()[chainSel]; ok && evmChain.DeployerKey != nil {
+		return evmChain.DeployerKey.From.Hex()
+	}
+	if solChain, ok := blockChains.SolanaChains()[chainSel]; ok && solChain.DeployerKey != nil {
+		return solChain.DeployerKey.PublicKey().String()
+	}
+	return ""
 }
 
 // findDeployerContract returns the CREATE2Factory address for the chain from the
@@ -105,10 +119,16 @@ func findDeployerContract(ds datastore.DataStore, chainSel uint64) string {
 	return refs[0].Address
 }
 
-func withCCTPChainDefaults(chainSel uint64, chainCfg CCTPChainConfig) CCTPChainConfig {
+func withCCTPChainDefaults(blockChains cldf_chain.BlockChains, chainSel uint64, chainCfg CCTPChainConfig) CCTPChainConfig {
 	// Circle-defined addresses only apply to canonical USDC chains. Non-canonical
 	// chains use their own token and do not interact with Circle's contracts.
 	if chainCfg.USDCType == adapters.Canonical {
+		// FeeAggregator defaults to the chain's own deployer key so operators do not have
+		// to supply it per chain. Only applied for canonical chains (non-canonical has no
+		// fee aggregation via CCTP). Left unset when the environment has no deployer key.
+		if chainCfg.FeeAggregator == "" {
+			chainCfg.FeeAggregator = chainDeployerKey(blockChains, chainSel)
+		}
 		if defaults, ok := config.GetCCTPChainDefaults(chainSel); ok {
 			if chainCfg.TokenMessengerV1 == "" {
 				chainCfg.TokenMessengerV1 = defaults.TokenMessengerV1
@@ -119,7 +139,12 @@ func withCCTPChainDefaults(chainSel uint64, chainCfg CCTPChainConfig) CCTPChainC
 			if chainCfg.USDCToken == "" {
 				chainCfg.USDCToken = defaults.USDCToken
 			}
-			// Canonical USDC is 6-decimal on every CCTP-enabled EVM chain and Solana.
+		}
+		// Canonical USDC is 6-decimal on every CCTP-enabled EVM chain (the CCTP standard).
+		// Hardcoding this for EVM avoids an RPC round-trip to read decimals() on every deploy.
+		// Solana and non-canonical tokens are not guaranteed to be 6-decimal, so they still
+		// resolve decimals on-chain (see makeApplyDeployCCTPChains).
+		if family, err := chain_selectors.GetSelectorFamily(chainSel); err == nil && family == chain_selectors.FamilyEVM {
 			if chainCfg.TokenDecimals == 0 {
 				chainCfg.TokenDecimals = config.CanonicalUSDCDecimals
 			}
@@ -148,7 +173,7 @@ func withCCTPChainDefaults(chainSel uint64, chainCfg CCTPChainConfig) CCTPChainC
 
 func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) error {
 	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) error {
-		cfg = applyCCTPDefaults(e.DataStore, cfg)
+		cfg = applyCCTPDefaults(e.BlockChains, e.DataStore, cfg)
 		if cfg.MCMS != nil {
 			err := cfg.MCMS.Validate()
 			if err != nil {
@@ -172,7 +197,9 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 					return fmt.Errorf("invalid USDCToken for Solana chain %d", chainSel)
 				}
 			} else {
-				if !common.IsHexAddress(chainCfg.TokenMessengerV2) {
+				// TokenMessengerV2 is only required for canonical chains; non-canonical
+				// chains do not use Circle's contracts.
+				if chainCfg.USDCType == adapters.Canonical && !common.IsHexAddress(chainCfg.TokenMessengerV2) {
 					return fmt.Errorf("invalid TokenMessengerV2 for chain %d", chainSel)
 				}
 				if chainCfg.TokenMessengerV1 != "" && !common.IsHexAddress(chainCfg.TokenMessengerV1) {
@@ -196,7 +223,7 @@ func makeVerifyDeployCCTPChains(_ *adapters.CCTPChainRegistry, _ *changesets.MCM
 
 func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg DeployCCTPChainsConfig) (cldf.ChangesetOutput, error) {
-		cfg = applyCCTPDefaults(e.DataStore, cfg)
+		cfg = applyCCTPDefaults(e.BlockChains, e.DataStore, cfg)
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
 
@@ -215,10 +242,27 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 
 		// Deploy across all chains.
 		newDS := datastore.NewMemoryDataStore()
+		// registeredPoolRefs maps chain selector -> the pool that should be registered on the
+		// chain's TokenAdminRegistry. It is derived from each chain's CCTP deploy output, whose
+		// first address is, by convention, the registered pool ref.
+		registeredPoolRefs := make(map[uint64]datastore.AddressRef, len(cfg.Chains))
 		for chainSel, chainCfg := range cfg.Chains {
 			dep := adapters.DeployCCTPChainDeps{
 				BlockChains: e.BlockChains,
 				DataStore:   e.DataStore,
+			}
+			// TokenDecimals is consumed by the CCTP token pool constructors on both the canonical
+			// and non-canonical EVM deploys, where it must equal the token's ERC20 decimals (the
+			// pool constructor reverts on a mismatch). Canonical EVM chains already have this
+			// defaulted to 6 by applyCCTPDefaults; remaining cases (non-canonical, or Solana)
+			// resolve it on-chain here when it is not supplied.
+			tokenDecimals := chainCfg.TokenDecimals
+			if tokenDecimals == 0 {
+				resolvedDecimals, err := adaptersByChain[chainSel].TokenDecimals(e.OperationsBundle, e.DataStore, e.BlockChains, chainSel, chainCfg.USDCToken)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve token decimals for chain %d: %w", chainSel, err)
+				}
+				tokenDecimals = resolvedDecimals
 			}
 			in := adapters.DeployCCTPInput{
 				ChainSelector:    chainSel,
@@ -229,7 +273,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				FastFinalityBps:  chainCfg.FastFinalityBps,
 				StorageLocations: chainCfg.StorageLocations,
 				FeeAggregator:    chainCfg.FeeAggregator,
-				TokenDecimals:    chainCfg.TokenDecimals,
+				TokenDecimals:    tokenDecimals,
 			}
 			deployCCTPChainReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].DeployCCTPChain(), dep, in)
 			if err != nil {
@@ -243,6 +287,11 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
 			}
+			// The deploy output's first address is the registered pool ref (convention).
+			if len(deployCCTPChainReport.Output.Addresses) == 0 {
+				return cldf.ChangesetOutput{}, fmt.Errorf("CCTP deploy for chain %d produced no addresses; cannot derive the registered pool ref", chainSel)
+			}
+			registeredPoolRefs[chainSel] = deployCCTPChainReport.Output.Addresses[0]
 		}
 
 		// Configure across all chains.
@@ -274,7 +323,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 					return cldf.ChangesetOutput{}, fmt.Errorf("no CCTP adapter registered for chain family '%s' and type '%s'", remoteFamily, remoteUSDCType)
 				}
 				remoteChains[remoteChainSelector] = remoteAdapter
-				remoteRegisteredPoolRefs[remoteChainSelector] = cfg.Chains[remoteChainSelector].RegisteredPoolRef
+				remoteRegisteredPoolRefs[remoteChainSelector] = registeredPoolRefs[remoteChainSelector]
 
 				// Derive the inbound rate limiter configs from the counterpart's outbound rate limiter configs.
 				derived := remoteCfg
@@ -283,16 +332,16 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				remoteChainConfigs[remoteChainSelector] = derived
 			}
 			dep := adapters.ConfigureCCTPChainForLanesDeps{
-				BlockChains:  e.BlockChains,
-				DataStore:    combinedDS.Seal(),
-				RemoteChains: remoteChains,
+				BlockChains:              e.BlockChains,
+				DataStore:                combinedDS.Seal(),
+				RemoteChains:             remoteChains,
+				RegisteredPoolRef:        registeredPoolRefs[chainSel],
+				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
 			}
 			in := adapters.ConfigureCCTPChainForLanesInput{
-				ChainSelector:            chainSel,
-				USDCToken:                chainCfg.USDCToken,
-				RegisteredPoolRef:        chainCfg.RegisteredPoolRef,
-				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
-				RemoteChains:             remoteChainConfigs,
+				ChainSelector: chainSel,
+				USDCToken:     chainCfg.USDCToken,
+				RemoteChains:  remoteChainConfigs,
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {

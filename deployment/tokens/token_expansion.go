@@ -57,6 +57,14 @@ type DeployTokenInput struct {
 	CCIPAdmin string `yaml:"ccipAdmin" json:"ccipAdmin"`
 	// Currency is the TIP20 token currency. This field is only applicable for TIP20 tokens on Tempo. If this field is empty, then a sensible default will be chosen.
 	Currency string `yaml:"currency" json:"currency"`
+	// Pauser is granted PAUSER_ROLE at deploy time. Only applicable to
+	// BurnMintERC20PausableFreezableTransparentToken (EVM). If empty, PAUSER_ROLE is not granted to
+	// anyone at deploy time.
+	Pauser string `yaml:"pauser,omitempty" json:"pauser,omitempty"`
+	// Freezer is granted FREEZER_ROLE at deploy time. Only applicable to
+	// BurnMintERC20PausableFreezableTransparentToken (EVM). If empty, FREEZER_ROLE is not granted to
+	// anyone at deploy time.
+	Freezer string `yaml:"freezer,omitempty" json:"freezer,omitempty"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`

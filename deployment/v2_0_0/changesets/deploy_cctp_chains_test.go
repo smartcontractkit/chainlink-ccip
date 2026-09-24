@@ -154,6 +154,11 @@ func (m *cctpTest_MockCCTPChain) USDCType() adapters.USDCType {
 	return adapters.Canonical
 }
 
+// TokenDecimals returns the number of decimals of the token on the chain.
+func (m *cctpTest_MockCCTPChain) TokenDecimals(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, token string) (uint8, error) {
+	return 6, nil
+}
+
 var cctpTest_BasicMCMSInput = mcms.Input{
 	OverridePreviousRoot: true,
 	ValidUntil:           3759765795,
@@ -604,6 +609,18 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 				},
 			},
 			expectedError: "invalid TokenMessengerV2",
+		},
+		{
+			desc: "success - non-canonical chain does not require TokenMessengerV2",
+			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
+					// Non-canonical chains do not use Circle's contracts, so an empty
+					// TokenMessengerV2 must not fail verify.
+					5009297550715157269: {
+						USDCType: adapters.NonCanonical,
+					},
+				},
+			},
 		},
 		{
 			desc: "failure - unknown chain selector",
