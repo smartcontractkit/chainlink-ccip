@@ -219,13 +219,13 @@ func TestTokenExpansionMigration_AddressCollisionReversePropagation(t *testing.T
 			args, err := method.Inputs.Unpack(tx.Data[4:])
 			require.NoError(t, err)
 
-			srcSelector, ok := args[0].(uint64)
+			sourceSelector, ok := args[0].(uint64)
 			require.True(t, ok, "first arg must be a uint64 chain selector")
-			require.Equal(t, selA, srcSelector, "remoteChainSelector must be the migrating hub A")
+			require.Equal(t, selA, sourceSelector, "remoteChainSelector must be the migrating hub A")
 
-			dstSelector, ok := args[1].([]byte)
+			remotePoolBytes, ok := args[1].([]byte)
 			require.True(t, ok, "second arg must be a bytes32 remote pool address")
-			require.Equal(t, expectedRemotePool, dstSelector, "must add A's migrated v2 pool as the remote pool")
+			require.Equal(t, expectedRemotePool, remotePoolBytes, "must add A's migrated v2 pool as the remote pool")
 		}
 	}
 
