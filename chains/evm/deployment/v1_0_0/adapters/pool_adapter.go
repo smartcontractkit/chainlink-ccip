@@ -459,17 +459,22 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 			// The MCMS batch, however, is executed by the timelock resolved from cfg.MCMS.Qualifier
 			// (input.TimelockAddress). If a non-CLL qualifier is configured, those two accounts differ,
 			// so the preflight would validate the wrong executor. Reject that up front rather than
-			// emitting a grant the actual executor cannot authorize (or skipping one it could).
+			// emitting a grant the actual executor cannot authorize (or skipping one it could). Only
+			// enforce this for tokens that actually emit role writes — plain ERC20 (lock/release) pools
+			// grant no roles and hand over no admin, so a non-CLL qualifier is harmless for them.
 			if tokenImpl != nil && input.TimelockAddress != "" {
-				cllTimelock, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve CLL timelock for token role handling on chain %d: %w", input.ChainSelector, err)
-				}
-				if common.HexToAddress(input.TimelockAddress) != cllTimelock {
-					return sequences.OnChainOutput{}, fmt.Errorf(
-						"token role handling requires the CLL MCMS qualifier: configured executor %s does not match CLL timelock %s on chain %d",
-						input.TimelockAddress, cllTimelock.Hex(), input.ChainSelector,
-					)
+				caps := tokenImpl.Capabilities()
+				if caps.ParticipatesInPoolRoleGrant || caps.SupportsAdminRole {
+					cllTimelock, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve CLL timelock for token role handling on chain %d: %w", input.ChainSelector, err)
+					}
+					if common.HexToAddress(input.TimelockAddress) != cllTimelock {
+						return sequences.OnChainOutput{}, fmt.Errorf(
+							"token role handling requires the CLL MCMS qualifier: configured executor %s does not match CLL timelock %s on chain %d",
+							input.TimelockAddress, cllTimelock.Hex(), input.ChainSelector,
+						)
+					}
 				}
 			}
 
