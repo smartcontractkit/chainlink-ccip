@@ -73,10 +73,16 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				if err == nil {
 					supportedChains := supportedChainsReport.Output
 					for _, sel := range supportedChains {
-						// Only require remoteChains to cover chains the tooling can actually
-						// migrate - sunset/superseded chains cannot be migrated, so they are
-						// excluded from this "must include all" requirement.
-						if isDeprecated, err := chainsel.IsDeprecated(sel); err != nil || isDeprecated {
+						// Sunset/superseded chains cannot be migrated, so they are excluded
+						// from this "must include all" requirement. A deprecation lookup
+						// failure is a hard error: silently treating an unclassifiable
+						// selector as deprecated would drop it from the requirement and
+						// allow a supported lane to be left unconfigured.
+						isDeprecated, err := chainsel.IsDeprecated(sel)
+						if err != nil {
+							return sequences.OnChainOutput{}, fmt.Errorf("failed to check if supported chain selector %d is deprecated: %w", sel, err)
+						}
+						if isDeprecated {
 							continue
 						}
 						if _, ok := input.RemoteChains[sel]; !ok {
