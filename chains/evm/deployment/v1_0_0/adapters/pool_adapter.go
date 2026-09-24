@@ -546,7 +546,15 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 				return nil, nil
 			}
 		}
-		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
+		// Resolve the CLL timelock as the grant's proposal executor, matching the preflight above and
+		// TidyTokenRoles (both resolve CLL). When no CLL timelock is configured (deployer-owned /
+		// no-MCMS flows) fall back to the zero address so GrantPoolRoles takes the direct-execution
+		// path rather than aborting.
+		grantExecutor, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
+		if err != nil {
+			grantExecutor = common.Address{}
+		}
+		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, grantExecutor); grantErr != nil {
 			return nil, fmt.Errorf("failed to grant pool roles for token with address %s and type %s and pool %s on chain %d: %w", tokenAddr.Hex(), tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil
