@@ -177,15 +177,58 @@ func TestTokenExpansionMigration_AddressCollisionReversePropagation(t *testing.T
 	})
 	require.NoError(t, err)
 
-	// The reverse propagation must produce exactly one op per counterpart chain. Before the fix the
-	// colliding addresses made B and C share a report-cache key, so one chain received two ops and
-	// the other none.
+	// The reverse propagation must produce exactly one op per counterpart chain, and each op must
+	// target THAT chain's counterpart pool and add A's migrated v2 pool back on the hub's selector.
+	// Before the fix the colliding addresses made B and C share a report-cache key, so one chain
+	// received two ops and the other none. Note poolB == poolC, so the ops are distinguished by
+	// op.ChainSelector, not by the target address.
+	matchesForNewPoolA := migOut.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selA),
+		datastore.AddressRefByType(datastore.ContractType(cciputils.BurnMintTokenPool)),
+		datastore.AddressRefByQualifier(fmt.Sprintf("COLLIDE_POOL_V2_%d", selA)),
+	)
+	require.Len(t, matchesForNewPoolA, 1, "expected exactly one migrated v2 pool for A")
+	expectedRemotePool := common.LeftPadBytes(common.HexToAddress(matchesForNewPoolA[0].Address).Bytes(), 32)
+
+	poolABI, err := tokenpoolV2_0_0.TokenPoolMetaData.GetAbi()
+	require.NoError(t, err)
+
+	expectedPoolPerChain := map[mcms_types.ChainSelector]string{
+		mcms_types.ChainSelector(selB): poolB,
+		mcms_types.ChainSelector(selC): poolC,
+	}
+
 	sentPerChain := map[mcms_types.ChainSelector]int{}
 	for _, prop := range migOut.MCMSTimelockProposals {
 		for _, op := range prop.Operations {
+			wantPool, ok := expectedPoolPerChain[op.ChainSelector]
+			if !ok {
+				continue
+			}
+
 			sentPerChain[op.ChainSelector] += len(op.Transactions)
+			require.Len(t, op.Transactions, 1, "expected a single reverse-propagation tx for chain %d", op.ChainSelector)
+
+			tx := op.Transactions[0]
+			require.Equal(t, common.HexToAddress(wantPool), common.HexToAddress(tx.To),
+				"reverse-propagation op for chain %d must target that chain's counterpart pool", op.ChainSelector)
+
+			method, err := poolABI.MethodById(tx.Data[:4])
+			require.NoError(t, err)
+			require.Equal(t, "addRemotePool", method.Name, "reverse propagation should add the migrated hub pool")
+			args, err := method.Inputs.Unpack(tx.Data[4:])
+			require.NoError(t, err)
+
+			srcSelector, ok := args[0].(uint64)
+			require.True(t, ok, "first arg must be a uint64 chain selector")
+			require.Equal(t, selA, srcSelector, "remoteChainSelector must be the migrating hub A")
+
+			dstSelector, ok := args[1].([]byte)
+			require.True(t, ok, "second arg must be a bytes32 remote pool address")
+			require.Equal(t, expectedRemotePool, dstSelector, "must add A's migrated v2 pool as the remote pool")
 		}
 	}
+
 	require.Equal(t, 1, sentPerChain[mcms_types.ChainSelector(selB)], "expected exactly one reverse-propagation op for chain B")
 	require.Equal(t, 1, sentPerChain[mcms_types.ChainSelector(selC)], "expected exactly one reverse-propagation op for chain C")
 }
