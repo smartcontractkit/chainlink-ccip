@@ -432,7 +432,24 @@ func removeRemotePoolsReverse(
 		// Filter the peer's remote list down to the exact local pool being torn down. The peer may
 		// list several local pools for this chain (e.g. during an upgrade), and we must only remove
 		// the one this entry targets — never unrelated pairings.
-		localPoolAddr, err := normalizeAddr(selector, fullPoolRef.Address)
+		//
+		// The peer stores the local pool in its counterpart form for the local family (EVM: the pool
+		// contract; Solana: the pool config PDA), which is NOT fullPoolRef.Address (Solana normalizes
+		// that to the program ID). Derive the counterpart so the comparison below is like-for-like
+		// across families.
+		localPoolBytes, err := localAdapter.AddressRefToBytes(fullPoolRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert local pool ref to bytes on chain selector %d: %w", selector, err)
+		}
+		localTokenBytes, err := localAdapter.AddressRefToBytes(fullTokenRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert local token ref to bytes on chain selector %d: %w", selector, err)
+		}
+		localCounterpartBytes, err := localAdapter.DeriveTokenPoolCounterpart(e, selector, localPoolBytes, localTokenBytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to derive local pool counterpart on chain selector %d: %w", selector, err)
+		}
+		localPoolAddr, err := deploy.BytesToString(selector, localCounterpartBytes)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to normalize local pool address on chain selector %d: %w", selector, err)
 		}
