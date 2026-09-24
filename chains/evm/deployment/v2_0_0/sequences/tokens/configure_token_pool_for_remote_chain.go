@@ -325,14 +325,17 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// Without dedupe the on-chain ApplyChainUpdates add reverts with PoolAlreadyAdded.
 		remotePoolAddresses := make([][]byte, 0, len(imported.LegacyRemotePools)+1)
 		seenPools := make(map[string]struct{}, len(imported.LegacyRemotePools)+1)
-		for _, raw := range slices.Concat(slices.Clone(imported.LegacyRemotePools), [][]byte{input.RemoteChainConfig.RemotePool}) {
-			paddedAddr := common.LeftPadBytes(raw, 32)
-			stringAddr := string(paddedAddr)
-			if _, ok := seenPools[stringAddr]; ok {
-				continue
+		for _, raw := range slices.Concat(imported.LegacyRemotePools, [][]byte{input.RemoteChainConfig.RemotePool}) {
+			// Skip empty entries: LeftPadBytes(nil, 32) would otherwise register a 32-zero-byte remote pool.
+			if len(raw) > 0 {
+				paddedAddr := common.LeftPadBytes(raw, 32)
+				stringAddr := string(paddedAddr)
+				if _, ok := seenPools[stringAddr]; ok {
+					continue
+				}
+				remotePoolAddresses = append(remotePoolAddresses, paddedAddr)
+				seenPools[stringAddr] = struct{}{}
 			}
-			remotePoolAddresses = append(remotePoolAddresses, paddedAddr)
-			seenPools[stringAddr] = struct{}{}
 		}
 
 		applyChainUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyChainUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
