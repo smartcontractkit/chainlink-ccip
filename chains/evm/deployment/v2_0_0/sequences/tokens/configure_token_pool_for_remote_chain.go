@@ -269,6 +269,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				}
 				// Add active pool's remote pools first to protect inflight messages during cutover.
 				for _, activePoolAddr := range imported.LegacyRemotePools {
+					// Skip empty entries: LeftPadBytes(nil, 32) would otherwise register a 32-zero-byte remote pool.
+					if len(activePoolAddr) == 0 {
+						continue
+					}
 					padded := common.LeftPadBytes(activePoolAddr, 32)
 					if !containsPool(padded) {
 						addReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
@@ -286,7 +290,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						existingPools = append(existingPools, padded)
 					}
 				}
-				if !containsPool(common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)) {
+				// Skip an empty requested pool: LeftPadBytes(nil, 32) would otherwise register a 32-zero-byte remote pool.
+				if len(input.RemoteChainConfig.RemotePool) > 0 && !containsPool(common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)) {
 					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
