@@ -560,6 +560,48 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
 		return nil, nil
 	}
+	// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the grant below;
+	// grantRole/revokeRole revert unconditionally for their admin role, so RevokeAdminRole has no
+	// equivalent here. Instead, queue AcceptDefaultAdminTransfer into the batch: this function
+	// always grants to the CLL timelock specifically (never a customer address), so once the
+	// resulting MCMS proposal is executed, the timelock itself is the caller, which completes the
+	// transfer and atomically revokes the deployer - no separate revoke step needed or possible.
+	if tokenCaps.UsesAsyncRoleManagement {
+		pending, err := tokenImpl.PendingAdminRoleTarget(b, chain, tokenAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check pending admin role target for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		// Don't clobber a transfer that is already in flight: if it targets the timelock, tidy is
+		// already satisfied; if it targets a customer-chosen admin, that explicit config wins.
+		if pending != (common.Address{}) {
+			b.Logger.Infof("token %q on chain %d already has a pending admin transfer to %q; skipping tidy", tokenAddr.Hex(), input.ChainSelector, pending.Hex())
+			return nil, nil
+		}
+
+		// Nothing is pending. Only begin a transfer when the deployer still holds
+		// DEFAULT_ADMIN_ROLE: BeginDefaultAdminTransfer is deployer-signed, so the deployer must be
+		// the current admin. If it isn't (e.g. a customer admin already accepted), queueing a begin
+		// would revert when the timelock executes it.
+		deployerHasRole, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		if !deployerHasRole {
+			b.Logger.Infof("deployer does not hold DEFAULT_ADMIN_ROLE on token %q on chain %d; skipping tidy", tokenAddr.Hex(), input.ChainSelector)
+			return nil, nil
+		}
+
+		grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		acceptWrites, err := tokenImpl.AcceptAdminRole(b, chain, tokenAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare accept of timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		return append(grantWrites, acceptWrites...), nil
+	}
+
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
