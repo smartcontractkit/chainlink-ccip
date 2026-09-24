@@ -204,7 +204,7 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 	if ref.Address != "" {
 		accessControllerAccount = solana.PublicKeyFromBytes([]byte(ref.Address))
 		var data access_controller.AccessController
-		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, accessControllerAccount, rpc.CommitmentConfirmed, &data)
+		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, accessControllerAccount, rpc.CommitmentFinalized, &data)
 		if err == nil {
 			b.Logger.Infow("access controller already initialized, skipping initialization", "chain", deps.Chain.String())
 			return cldf_datastore.AddressRef{}, nil
@@ -243,7 +243,7 @@ func initializeAccessController(
 	b operations.Bundle, chain cldf_solana.Chain, programID solana.PublicKey, roleAccount solana.PrivateKey,
 ) error {
 	rentExemption, err := chain.Client.GetMinimumBalanceForRentExemption(b.GetContext(),
-		accessControllerAccountSize, rpc.CommitmentConfirmed)
+		accessControllerAccountSize, rpc.CommitmentFinalized)
 	if err != nil {
 		return fmt.Errorf("failed to get minimum balance for rent exemption: %w", err)
 	}
@@ -269,7 +269,7 @@ func initializeAccessController(
 	}
 
 	var data access_controller.AccessController
-	err = common.GetAccountDataBorshInto(b.GetContext(), chain.Client, roleAccount.PublicKey(), rpc.CommitmentConfirmed, &data)
+	err = common.GetAccountDataBorshInto(b.GetContext(), chain.Client, roleAccount.PublicKey(), rpc.CommitmentFinalized, &data)
 	if err != nil {
 		return fmt.Errorf("failed to read access controller roleAccount: %w", err)
 	}
@@ -307,7 +307,7 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 		mcmSeed = state.PDASeed([]byte(ref.Address))
 		mcmConfigPDA := state.GetMCMConfigPDA(in.MCM, mcmSeed)
 		var data mcm.MultisigConfig
-		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, mcmConfigPDA, rpc.CommitmentConfirmed, &data)
+		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, mcmConfigPDA, rpc.CommitmentFinalized, &data)
 		if err == nil {
 			b.Logger.Infow("mcm config already initialized, skipping initialization", "chain", deps.Chain.String())
 			return MCMOutput{}, nil
@@ -428,7 +428,7 @@ func initializeMCM(b operations.Bundle, deps Deps, mcmProgram solana.PublicKey, 
 		DataType uint32
 		Address  solana.PublicKey
 	}
-	opts := &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentConfirmed}
+	opts := &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized}
 
 	data, err := deps.Chain.Client.GetAccountInfoWithOpts(b.GetContext(), mcmProgram, opts)
 	if err != nil {
@@ -560,7 +560,7 @@ func initializeTimelock(b operations.Bundle, deps Deps, timelockProgram solana.P
 		DataType uint32
 		Address  solana.PublicKey
 	}
-	opts := &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentConfirmed}
+	opts := &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized}
 
 	data, err := deps.Chain.Client.GetAccountInfoWithOpts(b.GetContext(), timelockProgram, opts)
 	if err != nil {
