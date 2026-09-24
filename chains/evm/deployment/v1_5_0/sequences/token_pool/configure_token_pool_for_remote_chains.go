@@ -42,7 +42,10 @@ type ConfigureTokenPoolForRemoteChainInput struct {
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
 
-func (c ConfigureTokenPoolForRemoteChainInput) Validate() error {
+func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
+	if c.ChainSelector != chain.Selector {
+		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
+	}
 	return evmutils.Wrap(
 		c.RemoteChainConfig.Validate(),
 		fmt.Sprintf("invalid remote chain config for remote chain selector %d", c.RemoteChainSelector),
@@ -77,6 +80,9 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		// ConfigureTokensForTransfers) so we intentionally use the direct contract bindings
 		// over ExecuteOperation to avoid the possibility of reading stale onchain data from
 		// the operation reports cache.
+		if input.ChainSelector != chain.Selector {
+			return sequences.OnChainOutput{}, fmt.Errorf("chain selector %d does not match chain %s", input.ChainSelector, chain)
+		}
 		tokenPool, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(input.TokenPoolAddress, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
@@ -125,7 +131,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	bmtpap.Version,
 	"Configures a v1.5.0 token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (sequences.OnChainOutput, error) {
-		if err := input.Validate(); err != nil {
+		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 
@@ -164,7 +170,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token from token pool: %w", err)
 		}
 		decimalsReport, err := cldf_ops.ExecuteOperation(b, erc20.GetDecimals, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
+			ChainSelector: input.ChainSelector,
 			Address:       localTokenAddr,
 		})
 		if err != nil {
@@ -175,7 +181,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// A pool's type and version is immutable so we can safely use ExecuteOperation here
 		// without worrying about stale data from the cache.
 		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
+			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 			Args:          struct{}{},
 		})
@@ -319,7 +325,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If either rate limiter config is different, then update it
 				if !isOutboundEqual || !isInboundEqual {
 					report, err := cldf_ops.ExecuteOperation(b, bmtpap.SetChainRateLimiterConfig, chain, contract.FunctionInput[bmtpap.SetChainRateLimiterConfigArgs]{
-						ChainSelector: chain.Selector,
+						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
 						Args: bmtpap.SetChainRateLimiterConfigArgs{
 							OutboundConfig:      bmtpap.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
@@ -350,7 +356,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						common.Bytes2Hex(onchainRemoteTP), common.Bytes2Hex(remoteTP),
 					)
 					report, err := cldf_ops.ExecuteOperation(b, bmtpap.SetRemotePool, chain, contract.FunctionInput[bmtpap.SetRemotePoolArgs]{
-						ChainSelector: chain.Selector,
+						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
 						Args: bmtpap.SetRemotePoolArgs{
 							RemoteChainSelector: remoteCS,
@@ -421,7 +427,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			})
 
 			report, err := cldf_ops.ExecuteOperation(b, bmtpap.ApplyChainUpdates, chain, contract.FunctionInput[[]bmtpap.ChainUpdate]{
-				ChainSelector: chain.Selector,
+				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 				Args:          chainUpdates,
 			})
