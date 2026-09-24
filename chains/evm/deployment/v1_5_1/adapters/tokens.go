@@ -94,6 +94,7 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 				b,
 				tpSeq.ConfigureTokenPoolForRemoteChains, chain,
 				tpSeq.ConfigureTokenPoolForRemoteChainsInput{
+					ChainSelector:    input.ChainSelector,
 					TokenPoolAddress: tpAddr,
 					TokenPoolVersion: tpOps.Version,
 					RemoteChains:     input.RemoteChains,

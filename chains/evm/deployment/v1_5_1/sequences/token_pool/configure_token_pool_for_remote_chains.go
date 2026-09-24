@@ -23,12 +23,20 @@ import (
 )
 
 type ConfigureTokenPoolForRemoteChainsInput struct {
+	// ChainSelector identifies the chain the pool lives on. It must be carried in the
+	// input (not only the executor dependency) so that two invocations with otherwise
+	// identical inputs on different chains do not collide in the operations report
+	// cache, which keys on the sequence input alone. Without it, configuring two
+	// chains whose pool addresses are identical reuses the first chain's cached report
+	// and emits ops against the wrong chain.
+	ChainSelector    uint64
 	TokenPoolAddress common.Address
 	TokenPoolVersion *semver.Version
 	RemoteChains     map[uint64]tokensapi.RemoteChainConfig[[]byte, string]
 }
 
 type ConfigureTokenPoolForRemoteChainInput struct {
+	ChainSelector       uint64
 	TokenPoolAddress    common.Address
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
@@ -77,6 +85,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				ConfigureTokenPoolForRemoteChain,
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
+					ChainSelector:       input.ChainSelector,
 					TokenPoolAddress:    tokenPool.Address(),
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
