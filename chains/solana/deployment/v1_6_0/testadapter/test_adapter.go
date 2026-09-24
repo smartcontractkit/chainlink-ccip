@@ -740,7 +740,7 @@ func SolEventEmitter[T any](ctx context.Context, client *solrpc.Client, address 
 					ctx,
 					address,
 					&solrpc.GetSignaturesForAddressOpts{
-						Commitment: solrpc.CommitmentConfirmed,
+						Commitment: solrpc.CommitmentFinalized,
 						Until:      until,
 					},
 				)
@@ -771,7 +771,7 @@ func SolEventEmitter[T any](ctx context.Context, client *solrpc.Client, address 
 						ctx,
 						txSig.Signature,
 						&solrpc.GetTransactionOpts{
-							Commitment:                     solrpc.CommitmentConfirmed,
+							Commitment:                     solrpc.CommitmentFinalized,
 							Encoding:                       solana.EncodingBase64,
 							MaxSupportedTransactionVersion: &v,
 						},

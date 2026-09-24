@@ -54,7 +54,7 @@ func TestCctpTpDevnet(t *testing.T) {
 
 	var referenceAddresses ccip_offramp.ReferenceAddresses
 	t.Run("Read Reference Addresses", func(t *testing.T) {
-		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.referenceAddresses, rpc.CommitmentConfirmed, &referenceAddresses))
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.referenceAddresses, rpc.CommitmentFinalized, &referenceAddresses))
 		fmt.Printf("Reference Addresses: %+v\n", referenceAddresses)
 	})
 
@@ -414,7 +414,7 @@ func TestCctpTpDevnet(t *testing.T) {
 		require.NoError(t, err)
 
 		var nonces ccip_router.Nonce
-		err = common.GetAccountDataBorshInto(ctx, client, routerNoncesPDA, rpc.CommitmentConfirmed, &nonces)
+		err = common.GetAccountDataBorshInto(ctx, client, routerNoncesPDA, rpc.CommitmentFinalized, &nonces)
 		if err != nil {
 			fmt.Println("WARNING: Nonce account error, initializing it !!! - This is normal for the first message of a sender to a chain")
 			fmt.Println(err)
