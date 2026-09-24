@@ -813,6 +813,11 @@ func (a *SolanaAdapter) GetRemotePools(e deployment.Environment, chainSelector u
 
 	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
 	if err := chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount); err != nil {
+		// A missing remote chain config PDA is the normal "pairing absent" state (the pool was
+		// never configured for this remote), so report an empty remote list rather than an error.
+		if errors.Is(err, rpc.ErrNotFound) {
+			return [][]byte{}, nil
+		}
 		return nil, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chainSelector, remoteSelector, err)
 	}
 

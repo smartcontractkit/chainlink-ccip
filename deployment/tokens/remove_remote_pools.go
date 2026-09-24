@@ -37,9 +37,10 @@ type RemoveRemotePoolsInput struct {
 //     automatically via the pool's remote-config reader).
 //   - bidirectional (with allRemotes or remotePoolsToRemove): also performs a reverse pass,
 //     removing this pool from each peer's remote list.
-//   - deactivate: must be specified alone. Unregisters the pool from the TokenAdminRegistry
-//     (setPool to zero) AND performs the allRemotes forward cleanup AND the bidirectional reverse
-//     cleanup, completing the full teardown.
+//   - deactivate: must be specified alone (no other mode flags and no explicit
+//     remotePoolsToRemove). Unregisters the pool from the TokenAdminRegistry (setPool to zero)
+//     AND performs the allRemotes forward cleanup AND the bidirectional reverse cleanup,
+//     completing the full teardown. The remotes are always discovered automatically.
 type RemoveRemotePoolsPerPool struct {
 	ChainSelector       uint64               `yaml:"selector" json:"selector,string"`
 	Pool                datastore.AddressRef `yaml:"pool" json:"pool"`
@@ -83,11 +84,10 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 
 			// Mode mutual-exclusivity rules.
 			if pool.Deactivate {
-				// deactivate implies allRemotes + bidirectional + TAR unregister, so the
-				// allRemotes/bidirectional flags must not be set alongside it. remotePoolsToRemove
-				// is allowed to provide the explicit remotes (required on Solana, where supported
-				// chains cannot be enumerated on-chain).
-				if pool.AllRemotes || pool.Bidirectional {
+				// deactivate performs the full teardown (allRemotes forward cleanup + bidirectional
+				// reverse pass + TAR unregister) and must be specified alone: no other mode flags and
+				// no explicit remotePoolsToRemove. The remotes are always discovered automatically.
+				if pool.AllRemotes || pool.Bidirectional || len(pool.RemotePoolsToRemove) > 0 {
 					return fmt.Errorf("pool entry %s on chain selector %d: deactivate must be specified alone", datastore_utils.SprintRef(pool.Pool), pool.ChainSelector)
 				}
 			} else {
@@ -134,6 +134,43 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 	}
 }
 
+// pairingKey identifies a torn-down lane pairing by the pool whose forward pass removed the
+// remote (localSelector/localPool) and the remote pool that was removed (remoteSelector/
+// remotePool). Dedup must be scoped to the exact pool pair: two different pools on the same chain
+// pair are distinct pairings and must not dedupe each other.
+type pairingKey struct {
+	localSelector  uint64
+	localPool      string
+	remoteSelector uint64
+	remotePool     string
+}
+
+// normalizeAddr round-trips an address string through the chain family's address normalizer so
+// that addresses from different sources (user input, datastore, on-chain reads) compare equal.
+func normalizeAddr(selector uint64, addr string) (string, error) {
+	b, err := deploy.StringToBytes(selector, addr)
+	if err != nil {
+		return "", err
+	}
+	return deploy.BytesToString(selector, b)
+}
+
+// forwardPairingKey builds the dedup key for a forward-pass removal of remote from the pool at
+// localPool on localSelector. The remote address is normalized so it compares equal to the
+// address the reverse pass reads back from the peer.
+func forwardPairingKey(localSelector uint64, localPool string, remote RemotePoolToRemove) (pairingKey, error) {
+	remotePool, err := normalizeAddr(remote.Selector, remote.Remote.Address)
+	if err != nil {
+		return pairingKey{}, err
+	}
+	return pairingKey{
+		localSelector:  localSelector,
+		localPool:      localPool,
+		remoteSelector: remote.Selector,
+		remotePool:     remotePool,
+	}, nil
+}
+
 func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cldf.ChangesetOutput, error) {
 	return func(e cldf.Environment, cfg RemoveRemotePoolsInput) (cldf.ChangesetOutput, error) {
 		batchOps := make([]mcms_types.BatchOperation, 0)
@@ -141,10 +178,12 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 		tokenRegistry := GetTokenAdapterRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 
-		// removedPairings tracks (poolSelector, remoteSelector) pairs that have already been torn
-		// down in the forward pass, so a bidirectional removal never double-removes a pairing when
-		// A and B are both specified for a bidirectional removal of each other.
-		removedPairings := make(map[uint64]map[uint64]struct{})
+		// removedPairings tracks lane pairings that have already been torn down, keyed by the exact
+		// pool pair (local pool + remote pool), so a bidirectional removal never double-removes a
+		// pairing when A and B are both specified for a bidirectional removal of each other. The
+		// key includes the pool identity so two distinct pools on the same chain pair do not
+		// dedupe each other.
+		removedPairings := make(map[pairingKey]struct{})
 
 		for _, pool := range cfg.Pools {
 			selector := pool.ChainSelector
@@ -170,12 +209,29 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve remotes to remove for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.Pool), selector, err)
 			}
 
+			// Skip pairings a prior entry's reverse pass already tore down, so we never emit a
+			// duplicate removal. Under MCMS the batched reads all see the initial state, so the
+			// sequence's own read-check can't dedupe across entries and the duplicate would revert
+			// on-chain when the proposal executes.
+			forwardRemotes := make([]RemotePoolToRemove, 0, len(remotesToRemove))
+			for _, remote := range remotesToRemove {
+				key, err := forwardPairingKey(selector, fullPoolRef.Address, remote)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to build pairing key for remote chain selector %d on chain selector %d: %w", remote.Selector, selector, err)
+				}
+				if _, already := removedPairings[key]; already {
+					e.Logger.Warnf("skipping forward removal of remote %d from pool %s on chain %d: pairing already removed", remote.Selector, fullPoolRef.Address, selector)
+					continue
+				}
+				forwardRemotes = append(forwardRemotes, remote)
+			}
+
 			// Forward pass: remove the specified remotes from this pool.
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, remover.RemoveRemotePools(), e.BlockChains, RemoveRemotePoolsSequenceInput{
 				Selector:            selector,
 				TokenPoolRef:        fullPoolRef,
 				TokenRef:            fullTokenRef,
-				RemotePoolsToRemove: remotesToRemove,
+				RemotePoolsToRemove: forwardRemotes,
 			})
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to remove remote pools from pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.Pool), selector, err)
@@ -184,16 +240,17 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 			batchOps = append(batchOps, report.Output.BatchOps...)
 			reports = append(reports, report.ExecutionReports...)
 
-			if removedPairings[selector] == nil {
-				removedPairings[selector] = make(map[uint64]struct{})
-			}
 			for _, remote := range remotesToRemove {
-				removedPairings[selector][remote.Selector] = struct{}{}
+				key, err := forwardPairingKey(selector, fullPoolRef.Address, remote)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to build pairing key for remote chain selector %d on chain selector %d: %w", remote.Selector, selector, err)
+				}
+				removedPairings[key] = struct{}{}
 			}
 
 			// Reverse pass: for bidirectional/deactivate, remove this pool from each peer's remote list.
 			if pool.Bidirectional || pool.Deactivate {
-				reverseBatchOps, reverseReports, err := removeRemotePoolsReverse(e, tokenRegistry, selector, fullPoolRef, fullTokenRef, remotesToRemove, removedPairings)
+				reverseBatchOps, reverseReports, err := removeRemotePoolsReverse(e, tokenRegistry, adapter, selector, fullPoolRef, fullTokenRef, remotesToRemove, removedPairings)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to reverse-remove pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.Pool), selector, err)
 				}
@@ -289,11 +346,12 @@ func resolveRemotesToRemove(
 func removeRemotePoolsReverse(
 	e cldf.Environment,
 	tokenRegistry *TokenAdapterRegistry,
+	localAdapter TokenAdapter,
 	selector uint64,
 	fullPoolRef datastore.AddressRef,
 	fullTokenRef datastore.AddressRef,
 	remotesToRemove []RemotePoolToRemove,
-	removedPairings map[uint64]map[uint64]struct{},
+	removedPairings map[pairingKey]struct{},
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	batchOps := make([]mcms_types.BatchOperation, 0)
 	reports := make([]cldf_ops.Report[any, any], 0)
@@ -301,22 +359,25 @@ func removeRemotePoolsReverse(
 	for _, remote := range remotesToRemove {
 		remoteSelector := remote.Selector
 
-		if _, alreadyRemoved := removedPairings[remoteSelector][selector]; alreadyRemoved {
-			e.Logger.Warnf("skipping reverse removal of pool %s on chain %d from pool on chain %d: pairing already removed", fullPoolRef.Address, selector, remoteSelector)
-			continue
-		}
-
 		remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
 		}
 
-		// Resolve the peer's adapter, pool ref, and token ref directly from the peer pool address
-		// given in the forward input. This avoids needing the TokenPoolMigrator (which cannot
-		// resolve the mint from a Solana pool program ID alone).
-		remoteAdapter, _, remotePoolRef, remoteTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, remoteSelector, remote.Remote, datastore.AddressRef{})
+		// Resolve the peer's adapter and pool ref from the peer pool address given in the forward
+		// input. The peer token ref is resolved separately below (from the local pool's remote
+		// config) because a Solana pool program ID is shared across mints, so the peer adapter
+		// cannot derive the token from the pool address alone.
+		remoteAdapter, _, _, _, err := ResolveAdapterAndRefs(e, tokenRegistry, remoteSelector, remote.Remote, datastore.AddressRef{})
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve peer adapter on remote chain selector %d: %w", remoteSelector, err)
+		}
+
+		// Resolve the peer's token from the local pool's remote config. This is the token the peer
+		// serves for this lane, and is required to resolve the peer's active pool below.
+		remoteTokenRef, err := resolvePeerTokenRef(e, tokenRegistry, localAdapter, selector, fullPoolRef, fullTokenRef, remoteSelector)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to resolve peer token on remote chain selector %d: %w", remoteSelector, err)
 		}
 
 		// Resolve the peer's active pool. A hard error (not a silent skip) when it cannot be
@@ -331,6 +392,18 @@ func removeRemotePoolsReverse(
 		}
 		if len(activePool) == 0 {
 			return nil, nil, fmt.Errorf("token on remote chain selector %d has no active pool registered; cannot resolve peer for reverse removal", remoteSelector)
+		}
+
+		// The peer's active pool is the pool that will receive the removal. Read its remote list
+		// from the same pool so the read and the write target the same contract (during a peer
+		// pool upgrade the explicitly configured remote address can differ from the active pool).
+		activePoolAddr, err := deploy.BytesToString(remoteSelector, activePool)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to normalize active pool address on remote chain selector %d: %w", remoteSelector, err)
+		}
+		activePoolRef, err := ResolveTokenPoolRef(e, tokenRegistry, remoteSelector, datastore.AddressRef{Address: activePoolAddr})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to resolve active pool ref on remote chain selector %d: %w", remoteSelector, err)
 		}
 
 		remoteRemover, ok := remoteAdapter.(RemotePoolRemover)
@@ -355,26 +428,47 @@ func removeRemotePoolsReverse(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read peer remote pools for chain selector %d on remote chain selector %d: %w", selector, remoteSelector, err)
 		}
-		if len(peerRemotes) == 0 {
-			e.Logger.Warnf("skipping reverse removal of pool %s on chain %d from pool on chain %d: peer has no remote pool for this chain", fullPoolRef.Address, selector, remoteSelector)
-			continue
-		}
 
+		// Filter the peer's remote list down to the exact local pool being torn down. The peer may
+		// list several local pools for this chain (e.g. during an upgrade), and we must only remove
+		// the one this entry targets — never unrelated pairings.
+		localPoolAddr, err := normalizeAddr(selector, fullPoolRef.Address)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to normalize local pool address on chain selector %d: %w", selector, err)
+		}
 		remotesToRemoveFromPeer := make([]RemotePoolToRemove, 0, len(peerRemotes))
 		for _, peerRemote := range peerRemotes {
 			peerRemoteAddr, err := deploy.BytesToString(selector, peerRemote)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to normalize peer remote pool address for chain selector %d: %w", selector, err)
 			}
+			if peerRemoteAddr != localPoolAddr {
+				continue
+			}
 			remotesToRemoveFromPeer = append(remotesToRemoveFromPeer, RemotePoolToRemove{
 				Selector: selector,
 				Remote:   datastore.AddressRef{Address: peerRemoteAddr},
 			})
 		}
+		if len(remotesToRemoveFromPeer) == 0 {
+			e.Logger.Warnf("skipping reverse removal of pool %s on chain %d from pool on chain %d: peer does not list this pool as a remote", fullPoolRef.Address, selector, remoteSelector)
+			continue
+		}
+
+		key := pairingKey{
+			localSelector:  remoteSelector,
+			localPool:      activePoolRef.Address,
+			remoteSelector: selector,
+			remotePool:     localPoolAddr,
+		}
+		if _, alreadyRemoved := removedPairings[key]; alreadyRemoved {
+			e.Logger.Warnf("skipping reverse removal of pool %s on chain %d from pool on chain %d: pairing already removed", fullPoolRef.Address, selector, remoteSelector)
+			continue
+		}
 
 		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, remoteRemover.RemoveRemotePools(), e.BlockChains, RemoveRemotePoolsSequenceInput{
 			Selector:            remoteSelector,
-			TokenPoolRef:        remotePoolRef,
+			TokenPoolRef:        activePoolRef,
 			TokenRef:            remoteTokenRef,
 			RemotePoolsToRemove: remotesToRemoveFromPeer,
 		})
@@ -385,13 +479,50 @@ func removeRemotePoolsReverse(
 		batchOps = append(batchOps, report.Output.BatchOps...)
 		reports = append(reports, report.ExecutionReports...)
 
-		if removedPairings[remoteSelector] == nil {
-			removedPairings[remoteSelector] = make(map[uint64]struct{})
-		}
-		removedPairings[remoteSelector][selector] = struct{}{}
+		removedPairings[key] = struct{}{}
 	}
 
 	return batchOps, reports, nil
+}
+
+// resolvePeerTokenRef resolves the token ref the peer pool serves for the lane from the local
+// pool's remote config. The local pool's GetRemoteToken returns the peer's token address, which
+// is then resolved to a full ref on the peer chain. This is required because a Solana pool
+// program ID is shared across mints, so the peer adapter cannot derive the token from the pool
+// address alone.
+func resolvePeerTokenRef(
+	e cldf.Environment,
+	tokenRegistry *TokenAdapterRegistry,
+	localAdapter TokenAdapter,
+	selector uint64,
+	fullPoolRef datastore.AddressRef,
+	fullTokenRef datastore.AddressRef,
+	remoteSelector uint64,
+) (datastore.AddressRef, error) {
+	localMigrator, ok := localAdapter.(TokenPoolMigrator)
+	if !ok {
+		return datastore.AddressRef{}, fmt.Errorf("adapter for chain selector %d does not support remote pool discovery", selector)
+	}
+
+	poolBytes, err := localAdapter.AddressRefToBytes(fullPoolRef)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to convert pool ref to bytes on chain selector %d: %w", selector, err)
+	}
+	tokenBytes, err := localAdapter.AddressRefToBytes(fullTokenRef)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
+	}
+
+	remoteTokenBytes, err := localMigrator.GetRemoteToken(e, selector, poolBytes, tokenBytes, remoteSelector)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to read remote token for remote chain selector %d: %w", remoteSelector, err)
+	}
+	remoteTokenAddr, err := deploy.BytesToString(remoteSelector, remoteTokenBytes)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to normalize remote token address for remote chain selector %d: %w", remoteSelector, err)
+	}
+
+	return ResolveTokenRef(e, tokenRegistry, remoteSelector, datastore.AddressRef{Address: remoteTokenAddr})
 }
 
 // unregisterToken unregisters the pool from the TokenAdminRegistry via the family's

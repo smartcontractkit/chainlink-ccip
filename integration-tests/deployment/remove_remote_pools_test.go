@@ -166,6 +166,19 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 			errors: []string{"deactivate must be specified alone"},
 		},
 		{
+			name: "rejects_deactivate_with_remote_pools",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector:       sel,
+					Pool:                poolRef,
+					Deactivate:          true,
+					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Remote: remoteRef}},
+				}},
+			},
+			errors: []string{"deactivate must be specified alone"},
+		},
+		{
 			name: "rejects_no_mode_selected",
 			input: tokensapi.RemoveRemotePoolsInput{
 				MCMS: mcms.Input{},

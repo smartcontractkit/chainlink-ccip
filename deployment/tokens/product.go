@@ -559,12 +559,12 @@ type SetTokenTransferFeeSequenceInput struct {
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
-	tokenRefResolverReg         map[string]TokenRefResolver
+	tokenRefResolverReg          map[string]TokenRefResolver
 	tokenAdminRegistryManagerReg map[string]TokenAdminRegistryManager
-	tokenAdapterReg             map[tokenAdapterID]TokenAdapter
-	tokenRefResolverMu          sync.Mutex
-	tokenAdminRegistryManagerMu sync.Mutex
-	tokenAdapterMu              sync.Mutex
+	tokenAdapterReg              map[tokenAdapterID]TokenAdapter
+	tokenRefResolverMu           sync.Mutex
+	tokenAdminRegistryManagerMu  sync.Mutex
+	tokenAdapterMu               sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {

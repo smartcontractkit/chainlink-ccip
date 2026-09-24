@@ -25,6 +25,10 @@ type BatchGetAccountsArgs[T any] struct {
 // GetMultipleAccountsWithOpts that avoids exceeding the RPC's per-call account
 // limit and tolerates missing/undecodable accounts.
 func BatchGetAccounts[T any](ctx context.Context, client *rpc.Client, args BatchGetAccountsArgs[T]) error {
+	if args.AccountMax <= 0 {
+		return fmt.Errorf("account max must be greater than zero, got %d", args.AccountMax)
+	}
+
 	for start := 0; start < len(args.PDAs); start += args.AccountMax {
 		end := min(start+args.AccountMax, len(args.PDAs))
 
