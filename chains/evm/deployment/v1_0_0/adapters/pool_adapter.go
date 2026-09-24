@@ -682,8 +682,7 @@ func (a *EVMPoolAdapter) canAdministerTokenRoles(
 		return true, nil
 	}
 
-	// Distinguish "no CLL timelock configured" from a genuine resolution failure. The datastore
-	// lookup returns an un-sentineled error for both, so check existence explicitly first: if no
+	// lookup returns a non-sentinel error for both, so check existence explicitly first: if no
 	// CLL timelock ref exists, only the deployer path could have worked (and it didn't), so CLD
 	// cannot administer the roles — a legitimate skip, not an error.
 	timelockRefs := input.ExistingDataStore.Addresses().Filter(
