@@ -680,7 +680,16 @@ func (a *EVMPoolAdapter) canAdministerTokenRoles(
 
 	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
 	if err != nil {
-		return false, nil // No CLL timelock resolvable; only the deployer path could have worked.
+		if errors.Is(err, datastore.ErrAddressRefQueryNoMatch) {
+			// No CLL timelock is configured in the datastore: only the deployer path
+			// could have worked, and it didn't, so CLD cannot administer the roles.
+			return false, nil
+		} else {
+			// Any other failure (ambiguous ref, malformed/zero address, datastore
+			// error) is a genuine problem: surface it rather than silently reporting
+			// "neither holds the admin role", which would be inaccurate.
+			return false, fmt.Errorf("failed to resolve CLL timelock address for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
 	}
 	hasTimelockAdmin, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
