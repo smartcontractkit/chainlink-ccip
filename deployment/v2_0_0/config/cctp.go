@@ -38,8 +38,9 @@ type CCTPChainDefaults struct {
 
 // CCTPChainDefaultsBySelector maps chain selectors to their Circle-defined CCTP
 // defaults. Chains that are documented by Circle but not yet present in the
-// pinned chain-selectors version (for example HyperEVM and Injective) are
-// intentionally omitted; their inputs must be provided explicitly.
+// pinned chain-selectors version (for example Injective) are intentionally
+// omitted; their inputs must be provided explicitly. HyperEVM is represented in
+// chain-selectors by the Hyperliquid mainnet/testnet selectors.
 var CCTPChainDefaultsBySelector = map[uint64]CCTPChainDefaults{
 	// --- EVM mainnets ---
 	chain_selectors.ETHEREUM_MAINNET.Selector: {
@@ -118,6 +119,11 @@ var CCTPChainDefaultsBySelector = map[uint64]CCTPChainDefaults{
 		DomainIdentifier: 18,
 		TokenMessengerV2: "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
 		USDCToken:        "0xfA2958CB79b0491CC627c1557F441eF849Ca8eb1",
+	},
+	chain_selectors.HYPERLIQUID_MAINNET.Selector: {
+		DomainIdentifier: 19,
+		TokenMessengerV2: "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+		USDCToken:        "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
 	},
 	chain_selectors.ETHEREUM_MAINNET_INK_1.Selector: {
 		DomainIdentifier: 21,
@@ -249,6 +255,11 @@ var CCTPChainDefaultsBySelector = map[uint64]CCTPChainDefaults{
 		DomainIdentifier: 18,
 		TokenMessengerV2: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
 		USDCToken:        "0xb5AB69F7bBada22B28e79C8FFAECe55eF1c771D4",
+	},
+	chain_selectors.HYPERLIQUID_TESTNET.Selector: {
+		DomainIdentifier: 19,
+		TokenMessengerV2: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+		USDCToken:        "0x2B3370eE501B4a559b57D449569354196457D8Ab",
 	},
 	chain_selectors.INK_TESTNET_SEPOLIA.Selector: {
 		DomainIdentifier: 21,
