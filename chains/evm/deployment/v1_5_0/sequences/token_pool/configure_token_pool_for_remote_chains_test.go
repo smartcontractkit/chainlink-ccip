@@ -13,6 +13,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
+	tpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -196,6 +198,51 @@ func TestConfigureTokenPoolForRemoteChains_RejectsEnabledZeroRateLimit(t *testin
 	require.ErrorContains(t, err, "rate and capacity are both zero")
 }
 
+// TestConfigureTokenPoolForRemoteChains_LockReleasePool asserts the sequence drives a
+// LockReleaseTokenPoolAndProxy exactly as it drives the burn-mint one. The sequence touches only
+// the shared TokenPoolAndProxy surface, so this covers both the fresh-chain applyChainUpdates path
+// and the single-remote-pool cutover on the lock-release contract.
+func TestConfigureTokenPoolForRemoteChains_LockReleasePool(t *testing.T) {
+	t.Parallel()
+
+	e, poolAddr := deployConfigurablePoolOfType(t, string(lrtpap.ContractType))
+	chain := e.BlockChains.EVMChains()[testChainSelector]
+	pool := mustPool(t, e, poolAddr)
+
+	remoteToken := common.HexToAddress("0x00000000000000000000000000000000000000aa")
+	firstPool := common.HexToAddress("0x00000000000000000000000000000000000000bb")
+	secondPool := common.HexToAddress("0x00000000000000000000000000000000000000dd")
+
+	configure(t, e, chain.Selector, poolAddr, remoteToken, firstPool, 100, 10)
+
+	supported, err := pool.GetSupportedChains(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, []uint64{remoteChainSelector}, supported)
+
+	onChainRemoteToken, err := pool.GetRemoteToken(&bind.CallOpts{}, remoteChainSelector)
+	require.NoError(t, err)
+	require.Equal(t, remoteToken.Bytes(), onChainRemoteToken)
+
+	outbound, err := pool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{}, remoteChainSelector)
+	require.NoError(t, err)
+	require.True(t, outbound.IsEnabled)
+	require.Positive(t, outbound.Capacity.Sign())
+
+	// Retarget the lane: v1.5.0 replaces its single remote pool rather than appending.
+	configure(t, e, chain.Selector, poolAddr, remoteToken, secondPool, 100, 10)
+
+	onChainRemotePool, err := pool.GetRemotePool(&bind.CallOpts{}, remoteChainSelector)
+	require.NoError(t, err)
+	require.Equal(t, common.LeftPadBytes(secondPool.Bytes(), 32), onChainRemotePool)
+
+	// The lock-release specific state is untouched by the configure flow.
+	lr, err := lrtpap.NewLockReleaseTokenPoolAndProxyContract(poolAddr, chain.Client)
+	require.NoError(t, err)
+	rebalancer, err := lr.GetRebalancer(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.Address{}, rebalancer, "configure must not touch the rebalancer")
+}
+
 // configure runs the sequence for a single remote chain and returns its output.
 func configure(
 	t *testing.T,
@@ -230,14 +277,21 @@ func configure(
 
 func deployConfigurablePool(t *testing.T) (*cldf.Environment, common.Address) {
 	t.Helper()
+	return deployConfigurablePoolOfType(t, string(bmtpap.ContractType))
+}
+
+func deployConfigurablePoolOfType(t *testing.T, poolType string) (*cldf.Environment, common.Address) {
+	t.Helper()
 
 	e, tokenRef, _, _ := setupDeployEnv(t)
+	acceptLiquidity := true
 	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, tokenapi.DeployTokenPoolInput{
 		TokenRef:          &tokenRef,
-		PoolType:          string(bmtpap.ContractType),
+		PoolType:          poolType,
 		TokenPoolVersion:  utils.Version_1_5_0,
 		ChainSelector:     testChainSelector,
 		ExistingDataStore: e.DataStore,
+		AcceptLiquidity:   &acceptLiquidity,
 	})
 	require.NoError(t, err)
 	require.Len(t, report.Output.Addresses, 1)
@@ -245,11 +299,11 @@ func deployConfigurablePool(t *testing.T) (*cldf.Environment, common.Address) {
 	return e, common.HexToAddress(report.Output.Addresses[0].Address)
 }
 
-func mustPool(t *testing.T, e *cldf.Environment, poolAddr common.Address) *bmtpap.BurnMintTokenPoolAndProxyContract {
+func mustPool(t *testing.T, e *cldf.Environment, poolAddr common.Address) *tpap.TokenPoolAndProxyContract {
 	t.Helper()
 
 	chain := e.BlockChains.EVMChains()[testChainSelector]
-	pool, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(poolAddr, chain.Client)
+	pool, err := tpap.NewTokenPoolAndProxyContract(poolAddr, chain.Client)
 	require.NoError(t, err)
 
 	return pool

@@ -1,6 +1,7 @@
 package token_pool
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -21,6 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
+	tpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
@@ -51,7 +54,7 @@ func TestDeployTokenPool(t *testing.T) {
 	require.Equal(t, utils.Version_1_5_0.String(), poolRef.Version.String())
 
 	chain := e.BlockChains.EVMChains()[testChainSelector]
-	pool, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(common.HexToAddress(poolRef.Address), chain.Client)
+	pool, err := tpap.NewTokenPoolAndProxyContract(common.HexToAddress(poolRef.Address), chain.Client)
 	require.NoError(t, err)
 
 	onChainToken, err := pool.GetToken(&bind.CallOpts{})
@@ -103,10 +106,79 @@ func TestDeployTokenPool_Idempotent(t *testing.T) {
 	require.Equal(t, poolRef.Address, second.Output.Addresses[0].Address, "Should reuse the existing pool, not redeploy")
 }
 
-// TestDeployTokenPool_RejectsUnsupportedTypes locks in the tight scope: v1.5.0 support covers
-// BurnMintTokenPoolAndProxy only. The lock-release and rebasing *AndProxy variants have bindings
-// but no adapter support, and the plain v1.5.1-era types do not exist at this version - deploying
-// any of them would produce a pool no changeset could subsequently configure.
+// TestDeployLockReleaseTokenPool covers the lock-release variant, whose constructor differs from
+// the burn-mint one by the immutable acceptLiquidity flag.
+func TestDeployLockReleaseTokenPool(t *testing.T) {
+	t.Parallel()
+
+	for _, acceptLiquidity := range []bool{true, false} {
+		t.Run(fmt.Sprintf("acceptLiquidity=%v", acceptLiquidity), func(t *testing.T) {
+			t.Parallel()
+
+			e, tokenRef, routerAddress, _ := setupDeployEnv(t)
+
+			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, tokenapi.DeployTokenPoolInput{
+				TokenRef:          &tokenRef,
+				PoolType:          string(lrtpap.ContractType),
+				TokenPoolVersion:  utils.Version_1_5_0,
+				ChainSelector:     testChainSelector,
+				ExistingDataStore: e.DataStore,
+				AcceptLiquidity:   &acceptLiquidity,
+			})
+			require.NoError(t, err, "Failed to execute DeployTokenPool sequence")
+			require.Len(t, report.Output.Addresses, 1, "Should have deployed exactly one pool")
+
+			poolRef := report.Output.Addresses[0]
+			require.Equal(t, string(lrtpap.ContractType), string(poolRef.Type))
+			require.Equal(t, utils.Version_1_5_0.String(), poolRef.Version.String())
+
+			chain := e.BlockChains.EVMChains()[testChainSelector]
+			poolAddr := common.HexToAddress(poolRef.Address)
+
+			// The shared base surface must work against a lock-release pool too - that is the
+			// whole premise of routing both pool types through TokenPoolAndProxy.
+			base, err := tpap.NewTokenPoolAndProxyContract(poolAddr, chain.Client)
+			require.NoError(t, err)
+
+			onChainToken, err := base.GetToken(&bind.CallOpts{})
+			require.NoError(t, err)
+			require.Equal(t, common.HexToAddress(tokenRef.Address), onChainToken, "Token address mismatch")
+
+			onChainRouter, err := base.GetRouter(&bind.CallOpts{})
+			require.NoError(t, err)
+			require.Equal(t, routerAddress, onChainRouter, "Router address mismatch")
+
+			lr, err := lrtpap.NewLockReleaseTokenPoolAndProxyContract(poolAddr, chain.Client)
+			require.NoError(t, err)
+
+			canAccept, err := lr.CanAcceptLiquidity(&bind.CallOpts{})
+			require.NoError(t, err)
+			require.Equal(t, acceptLiquidity, canAccept, "acceptLiquidity constructor arg not honoured")
+		})
+	}
+}
+
+// TestDeployLockReleaseTokenPool_RequiresAcceptLiquidity asserts the flag is demanded rather than
+// defaulted: it is immutable on-chain, so guessing wrong is unrecoverable.
+func TestDeployLockReleaseTokenPool_RequiresAcceptLiquidity(t *testing.T) {
+	t.Parallel()
+
+	e, tokenRef, _, _ := setupDeployEnv(t)
+
+	_, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, tokenapi.DeployTokenPoolInput{
+		TokenRef:          &tokenRef,
+		PoolType:          string(lrtpap.ContractType),
+		TokenPoolVersion:  utils.Version_1_5_0,
+		ChainSelector:     testChainSelector,
+		ExistingDataStore: e.DataStore,
+	})
+	require.ErrorContains(t, err, "AcceptLiquidity is required")
+}
+
+// TestDeployTokenPool_RejectsUnsupportedTypes locks in the scope: v1.5.0 support covers
+// BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy. The rebasing *AndProxy variant has
+// bindings but no adapter support, and the plain v1.5.1-era types do not exist at this version -
+// deploying any of them would produce a pool no changeset could subsequently configure.
 func TestDeployTokenPool_RejectsUnsupportedTypes(t *testing.T) {
 	t.Parallel()
 
@@ -115,13 +187,13 @@ func TestDeployTokenPool_RejectsUnsupportedTypes(t *testing.T) {
 		poolType    string
 		poolVersion *semver.Version
 	}{
-		{name: "LockReleaseTokenPoolAndProxy", poolType: "LockReleaseTokenPoolAndProxy", poolVersion: utils.Version_1_5_0},
 		{name: "BurnWithFromMintTokenPoolAndProxy", poolType: "BurnWithFromMintTokenPoolAndProxy", poolVersion: utils.Version_1_5_0},
 		{name: "PlainBurnMintTokenPool", poolType: string(utils.BurnMintTokenPool), poolVersion: utils.Version_1_5_0},
 		{name: "LockReleaseTokenPool", poolType: string(utils.LockReleaseTokenPool), poolVersion: utils.Version_1_5_0},
 		{name: "UnknownType", poolType: "NotARealTokenPool", poolVersion: utils.Version_1_5_0},
 		// Right type, wrong version: the switch keys on the full "Type Version" string.
 		{name: "RightTypeWrongVersion", poolType: string(bmtpap.ContractType), poolVersion: utils.Version_1_5_1},
+		{name: "RightLockReleaseTypeWrongVersion", poolType: string(lrtpap.ContractType), poolVersion: utils.Version_1_5_1},
 	}
 
 	for _, tc := range testCases {

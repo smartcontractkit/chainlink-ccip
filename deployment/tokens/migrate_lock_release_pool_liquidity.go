@@ -19,7 +19,9 @@ import (
 type LockReleasePoolMigration struct {
 	// ChainSelector identifies the chain on which both the old and new pools live.
 	ChainSelector uint64
-	// OldPoolRef is a reference to the legacy LockReleaseTokenPool (v1.5.1 or v1.6.1) to migrate from.
+	// OldPoolRef is a reference to the legacy lock-release pool to migrate from: v1.5.1 or
+	// v1.6.1 LockReleaseTokenPool, or v1.5.0 LockReleaseTokenPoolAndProxy - all three share the
+	// getRebalancer/setRebalancer/withdrawLiquidity signatures the migration drives.
 	// Required because in step-2 migrations, the TAR already points to the new pool.
 	OldPoolRef datastore.AddressRef
 	// NewPoolRef is a reference to the new v2.0 LockReleaseTokenPool (with lockbox) to migrate to.

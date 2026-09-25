@@ -126,8 +126,10 @@ type DeployTokenPoolInput struct {
 	// For Solana: If empty, DeployTokenPoolForToken sets the timelock signer PDA from the datastore;
 	// if non-empty, sets this base58 pubkey. On EVM, empty leaves the pool default (unchanged from contract deploy).
 	RateLimitAdmin string `yaml:"rateLimitAdmin" json:"rateLimitAdmin"`
-	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
-	// whether the pool should accept liquidity from liquidity providers
+	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1) and
+	// LockReleaseTokenPoolAndProxy (v1.5.0) to indicate whether the pool should accept liquidity
+	// from liquidity providers. It is immutable on-chain, so the v1.5.0 sequence requires it
+	// rather than defaulting a nil to false.
 	AcceptLiquidity *bool `yaml:"acceptLiquidity" json:"acceptLiquidity"`
 	// BurnAddress is used by BurnToAddressMintTokenPool to specify the address
 	// where tokens will be burned to
