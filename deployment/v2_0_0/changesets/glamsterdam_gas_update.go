@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"sort"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -44,16 +45,24 @@ func UpdateGasConfigForGlamsterdamV200(registry *changesets.MCMSReaderRegistry) 
 			skipSet[sel] = true
 		}
 
-		// Get all candidate chain selectors (all chains except target and skip list)
+		// Get all candidate chain selectors (all chains except target and skip list). Sorted so
+		// that identical inputs always produce operations/descriptions in the same order,
+		// regardless of Go's randomized map iteration order.
 		candidateChains := []uint64{}
 		for sel := range e.BlockChains.EVMChains() {
 			if sel != cfg.Cfg.TargetChainSelector && !skipSet[sel] {
 				candidateChains = append(candidateChains, sel)
 			}
 		}
+		sort.Slice(candidateChains, func(i, j int) bool { return candidateChains[i] < candidateChains[j] })
 
-		// Add skip list entries to report
+		// Add skip list entries to report, sorted for the same reason.
+		sortedSkips := make([]uint64, 0, len(skipSet))
 		for sel := range skipSet {
+			sortedSkips = append(sortedSkips, sel)
+		}
+		sort.Slice(sortedSkips, func(i, j int) bool { return sortedSkips[i] < sortedSkips[j] })
+		for _, sel := range sortedSkips {
 			report.AddLine(fmt.Sprintf("chain %d: skipped (explicit SkipChainSelectors entry)", sel))
 		}
 
@@ -61,17 +70,10 @@ func UpdateGasConfigForGlamsterdamV200(registry *changesets.MCMSReaderRegistry) 
 		adapterRegistry := v2_0_0_adapters.GetGasUpdateAdapterRegistry()
 		adapter := adapterRegistry.GetGasUpdateAdapter(chain_selectors.FamilyEVM)
 		if adapter == nil {
-			// Gracefully skip if no adapter is registered for EVM (shouldn't happen in practice)
-			report.AddLine(fmt.Sprintf("EVM family: no gas update adapter registered, skipped"))
-			mcmsInput := cfg.MCMS
-			if mcmsInput.Description == "" {
-				mcmsInput.Description = report.String()
-			} else {
-				mcmsInput.Description = mcmsInput.Description + "\n\n" + report.String()
-			}
-			return changesets.NewOutputBuilder(e, registry).
-				WithBatchOps(allBatchOps).
-				Build(mcmsInput)
+			// A missing adapter means this migration cannot run at all for this chain family —
+			// fail loudly rather than silently returning a "successful" no-op output, which would
+			// let automation treat an unexecuted update as complete.
+			return deployment.ChangesetOutput{}, fmt.Errorf("no gas update adapter registered for EVM family")
 		}
 
 		// Run the orchestration sequence for EVM chains

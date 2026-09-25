@@ -42,6 +42,39 @@ type tokenPoolKind struct {
 	FieldSpec    glamsterdamutils.FieldSpec[uint32]
 }
 
+// supportedLombardVerifierVersions and supportedCCTPVerifierVersions are the datastore-tagged
+// contract versions this adapter knows how to drive. The v2.1.0 client/ABI is backward-compatible
+// with a v2.0.0-deployed contract for the methods used here, so a single client library can
+// safely call either. Listing both means a chain with only a v2.0.0-tagged verifier is still
+// resolved, instead of being silently skipped because the lookup only ever checked v2.1.0.
+var (
+	supportedLombardVerifierVersions = []*semver.Version{lombard_verifier.Version, semver.MustParse("2.0.0")}
+	supportedCCTPVerifierVersions    = []*semver.Version{cctp_verifier.Version, semver.MustParse("2.0.0")}
+)
+
+// resolveAddressRefsAllVersions returns every distinct address matching contractType across
+// versions for the given chain — unlike a single-version lookup, it doesn't stop at the first
+// match. Used for verifier contracts where a chain can have more than one version live at once
+// during a migration window, and all of them need their gas config updated, not just one.
+func resolveAddressRefsAllVersions(
+	addrs []datastore.AddressRef, sel uint64, contractType cldf_deployment.ContractType, versions []*semver.Version,
+) []common.Address {
+	seen := make(map[common.Address]bool, len(versions))
+	var out []common.Address
+	for _, v := range versions {
+		ref := datastore_utils.GetAddressRef(addrs, sel, contractType, v, "")
+		if datastore_utils.IsAddressRefEmpty(ref) {
+			continue
+		}
+		addr := common.HexToAddress(ref.Address)
+		if !seen[addr] {
+			seen[addr] = true
+			out = append(out, addr)
+		}
+	}
+	return out
+}
+
 var glamsterdamTokenPoolKinds = []tokenPoolKind{
 	{lombard_token_pool.ContractType, lombard_token_pool.Version, v2_0_0_adapters.LombardTokenPoolDestGasOverhead},
 	{siloed_usdc_token_pool.ContractType, siloed_usdc_token_pool.Version, v2_0_0_adapters.USDCTokenPoolDestGasOverhead},
@@ -319,66 +352,65 @@ func (a *GlamsterdamGasAdapter) WriteDestGasFields(
 		}
 	}
 
-	// LombardVerifier: GasForVerification
-	lvRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, lombard_verifier.ContractType, lombard_verifier.Version, "")
-	if !datastore_utils.IsAddressRefEmpty(lvRef) {
-		lvAddr := common.HexToAddress(lvRef.Address)
+	// LombardVerifier: GasForVerification. A chain can have more than one LombardVerifier address
+	// tracked simultaneously during a migration window (e.g. v2.0.0 and v2.1.0 live at once), and
+	// each one's current value is resolved independently against its own Prague baseline — reusing
+	// a single shared "resolved" value across addresses would be wrong whenever they don't already
+	// agree, so this reads and resolves each address itself rather than trusting the caller's
+	// resolved map for this field.
+	for _, lvAddr := range resolveAddressRefsAllVersions(addrs, srcChainSelector, lombard_verifier.ContractType, supportedLombardVerifierVersions) {
 		lvCur, err := cldf_ops.ExecuteOperation(b, lombard_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 			ChainSelector: srcChainSelector,
 			Address:       lvAddr,
 			Args:          targetChainSelector,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to read LombardVerifier remote chain config: %w", err)
+			return nil, fmt.Errorf("failed to read LombardVerifier(%s) remote chain config: %w", lvAddr, err)
+		}
+		if lvCur.Output.RemoteChainConfig.Router == (common.Address{}) {
+			continue
 		}
 
-		if lvCur.Output.RemoteChainConfig.Router != (common.Address{}) {
-			updated := lvCur.Output.RemoteChainConfig
-			if val, ok := resolved[v2_0_0_adapters.LombardVerifierGasForVerification.Name]; ok {
-				updated.GasForVerification = val
-			}
+		updated := lvCur.Output.RemoteChainConfig
+		updated.GasForVerification = glamsterdamutils.Resolve(v2_0_0_adapters.LombardVerifierGasForVerification, updated.GasForVerification).AppliedValue
 
-			lvWrite, err := cldf_ops.ExecuteOperation(b, glamsterdam.ApplyLombardVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]lombard_verifier.RemoteChainConfigArgs]{
-				ChainSelector: srcChainSelector,
-				Address:       lvAddr,
-				Args:          []lombard_verifier.RemoteChainConfigArgs{updated},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to apply LombardVerifier update: %w", err)
-			}
-			writes = append(writes, lvWrite.Output)
+		lvWrite, err := cldf_ops.ExecuteOperation(b, glamsterdam.ApplyLombardVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]lombard_verifier.RemoteChainConfigArgs]{
+			ChainSelector: srcChainSelector,
+			Address:       lvAddr,
+			Args:          []lombard_verifier.RemoteChainConfigArgs{updated},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply LombardVerifier(%s) update: %w", lvAddr, err)
 		}
+		writes = append(writes, lvWrite.Output)
 	}
 
-	// CCTPVerifier: GasForVerification
-	ctpRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, cctp_verifier.ContractType, cctp_verifier.Version, "")
-	if !datastore_utils.IsAddressRefEmpty(ctpRef) {
-		ctpAddr := common.HexToAddress(ctpRef.Address)
+	// CCTPVerifier: GasForVerification. Same multi-address reasoning as LombardVerifier above.
+	for _, ctpAddr := range resolveAddressRefsAllVersions(addrs, srcChainSelector, cctp_verifier.ContractType, supportedCCTPVerifierVersions) {
 		ctpCur, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetRemoteChainConfig, chain, contract.FunctionInput[uint64]{
 			ChainSelector: srcChainSelector,
 			Address:       ctpAddr,
 			Args:          targetChainSelector,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to read CCTPVerifier remote chain config: %w", err)
+			return nil, fmt.Errorf("failed to read CCTPVerifier(%s) remote chain config: %w", ctpAddr, err)
+		}
+		if ctpCur.Output.RemoteChainConfig.Router == (common.Address{}) {
+			continue
 		}
 
-		if ctpCur.Output.RemoteChainConfig.Router != (common.Address{}) {
-			updated := ctpCur.Output.RemoteChainConfig
-			if val, ok := resolved[v2_0_0_adapters.USDCVerifierGasForVerification.Name]; ok {
-				updated.GasForVerification = val
-			}
+		updated := ctpCur.Output.RemoteChainConfig
+		updated.GasForVerification = glamsterdamutils.Resolve(v2_0_0_adapters.USDCVerifierGasForVerification, updated.GasForVerification).AppliedValue
 
-			ctpWrite, err := cldf_ops.ExecuteOperation(b, glamsterdam.ApplyCCTPVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
-				ChainSelector: srcChainSelector,
-				Address:       ctpAddr,
-				Args:          []cctp_verifier.RemoteChainConfigArgs{updated},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to apply CCTPVerifier update: %w", err)
-			}
-			writes = append(writes, ctpWrite.Output)
+		ctpWrite, err := cldf_ops.ExecuteOperation(b, glamsterdam.ApplyCCTPVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
+			ChainSelector: srcChainSelector,
+			Address:       ctpAddr,
+			Args:          []cctp_verifier.RemoteChainConfigArgs{updated},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply CCTPVerifier(%s) update: %w", ctpAddr, err)
 		}
+		writes = append(writes, ctpWrite.Output)
 	}
 
 	// Convert all writes to a single batch operation

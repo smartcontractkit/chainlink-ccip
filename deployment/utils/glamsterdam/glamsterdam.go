@@ -51,15 +51,26 @@ func ApplyRatio[T constraints.Integer](prague, glamsterdam T) func(current T) T 
 
 // FieldResult is the outcome of resolving one FieldSpec against a chain's current on-chain value.
 type FieldResult[T comparable] struct {
-	Spec         FieldSpec[T]
-	Current      T
-	Matched      bool
-	AppliedValue T
+	Spec    FieldSpec[T]
+	Current T
+	Matched bool
+	// AlreadyApplied is true when current already equals spec.GlamsterdamValue, meaning a prior
+	// run (or partial retry of this same run) already migrated this field. AppliedValue is set to
+	// current unchanged in this case, so re-running is idempotent rather than compounding the
+	// fallback ratio on top of an already-migrated value.
+	AlreadyApplied bool
+	AppliedValue   T
 }
 
-// Resolve compares current against spec.ExpectedPrague. If it matches, the literal
-// GlamsterdamValue is applied; otherwise spec.Fallback(current) is applied instead.
+// Resolve compares current against spec.GlamsterdamValue and spec.ExpectedPrague, in that order.
+// If current already equals GlamsterdamValue, this field was already migrated by a prior run (or
+// an earlier step of the same batch); resolving it again is a no-op. Otherwise, if current
+// matches ExpectedPrague, the literal GlamsterdamValue is applied; if it matches neither,
+// spec.Fallback(current) is applied instead.
 func Resolve[T comparable](spec FieldSpec[T], current T) FieldResult[T] {
+	if current == spec.GlamsterdamValue {
+		return FieldResult[T]{Spec: spec, Current: current, AlreadyApplied: true, AppliedValue: current}
+	}
 	if current == spec.ExpectedPrague {
 		return FieldResult[T]{Spec: spec, Current: current, Matched: true, AppliedValue: spec.GlamsterdamValue}
 	}
@@ -69,6 +80,13 @@ func Resolve[T comparable](spec FieldSpec[T], current T) FieldResult[T] {
 // FieldResultString renders a FieldResult as a single human-readable report line for a given
 // chain selector.
 func FieldResultString[T comparable](chainSelector uint64, result FieldResult[T]) string {
+	if result.AlreadyApplied {
+		return fmt.Sprintf(
+			"chain %d: %s already matches Glamsterdam value %v (no-op, e.g. re-run after this "+
+				"proposal already executed)",
+			chainSelector, result.Spec.Name, result.AppliedValue,
+		)
+	}
 	if result.Matched {
 		return fmt.Sprintf(
 			"chain %d: %s matched expected Prague value %v, applying Glamsterdam value %v",
