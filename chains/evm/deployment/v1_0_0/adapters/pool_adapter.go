@@ -454,30 +454,6 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 				poolRef = out.Output.Addresses[0]
 			}
 
-			// Token role handling (the pool mint/burn grant preflight and the deployer->timelock admin
-			// handover below) is CLL-canonical: it authorizes and hands over against the CLL timelock.
-			// The MCMS batch, however, is executed by the timelock resolved from cfg.MCMS.Qualifier
-			// (input.TimelockAddress). If a non-CLL qualifier is configured, those two accounts differ,
-			// so the preflight would validate the wrong executor. Reject that up front rather than
-			// emitting a grant the actual executor cannot authorize (or skipping one it could). Only
-			// enforce this for tokens that actually emit role writes — plain ERC20 (lock/release) pools
-			// grant no roles and hand over no admin, so a non-CLL qualifier is harmless for them.
-			if tokenImpl != nil && input.TimelockAddress != "" {
-				caps := tokenImpl.Capabilities()
-				if caps.ParticipatesInPoolRoleGrant || caps.SupportsAdminRole {
-					cllTimelock, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve CLL timelock for token role handling on chain %d: %w", input.ChainSelector, err)
-					}
-					if common.HexToAddress(input.TimelockAddress) != cllTimelock {
-						return sequences.OnChainOutput{}, fmt.Errorf(
-							"token role handling requires the CLL MCMS qualifier: configured executor %s does not match CLL timelock %s on chain %d",
-							input.TimelockAddress, cllTimelock.Hex(), input.ChainSelector,
-						)
-					}
-				}
-			}
-
 			var writes []evm_contract.WriteOutput
 			if !datastore_utils.IsAddressRefEmpty(poolRef) {
 				poolAddr, err := datastore_utils_evm.ToNonZeroEVMAddress(poolRef)
@@ -570,11 +546,14 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 				return nil, nil
 			}
 		}
-		// The proposal executor is only consumed by BurnMintERC677 (which owner-gates it); every
-		// admin-role token type ignores it. Pass input.TimelockAddress — the MCMS executor resolved
-		// from cfg.MCMS by TokenExpansion — which is empty (zero) for deployer-owned / no-MCMS flows
-		// so the ERC677 grant takes the deployer-signed direct path instead of the owner check.
-		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
+		// The proposal-executor argument is only consumed by BurnMintERC677 (which owner-gates it);
+		// every admin-role token type ignores it. Pass the zero address so the ERC677 grant skips the
+		// plan-time owner check and is authorized at execution time instead. This lets same-batch
+		// "transfer ownership to the timelock, then grant" flows plan cleanly and keeps deployer-owned
+		// grants working, rather than failing planning because the deployer (not the timelock) is the
+		// current owner. Role-handling execution is CLL-canonical and enforced up front in
+		// DeployTokenPoolForToken, so no MCMS executor needs to be threaded through here.
+		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.Address{}); grantErr != nil {
 			return nil, fmt.Errorf("failed to grant pool roles for token with address %s and type %s and pool %s on chain %d: %w", tokenAddr.Hex(), tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil
