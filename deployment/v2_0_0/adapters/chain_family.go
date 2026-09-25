@@ -6,6 +6,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -38,8 +39,8 @@ type CommitteeVerifierConfig[C any] struct {
 
 // ExecutorDestChainConfig configures the Executor for a remote chain.
 type ExecutorDestChainConfig struct {
-	USDCentsFee uint16
-	Enabled     bool
+	USDCentsFee uint16 `json:"usdCentsFee,omitempty" yaml:"usdCentsFee,omitempty"`
+	Enabled     bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
 
 // CommitteeVerifierRemoteChainDefaults provides sensible defaults for CommitteeVerifier
@@ -62,6 +63,13 @@ type RemoteChainDefaults struct {
 	TokenReceiverAllowed      bool
 	MessageNetworkFeeUSDCents uint16
 	TokenNetworkFeeUSDCents   uint16
+	// SkipExecutorConfig tells the local chain's sequence not to configure an Executor
+	// contract for this lane. A remote adapter sets it when that destination has no
+	// executor because its messages are executed manually. The local chain's sequence
+	// decides what that means in its own terms — an EVM source, for example, writes its
+	// own no-execution sentinel into the OnRamp — so no family-specific address crosses
+	// this boundary.
+	SkipExecutorConfig bool
 }
 
 // RemoteChainConfig defines the configuration for a remote chain.
@@ -81,6 +89,9 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	DefaultExecutor           LocalContract
 	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
 	ExecutorDestChainConfig   ExecutorDestChainConfig
+	// SkipExecutorConfig mirrors RemoteChainDefaults.SkipExecutorConfig: when set, the
+	// local chain's sequence must not read or write an Executor contract for this lane.
+	SkipExecutorConfig bool
 	AddressBytesLength        uint8
 	BaseExecutionGasCost      uint32
 	TokenReceiverAllowed      *bool
@@ -92,7 +103,12 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 type ConfigureChainForLanesInput struct {
 	ChainSelector       uint64
 	AllowOnrampOverride bool
-	Router              []byte
+	// AllowLoweringBaseExecutionGasCost permits writing a BaseExecutionGasCost below the
+	// value already on chain. Off by default: the per-family default is a single flat
+	// value, so re-running a lane whose gas cost was raised by hand would otherwise put
+	// the default back and break execution on the destination.
+	AllowLoweringBaseExecutionGasCost bool
+	Router                            []byte
 	// OnRamp is the local OnRamp as returned by this chain's GetOnRampAddress, so it
 	// carries the family's message encoding rather than its plain contract address.
 	// On EVM that means 32 abi-encoded bytes; the sequence decodes the address from it.
@@ -135,6 +151,22 @@ type ChainFamily interface {
 	GetDefaultCommitteeVerifierRemoteChainConfig() CommitteeVerifierRemoteChainDefaults
 	GetDefaultFinalityConfig() finality.Config
 	ValidateNOPsTopology(chainSelector string, nopCount int) error
+}
+
+// GasPriceValidator is an optional interface a ChainFamily adapter can implement to expose a
+// read-only gas-price preflight. applyConfigureChains runs it for every chain before
+// dispatching any chain's sequence, so a missing or invalid gas price on a later chain fails
+// before earlier chains are written (which would otherwise leave a partially-configured lane).
+//
+// Adapters that do not implement it are skipped; their sequence still enforces the rule per
+// chain at apply time.
+type GasPriceValidator interface {
+	ValidateGasPricesForLanes(
+		e deployment.Environment,
+		chainSelector uint64,
+		feeQuoter []byte,
+		remoteChains map[uint64]RemoteChainConfig[[]byte, string],
+	) error
 }
 
 // ChainFamilyRegistry maintains a registry of chain families.
@@ -180,17 +212,17 @@ func (r *ChainFamilyRegistry) GetChainFamily(chainFamily string) (ChainFamily, b
 // (including those explicitly set to zero) replace the corresponding value. This ensures
 // user-supplied zero values are honored rather than silently dropped.
 type FeeQuoterDestChainConfigOverrides struct {
-	OverrideExistingConfig      bool
-	IsEnabled                   *bool
-	MaxDataBytes                *uint32
-	MaxPerMsgGasLimit           *uint32
-	DestGasOverhead             *uint32
-	DestGasPerPayloadByteBase   *uint8
-	ChainFamilySelector         [4]byte
-	DefaultTokenFeeUSDCents     *uint16
-	DefaultTokenDestGasOverhead *uint32
-	DefaultTxGasLimit           *uint32
-	NetworkFeeUSDCents          *uint16
-	LinkFeeMultiplierPercent    *uint8
-	USDPerUnitGas               *big.Int
+	OverrideExistingConfig      bool     `json:"overrideExistingConfig,omitempty" yaml:"overrideExistingConfig,omitempty"`
+	IsEnabled                   *bool    `json:"isEnabled,omitempty" yaml:"isEnabled,omitempty"`
+	MaxDataBytes                *uint32  `json:"maxDataBytes,omitempty" yaml:"maxDataBytes,omitempty"`
+	MaxPerMsgGasLimit           *uint32  `json:"maxPerMsgGasLimit,omitempty" yaml:"maxPerMsgGasLimit,omitempty"`
+	DestGasOverhead             *uint32  `json:"destGasOverhead,omitempty" yaml:"destGasOverhead,omitempty"`
+	DestGasPerPayloadByteBase   *uint8   `json:"destGasPerPayloadByteBase,omitempty" yaml:"destGasPerPayloadByteBase,omitempty"`
+	ChainFamilySelector         [4]byte  `json:"chainFamilySelector,omitempty" yaml:"chainFamilySelector,omitempty"`
+	DefaultTokenFeeUSDCents     *uint16  `json:"defaultTokenFeeUSDCents,omitempty" yaml:"defaultTokenFeeUSDCents,omitempty"`
+	DefaultTokenDestGasOverhead *uint32  `json:"defaultTokenDestGasOverhead,omitempty" yaml:"defaultTokenDestGasOverhead,omitempty"`
+	DefaultTxGasLimit           *uint32  `json:"defaultTxGasLimit,omitempty" yaml:"defaultTxGasLimit,omitempty"`
+	NetworkFeeUSDCents          *uint16  `json:"networkFeeUSDCents,omitempty" yaml:"networkFeeUSDCents,omitempty"`
+	LinkFeeMultiplierPercent    *uint8   `json:"linkFeeMultiplierPercent,omitempty" yaml:"linkFeeMultiplierPercent,omitempty"`
+	USDPerUnitGas               *big.Int `json:"usdPerUnitGas,omitempty" yaml:"usdPerUnitGas,omitempty"`
 }

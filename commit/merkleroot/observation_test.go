@@ -377,6 +377,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport,
 				ccipReader,
 				mocks.NewMessageHasher(),
+				NoopMetrics{},
 			)
 
 			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx))
@@ -589,6 +590,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 				chainSupport,
 				ccipReader,
 				mocks.NewMessageHasher(),
+				NoopMetrics{},
 			)
 
 			assert.Equal(t, tc.expResult, o.ObserveLatestOnRampSeqNums(ctx))
@@ -634,6 +636,7 @@ func Test_ObserveOnRampNextSeqNums(t *testing.T) {
 			chainSupport,
 			ccipReader,
 			mocks.NewMessageHasher(),
+			NoopMetrics{},
 		)
 
 		result := o.ObserveLatestOnRampSeqNums(ctx)
@@ -939,6 +942,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				chainSupport,
 				mockCCIPReader,
 				mocks.NewMessageHasher(),
+				NoopMetrics{},
 			)
 
 			roots := o.ObserveMerkleRoots(ctx, tc.ranges)
@@ -1003,6 +1007,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 			chainSupport,
 			mockCCIPReader,
 			mocks.NewMessageHasher(),
+			NoopMetrics{},
 		)
 
 		roots := o.ObserveMerkleRoots(ctx, ranges)

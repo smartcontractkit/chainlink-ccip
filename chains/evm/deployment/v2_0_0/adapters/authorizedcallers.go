@@ -19,8 +19,6 @@ import (
 	sequtil "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-const evmCallerLen = 20
-
 // EVMAuthorizedCallersAdapter implements api.AuthorizedCallersAdapter for EVM chains.
 // The adapter is not tied to any specific contract: it is parameterized at construction
 // time with per-contract generated operations (applyOp, getAllOp) and a buildArgs
@@ -138,7 +136,7 @@ func (a *EVMAuthorizedCallersAdapter) GetAllAuthorizedCallers(
 	}
 	callers := make([]api.Caller, len(report.Output))
 	for i, c := range report.Output {
-		callers[i] = c.Bytes()
+		callers[i] = c.Hex()
 	}
 	return callers, nil
 }
@@ -211,15 +209,23 @@ func addrCacheKey(selector uint64, contractType cldf.ContractType, version *semv
 	return fmt.Sprintf("%d|%s|%s", selector, contractType, ver)
 }
 
+// NormalizeCaller canonicalizes an EVM caller to its EIP-55 checksummed form so that
+// "0xabc...", "0xABC..." and a mis-checksummed spelling all compare equal against the
+// values returned by GetAllAuthorizedCallers, which are already checksummed.
+func (a *EVMAuthorizedCallersAdapter) NormalizeCaller(c api.Caller) (api.Caller, error) {
+	// common.HexToAddress silently truncates or zero-pads malformed input, so validate first.
+	if !common.IsHexAddress(c) {
+		return "", fmt.Errorf("caller %q is not a valid EVM address (expected 20-byte hex, optional 0x prefix)", c)
+	}
+	return common.HexToAddress(c).Hex(), nil
+}
+
 func toEVMAddresses(callers []api.Caller) ([]common.Address, error) {
 	out := make([]common.Address, len(callers))
 	for i, c := range callers {
-		if len(c) != evmCallerLen {
-			return nil, fmt.Errorf("caller at index %d has length %d, expected %d (EVM address)", i, len(c), evmCallerLen)
-		}
-		addr := common.BytesToAddress(c)
+		addr := common.HexToAddress(c)
 		if addr == (common.Address{}) {
-			return nil, fmt.Errorf("caller at index %d is the zero address", i)
+			return nil, fmt.Errorf("caller at index %d is the zero address or invalid hex: %q", i, c)
 		}
 		out[i] = addr
 	}

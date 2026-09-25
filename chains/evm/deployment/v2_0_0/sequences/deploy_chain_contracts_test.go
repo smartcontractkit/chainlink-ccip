@@ -26,7 +26,6 @@ import (
 	mcms_seq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
@@ -36,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	mock_recv_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/mock_receiver_v2"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -92,7 +92,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 				e.BlockChains.EVMChains()[chainSelector],
 				sequences.DeployChainContractsInput{
 					ChainSelector:     chainSelector,
-					ExistingAddresses: test.existingAddresses,
+					ExistingAddresses: append(testsetup.UltraFastCurseMCMSRefs(chainSelector), test.existingAddresses...),
 					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					ContractParams:    testsetup.CreateBasicContractParams(),
 					DeployTestRouter:  true,
@@ -103,7 +103,7 @@ func TestDeployChainContracts_Idempotency(t *testing.T) {
 			require.Len(t, report.Output.BatchOps, 2, "Expected 2 batch operations")
 
 			exists := map[deployment.ContractType]bool{
-				rmn_remote.ContractType:                 false,
+				rmnops.ContractType:                     false,
 				router.ContractType:                     false,
 				executor.ContractType:                   false,
 				link.ContractType:                       false,
@@ -163,7 +163,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 			require.NoError(t, err, "Failed to deploy CREATE2Factory")
 			input := sequences.DeployChainContractsInput{
 				ChainSelector:     evmChain.Selector,
-				ExistingAddresses: nil,
+				ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(evmChain.Selector),
 				ContractParams:    testsetup.CreateBasicContractParams(),
 				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 				DeployerKeyOwned:  true,
@@ -216,7 +216,7 @@ func TestDeployChainContracts_MultipleDeployments(t *testing.T) {
 
 				input := sequences.DeployChainContractsInput{
 					ChainSelector:     chainSel,
-					ExistingAddresses: nil,
+					ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(evmChain.Selector),
 					ContractParams:    testsetup.CreateBasicContractParams(),
 					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 					DeployerKeyOwned:  true,
@@ -322,7 +322,7 @@ func TestDeployChainContracts_MultipleCommitteeVerifiersAndMultipleMockReceiverC
 		e.BlockChains.EVMChains()[chainSelector],
 		sequences.DeployChainContractsInput{
 			ChainSelector:     chainSelector,
-			ExistingAddresses: nil,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
 			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
 			ContractParams:    params,
 			DeployerKeyOwned:  true,
@@ -469,6 +469,11 @@ func deployAllMCMSForTest(
 	rmnTimelockAddr, rmnAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.RMNTimelockQualifier)
 	addresses = append(addresses, rmnAddrs...)
 
+	// DeployChainContracts resolves this one to use as the RMN's curse admin, so a deployment that
+	// is not deployer-key-owned cannot succeed without it.
+	_, ultraFastCurseAddrs := deployMCMSInstanceForTest(t, b, chain, deployer, common_utils.UltraFastCurseMCMSQualifier)
+	addresses = append(addresses, ultraFastCurseAddrs...)
+
 	return cllTimelockAddr, rmnTimelockAddr, addresses
 }
 
@@ -549,7 +554,7 @@ func TestDeployChainContracts_DefaultOwnershipTransfer(t *testing.T) {
 	// For Ownable2Step contracts, owner is still the deployer (pending transfer not yet
 	// accepted). For one-step Ownable contracts, owner is the timelock directly.
 	singleProductTypes := []deployment.ContractType{
-		rmn_remote.ContractType,
+		rmnops.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
 		fee_quoter.ContractType,
@@ -682,7 +687,7 @@ func TestDeployChainContracts_DefaultOwnershipTransfer_Idempotent(t *testing.T) 
 	// Verify ownership is still pointing to CLL timelock after second run.
 	outputDS := sealAddressRefs(t, secondReport.Output.Addresses)
 	singleProductTypes := []deployment.ContractType{
-		rmn_remote.ContractType,
+		rmnops.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
 		fee_quoter.ContractType,
@@ -739,7 +744,7 @@ func TestDeployChainContracts_DeployerKeyOwned(t *testing.T) {
 
 	// Verify product contracts are deployed but still owned by deployer (no transfer).
 	singleProductTypes := []deployment.ContractType{
-		rmn_remote.ContractType,
+		rmnops.ContractType,
 		router.ContractType,
 		token_admin_registry.ContractType,
 		fee_quoter.ContractType,
@@ -819,6 +824,29 @@ func TestDeployChainContracts_DefaultTransfer_FailsWithoutMCMS(t *testing.T) {
 		require.Contains(t, err.Error(), common_utils.RMNTimelockQualifier)
 	})
 
+	t.Run("CLLCCIP and RMNMCMS deployed, missing UltraFastCurse", func(t *testing.T) {
+		var addrs []datastore.AddressRef
+		_, cllAddresses := deployMCMSInstanceForTest(t, e.OperationsBundle, chain, deployer, common_utils.CLLQualifier)
+		addrs = append(addrs, cllAddresses...)
+		_, rmnAddresses := deployMCMSInstanceForTest(t, e.OperationsBundle, chain, deployer, common_utils.RMNTimelockQualifier)
+		addrs = append(addrs, rmnAddresses...)
+
+		_, err = operations.ExecuteSequence(
+			e.OperationsBundle,
+			sequences.DeployChainContracts,
+			chain,
+			sequences.DeployChainContractsInput{
+				ChainSelector:     chainSelector,
+				CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+				ContractParams:    testsetup.CreateBasicContractParams(),
+				ExistingAddresses: addrs,
+			},
+		)
+		// Without it the RMN would deploy with no curse admin and so no fast-curse path.
+		require.Error(t, err, "Expected error when the UltraFastCurse MCMS is not in ExistingAddresses")
+		require.Contains(t, err.Error(), common_utils.UltraFastCurseMCMSQualifier)
+	})
+
 	t.Run("timelocks present but MCM contracts missing", func(t *testing.T) {
 		_, _, allAddrs := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
 
@@ -845,4 +873,156 @@ func TestDeployChainContracts_DefaultTransfer_FailsWithoutMCMS(t *testing.T) {
 		require.Error(t, err, "Expected error when timelocks exist but MCM contracts are missing")
 		require.Contains(t, err.Error(), "ownership transfer requires MCM contract")
 	})
+}
+
+// findDeployedAddress returns the address deployed for the given contract type.
+func findDeployedAddress(t *testing.T, refs []datastore.AddressRef, ctype deployment.ContractType) common.Address {
+	t.Helper()
+	for _, ref := range refs {
+		if ref.Type == datastore.ContractType(ctype) {
+			return common.HexToAddress(ref.Address)
+		}
+	}
+	require.FailNowf(t, "contract not found", "no deployed address for type %s", ctype)
+
+	return common.Address{}
+}
+
+// TestDeployChainContracts_RampsResolveRMNViaProxy pins the invariant that both ramps resolve RMN
+// through the RMNProxy rather than through a raw RMN implementation. Both store the address as an
+// immutable, so wiring either one to the implementation permanently pins it to whichever RMN was
+// live at deploy time: once the proxy is repointed (see DeployAndActivateRMN) that ramp stops
+// observing curses entirely and can only be corrected by redeploying it.
+func TestDeployChainContracts_RampsResolveRMNViaProxy(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	chain := e.BlockChains.EVMChains()[chainSelector]
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSelector,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{chain.DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	rmnProxyAddr := findDeployedAddress(t, report.Output.Addresses, rmn_proxy.ContractType)
+	rmnImplAddr := findDeployedAddress(t, report.Output.Addresses, rmnops.ContractType)
+	require.NotEqual(t, rmnProxyAddr, rmnImplAddr, "proxy and implementation must be distinct for this test to be meaningful")
+
+	onRampStaticConfig, err := operations.ExecuteOperation(e.OperationsBundle, onramp.GetStaticConfig, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       findDeployedAddress(t, report.Output.Addresses, onramp.ContractType),
+	})
+	require.NoError(t, err, "failed to read OnRamp static config")
+	require.Equal(t, rmnProxyAddr, onRampStaticConfig.Output.RmnRemote,
+		"OnRamp must resolve RMN through the RMNProxy, not the RMN implementation")
+
+	offRampStaticConfig, err := operations.ExecuteOperation(e.OperationsBundle, offramp.GetStaticConfig, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       findDeployedAddress(t, report.Output.Addresses, offramp.ContractType),
+	})
+	require.NoError(t, err, "failed to read OffRamp static config")
+	require.Equal(t, rmnProxyAddr, offRampStaticConfig.Output.RmnRemote,
+		"OffRamp must resolve RMN through the RMNProxy, not the RMN implementation")
+}
+
+// TestDeployChainContracts_RMNCurseAdminAndOwnership pins the two RMN properties a new chain must
+// end up with: the Ultra Fast Curse MCMS timelock is a curse admin on the deployed RMN, and the RMN
+// is routed to the RMNMCMS timelock for ownership rather than to CLLCCIP.
+func TestDeployChainContracts_RMNCurseAdminAndOwnership(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+	e, err := environment.New(t.Context(),
+		environment.WithEVMSimulated(t, []uint64{chainSelector}),
+	)
+	require.NoError(t, err, "Failed to create environment")
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	deployer := chain.DeployerKey.From
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSelector,
+		Args:           create2_factory.ConstructorArgs{AllowList: []common.Address{deployer}},
+	}, nil)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+
+	cllTimelockAddr, rmnTimelockAddr, mcmsAddresses := deployAllMCMSForTest(t, e.OperationsBundle, chain, deployer)
+
+	ultraFastCurseTimelock, err := datastore_utils.FindAndFormatRef(
+		sealAddressRefs(t, mcmsAddresses),
+		datastore.AddressRef{
+			Type:      datastore.ContractType(common_utils.RBACTimelock),
+			Qualifier: common_utils.UltraFastCurseMCMSQualifier,
+		}, chainSelector, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "test setup should deploy an UltraFastCurse timelock")
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			ExistingAddresses: mcmsAddresses,
+		},
+	)
+	require.NoError(t, err, "ExecuteSequence should not error")
+
+	rmnAddr := findDeployedAddress(t, report.Output.Addresses, rmnops.ContractType)
+
+	// The RMN must be deployed at 2.1.0 and nothing else.
+	var rmnVersion string
+	for _, ref := range report.Output.Addresses {
+		if ref.Type == datastore.ContractType(rmnops.ContractType) {
+			rmnVersion = ref.Version.String()
+		}
+	}
+	require.Equal(t, rmnops.Version.String(), rmnVersion, "a new chain must always get RMN 2.1.0")
+
+	// The Ultra Fast Curse timelock must be an authorized curse admin on the deployed RMN.
+	curseAdmins, err := operations.ExecuteOperation(e.OperationsBundle, rmnops.GetAllAuthorizedCallers, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chainSelector,
+		Address:       rmnAddr,
+	})
+	require.NoError(t, err, "failed to read authorized callers from RMN")
+	require.Contains(t, curseAdmins.Output, ultraFastCurseTimelock,
+		"the UltraFastCurse MCMS timelock must be a curse admin on the deployed RMN")
+
+	// Ownership must be routed to RMNMCMS, not CLLCCIP. Transfers are only proposed here, so assert
+	// on the routing buckets rather than the on-chain owner (which is still the deployer).
+	require.NotEqual(t, cllTimelockAddr, rmnTimelockAddr, "test setup must use distinct timelocks")
+	var inCLLBucket bool
+	for _, ref := range report.Output.RefsToTransferOwnership {
+		if ref.Type == datastore.ContractType(rmnops.ContractType) {
+			inCLLBucket = true
+		}
+	}
+	require.False(t, inCLLBucket, "RMN must not be transferred to the CLLCCIP timelock")
+
+	var inRMNBucket bool
+	for _, ref := range report.Output.RefsToTransferOwnershipRMN {
+		if ref.Type == datastore.ContractType(rmnops.ContractType) {
+			inRMNBucket = true
+		}
+	}
+	require.True(t, inRMNBucket, "RMN must be transferred to the RMNMCMS timelock")
 }

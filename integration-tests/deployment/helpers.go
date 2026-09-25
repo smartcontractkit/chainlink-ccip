@@ -45,6 +45,7 @@ import (
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	v2changesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 )
@@ -316,7 +317,10 @@ func EVMTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector
 	chain := e.BlockChains.EVMChains()[selector]
 	timelockAddrs := make(map[uint64]string)
 	for _, addrRef := range e.DataStore.Addresses().Filter() {
-		if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) {
+		// Qualifier-scoped on purpose: the datastore also holds the UltraFastCurse RBACTimelock, and
+		// an unqualified match would let it win this loop and become the proposed owner.
+		if addrRef.Type == datastore.ContractType(common_utils.RBACTimelock) &&
+			addrRef.Qualifier == common_utils.CLLQualifier {
 			timelockAddrs[addrRef.ChainSelector] = addrRef.Address
 		}
 	}
@@ -468,6 +472,10 @@ func NewLaneTopologyForV2(signer string, chainSelectors ...uint64) *offchain.Env
 // NewLaneOverridesForV2 pins the lane's CCVs to the committee verifier deployed under
 // LaneCommitteeQualifier. Without it the changeset auto-resolves CCVs under the "default"
 // qualifier, which CreateBasicContractParams does not deploy.
+//
+// It also supplies a USDPerUnitGas: ConfigureChainForLanes refuses to configure a lane whose
+// FeeQuoter has no gas price for the destination, so a lane built without one would fail the
+// gas-price preflight.
 func NewLaneOverridesForV2(chainSelector uint64) *v2changesets.ChainOverrides {
 	verifier := []datastore.AddressRef{
 		{
@@ -481,6 +489,9 @@ func NewLaneOverridesForV2(chainSelector uint64) *v2changesets.ChainOverrides {
 		RemoteChainCfg: v2changesets.PartialRemoteChainConfig{
 			DefaultInboundCCVs:  verifier,
 			DefaultOutboundCCVs: verifier,
+			FeeQuoterDestChainConfig: ccvadapters.FeeQuoterDestChainConfigOverrides{
+				USDPerUnitGas: big.NewInt(1e18),
+			},
 		},
 	}
 }
@@ -520,10 +531,13 @@ func DeployChainContractsV2_0_0(t *testing.T, e *cldf_deployment.Environment, cu
 		sequencesV2_0_0.DeployChainContracts,
 		e.BlockChains.EVMChains()[chainSel],
 		sequencesV2_0_0.DeployChainContractsInput{
-			ChainSelector:    chainSel,
-			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-			ContractParams:   testsetupV2_0_0.CreateBasicContractParams(),
-			DeployerKeyOwned: true,
+			ChainSelector:  chainSel,
+			CREATE2Factory: common.HexToAddress(create2FactoryRef.Address),
+			ContractParams: testsetupV2_0_0.CreateBasicContractParams(),
+			// The RMN is always deployed with the Ultra Fast Curse MCMS timelock as its curse admin,
+			// so the sequence requires that ref to be resolvable.
+			ExistingAddresses: testsetupV2_0_0.UltraFastCurseMCMSRefs(chainSel),
+			DeployerKeyOwned:  true,
 		},
 	)
 	require.NoError(t, err)
@@ -636,4 +650,21 @@ func CurrentBlockEVM(t *testing.T, e *cldf_deployment.Environment, sel uint64) u
 	header, err := chain.Client.HeaderByNumber(t.Context(), nil)
 	require.NoError(t, err)
 	return header.Number.Uint64()
+}
+
+// SeedUltraFastCurseMCMS registers an Ultra Fast Curse RBACTimelock ref for every EVM chain in the
+// environment.
+//
+// Chain-contract deploys use that timelock as the RMN's curse admin and fail without it. These test
+// flows deploy contracts before any MCMS exists, so the ref is seeded rather than deployed: the
+// address is only ever passed as a constructor argument, never called.
+func SeedUltraFastCurseMCMS(t *testing.T, e *cldf_deployment.Environment) {
+	t.Helper()
+	selectors := make([]uint64, 0)
+	for sel := range e.BlockChains.EVMChains() {
+		selectors = append(selectors, sel)
+	}
+	ds, err := testsetupV2_0_0.WithUltraFastCurseMCMS(e.DataStore, selectors...)
+	require.NoError(t, err, "failed to seed UltraFastCurse MCMS timelock refs")
+	e.DataStore = ds
 }

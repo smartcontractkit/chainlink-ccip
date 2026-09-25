@@ -93,7 +93,7 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader,
 					homeChain,
 					f,
-					plugincommon.NoopReporter{},
+					NoopMetrics{},
 				)
 			},
 			expObs: Observation{
@@ -145,7 +145,7 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader,
 					homeChain,
 					f,
-					plugincommon.NoopReporter{},
+					NoopMetrics{},
 				)
 			},
 			expObs: Observation{

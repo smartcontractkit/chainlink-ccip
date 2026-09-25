@@ -120,11 +120,16 @@ var ConfigureLombardChainForLanes = cldf_ops.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token address: %w", err)
 			}
+			remoteDecimals, err := dep.RemoteChains[remoteChainSelector].RemoteTokenDecimals(b, dep.DataStore, dep.BlockChains, remoteChainSelector, *tokenPoolQualifier(input.TokenQualifier))
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get remote token decimals: %w", err)
+			}
 
 			feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(remoteChain.TokenTransferFeeConfig)
 			remoteChainConfigs[remoteChainSelector] = tokens_core.RemoteChainConfig[[]byte, string]{
 				RemotePool:             common.LeftPadBytes(remotePoolAddress, 32),
 				RemoteToken:            common.LeftPadBytes(remoteTokenAddress, 32),
+				RemoteDecimals:         remoteDecimals,
 				TokenTransferFeeConfig: &feeCfg,
 				// Lombard does not use rate limiters
 				InboundRateLimiterConfig: &tokens_core.RateLimiterConfigFloatInput{

@@ -101,6 +101,9 @@ type RemoteLombardChain interface {
 	RemoteTokenAddress(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error)
 
 	RemoteTokenPoolAddress(ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, tokenQualifier string) ([]byte, error)
+
+	// RemoteTokenDecimals returns the decimals of the remote Lombard token on the given chain.
+	RemoteTokenDecimals(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, tokenQualifier string) (uint8, error)
 }
 
 // LombardChainRegistry maintains a registry of Lombard chains.

@@ -9,13 +9,14 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
@@ -38,10 +39,10 @@ import (
 )
 
 var (
-	getTokensPaginationSize = uint64(20)
+	getTokensPaginationSize = uint64(1000)
 	// getSupportedTokensPoolConcurrency caps concurrent RPC calls when fetching supported tokens per pool.
 	// Limits in-flight requests to avoid overwhelming the node/provider (rate limits, timeouts) and memory.
-	getSupportedTokensPoolConcurrency = 10
+	getSupportedTokensPoolConcurrency = 20
 )
 
 type ConfigImportAdapter struct {
@@ -275,6 +276,21 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 
 	tokensPerRemoteChain := make(map[uint64][]common.Address)
 	var mu sync.Mutex
+
+	// Batch pool lookups; getPools returns an address per token, zero if none.
+	poolByToken := make(map[common.Address]common.Address, len(allTokens))
+	for start := 0; start < len(allTokens); start += int(getTokensPaginationSize) {
+		end := min(start+int(getTokensPaginationSize), len(allTokens))
+		pools, err := tokenAdminRegC.GetPools(&bind.CallOpts{Context: ctx}, allTokens[start:end])
+		if err != nil {
+			return nil, fmt.Errorf("failed to get pools from token admin registry at %s on chain %d: %w",
+				tokenAdminRegAddr.String(), chain.Selector, err)
+		}
+		for i, pool := range pools {
+			poolByToken[allTokens[start+i]] = pool
+		}
+	}
+
 	grp, grpCtx := errgroup.WithContext(ctx)
 	grp.SetLimit(getSupportedTokensPoolConcurrency)
 	for _, tokenAddr := range allTokens {
@@ -283,13 +299,7 @@ func GetSupportedTokensPerRemoteChain(ctx context.Context, l logger.Logger, toke
 			continue
 		}
 		grp.Go(func() error {
-			poolAddr, err := tokenAdminRegC.GetPool(&bind.CallOpts{
-				Context: grpCtx,
-			}, tokenAddr)
-			if err != nil {
-				return fmt.Errorf("failed to get pool for token %s from token admin registry at %s on chain %d: %w",
-					tokenAddr.String(), tokenAdminRegAddr.String(), chain.Selector, err)
-			}
+			poolAddr := poolByToken[tokenAddr]
 			if poolAddr == (common.Address{}) {
 				// no pool configured for this token, skip
 				return nil

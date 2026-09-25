@@ -33,7 +33,9 @@ type MCMSReaderRegistry struct {
 	m  map[string]MCMSReader
 }
 
-func newMCMSReaderRegistry() *MCMSReaderRegistry {
+// NewMCMSReaderRegistry returns an empty MCMSReaderRegistry. Useful for tests
+// that need an isolated registry instead of the global singleton.
+func NewMCMSReaderRegistry() *MCMSReaderRegistry {
 	return &MCMSReaderRegistry{
 		m: make(map[string]MCMSReader),
 	}
@@ -48,7 +50,7 @@ var (
 // The first call creates the registry; subsequent calls return the same pointer.
 func GetRegistry() *MCMSReaderRegistry {
 	once.Do(func() {
-		singletonRegistry = newMCMSReaderRegistry()
+		singletonRegistry = NewMCMSReaderRegistry()
 	})
 	return singletonRegistry
 }

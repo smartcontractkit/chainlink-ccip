@@ -113,6 +113,9 @@ func TestTokenAdapter(t *testing.T) {
 				}, nil)
 				require.NoError(t, err, "Failed to deploy CREATE2Factory")
 
+				e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
+				require.NoError(t, err)
+
 				deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
 					Cfg: v2_0_0.DeployChainContractsCfg{
 						ChainSel:         chainSel,
@@ -307,12 +310,6 @@ func TestTokenAdapter(t *testing.T) {
 					Version:       semver.MustParse("1.5.0"),
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
-				verifierAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
-					ChainSelector: chainSel,
-					Type:          datastore.ContractType(committee_verifier.ContractType),
-					Version:       committee_verifier.Version,
-				}, chainSel, evm_datastore_utils.ToEVMAddress)
-				require.NoError(t, err, "Failed to find deployed verifier ref in datastore")
 
 				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
 					ChainSelector: chainSel,
@@ -358,19 +355,19 @@ func TestTokenAdapter(t *testing.T) {
 					requireRateLimiterScaled(t, cfg.OutboundRateLimiterConfig.Rate, cfg.OutboundRateLimiterConfig.Capacity, currentStates.OutboundRateLimiterState.Rate, currentStates.OutboundRateLimiterState.Capacity, decimals, false)
 				}
 
-				// Chain A has a 2.0.0 token pool so should have set CCVs
+				// Chain A has a 2.0.0 token pool. TokenExpansion no longer deploys
+				// AdvancedPoolHooks, so the pool has no hooks contract wired in and no CCVs
+				// are configured through it.
 				if chainSel == chainA {
 					boundTokenPool, err := tp_bindings.NewTokenPool(tokenPoolAddr, evmChain.Client)
 					require.NoError(t, err, "Failed to instantiate token pool contract")
 					inboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, inbound)
 					require.NoError(t, err, "Failed to get inbound CCVs from token pool")
-					require.Len(t, inboundCCVs, 1, "Number of inbound CCVs should match")
-					require.Equal(t, verifierAddr, inboundCCVs[0], "Inbound CCV address should match")
+					require.Empty(t, inboundCCVs, "No inbound CCVs should be required without AdvancedPoolHooks")
 
 					outboundCCVs, err := boundTokenPool.GetRequiredCCVs(nil, common.Address{}, remoteChainSel, big.NewInt(0), finality.RawWaitForFinality, []byte{}, outbound)
 					require.NoError(t, err, "Failed to get outbound CCVs from token pool")
-					require.Len(t, outboundCCVs, 1, "Number of outbound CCVs should match")
-					require.Equal(t, verifierAddr, outboundCCVs[0], "Outbound CCV address should match")
+					require.Empty(t, outboundCCVs, "No outbound CCVs should be required without AdvancedPoolHooks")
 				}
 			}
 		})
@@ -398,6 +395,9 @@ func TestTokenExpansion(t *testing.T) {
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
 		}, nil)
+		require.NoError(t, err)
+
+		e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
 		require.NoError(t, err)
 
 		deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
@@ -559,6 +559,9 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
+	require.NoError(t, err)
+
 	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
 		Cfg: v2_0_0.DeployChainContractsCfg{
 			ChainSel:         chainSel,
@@ -595,8 +598,8 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 
 	// 1. Fresh deploy via TokenExpansion (no reconcile opts).
 	type reconcileOpts struct {
-		routerRef     *datastore.AddressRef
-		feeAggregator string
+		routerRef *datastore.AddressRef
+		feeAdmin  string
 	}
 	expansion := func(opts reconcileOpts, deploy bool) tokens.TokenExpansionInputPerChain {
 		in := tokens.TokenExpansionInputPerChain{
@@ -606,7 +609,7 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 				PoolType:           string(burn_mint_token_pool.ContractType),
 				TokenPoolQualifier: symbol,
 				RouterRef:          opts.routerRef,
-				FeeAggregator:      opts.feeAggregator,
+				FeeAdmin:           opts.feeAdmin,
 				// On reconcile runs (no DeployTokenInput), TokenExpansion still
 				// needs a TokenRef to merge against. Point at the v1.0.0
 				// burn-mint-drip token deployed on the first run.
@@ -670,30 +673,30 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 	require.Equal(t, common.Address{}, cfg.FeeAdmin, "fresh deploy should leave feeAdmin unset")
 
 	// 2. Reconcile RouterRef → TestRouter. FeeAdmin should stay at its zero
-	//    value because we didn't supply a FeeAggregator.
+	//    value because we didn't supply a FeeAdmin.
 	testRouterRef := &datastore.AddressRef{Type: datastore.ContractType(router.TestRouterContractType)}
 	apply(t, reconcileOpts{routerRef: testRouterRef}, false, "reconcile RouterRef=TestRouter")
 
 	cfg = readDynamicConfig(t)
 	require.Equal(t, testRouter, cfg.Router, "router should flip to TestRouter")
-	require.Equal(t, common.Address{}, cfg.FeeAdmin, "feeAdmin should remain unchanged when FeeAggregator not provided")
+	require.Equal(t, common.Address{}, cfg.FeeAdmin, "feeAdmin should remain unchanged when FeeAdmin not provided")
 
-	// 3. Reconcile FeeAggregator without RouterRef. Router must stay on
+	// 3. Reconcile FeeAdmin without RouterRef. Router must stay on
 	//    TestRouter (proves fields reconcile independently), feeAdmin flips.
-	feeAggAddr := common.HexToAddress("0x000000000000000000000000000000000000fEEE")
-	apply(t, reconcileOpts{feeAggregator: feeAggAddr.Hex()}, false, "reconcile FeeAggregator only")
+	feeAdminAddr := common.HexToAddress("0x000000000000000000000000000000000000fEEE")
+	apply(t, reconcileOpts{feeAdmin: feeAdminAddr.Hex()}, false, "reconcile FeeAdmin only")
 
 	cfg = readDynamicConfig(t)
-	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter when only FeeAggregator is reconciled")
-	require.Equal(t, feeAggAddr, cfg.FeeAdmin, "feeAdmin should be set to provided FeeAggregator")
+	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter when only FeeAdmin is reconciled")
+	require.Equal(t, feeAdminAddr, cfg.FeeAdmin, "feeAdmin should be set to provided FeeAdmin")
 
 	// 4. Idempotent re-run with both fields. ConfigureTokenPool detects no
 	//    diff and skips the setDynamicConfig write; on-chain state unchanged.
-	apply(t, reconcileOpts{routerRef: testRouterRef, feeAggregator: feeAggAddr.Hex()}, false, "idempotent reconcile")
+	apply(t, reconcileOpts{routerRef: testRouterRef, feeAdmin: feeAdminAddr.Hex()}, false, "idempotent reconcile")
 
 	cfg = readDynamicConfig(t)
 	require.Equal(t, testRouter, cfg.Router, "router should remain TestRouter after idempotent reconcile")
-	require.Equal(t, feeAggAddr, cfg.FeeAdmin, "feeAdmin should remain set after idempotent reconcile")
+	require.Equal(t, feeAdminAddr, cfg.FeeAdmin, "feeAdmin should remain set after idempotent reconcile")
 }
 
 // TestTokenExpansion_FreshDeployWithRouterRef covers the fresh-deploy
@@ -720,6 +723,9 @@ func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
 			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 		},
 	}, nil)
+	require.NoError(t, err)
+
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
 	require.NoError(t, err)
 
 	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
@@ -828,6 +834,9 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 				AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
 			},
 		}, nil)
+		require.NoError(t, err)
+
+		e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
 		require.NoError(t, err)
 
 		deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{

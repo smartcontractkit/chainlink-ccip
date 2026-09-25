@@ -96,6 +96,28 @@ var GetDecimals = contract.NewRead(contract.ReadParams[struct{}, uint8, *erc20.E
 	},
 })
 
+// TransferProposalOnly is identical to Transfer but forces the operation into a proposal
+// rather than executing directly. Use when the transfer must be called by a timelock
+// as part of an atomic MCMS batch (e.g., withdraw → transfer liquidity flows).
+var TransferProposalOnly = contract.NewWrite(contract.WriteParams[TransferArgs, *erc20.ERC20]{
+	Name:            "erc20:transfer-proposal-only",
+	Version:         utils.Version_1_0_0,
+	Description:     "Transfer ERC20 tokens to a specified address (proposal-only, never executed directly)",
+	ContractType:    ContractType,
+	ContractABI:     erc20.ERC20ABI,
+	NewContract:     erc20.NewERC20,
+	IsAllowedCaller: contract.NoCallersAllowed[*erc20.ERC20, TransferArgs],
+	Validate: func(args TransferArgs) error {
+		if args.Amount == nil || args.Amount.Cmp(big.NewInt(0)) <= 0 {
+			return errors.New("amount must be greater than 0")
+		}
+		return nil
+	},
+	CallContract: func(token *erc20.ERC20, opts *bind.TransactOpts, args TransferArgs) (*types.Transaction, error) {
+		return token.Transfer(opts, args.Receiver, args.Amount)
+	},
+})
+
 var Approve = contract.NewWrite(contract.WriteParams[ApproveArgs, *erc20.ERC20]{
 	Name:            "erc20:approve",
 	Version:         utils.Version_1_0_0,

@@ -50,6 +50,7 @@ func testUpdateFQDestsEVMOnly(t *testing.T) {
 	for _, sel := range chains {
 		chainInput[sel] = NewDefaultDeploymentConfigForEVM(v1_6_0)
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deploy.DeployContracts(deploy.GetRegistry()).Apply(*e, deploy.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -57,7 +58,7 @@ func testUpdateFQDestsEVMOnly(t *testing.T) {
 	require.NoError(t, err)
 	MergeAddresses(t, e, out.DataStore)
 
-	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: v1_6_0,
@@ -142,6 +143,7 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 	mcmsRegistry := changesets.GetRegistry()
 	mcmsRegistry.RegisterMCMSReader(chainsel.FamilyEVM, &evmadaptersV1_0_0.EVMMCMSReader{})
 
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deploy.DeployContracts(deployRegistry).Apply(*e, deploy.ContractDeploymentConfig{
 		MCMS: mcms.Input{},
 		Chains: map[uint64]deploy.ContractDeploymentConfigPerChain{
@@ -152,7 +154,7 @@ func testUpdateFQDestsCrossChain(t *testing.T) {
 	require.NoError(t, err)
 	MergeAddresses(t, e, out.DataStore)
 
-	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanes.ConnectChainsConfig{
+	_, err = lanes.ConnectChains(lanes.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanes.ConnectChainsConfig{
 		Lanes: []lanes.LaneConfig{
 			{
 				Version: v1_6_0,

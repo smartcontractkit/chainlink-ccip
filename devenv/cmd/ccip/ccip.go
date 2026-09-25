@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	LocalWASPLoadDashboard = "http://localhost:3000/d/WASPLoadTests/wasp-load-test?orgId=1&from=now-5m&to=now&refresh=5s"
-	LocalCCIPDashboard     = "http://localhost:3000/d/f8a04cef-653f-46d3-86df-87c532300672/ccip-services?orgId=1&refresh=5s"
+	LocalWASPLoadDashboard  = "http://localhost:3000/d/WASPLoadTests/wasp-load-test?orgId=1&from=now-5m&to=now&refresh=5s"
+	LocalCCIPDashboard      = "http://localhost:3000/d/f8a04cef-653f-46d3-86df-87c532300672/ccip-services?orgId=1&refresh=5s"
+	LocalGrafanaVictoriaURL = "http://localhost:3000"
 )
 
 var rootCmd = &cobra.Command{
@@ -178,15 +179,27 @@ var obsUpCmd = &cobra.Command{
 	Aliases: []string{"u"},
 	Short:   "Spin up the observability stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		victoria, _ := cmd.Flags().GetBool("victoria")
 		full, _ := cmd.Flags().GetBool("full")
 		var err error
-		if full {
+		switch {
+		case victoria:
+			err = framework.ObservabilityVictoriaMetricsUp()
+		case full:
 			err = framework.ObservabilityUpFull()
-		} else {
+		default:
 			err = framework.ObservabilityUp()
 		}
 		if err != nil {
 			return fmt.Errorf("observability up failed: %w", err)
+		}
+		if victoria {
+			// Beholder-only metrics (see docs/metrics/commit-metrics.md) are only ever pushed
+			// via OTLP, and only this stack's otel-collector ingests + remote-writes them into
+			// VictoriaMetrics. Nodes must be pointed at it via [Telemetry] in env.toml's
+			// node_config_overrides for anything to show up.
+			ccipde.Plog.Info().Msgf("Grafana: %s", LocalGrafanaVictoriaURL)
+			return nil
 		}
 		ccipde.Plog.Info().Msgf("CCIP Dashboard: %s", LocalCCIPDashboard)
 		ccipde.Plog.Info().Msgf("CCIP Load Test Dashboard: %s", LocalWASPLoadDashboard)
@@ -199,6 +212,10 @@ var obsDownCmd = &cobra.Command{
 	Aliases: []string{"d"},
 	Short:   "Spin down the observability stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		victoria, _ := cmd.Flags().GetBool("victoria")
+		if victoria {
+			return framework.ObservabilityVictoriaDown()
+		}
 		return framework.ObservabilityDown()
 	},
 }
@@ -208,10 +225,23 @@ var obsRestartCmd = &cobra.Command{
 	Aliases: []string{"r"},
 	Short:   "Restart the observability stack (data wipe)",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		victoria, _ := cmd.Flags().GetBool("victoria")
+		full, _ := cmd.Flags().GetBool("full")
+
+		if victoria {
+			if err := framework.ObservabilityVictoriaDown(); err != nil {
+				return fmt.Errorf("observability down failed: %w", err)
+			}
+			if err := framework.ObservabilityVictoriaMetricsUp(); err != nil {
+				return fmt.Errorf("observability up failed: %w", err)
+			}
+			ccipde.Plog.Info().Msgf("Grafana: %s", LocalGrafanaVictoriaURL)
+			return nil
+		}
+
 		if err := framework.ObservabilityDown(); err != nil {
 			return fmt.Errorf("observability down failed: %w", err)
 		}
-		full, _ := cmd.Flags().GetBool("full")
 		var err error
 		if full {
 			err = framework.ObservabilityUpFull()
@@ -369,6 +399,10 @@ func init() {
 
 	// observability
 	obsCmd.PersistentFlags().BoolP("full", "f", false, "Enable full observability stack with additional components")
+	obsCmd.PersistentFlags().BoolP("victoria", "m", false,
+		"Use the VictoriaMetrics stack instead (otel-collector + VictoriaMetrics/Logs/Traces). "+
+			"Required for the ccip_commit_* Beholder-only metrics; mutually exclusive with --full, "+
+			"and cannot run alongside the default stack (port/container-name collisions).")
 	obsCmd.AddCommand(obsRestartCmd)
 	obsCmd.AddCommand(obsUpCmd)
 	obsCmd.AddCommand(obsDownCmd)

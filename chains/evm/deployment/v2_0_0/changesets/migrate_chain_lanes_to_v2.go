@@ -11,12 +11,22 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	changesetscore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -25,7 +35,11 @@ import (
 )
 
 // v2MajorVersion is the major version of a lane already on CCIP 2.0 (no migration needed).
-const v2MajorVersion = 2
+const (
+	v2MajorVersion    = 2
+	testTokenSymbol   = "TESTTR" // Note: a TEST token already exists on some chains behind the PROD Router
+	testTokenDecimals = 18
+)
 
 // tokenSymbolLookup resolves the ERC20 symbol of a token deployed on the given chain.
 type tokenSymbolLookup func(chainSel uint64, token common.Address) (string, error)
@@ -53,6 +67,10 @@ type MigrateChainLanesToV2Input struct {
 	// discovery. Any lane to one of these remotes is left untouched. Useful for routing around
 	// a flaky/unreachable remote chain RPC or to intentionally hold a lane back from migration.
 	ExcludedRemoteChains []uint64 `json:"excludedRemoteChains,omitempty" yaml:"excludedRemoteChains,omitempty"`
+	// RemoteChains is an optional allowlist of remote chain selectors. When set, only lanes to
+	// these remotes are migrated; all others are left untouched. ExcludedRemoteChains is still
+	// honored as a subtraction from this set.
+	RemoteChains []uint64 `json:"remoteChains,omitempty" yaml:"remoteChains,omitempty"`
 	// ExcludeLanesWithTokenSymbols optionally skips any lane where either chain has a token with one
 	// of these symbols configured (supported) for the other chain — e.g. []string{"USDC", "LBTC"}
 	// to hold back token lanes that need a dedicated migration path. Symbols are matched
@@ -60,7 +78,14 @@ type MigrateChainLanesToV2Input struct {
 	// tokens are configured requires a non-nil fee-quoter/ramp updater registry.
 	ExcludeLanesWithTokenSymbols []string   `json:"excludeLanesWithTokenSymbols,omitempty" yaml:"excludeLanesWithTokenSymbols,omitempty"`
 	MCMS                         mcms.Input `json:"mcms" yaml:"mcms"`
-	TestRouter                   *bool      `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	// TestRouter migrates the lanes onto the TestRouter instead of the production Router, and
+	// configures a TESTTR test token behind the TestRouter on every migrated chain.
+	TestRouter *bool `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	// MaxLanesPerChunk caps how many lanes are configured per underlying apply, bounding each
+	// chain's per-timelock-batch gas below restrictive per-tx caps (e.g. Linea's 2^24). Each
+	// chunk emits its own MCMS proposal, so multi-chunk runs require merge-proposals: true and
+	// an explicit mcms.validUntil in the pipeline input. 0 (default) keeps a single chunk.
+	MaxLanesPerChunk int `json:"maxLanesPerChunk,omitempty" yaml:"maxLanesPerChunk,omitempty"`
 }
 
 // MigrateChainLanesToV2Config is the full changeset config: the durable-pipeline payload plus the
@@ -111,6 +136,12 @@ func MigrateChainLanesToV2(
 		// migrated must not also be excluded, and each EVM chain must have a lane version resolver
 		// so we fail fast on missing wiring. Non-EVM chains (e.g. Solana) are not migrated by this
 		// changeset and are skipped here.
+		allowedRemotes := newUint64Set(cfg.RemoteChains)
+		for _, remote := range cfg.ExcludedRemoteChains {
+			if _, included := allowedRemotes[remote]; included {
+				return fmt.Errorf("remote chain %d cannot be in both remoteChains and excludedRemoteChains", remote)
+			}
+		}
 		excludedRemotes := newUint64Set(cfg.ExcludedRemoteChains)
 		for _, chainSel := range cfg.ChainSelectors {
 			if _, excluded := excludedRemotes[chainSel]; excluded {
@@ -143,10 +174,57 @@ func MigrateChainLanesToV2(
 		e.Logger.Infow("migrate_chain_lanes_to_v2: migrating lanes to CCIP 2.0",
 			"count", len(lanes), "lanes", laneDescriptions)
 
+		laneOut, err := applyLanesInChunks(e, underlying, cfg, lanes)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+
+		// TODO: Wire the USDC CCTP_V2_WITH_CCV mechanism switch into this prod-router
+		// migration path once MigrateChainLanesToV2 supports the same targeted prod-lane
+		// workflow as LaneMigrateToNewVersionChangeset.
+
+		// Lane migrations to the TestRouter also get a TESTTR test token wired behind it.
+		if cfg.TestRouter == nil || !*cfg.TestRouter {
+			return laneOut, nil
+		}
+
+		tokenInput, err := buildTestTokenExpansionInput(e, cfg, lanes)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to build test token config: %w", err)
+		}
+		tokenExpansion := tokens.TokenExpansion()
+		if err := tokenExpansion.VerifyPreconditions(e, tokenInput); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("test token expansion failed preconditions: %w", err)
+		}
+		tokenOut, err := tokenExpansion.Apply(e, tokenInput)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+		return mergeOutputs(e, laneOut, tokenOut)
+	}
+
+	return deployment.CreateChangeSet(apply, validate)
+}
+
+// applyLanesInChunks runs the underlying lane changeset once per chunk of at most
+// cfg.MaxLanesPerChunk lanes (a single chunk when unset) and merges the outputs. Each chunk
+// yields its own proposal; the pipeline's merge-proposals step folds them into one.
+func applyLanesInChunks(
+	e deployment.Environment,
+	underlying deployment.ChangeSetV2[v2changesets.ConfigureChainsForLanesFromTopologyConfig],
+	cfg MigrateChainLanesToV2Config,
+	lanes []v2changesets.CrossFamilyLanePair,
+) (deployment.ChangesetOutput, error) {
+	chunkSize := cfg.MaxLanesPerChunk
+	if chunkSize <= 0 {
+		chunkSize = len(lanes)
+	}
+	var out deployment.ChangesetOutput
+	for start := 0; start < len(lanes); start += chunkSize {
 		resolvedCfg := v2changesets.ConfigureChainsForLanesFromTopologyConfig{
 			Topology: cfg.Topology,
 			BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
-				Lanes:      lanes,
+				Lanes:      lanes[start:min(start+chunkSize, len(lanes))],
 				MCMS:       cfg.MCMS,
 				TestRouter: cfg.TestRouter,
 				// A migration's whole purpose is to swap each lane's pre-2.0 OnRamp for the CCIP 2.0
@@ -157,10 +235,178 @@ func MigrateChainLanesToV2(
 		if err := underlying.VerifyPreconditions(e, resolvedCfg); err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("resolved lane config failed preconditions: %w", err)
 		}
-		return underlying.Apply(e, resolvedCfg)
+		chunkOut, err := underlying.Apply(e, resolvedCfg)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+		if start == 0 {
+			out = chunkOut
+			continue
+		}
+		out, err = mergeOutputs(e, out, chunkOut)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+	}
+	return out, nil
+}
+
+func mergeOutputs(e deployment.Environment, base, extra deployment.ChangesetOutput) (deployment.ChangesetOutput, error) {
+	merged := base
+	if err := deployment.MergeChangesetOutput(e, &merged, extra); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output: %w", err)
+	}
+	// MergeChangesetOutput does not carry the DataStore.
+	switch {
+	case merged.DataStore == nil:
+		merged.DataStore = extra.DataStore
+	case extra.DataStore != nil:
+		if err := merged.DataStore.Merge(extra.DataStore.Seal()); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+		}
+	}
+	return merged, nil
+}
+
+// testTokenRef returns the datastore ref identifying the TESTTR token on a chain.
+func testTokenRef(sel uint64) datastore.AddressRef {
+	return datastore.AddressRef{
+		ChainSelector: sel,
+		Qualifier:     testTokenSymbol,
+		Type:          datastore.ContractType(burn_mint_erc20_with_drip.ContractType),
+		Version:       burn_mint_erc20_with_drip.Version,
+	}
+}
+
+// buildTestTokenExpansionInput builds the TokenExpansion input for the migrated lanes: every
+// participating chain gets a TESTTR token + pool behind the TestRouter with each lane partner as a
+// remote chain (rate limits disabled). Existing TESTTR tokens are reused, not redeployed.
+func buildTestTokenExpansionInput(e deployment.Environment, cfg MigrateChainLanesToV2Config, lanes []v2changesets.CrossFamilyLanePair) (tokens.TokenExpansionInput, error) {
+	// remotesOf maps each chain to the set of remote chains it shares a (migrated) lane with.
+	remotesOf := make(map[uint64]map[uint64]struct{})
+	for _, lane := range lanes {
+		if !isEVMChain(lane.ChainA) || !isEVMChain(lane.ChainB) {
+			continue
+		}
+		if remotesOf[lane.ChainA] == nil {
+			remotesOf[lane.ChainA] = make(map[uint64]struct{})
+		}
+		if remotesOf[lane.ChainB] == nil {
+			remotesOf[lane.ChainB] = make(map[uint64]struct{})
+		}
+		remotesOf[lane.ChainA][lane.ChainB] = struct{}{}
+		remotesOf[lane.ChainB][lane.ChainA] = struct{}{}
+	}
+	if len(remotesOf) == 0 {
+		return tokens.TokenExpansionInput{}, fmt.Errorf("no EVM lanes found to configure test tokens on")
 	}
 
-	return deployment.CreateChangeSet(apply, validate)
+	perChain := make(map[uint64]tokens.TokenExpansionInputPerChain, len(remotesOf))
+	for sel, remotes := range remotesOf {
+		perChainConfig, err := newTestTokenPerChainConfig(e, sel, remotes)
+		if err != nil {
+			return tokens.TokenExpansionInput{}, err
+		}
+		perChain[sel] = perChainConfig
+	}
+
+	return tokens.TokenExpansionInput{
+		ChainAdapterVersion:         utils.Version_2_0_0,
+		TokenExpansionInputPerChain: perChain,
+		MCMS:                        cfg.MCMS,
+	}, nil
+}
+
+// newTestTokenPerChainConfig builds the per-chain TESTTR config. A TESTTR token already in the
+// datastore is reused (no DeployTokenInput); otherwise a fresh burn-mint token is deployed.
+func newTestTokenPerChainConfig(e deployment.Environment, sel uint64, remotes map[uint64]struct{}) (tokens.TokenExpansionInputPerChain, error) {
+	remoteChains := make(map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef], len(remotes))
+	disabledRateLimiter := &tokens.RateLimiterConfigFloatInput{IsEnabled: false}
+	for remote := range remotes {
+		remoteChains[remote] = tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+			OutboundRateLimiterConfig: disabledRateLimiter,
+		}
+	}
+	tokenRef := testTokenRef(sel)
+
+	perChain := tokens.TokenExpansionInputPerChain{
+		TokenPoolVersion: utils.Version_2_0_0,
+		// Pools stay deployer-owned so the test flow does not depend on timelock ownership.
+		SkipOwnershipTransfer: true,
+		DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+			TokenRef:           &tokenRef,
+			TokenPoolQualifier: testTokenSymbol,
+			PoolType:           string(utils.BurnMintTokenPool),
+			TokenPoolVersion:   utils.Version_2_0_0,
+			RouterRef: &datastore.AddressRef{
+				ChainSelector: sel,
+				Type:          datastore.ContractType(router.TestRouterContractType),
+				Version:       router.Version,
+			},
+		},
+		TokenTransferConfig: &tokens.TokenTransferConfig{
+			RegistryRef: datastore.AddressRef{
+				ChainSelector: sel,
+				Type:          datastore.ContractType(token_admin_registry.ContractType),
+				Version:       token_admin_registry.Version,
+			},
+			TokenRef: testTokenRef(sel),
+			TokenPoolRef: datastore.AddressRef{
+				ChainSelector: sel,
+				Qualifier:     testTokenSymbol,
+				Type:          datastore.ContractType(utils.BurnMintTokenPool),
+				Version:       utils.Version_2_0_0,
+			},
+			AllowedFinalityConfig: finality.Config{
+				WaitForFinality: false,
+				WaitForSafe:     true,
+				BlockDepth:      1,
+			},
+			RemoteChains: remoteChains,
+		},
+	}
+
+	existing, err := findTestTokenRefs(e, sel)
+	if err != nil {
+		return tokens.TokenExpansionInputPerChain{}, err
+	}
+	if len(existing) == 0 {
+		perChain.DeployTokenInput = &tokens.DeployTokenInput{
+			Name:     testTokenSymbol,
+			Symbol:   testTokenSymbol,
+			Decimals: testTokenDecimals,
+			Type:     deployment.ContractType(burn_mint_erc20_with_drip.ContractType),
+		}
+	} else {
+		// TESTTR is already recorded on this chain: the changeset that first touched it in this
+		// batch deployed it and emitted its TokenAdminRegistry registration + token admin
+		// handover ops. Those ops are pending in the same MCMS root — re-emitting them would
+		// revert AlreadyRegistered at execution time and, because MCMS ops must run in per-chain
+		// nonce order, block every later operation for this chain. Only the new lane's pool
+		// remote configuration still needs to run.
+		perChain.TokenTransferConfig.SkipTokenAdminRegistrySetup = true
+		if e.Logger != nil {
+			e.Logger.Infof("reusing existing %s token at %s on chain with selector %d; skipping already-emitted registry setup ops", testTokenSymbol, existing[0].Address, sel)
+		}
+	}
+	return perChain, nil
+}
+
+// findTestTokenRefs returns the chain's TESTTR token refs from the datastore (at most one expected).
+func findTestTokenRefs(e deployment.Environment, sel uint64) ([]datastore.AddressRef, error) {
+	if e.DataStore == nil {
+		return nil, nil
+	}
+	matches := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(sel),
+		datastore.AddressRefByType(datastore.ContractType(burn_mint_erc20_with_drip.ContractType)),
+		datastore.AddressRefByVersion(burn_mint_erc20_with_drip.Version),
+		datastore.AddressRefByQualifier(testTokenSymbol),
+	)
+	if len(matches) > 1 {
+		return nil, fmt.Errorf("multiple %s tokens found in datastore on chain with selector %d", testTokenSymbol, sel)
+	}
+	return matches, nil
 }
 
 // laneDiscoverer resolves, from live on-chain state, the set of lanes to migrate to CCIP 2.0. It
@@ -171,13 +417,15 @@ type laneDiscoverer struct {
 	resolvers       *adapters.DeployChainContractsRegistry
 	fqRegistry      *deploy.FQAndRampUpdaterRegistry
 	symbolOf        tokenSymbolLookup
+	allowedRemotes  map[uint64]struct{}
 	excludedRemotes map[uint64]struct{}
 	excludedSymbols map[string]struct{}
 }
 
 // discoverLanesToMigrate returns a deduplicated, deterministically ordered set of bidirectional
-// lane pairs to migrate: connected, EVM-only, not already on CCIP 2.0, not blocklisted, and (when
-// ExcludeLanesWithTokenSymbols is set) not carrying a token with an excluded symbol.
+// lane pairs to migrate: connected, EVM-only, not already on CCIP 2.0, within the RemoteChains
+// allowlist when set, not blocklisted, and (when ExcludeLanesWithTokenSymbols is set) not
+// carrying a token with an excluded symbol.
 func discoverLanesToMigrate(
 	e deployment.Environment,
 	resolvers *adapters.DeployChainContractsRegistry,
@@ -185,11 +433,15 @@ func discoverLanesToMigrate(
 	symbolOf tokenSymbolLookup,
 	cfg MigrateChainLanesToV2Config,
 ) ([]v2changesets.CrossFamilyLanePair, error) {
+	if e.Logger == nil {
+		e.Logger = logger.Nop()
+	}
 	d := &laneDiscoverer{
 		env:             e,
 		resolvers:       resolvers,
 		fqRegistry:      fqRegistry,
 		symbolOf:        symbolOf,
+		allowedRemotes:  newUint64Set(cfg.RemoteChains),
 		excludedRemotes: newUint64Set(cfg.ExcludedRemoteChains),
 		excludedSymbols: canonicalSymbolSet(cfg.ExcludeLanesWithTokenSymbols),
 	}
@@ -240,12 +492,17 @@ func (d *laneDiscoverer) run(chainSelectors []uint64) ([]v2changesets.CrossFamil
 }
 
 // chainCandidates returns the sorted remotes on chainSel whose lane should be migrated: connected,
-// EVM, not already on CCIP 2.0, not blocklisted, and not carrying an excluded token symbol. Token
+// EVM, not already on CCIP 2.0, allowlisted (when RemoteChains is set), not blocklisted, and not
+// carrying an excluded token symbol. Token
 // detection runs only over the surviving candidates, so we never read token config for lanes that
 // are already 2.0 or blocklisted.
 func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 	// This changeset only migrates EVM lanes; skip non-EVM local chains (e.g. Solana) entirely.
 	if !isEVMChain(chainSel) {
+		return nil, nil
+	}
+	if deprecatedChain(chainSel) {
+		d.env.Logger.Warnf("skipping deprecated chain %d", chainSel)
 		return nil, nil
 	}
 
@@ -261,15 +518,21 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 		return nil, fmt.Errorf("failed to derive lane versions for chain %d: %w", chainSel, err)
 	}
 
-	// Keep only EVM remotes that are connected, not blocklisted, not already on 2.0, and whose
-	// source lane version we can migrate (i.e. has a registered config importer). Lanes with an
-	// unknown or unsupported version are skipped — we never migrate a lane without a resolver.
+	// Keep only EVM remotes that are connected, not blocklisted, not already on 2.0, not
+	// deprecated, and whose source lane version we can migrate (i.e. has a registered config
+	// importer). Lanes with an unknown or unsupported version are skipped — we never migrate a
+	// lane without a resolver.
 	candidateVersions := make(map[uint64]*semver.Version, len(laneVersions))
 	for remote, version := range laneVersions {
 		switch {
+		case len(d.allowedRemotes) > 0 && !isExcluded(d.allowedRemotes, remote):
+			continue
 		case isExcluded(d.excludedRemotes, remote):
 			continue
 		case !isEVMChain(remote):
+			continue
+		case deprecatedChain(remote):
+			d.env.Logger.Warnf("skipping deprecated remote chain %d on chain %d", remote, chainSel)
 			continue
 		case version != nil && version.Major() >= v2MajorVersion:
 			continue
@@ -296,6 +559,9 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 
 // reverseDirectionCarriesExcludedToken checks the remote-to-local direction before a directional
 // candidate is promoted to a bidirectional lane. chainCandidates already checked chainSel-to-remote.
+// A reverse chain that cannot be resolved (dead RPC, or missing from the environment) is treated as
+// excluded — its lane is held back from this batch rather than migrating it unverified or aborting
+// discovery entirely.
 func (d *laneDiscoverer) reverseDirectionCarriesExcludedToken(chainSel, remote uint64) (bool, error) {
 	if len(d.excludedSymbols) == 0 {
 		return false, nil
@@ -303,14 +569,17 @@ func (d *laneDiscoverer) reverseDirectionCarriesExcludedToken(chainSel, remote u
 
 	resolver, ok := d.resolvers.GetLaneVersionResolver(remote)
 	if !ok {
-		return false, fmt.Errorf("no lane version resolver registered for reverse chain %d", remote)
+		d.env.Logger.Warnf("no lane version resolver for reverse lane %d->%d; holding lane back", remote, chainSel)
+		return true, nil
 	}
 	if !resolver.IsSupportedChain(d.env, remote) {
-		return false, fmt.Errorf("reverse chain %d is not supported by its lane version resolver", remote)
+		d.env.Logger.Warnf("reverse lane %d->%d is not supported by its lane version resolver; holding lane back", remote, chainSel)
+		return true, nil
 	}
 	laneVersions, _, err := resolver.DeriveLaneVersionsForChain(d.env, remote)
 	if err != nil {
-		return false, fmt.Errorf("failed to derive lane versions for reverse chain %d: %w", remote, err)
+		d.env.Logger.Warnf("failed to derive lane versions for reverse lane %d->%d: %v; holding lane back", remote, chainSel, err)
+		return true, nil
 	}
 	version, connected := laneVersions[chainSel]
 	if !connected {
@@ -499,6 +768,13 @@ func isExcluded(set map[uint64]struct{}, sel uint64) bool {
 func isEVMChain(sel uint64) bool {
 	family, err := chainsel.GetSelectorFamily(sel)
 	return err == nil && family == chainsel.FamilyEVM
+}
+
+// deprecatedChain reports whether the chain selector is marked deprecated in chain-selectors.
+// Unknown selectors are treated as not deprecated.
+func deprecatedChain(sel uint64) bool {
+	deprecated, err := chainsel.IsDeprecated(sel)
+	return err == nil && deprecated
 }
 
 // canonicalLaneKey returns an order-independent key for a bidirectional lane so that discovering

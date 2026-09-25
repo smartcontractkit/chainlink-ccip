@@ -13,6 +13,7 @@ OPTIMIZE_RUNS_ONRAMP=1500
 OPTIMIZE_RUNS_OFFRAMP=23000
 OPTIMIZE_RUNS_FEE_QUOTER=27500
 OPTIMIZE_RUNS_LARGE_POOL=17000
+OPTIMIZE_RUNS_SUCCINCT_ZK_VERIFIER=15000
 
 
 PROJECT="ccip"
@@ -71,6 +72,9 @@ function getOptimizations() {
       "FeeQuoter")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_FEE_QUOTER"
         ;;
+      "SuccinctZKVerifier")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_SUCCINCT_ZK_VERIFIER"
+        ;;
       "SiloedUSDCTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
         ;;
@@ -90,6 +94,7 @@ compileContract Proxy
 compileContract ccvs/CommitteeVerifier
 compileContract ccvs/CCTPVerifier
 compileContract ccvs/LombardVerifier
+compileContract ccvs/SuccinctZKVerifier
 compileContract ccvs/VersionedVerifierResolver
 compileContract onRamp/OnRamp
 compileContract executor/Executor
@@ -132,6 +137,7 @@ compileContract test/helpers/USDCReaderTester
 compileContract test/helpers/receivers/MaybeRevertMessageReceiver
 compileContract test/helpers/receivers/LogMessageDataReceiver
 compileContract test/helpers/MessageHasher
+compileContract test/helpers/VerifierTestHelper
 
 compileContract test/mocks/MockE2EUSDCTokenMessenger
 compileContract test/mocks/MockTokenMinter

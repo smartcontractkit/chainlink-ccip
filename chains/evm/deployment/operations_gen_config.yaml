@@ -23,6 +23,33 @@ contracts:
         access: public
       - name: getPreviousPool
         access: public
+      # NOTE: v1.5.0 pools expose a narrower surface than v1.5.1. There is no
+      # getTokenDecimals, no getRemotePools/addRemotePool/removeRemotePool (a
+      # v1.5.0 pool holds exactly one remote pool per lane, replaced via
+      # setRemotePool), and applyChainUpdates takes a single ChainUpdate[] with
+      # removals expressed as allowed=false entries.
+      - name: getToken
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: getRemoteToken
+        access: public
+      - name: getRateLimitAdmin
+        access: public
+      - name: isSupportedToken
+        access: public
+      - name: applyChainUpdates
+        access: owner
+      - name: setChainRateLimiterConfig
+        access: owner
+      - name: setRemotePool
+        access: owner
+      - name: setRateLimitAdmin
+        access: owner
+      - name: getRouter
+        access: public
+      - name: setRouter
+        access: owner
 
   # 1.6.3
   - contract_name: FeeQuoter
@@ -162,18 +189,15 @@ contracts:
         access: owner
       - name: withdrawSiloedLiquidity
         access: owner
-      - name: getToken
+      # provideLiquidity/provideSiloedLiquidity are rebalancer-gated on-chain rather than onlyOwner,
+      # and there is no rebalancer access alias, so they are declared public and rely on that check.
+      - name: provideLiquidity
         access: public
-
-  # 1.6.0
-  - contract_name: RMNRemote
-    version: "1.6.0"
-    functions:
-      - name: curse
+      - name: provideSiloedLiquidity
+        access: public
+      - name: updateSiloDesignations
         access: owner
-      - name: uncurse
-        access: owner
-      - name: isCursed
+      - name: getToken
         access: public
 
   - contract_name: FeeQuoter
@@ -219,6 +243,8 @@ contracts:
         access: public
       - name: setDynamicConfig
         access: owner
+      - name: withdrawFeeTokens
+        access: public
 
   - contract_name: OffRamp
     package_name: offramp
@@ -310,6 +336,8 @@ contracts:
       - name: getDynamicConfig
         access: public
       - name: getStaticConfig
+        access: public
+      - name: getAllDestChainConfigs
         access: public
 
   - contract_name: OffRamp
@@ -412,6 +440,8 @@ contracts:
   - contract_name: SiloedLockReleaseTokenPool
     version: "2.0.0"
     functions:
+      - name: configureLockBoxes
+        access: owner
       - name: getLockBox
         access: public
       - name: getAllLockBoxConfigs
@@ -607,6 +637,14 @@ contracts:
       - name: getFee
         access: public
 
+  - contract_name: VersionedVerifierResolver
+    version: "2.0.0"
+    functions:
+      - name: getFeeAggregator
+        access: public
+      - name: setFeeAggregator
+        access: owner
+
   - contract_name: CommitteeVerifier
     version: "2.0.0"
     functions:
@@ -633,6 +671,20 @@ contracts:
       - name: getFee
         access: public
       - name: versionTag
+        access: public
+
+  - contract_name: VerifierTestHelper
+    version: "2.0.0"
+    functions:
+      - name: getTestRouter
+        access: public
+      - name: applyRemoteChainConfigUpdates
+        access: owner
+      - name: applyAllowlistUpdates
+        access: owner
+      - name: withdrawFeeTokens
+        access: public
+      - name: getRemoteChainConfig
         access: public
 
   - contract_name: RMN

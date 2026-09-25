@@ -128,9 +128,7 @@ func transferOwnershipVerify(cr *TransferOwnershipAdapterRegistry, mcmsRegistry 
 	}
 }
 
-func TransferToTimelock(chainSel uint64, e cldf.Environment, mcmsInput mcms.Input, addressRefs []datastore.AddressRef) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	mcmsRegistry := changesets.GetRegistry()
-	transferOwnershipReg := GetTransferOwnershipRegistry()
+func TransferToTimelock(chainSel uint64, e cldf.Environment, mcmsInput mcms.Input, addressRefs []datastore.AddressRef, mcmsRegistry *changesets.MCMSReaderRegistry, transferOwnershipReg *TransferOwnershipAdapterRegistry) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	family, err := chain_selectors.GetSelectorFamily(chainSel)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get chain family for selector %d: %w", chainSel, err)

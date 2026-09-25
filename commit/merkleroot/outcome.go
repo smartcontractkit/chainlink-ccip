@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strconv"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -52,6 +53,17 @@ const (
 	InsufficientOffRampConsensus = "not enough observations for OffRampNextSeqNums consensus on chain"
 )
 
+// Violation-type labels used with MetricsReporter.TrackSeqNumInvariantViolation. Named here, rather
+// than left as inline literals, because these are effectively a stable label-value contract for
+// dashboards/runbooks/alerts (see docs/runbooks/uncommitted-message.md's metric reference table) with
+// no test asserting on the literal spelling -- a typo at a call site would silently create an
+// unmonitored label value instead of failing to compile.
+const (
+	seqNumViolationOnRampMaxZero          = "onramp_max_zero"
+	seqNumViolationOffRampAheadOfOnRamp   = "offramp_ahead_of_onramp"
+	seqNumViolationOffRampSeqNumRegressed = "offramp_seqnum_regression"
+)
+
 // Outcome depending on the current state, either:
 // - chooses the seq num ranges for the next round
 // - builds a report
@@ -85,15 +97,17 @@ func (p *Processor) getOutcome(
 ) (Outcome, processorState, error) {
 	nextState := previousOutcome.nextState()
 
-	consObservation, err := getConsensusObservation(lggr, p.reportingCfg.F, p.destChain, aos)
+	consObservation, err := getConsensusObservation(lggr, p.reportingCfg.F, p.destChain, aos, p.metricsReporter)
 	if err != nil {
 		lggr.Warnw(ConsensusObservationFailed, "err", err)
+		p.metricsReporter.TrackConsensusObservationFailed()
 		return Outcome{}, nextState, nil
 	}
 
 	switch nextState {
 	case selectingRangesForReport:
-		return reportRangesOutcome(q, lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
+		return reportRangesOutcome(
+				q, lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain, p.metricsReporter),
 			nextState,
 			nil
 	case buildingReport:
@@ -115,7 +129,8 @@ func (p *Processor) getOutcome(
 	case waitingForReportTransmission:
 		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
 		multipleReports := p.offchainCfg.MultipleReportsEnabled
-		outcome := checkForReportTransmission(lggr, attempts, multipleReports, previousOutcome, consObservation)
+		outcome := checkForReportTransmission(
+			lggr, attempts, multipleReports, previousOutcome, consObservation, p.metricsReporter)
 		return outcome, nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
@@ -129,6 +144,7 @@ func reportRangesOutcome(
 	consObservation consensusObservation,
 	maxMerkleTreeSize uint64,
 	dstChain cciptypes.ChainSelector,
+	metricsReporter MetricsReporter,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
@@ -149,15 +165,23 @@ func reportRangesOutcome(
 			continue
 		}
 
+		var pending uint64
+		if onRampMaxSeqNum >= offRampNextSeqNum {
+			pending = uint64(onRampMaxSeqNum-offRampNextSeqNum) + 1
+		}
+		metricsReporter.TrackPendingMessages(chainSel, pending)
+
 		if onRampMaxSeqNum < offRampNextSeqNum-1 {
 			if onRampMaxSeqNum == 0 {
 				lggr.Infow(OnRampMaxSeqNumZero,
 					logutil.FieldChain, chainSel,
 					"note", "not necessarily an issue, but if it persists without progress investigate why oracles observe 0")
+				metricsReporter.TrackSeqNumInvariantViolation(chainSel, seqNumViolationOnRampMaxZero)
 			} else {
 				lggr.Errorw(ImpossibleSeqNumsOnOffRamp,
 					"detail", "offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
 					logutil.FieldChain, chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+				metricsReporter.TrackSeqNumInvariantViolation(chainSel, seqNumViolationOffRampAheadOfOnRamp)
 			}
 		}
 
@@ -173,6 +197,7 @@ func reportRangesOutcome(
 
 			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
 				lggr.Debugf("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
+				metricsReporter.TrackRangeTruncated(chainSel)
 			} else {
 				lggr.Debugf("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
 			}
@@ -397,6 +422,7 @@ func checkForReportTransmission(
 	multipleReports bool,
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
+	metricsReporter MetricsReporter,
 ) Outcome {
 	// Check that all sources have been updates using a set initialized from the previous outcome.
 	// Check that all have been updated in case there were multiple reports generated in the previous round.
@@ -405,11 +431,15 @@ func checkForReportTransmission(
 		pendingSources[root.ChainSel] = struct{}{}
 	}
 
+	// Attempts consumed as of, and including, this check.
+	checksSoFar := previousOutcome.ReportTransmissionCheckAttempts + 1
+
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
 				// if there is only one report, any single update means the report has been transmitted.
 				if !multipleReports {
+					metricsReporter.TrackReportTransmissionAttempts(checksSoFar, true)
 					return Outcome{
 						OutcomeType: ReportTransmitted,
 					}
@@ -425,23 +455,30 @@ func checkForReportTransmission(
 					logutil.FieldSeqNum, previousSeqNumChain.SeqNum,
 					"currentSeqNum", currentSeqNum,
 				)
+				metricsReporter.TrackSeqNumInvariantViolation(
+					previousSeqNumChain.ChainSel, seqNumViolationOffRampSeqNumRegressed)
 			}
 		}
 	}
 
 	// All pending sources have been updated, we can move to the next state.
 	if len(pendingSources) == 0 {
+		metricsReporter.TrackReportTransmissionAttempts(checksSoFar, true)
 		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
 	}
 
-	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
+	if checksSoFar >= maxReportTransmissionCheckAttempts {
 		lggr.Warnw(
 			ReportTransmissionGaveUp,
 			"maxReportTransmissionCheckAttempts", maxReportTransmissionCheckAttempts,
 			"abandonedSourceChains", slices.Collect(maps.Keys(pendingSources)),
 		)
+		for chainSel := range pendingSources {
+			metricsReporter.TrackReportTransmissionGaveUp(chainSel)
+		}
+		metricsReporter.TrackReportTransmissionAttempts(checksSoFar, false)
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
 		}
@@ -463,13 +500,15 @@ func getConsensusObservation(
 	fRoleDON int,
 	destChain cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[Observation],
+	metricsReporter MetricsReporter,
 ) (consensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fRoleDON))
-	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	fChains, fChainDrops := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
+	reportChainSelectorDrops(metricsReporter, "fChain", fChainDrops)
 
 	_, exists := fChains[destChain]
 	if !exists {
@@ -491,20 +530,60 @@ func getConsensusObservation(
 		return consensusObservation{}, fmt.Errorf("no consensus value for fDestChain(%d): %v", fDestChain, fChain)
 	}
 
+	merkleRoots, merkleRootDrops := consensus.GetConsensusMap(
+		lggr,
+		"MerkleRoot",
+		aggObs.MerkleRoots,
+		twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "MerkleRoot", merkleRootDrops)
+
+	rmnEnabledChains, rmnEnabledDrops := consensus.GetConsensusMap(
+		lggr,
+		"RMNEnabledChains",
+		aggObs.RMNEnabledChains,
+		twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "RMNEnabledChains", rmnEnabledDrops)
+
+	onRampMaxSeqNums, onRampDrops := consensus.GetOrderedConsensus(
+		lggr,
+		"OnRampMaxSeqNums",
+		aggObs.OnRampMaxSeqNums,
+		fChain)
+	reportChainSelectorDrops(metricsReporter, "OnRampMaxSeqNums", onRampDrops)
+
+	rmnRemoteConfig, rmnRemoteDrops := consensus.GetConsensusMap(
+		lggr,
+		"RMNRemoteConfig",
+		rmnRemoteConfigs,
+		twoFChainPlus1)
+	reportChainSelectorDrops(metricsReporter, "RMNRemoteConfig", rmnRemoteDrops)
+
 	consensusObs := consensusObservation{
-		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
-		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
-		OnRampMaxSeqNums: consensus.GetOrderedConsensus(
-			lggr,
-			"OnRamp Max Seq Nums",
-			aggObs.OnRampMaxSeqNums,
-			fChain),
-		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(lggr, uint(fDestChain), aggObs.OffRampNextSeqNums),
-		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
-		FChain:             fChains,
+		MerkleRoots:      merkleRoots,
+		RMNEnabledChains: rmnEnabledChains,
+		OnRampMaxSeqNums: onRampMaxSeqNums,
+		OffRampNextSeqNums: getOffRampNextSequenceNumbersConsensus(
+			lggr, uint(fDestChain), aggObs.OffRampNextSeqNums, metricsReporter),
+		RMNRemoteConfig: rmnRemoteConfig,
+		FChain:          fChains,
 	}
 
 	return consensusObs, nil
+}
+
+func reportChainSelectorDrops(
+	metricsReporter MetricsReporter,
+	objectName string,
+	drops map[cciptypes.ChainSelector]consensus.ConsensusDropReason,
+) {
+	for chain, reason := range drops {
+		metricsReporter.TrackConsensusDropped(
+			objectName,
+			strconv.FormatUint(uint64(chain), 10),
+			reason.String(),
+			chain,
+		)
+	}
 }
 
 // getOffRampNextSequenceNumbersConsensus accepts a list of offramp sequence number observations per chain
@@ -516,6 +595,7 @@ func getOffRampNextSequenceNumbersConsensus(
 	lggr logger.Logger,
 	fDestChain uint,
 	observationsPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
+	metricsReporter MetricsReporter,
 ) map[cciptypes.ChainSelector]cciptypes.SeqNum {
 	lggr = logger.With(lggr, "fDestChain", fDestChain)
 
@@ -528,6 +608,7 @@ func getOffRampNextSequenceNumbersConsensus(
 				"numObservations", len(observedNextSeqNums),
 				"requiredObservations", 2*fDestChain+1,
 			)
+			metricsReporter.TrackOffRampConsensusInsufficient(sourceChain)
 			continue
 		}
 

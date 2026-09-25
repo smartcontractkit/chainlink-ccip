@@ -28,6 +28,7 @@ var (
 	_ tokensapi.RateLimitReaderAdapter = &EVMPoolAdapter{}
 	_ tokensapi.TokenRefResolver       = &EVMPoolAdapter{}
 	_ tokensapi.TokenAdapter           = &EVMPoolAdapter{}
+	_ tokensapi.RemotePoolRemover      = &EVMPoolAdapter{}
 )
 
 // PoolOps abstracts the version-specific token pool contract calls.
@@ -38,13 +39,20 @@ type PoolOps interface {
 	GetTokenDecimals(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (uint8, error)
 	GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolAddr common.Address) (owner, rlAdmin common.Address, err error)
 	SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error)
-	// SetAdmins updates the admin roles on the pool. A nil pointer means "leave this
-	// admin unchanged". Implementations own version-specific semantics: pre-2.0 pools
-	// reject a non-nil feeAdmin (no such concept on the contract); v2.0+ sets both
-	// admins in a single SetDynamicConfig write. Returns no writes when on-chain
-	// state already matches.
-	SetAdmins(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
+	// SetDynamicPoolConfigs updates the router and the admin roles on the pool. A nil
+	// pointer means "leave this value unchanged". Implementations own version-specific
+	// semantics: pre-2.0 pools reject a non-nil feeAdmin (no such concept on the
+	// contract) and set the router via setRouter, while v2.0+ sets router and both
+	// admins in a single SetDynamicConfig write. Returns no writes when on-chain state
+	// already matches.
+	SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
+	// RemoveRemotePools removes the given remote pool entries from the pool. Implementations
+	// read the current on-chain remote pools for each remote chain and return a clear error when
+	// a requested remote pool is not currently configured, rather than emitting a no-op
+	// transaction. Remote pool addresses are stored left-padded to 32 bytes on-chain, so
+	// implementations must pad the input address the same way before matching and removal.
+	RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error)
 	Version() *semver.Version
 }
 
@@ -192,17 +200,17 @@ func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.T
 	)
 }
 
-// SetTokenPoolAdmins updates the admin roles on an EVM token pool. Version-specific
-// capability lives in PoolOps.SetAdmins: pre-2.0 pools support only the rate limit
-// admin (a non-nil FeeAdmin is rejected there), while v2.0+ pools set both admins in
-// a single SetDynamicConfig write. No-op (zero BatchOps) when the desired values
-// already match on-chain state.
-func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTokenPoolAdminsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+// SetTokenPoolDynamicConfig updates the router, rate limit admin, and fee admin on an EVM
+// token pool. Nil fields are left unchanged. Pre-2.0 pools only support the router (via
+// setRouter) and the rate limit admin (a non-nil FeeAdmin is rejected there), while v2.0+
+// pools set router and both admins in a single SetDynamicConfig write. No-op (zero BatchOps)
+// when the desired values already match on-chain state.
+func (a *EVMPoolAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokensapi.SetTokenPoolDynamicConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
-		"evm-pool-adapter:set-token-pool-admins",
+		"evm-pool-adapter:set-token-pool-dynamic-config",
 		a.Ops.Version(),
-		"Updates the admin roles on an EVM token pool; no-op when the values already match",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.SetTokenPoolAdminsSequenceInput) (sequences.OnChainOutput, error) {
+		"Updates the router and admin roles on an EVM token pool; no-op when the values already match",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.SetTokenPoolDynamicConfigSequenceInput) (sequences.OnChainOutput, error) {
 			chain, ok := chains.EVMChains()[input.Selector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
@@ -212,6 +220,20 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 			}
 			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
 
+			var router *common.Address
+			if input.Router != nil {
+				if !common.IsHexAddress(*input.Router) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid router address for chain %d: %s", input.Selector, *input.Router)
+				}
+				addr := common.HexToAddress(*input.Router)
+				// A zero router always reverts on-chain (ZeroAddressNotAllowed on pre-2.0
+				// setRouter, ZeroAddressInvalid on 2.0+ setDynamicConfig), so reject it here
+				// rather than emit a transaction or proposal that is certain to fail.
+				if addr == (common.Address{}) {
+					return sequences.OnChainOutput{}, fmt.Errorf("router address for chain %d must not be the zero address", input.Selector)
+				}
+				router = &addr
+			}
 			var rateLimitAdmin *common.Address
 			if input.RateLimitAdmin != nil {
 				if !common.IsHexAddress(*input.RateLimitAdmin) {
@@ -228,13 +250,51 @@ func (a *EVMPoolAdapter) SetTokenPoolAdmins() *cldf_ops.Sequence[tokensapi.SetTo
 				addr := common.HexToAddress(*input.FeeAdmin)
 				feeAdmin = &addr
 			}
-			if rateLimitAdmin == nil && feeAdmin == nil {
+			if router == nil && rateLimitAdmin == nil && feeAdmin == nil {
 				return sequences.OnChainOutput{}, nil
 			}
 
-			writes, err := a.Ops.SetAdmins(b, chain, poolAddr, rateLimitAdmin, feeAdmin)
+			writes, err := a.Ops.SetDynamicPoolConfigs(b, chain, poolAddr, router, rateLimitAdmin, feeAdmin)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to set admins on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to set dynamic config on token pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
+			}
+			if len(writes) == 0 {
+				return sequences.OnChainOutput{}, nil
+			}
+
+			var result sequences.OnChainOutput
+			batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			result.BatchOps = append(result.BatchOps, batchOp)
+			return result, nil
+		},
+	)
+}
+
+// RemoveRemotePools removes remote pool entries from an EVM token pool. Version-specific
+// contract calls live in PoolOps.RemoveRemotePools, which reads the current on-chain remote
+// pools for each remote chain and returns a clear error when a requested remote pool is not
+// currently configured. No-op (zero BatchOps) when there are no writes.
+func (a *EVMPoolAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokensapi.RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-pool-adapter:remove-remote-pools",
+		a.Ops.Version(),
+		"Removes remote pool entries from an EVM token pool",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.RemoveRemotePoolsSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.EVMChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
+			}
+			if !common.IsHexAddress(input.TokenPoolRef.Address) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for chain %d: %s", input.Selector, input.TokenPoolRef.Address)
+			}
+			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
+
+			writes, err := a.Ops.RemoveRemotePools(b, chain, poolAddr, input.RemotePoolsToRemove)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove remote pools from pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
 			}
 			if len(writes) == 0 {
 				return sequences.OnChainOutput{}, nil
@@ -413,7 +473,7 @@ func (a *EVMPoolAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokensapi.
 						return sequences.OnChainOutput{}, fmt.Errorf("rate limit admin address %q is not a valid hex address", input.RateLimitAdmin)
 					}
 					rlAdminAddr := common.HexToAddress(rlAdminHex)
-					output, err := a.Ops.SetAdmins(b, chain, poolAddr, &rlAdminAddr, nil)
+					output, err := a.Ops.SetDynamicPoolConfigs(b, chain, poolAddr, nil, &rlAdminAddr, nil)
 					if err != nil {
 						return sequences.OnChainOutput{}, fmt.Errorf("failed to set rate limit admin: %w", err)
 					}
@@ -500,6 +560,48 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
 		return nil, nil
 	}
+	// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the grant below;
+	// grantRole/revokeRole revert unconditionally for their admin role, so RevokeAdminRole has no
+	// equivalent here. Instead, queue AcceptDefaultAdminTransfer into the batch: this function
+	// always grants to the CLL timelock specifically (never a customer address), so once the
+	// resulting MCMS proposal is executed, the timelock itself is the caller, which completes the
+	// transfer and atomically revokes the deployer - no separate revoke step needed or possible.
+	if tokenCaps.UsesAsyncRoleManagement {
+		pending, err := tokenImpl.PendingAdminRoleTarget(b, chain, tokenAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check pending admin role target for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		// Don't clobber a transfer that is already in flight: if it targets the timelock, tidy is
+		// already satisfied; if it targets a customer-chosen admin, that explicit config wins.
+		if pending != (common.Address{}) {
+			b.Logger.Infof("token %q on chain %d already has a pending admin transfer to %q; skipping tidy", tokenAddr.Hex(), input.ChainSelector, pending.Hex())
+			return nil, nil
+		}
+
+		// Nothing is pending. Only begin a transfer when the deployer still holds
+		// DEFAULT_ADMIN_ROLE: BeginDefaultAdminTransfer is deployer-signed, so the deployer must be
+		// the current admin. If it isn't (e.g. a customer admin already accepted), queueing a begin
+		// would revert when the timelock executes it.
+		deployerHasRole, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		if !deployerHasRole {
+			b.Logger.Infof("deployer does not hold DEFAULT_ADMIN_ROLE on token %q on chain %d; skipping tidy", tokenAddr.Hex(), input.ChainSelector)
+			return nil, nil
+		}
+
+		grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		acceptWrites, err := tokenImpl.AcceptAdminRole(b, chain, tokenAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare accept of timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+		}
+		return append(grantWrites, acceptWrites...), nil
+	}
+
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)

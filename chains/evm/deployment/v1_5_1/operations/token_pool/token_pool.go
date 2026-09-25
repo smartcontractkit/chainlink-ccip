@@ -35,6 +35,11 @@ type AddRemotePoolArgs struct {
 	RemotePoolAddress   []byte
 }
 
+type RemoveRemotePoolArgs struct {
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+}
+
 type SetRateLimitAdminArgs struct {
 	NewAdmin common.Address
 }
@@ -116,6 +121,20 @@ var AddRemotePool = contract.NewWrite(contract.WriteParams[AddRemotePoolArgs, *t
 	},
 })
 
+var RemoveRemotePool = contract.NewWrite(contract.WriteParams[RemoveRemotePoolArgs, *token_pool.TokenPool]{
+	Name:            "token-pool:remove-remote-pool",
+	Version:         Version,
+	Description:     "Removes a remote pool for a given chain selector on the TokenPool 1.5.1 contract",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, RemoveRemotePoolArgs],
+	Validate:        func(args RemoveRemotePoolArgs) error { return nil },
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args RemoveRemotePoolArgs) (*types.Transaction, error) {
+		return tp.RemoveRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
 var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[SetRateLimitAdminArgs, *token_pool.TokenPool]{
 	Name:            "token-pool:set-rate-limit-admin",
 	Version:         Version,
@@ -182,5 +201,19 @@ var GetRemotePools = contract.NewRead(contract.ReadParams[uint64, [][]byte, *tok
 	NewContract:  token_pool.NewTokenPool,
 	CallContract: func(tp *token_pool.TokenPool, opts *bind.CallOpts, args uint64) ([][]byte, error) {
 		return tp.GetRemotePools(opts, args)
+	},
+})
+
+var SetRouter = contract.NewWrite(contract.WriteParams[common.Address, *token_pool.TokenPool]{
+	Name:            "token-pool:set-router",
+	Version:         Version,
+	Description:     "Calls setRouter on the TokenPool 1.5.1 contract",
+	ContractType:    ContractType,
+	ContractABI:     token_pool.TokenPoolABI,
+	NewContract:     token_pool.NewTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*token_pool.TokenPool, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(tp *token_pool.TokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return tp.SetRouter(opts, args)
 	},
 })

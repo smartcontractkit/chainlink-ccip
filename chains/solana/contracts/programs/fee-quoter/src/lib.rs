@@ -445,4 +445,8 @@ pub enum FeeQuoterError {
     InvalidCodeVersion,
     #[msg("Proposed owner is the default pubkey")]
     DefaultOwnerProposal,
+    #[msg("Invalid Sui receiver object ids")]
+    InvalidSuiReceiverObjectIds,
+    #[msg("Token transfer fee config must be enabled")]
+    TokenTransferConfigMustBeEnabled,
 }

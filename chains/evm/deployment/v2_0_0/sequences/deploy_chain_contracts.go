@@ -29,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/registry_module_owner_custom"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/mock_receiver"
@@ -38,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool_factory"
+	rmnops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -83,11 +83,6 @@ type MockReceiverParams struct {
 	Qualifier string
 }
 
-type RMNRemoteParams struct {
-	Version   *semver.Version
-	LegacyRMN common.Address
-}
-
 type OffRampParams struct {
 	Version                   *semver.Version
 	GasForCallExactCheck      uint16
@@ -119,7 +114,6 @@ type ExecutorParams struct {
 }
 
 type ContractParams struct {
-	RMNRemote          RMNRemoteParams
 	OffRamp            OffRampParams
 	CommitteeVerifiers []CommitteeVerifierParams
 	OnRamp             OnRampParams
@@ -183,27 +177,36 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, linkRef)
 
-		// Deploy RMNRemote
-		rmnRemoteRef, err := contract_utils.MaybeDeployContract(b, rmn_remote.Deploy, chain, contract_utils.DeployInput[rmn_remote.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(rmn_remote.ContractType, *input.ContractParams.RMNRemote.Version),
+		// The Ultra Fast Curse MCMS timelock is always the curse admin on a newly deployed RMN.
+		var curseAdmins []common.Address
+		ultraFastCurseTimelock, resolveErr := resolveTimelockAddress(input.ExistingAddresses, chain.Selector, common_utils.UltraFastCurseMCMSQualifier)
+		if resolveErr != nil {
+			return output, fmt.Errorf("RMN deployment requires the Ultra Fast Curse MCMS timelock: %w", resolveErr)
+		}
+		curseAdmins = append(curseAdmins, ultraFastCurseTimelock)
+
+		// Deploy RMN. The version is deliberately not configurable: a new chain always gets RMN
+		// 2.1.0. Migrating a chain that still runs an older RMN is DeployAndActivateRMN's job
+		// (rmn.go).
+		rmnRef, err := contract_utils.MaybeDeployContract(b, rmnops.Deploy, chain, contract_utils.DeployInput[rmnops.ConstructorArgs]{
+			TypeAndVersion: deployment.NewTypeAndVersion(rmnops.ContractType, *rmnops.Version),
 			ChainSelector:  chain.Selector,
-			Args: rmn_remote.ConstructorArgs{
-				LocalChainSelector: chain.Selector,
-				LegacyRMN:          input.ContractParams.RMNRemote.LegacyRMN,
+			Args: rmnops.ConstructorArgs{
+				CurseAdmins: curseAdmins,
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
 			return output, err
 		}
-		addresses = append(addresses, rmnRemoteRef)
-		ownableContracts = append(ownableContracts, rmnRemoteRef)
+		addresses = append(addresses, rmnRef)
+		ownableContracts = append(ownableContracts, rmnRef)
 
-		// Deploy RMNProxy
+		// Deploy RMNProxy pointing at the RMN above.
 		rmnProxyRef, err := contract_utils.MaybeDeployContract(b, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
 			TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
 			ChainSelector:  chain.Selector,
 			Args: rmn_proxy.ConstructorArgs{
-				RMN: common.HexToAddress(rmnRemoteRef.Address),
+				RMN: common.HexToAddress(rmnRef.Address),
 			},
 		}, input.ExistingAddresses)
 		if err != nil {
@@ -211,30 +214,6 @@ var DeployChainContracts = cldf_ops.NewSequence(
 		}
 		addresses = append(addresses, rmnProxyRef)
 		ownableContracts = append(ownableContracts, rmnProxyRef)
-
-		// Fetch the RMN contract address set on the RMNProxy
-		rmnAddressReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.GetRMN, chain, contract_utils.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
-			Address:       common.HexToAddress(rmnProxyRef.Address),
-		})
-		if err != nil {
-			return output, err
-		}
-
-		// Set the RMNRemote on the RMNProxy if diff exists
-		if rmnAddressReport.Output != common.HexToAddress(rmnRemoteRef.Address) {
-			setRMNReport, err := cldf_ops.ExecuteOperation(b, rmn_proxy.SetRMN, chain, contract_utils.FunctionInput[rmn_proxy.SetRMNArgs]{
-				ChainSelector: chain.Selector,
-				Address:       common.HexToAddress(rmnProxyRef.Address),
-				Args: rmn_proxy.SetRMNArgs{
-					RMN: common.HexToAddress(rmnRemoteRef.Address),
-				},
-			})
-			if err != nil {
-				return output, err
-			}
-			writes = append(writes, setRMNReport.Output)
-		}
 
 		// Deploy Router
 		routerRef, err := contract_utils.MaybeDeployContract(b, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
@@ -449,7 +428,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			Args: onramp.ConstructorArgs{
 				StaticConfig: onramp.StaticConfig{
 					ChainSelector:         chain.Selector,
-					RmnRemote:             common.HexToAddress(rmnRemoteRef.Address),
+					RmnRemote:             common.HexToAddress(rmnProxyRef.Address),
 					TokenAdminRegistry:    common.HexToAddress(tokenAdminRegistryRef.Address),
 					MaxUSDCentsPerMessage: input.ContractParams.OnRamp.MaxUSDCentsPerMessage,
 				},
@@ -573,7 +552,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			var executorProxyRef *datastore.AddressRef
 			for _, ref := range input.ExistingAddresses {
 				if ref.Type == datastore.ContractType(ExecutorProxyType) &&
-					ref.Version.String() == executor.Version.String() &&
+					ref.Version != nil && ref.Version.String() == executor.Version.String() &&
 					(qualifierPtr == nil || ref.Qualifier == *qualifierPtr) {
 					executorProxyRef = &ref
 				}
@@ -586,7 +565,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 				}
 				deployExecutorProxyViaCREATE2Report, err := cldf_ops.ExecuteSequence(b, DeployContractViaCREATE2, chain, DeployContractViaCREATE2Input{
 					ChainSelector:  chain.Selector,
-					Qualifier:      *qualifierPtr,
+					Qualifier:      executorParam.Qualifier,
 					Type:           datastore.ContractType(ExecutorProxyType),
 					Version:        executor.Version,
 					CREATE2Factory: input.CREATE2Factory,
@@ -750,7 +729,7 @@ var DeployChainContracts = cldf_ops.NewSequence(
 			BatchOps:  batchOps,
 		}
 		if !input.DeployerKeyOwned {
-			output.RefsToTransferOwnership, err = filterContractsNeedingOwnershipTransfer(chain, ownableContracts, cllccipTimelockAddr, rmnTimelockAddr)
+			output.RefsToTransferOwnership, output.RefsToTransferOwnershipRMN, err = filterContractsNeedingOwnershipTransfer(chain, ownableContracts, cllccipTimelockAddr, rmnTimelockAddr)
 			if err != nil {
 				return output, fmt.Errorf("failed to filter ownable contracts: %w", err)
 			}
@@ -833,39 +812,41 @@ func filterContractsNeedingOwnershipTransfer(
 	chain evm.Chain,
 	refs []datastore.AddressRef,
 	cllccipTimelockAddr, rmnTimelockAddr common.Address,
-) ([]datastore.AddressRef, error) {
-	var filtered []datastore.AddressRef
+) (cllRefs []datastore.AddressRef, rmnRefs []datastore.AddressRef, err error) {
 	for _, ref := range refs {
-		currentOwner, _, err := mcms_seq.LoadOwnableContract(common.HexToAddress(ref.Address), chain.Client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load ownable contract %s (%s): %w", ref.Address, ref.Type, err)
+		currentOwner, _, loadErr := mcms_seq.LoadOwnableContract(common.HexToAddress(ref.Address), chain.Client)
+		if loadErr != nil {
+			return nil, nil, fmt.Errorf("failed to load ownable contract %s (%s): %w", ref.Address, ref.Type, loadErr)
 		}
 		switch ref.Type {
-		case datastore.ContractType(rmn_remote.ContractType):
+		case datastore.ContractType(rmnops.ContractType):
+			// RMN is owned by the RMNMCMS timelock, not CLLCCIP, so it is returned in its own
+			// bucket. TransferToTimelock applies a single ProposedOwner to every ref it is handed,
+			// so mixing the two here would hand RMN to CLLCCIP and re-propose it on every run.
 			if currentOwner != rmnTimelockAddr {
-				filtered = append(filtered, ref)
+				rmnRefs = append(rmnRefs, ref)
 			}
 		case datastore.ContractType(common_utils.ProposerManyChainMultisig), datastore.ContractType(common_utils.BypasserManyChainMultisig), datastore.ContractType(common_utils.CancellerManyChainMultisig):
 			if ref.Qualifier == common_utils.CLLQualifier {
 				if currentOwner != cllccipTimelockAddr {
-					filtered = append(filtered, ref)
+					cllRefs = append(cllRefs, ref)
 				}
 			} else if ref.Qualifier == common_utils.RMNTimelockQualifier {
 				if currentOwner != rmnTimelockAddr {
-					filtered = append(filtered, ref)
+					cllRefs = append(cllRefs, ref)
 				}
 			} else {
 				if currentOwner != cllccipTimelockAddr && currentOwner != rmnTimelockAddr {
-					filtered = append(filtered, ref)
+					cllRefs = append(cllRefs, ref)
 				}
 			}
 		default:
 			if currentOwner != cllccipTimelockAddr {
-				filtered = append(filtered, ref)
+				cllRefs = append(cllRefs, ref)
 			}
 		}
 	}
-	return filtered, nil
+	return cllRefs, rmnRefs, nil
 }
 
 // ensureTimelockSelfGoverned checks that newAdmin holds ADMIN_ROLE on the given

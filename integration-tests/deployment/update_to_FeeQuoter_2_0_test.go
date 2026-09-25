@@ -69,6 +69,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 			RampsVersion:     semver.MustParse("1.6.0"),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -84,7 +85,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
 		GasPrice: big.NewInt(1e9),
 	}
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
@@ -181,6 +182,7 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 			FeeQuoterVersion: semver.MustParse("2.0.0"),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -194,7 +196,7 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 	chain2 := lanesapi.ChainDefinition{
 		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
 	}
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
@@ -289,6 +291,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 			FeeQuoterVersion: semver.MustParse("2.0.0"),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -304,7 +307,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
 		GasPrice: big.NewInt(1e9),
 	}
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,

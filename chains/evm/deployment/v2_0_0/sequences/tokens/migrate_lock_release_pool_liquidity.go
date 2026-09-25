@@ -1,9 +1,10 @@
 package tokens
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
-	"strings"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +24,7 @@ import (
 	siloed_lrtp_ops_v170 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	token_pool_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
@@ -63,24 +65,48 @@ var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 		}
 		tokenAddr := tokenReport.Output
 
-		isSiloed := strings.Contains(oldPoolType, "Siloed")
+		// Only the generic siloed lock-release pool is handled here. A substring match on "Siloed"
+		// would also catch SiloedUSDCTokenPool, which migrates through the CCTP hybrid path instead.
+		isSiloed := oldPoolType == utils.SiloedLockReleaseTokenPool.String()
 
 		if isSiloed {
-			if input.Amount != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("siloed pools only support BasisPoints, not exact Amount")
-			}
 			return migrateSiloedPool(b, evmChain, input, oldPoolAddr, newPoolAddr, tokenAddr, timelockAddr)
+		}
+		if isExactSiloMode(input) {
+			return sequences.OnChainOutput{}, fmt.Errorf("SiloExactAmounts/UnsiloedExactAmount are only supported for siloed pools")
 		}
 		return migrateUnsiloedPool(b, evmChain, input, oldPoolAddr, newPoolAddr, tokenAddr, timelockAddr)
 	},
 )
 
+// isExactSiloMode reports whether the input requests exact-amount migration (per-silo and/or
+// unsiloed shared bucket) rather than the legacy Amount/BasisPoints proportional mode.
+func isExactSiloMode(input tokens.MigrateLockReleasePoolLiquidityInput) bool {
+	return len(input.SiloExactAmounts) > 0 || input.UnsiloedExactAmount != nil
+}
+
+// siloExactAmount returns the exact amount configured for the given remote chain's silo, if any.
+func siloExactAmount(input tokens.MigrateLockReleasePoolLiquidityInput, chainSel uint64) (*big.Int, bool) {
+	for _, sa := range input.SiloExactAmounts {
+		if sa.ChainSelector == chainSel {
+			return sa.Amount, true
+		}
+	}
+	return nil, false
+}
+
 func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) error {
+	exactMode := isExactSiloMode(input)
+	legacyMode := input.Amount != nil || input.BasisPoints != nil
+
+	if exactMode && legacyMode {
+		return fmt.Errorf("SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints")
+	}
+	if !exactMode && !legacyMode {
+		return fmt.Errorf("one of Amount, BasisPoints, or SiloExactAmounts/UnsiloedExactAmount must be provided")
+	}
 	if input.Amount != nil && input.BasisPoints != nil {
 		return fmt.Errorf("Amount and BasisPoints are mutually exclusive")
-	}
-	if input.Amount == nil && input.BasisPoints == nil {
-		return fmt.Errorf("one of Amount or BasisPoints must be provided")
 	}
 	if input.BasisPoints != nil {
 		bp := *input.BasisPoints
@@ -91,6 +117,28 @@ func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) e
 	if input.Amount != nil && input.Amount.Sign() <= 0 {
 		return fmt.Errorf("Amount must be positive")
 	}
+	if exactMode {
+		// UnsiloedExactAmount is a companion to SiloExactAmounts, not a standalone mode: migrating
+		// only the shared bucket while leaving every silo untouched isn't supported by this loop
+		// (it would migrate all siloed chains too), so reject it outright rather than silently
+		// draining silos the operator didn't intend to touch.
+		if input.UnsiloedExactAmount != nil && len(input.SiloExactAmounts) == 0 {
+			return fmt.Errorf("UnsiloedExactAmount requires SiloExactAmounts to also be set; exact mode cannot migrate the unsiloed bucket alone")
+		}
+		seen := make(map[uint64]bool, len(input.SiloExactAmounts))
+		for i, sa := range input.SiloExactAmounts {
+			if seen[sa.ChainSelector] {
+				return fmt.Errorf("duplicate ChainSelector %d in SiloExactAmounts", sa.ChainSelector)
+			}
+			seen[sa.ChainSelector] = true
+			if sa.Amount == nil || sa.Amount.Sign() < 0 {
+				return fmt.Errorf("SiloExactAmounts[%d].Amount must be positive", i)
+			}
+		}
+		if input.UnsiloedExactAmount != nil && input.UnsiloedExactAmount.Sign() <= 0 {
+			return fmt.Errorf("UnsiloedExactAmount must be positive")
+		}
+	}
 	if input.OldPoolAddress == "" || input.NewPoolAddress == "" {
 		return fmt.Errorf("OldPoolAddress and NewPoolAddress must be provided")
 	}
@@ -98,6 +146,47 @@ func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) e
 		return fmt.Errorf("TimelockAddress must be provided")
 	}
 	return nil
+}
+
+// resolveUnsiloedLockBox validates the supplied destination in the input for the unsiloed (shared)
+// balance against the lockboxes actually mapped on the new pool.
+//
+// An empty address is allowed here and reported later, but only if there turns out to be unsiloed
+// liquidity to move - a siloed pool with no shared balance does not need a destination.
+func resolveUnsiloedLockBox(
+	address string,
+	configuredLockBoxes map[common.Address]bool,
+	newPoolAddr common.Address,
+) (common.Address, error) {
+	if address == "" {
+		return common.Address{}, nil
+	}
+
+	lockBox := common.HexToAddress(address)
+	if lockBox == (common.Address{}) {
+		return common.Address{}, fmt.Errorf("UnsiloedLockBoxAddress %q is not a valid address", address)
+	}
+
+	if !configuredLockBoxes[lockBox] {
+		return common.Address{}, fmt.Errorf(
+			"UnsiloedLockBoxAddress %s is not one of the lockboxes configured on new pool %s; configured lockboxes are %v",
+			lockBox, newPoolAddr, sortedAddresses(configuredLockBoxes),
+		)
+	}
+
+	return lockBox, nil
+}
+
+// sortedAddresses returns the set in a stable order so error messages are reproducible.
+func sortedAddresses(set map[common.Address]bool) []common.Address {
+	out := make([]common.Address, 0, len(set))
+
+	for addr := range set {
+		out = append(out, addr)
+	}
+	slices.SortFunc(out, func(a, b common.Address) int { return bytes.Compare(a.Bytes(), b.Bytes()) })
+
+	return out
 }
 
 func computeAmount(balance *big.Int, input tokens.MigrateLockReleasePoolLiquidityInput) *big.Int {
@@ -162,15 +251,20 @@ func migrateUnsiloedPool(
 		return sequences.OnChainOutput{}, err
 	}
 
-	ops, err = appendAuthApproveDeposit(b, evmChain, chainSel, lockboxAddr, tokenAddr, timelockAddr, amount, 0, ops)
+	ops, err = appendFundingOps(b, evmChain, chainSel, lockboxAddr, tokenAddr, timelockAddr, amount, 0, input.UsePlainTransfer, ops)
 	if err != nil {
 		return sequences.OnChainOutput{}, err
 	}
 
-	ops, err = appendCleanup(b, evmChain, chainSel, lockboxAddr, oldPoolAddr, timelockAddr, originalRebalancer, ops)
+	restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
+		ChainSelector: chainSel,
+		Address:       oldPoolAddr,
+		Args:          originalRebalancer,
+	})
 	if err != nil {
-		return sequences.OnChainOutput{}, err
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to restore rebalancer on old pool %s: %w", oldPoolAddr, err)
 	}
+	ops = append(ops, restoreRebalancerReport.Output)
 
 	if input.SetPoolConfig != nil {
 		ops, err = appendSetPool(b, evmChain, chainSel, input.SetPoolConfig, newPoolAddr, ops)
@@ -216,8 +310,177 @@ func migrateSiloedPool(
 	}
 
 	lockboxByChain := make(map[uint64]common.Address)
+	configuredLockBoxes := make(map[common.Address]bool)
 	for _, config := range lockboxConfigsReport.Output {
+		if config.LockBox == (common.Address{}) {
+			continue
+		}
 		lockboxByChain[config.RemoteChainSelector] = config.LockBox
+		configuredLockBoxes[config.LockBox] = true
+	}
+
+	// Resolve the destination for the unsiloed (shared) balance up front, so a missing or wrong
+	// address fails before any write is emitted rather than partway through the batch.
+	unsiloedLockBox, err := resolveUnsiloedLockBox(input.UnsiloedLockBoxAddress, configuredLockBoxes, newPoolAddr)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	// Resolve which of the old pool's chains are siloed once; used both for the coverage check below
+	// and for the rebalancer handover further down.
+	isSiloedByChain := make(map[uint64]bool, len(supportedChains))
+	for _, remoteChain := range supportedChains {
+		isSiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.IsSiloed, evmChain, evm_contract.FunctionInput[uint64]{
+			ChainSelector: chainSel,
+			Address:       oldPoolAddr,
+			Args:          remoteChain,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if chain %d is siloed on old pool %s: %w", remoteChain, oldPoolAddr, err)
+		}
+		isSiloedByChain[remoteChain] = isSiloedReport.Output
+	}
+
+	// Check lockbox coverage before emitting any writes. Without this the batch is built chain by
+	// chain and a gap surfaces partway through - after the rebalancer has already been repointed at
+	// the timelock - leaving the engineer to work out which silo was missing.
+	var chainsWithoutLockBox []uint64
+	for _, remoteChain := range supportedChains {
+		if !isSiloedByChain[remoteChain] {
+			continue
+		}
+		if _, ok := lockboxByChain[remoteChain]; !ok {
+			chainsWithoutLockBox = append(chainsWithoutLockBox, remoteChain)
+		}
+	}
+	if len(chainsWithoutLockBox) > 0 {
+		slices.Sort(chainsWithoutLockBox)
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"new siloed pool %s has no lockbox configured for siloed chains %v of old pool %s; the new pool's lockBoxGroups must cover every siloed chain being migrated",
+			newPoolAddr, chainsWithoutLockBox, oldPoolAddr,
+		)
+	}
+
+	exactMode := isExactSiloMode(input)
+
+	// In exact mode, every siloed chain must be explicit - a chain silently falling back to zero
+	// migration is more likely to be an oversight than intent, so surface it before any write is
+	// emitted rather than migrating a partial set of silos.
+	if exactMode {
+		validSiloedChains := make(map[uint64]bool, len(supportedChains))
+		for _, remoteChain := range supportedChains {
+			if isSiloedByChain[remoteChain] {
+				validSiloedChains[remoteChain] = true
+			}
+		}
+
+		// A ChainSelector that isn't actually a siloed chain of the old pool would otherwise be
+		// silently ignored by the withdraw loop below, leaving no trace in the execution logs that
+		// the entry was never applied - fail loudly instead so a typo'd or stale selector surfaces
+		// immediately.
+		var unknownSilos []uint64
+		for _, sa := range input.SiloExactAmounts {
+			if !validSiloedChains[sa.ChainSelector] {
+				unknownSilos = append(unknownSilos, sa.ChainSelector)
+			}
+		}
+		if len(unknownSilos) > 0 {
+			slices.Sort(unknownSilos)
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"SiloExactAmounts references chain selectors %v that are not siloed chains on old pool %s",
+				unknownSilos, oldPoolAddr,
+			)
+		}
+
+		var missingSilos []uint64
+		for remoteChain := range validSiloedChains {
+			if _, ok := siloExactAmount(input, remoteChain); !ok {
+				missingSilos = append(missingSilos, remoteChain)
+			}
+		}
+		if len(missingSilos) > 0 {
+			slices.Sort(missingSilos)
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"SiloExactAmounts is missing entries for siloed chains %v of old pool %s; exact mode requires every siloed chain to be explicit",
+				missingSilos, oldPoolAddr,
+			)
+		}
+	}
+
+	// Read the shared balance here, for the same reason as the coverage check above: a missing
+	// destination must surface before the rebalancer is repointed at the timelock, not once the
+	// silos have already been drained.
+	unsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetUnsiloedLiquidity, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSel,
+		Address:       oldPoolAddr,
+	})
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed liquidity from old pool %s: %w", oldPoolAddr, err)
+	}
+
+	var unsiloedAmount *big.Int
+	if exactMode {
+		if unsiloedReport.Output.Sign() > 0 && input.UnsiloedExactAmount == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"old pool %s holds %s unsiloed liquidity to migrate but UnsiloedExactAmount was not set; "+
+					"exact mode requires an explicit amount for the shared bucket",
+				oldPoolAddr, unsiloedReport.Output,
+			)
+		}
+		if input.UnsiloedExactAmount != nil {
+			unsiloedAmount = new(big.Int).Set(input.UnsiloedExactAmount)
+		} else {
+			unsiloedAmount = big.NewInt(0)
+		}
+		if unsiloedAmount.Cmp(unsiloedReport.Output) > 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"UnsiloedExactAmount %s exceeds old pool %s unsiloed balance %s",
+				unsiloedAmount, oldPoolAddr, unsiloedReport.Output,
+			)
+		}
+	} else {
+		unsiloedAmount = computeAmount(unsiloedReport.Output, input)
+	}
+	if unsiloedAmount.Sign() > 0 && unsiloedLockBox == (common.Address{}) {
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"old pool %s holds %s unsiloed liquidity to migrate but UnsiloedLockBoxAddress was not set; "+
+				"the shared balance backs the pool's non-siloed chains and its destination cannot be inferred - "+
+				"set it to the lockbox serving those chains on new pool %s",
+			oldPoolAddr, unsiloedAmount, newPoolAddr,
+		)
+	}
+
+	// Resolve every siloed chain's migration amount and validate it against the on-chain balance
+	// up front, before any write is emitted (the rebalancer handover below is the first write).
+	siloAmounts := make(map[uint64]*big.Int, len(supportedChains))
+	for _, remoteChain := range supportedChains {
+		if !isSiloedByChain[remoteChain] {
+			continue
+		}
+
+		availableReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetAvailableTokens, evmChain, evm_contract.FunctionInput[uint64]{
+			ChainSelector: chainSel,
+			Address:       oldPoolAddr,
+			Args:          remoteChain,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get available tokens for chain %d: %w", remoteChain, err)
+		}
+		siloBalance := availableReport.Output
+
+		var siloAmount *big.Int
+		if exactMode {
+			amt, _ := siloExactAmount(input, remoteChain) // presence guaranteed by the missing-silo check above
+			siloAmount = amt
+		} else {
+			siloAmount = computeAmount(siloBalance, input)
+		}
+		if siloAmount.Cmp(siloBalance) > 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"migration amount %s for chain %d exceeds silo balance %s", siloAmount, remoteChain, siloBalance,
+			)
+		}
+		siloAmounts[remoteChain] = siloAmount
 	}
 
 	rebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
@@ -247,16 +510,7 @@ func migrateSiloedPool(
 	var siloInfos []chainRebalancerInfo
 
 	for _, remoteChain := range supportedChains {
-		isSiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.IsSiloed, evmChain, evm_contract.FunctionInput[uint64]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
-			Args:          remoteChain,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to check if chain %d is siloed on old pool %s: %w", remoteChain, oldPoolAddr, err)
-		}
-
-		if isSiloedReport.Output {
+		if isSiloedByChain[remoteChain] {
 			chainRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetChainRebalancer, evmChain, evm_contract.FunctionInput[uint64]{
 				ChainSelector: chainSel,
 				Address:       oldPoolAddr,
@@ -292,8 +546,6 @@ func migrateSiloedPool(
 		}
 	}
 
-	var firstLockbox common.Address
-	usedLockboxes := make(map[common.Address]bool)
 	for _, info := range siloInfos {
 		if !info.isSiloed {
 			continue
@@ -303,21 +555,8 @@ func migrateSiloedPool(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("no lockbox configured for chain %d on new siloed pool", info.chainSelector)
 		}
-		if firstLockbox == (common.Address{}) {
-			firstLockbox = lockbox
-		}
 
-		availableReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetAvailableTokens, evmChain, evm_contract.FunctionInput[uint64]{
-			ChainSelector: chainSel,
-			Address:       oldPoolAddr,
-			Args:          info.chainSelector,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get available tokens for chain %d: %w", info.chainSelector, err)
-		}
-
-		siloBalance := availableReport.Output
-		siloAmount := computeAmount(siloBalance, input)
+		siloAmount := siloAmounts[info.chainSelector]
 		if siloAmount.Sign() == 0 {
 			continue
 		}
@@ -335,35 +574,13 @@ func migrateSiloedPool(
 		}
 		ops = append(ops, withdrawReport.Output)
 
-		ops, err = appendAuthApproveDeposit(b, evmChain, chainSel, lockbox, tokenAddr, timelockAddr, siloAmount, info.chainSelector, ops)
+		ops, err = appendFundingOps(b, evmChain, chainSel, lockbox, tokenAddr, timelockAddr, siloAmount, info.chainSelector, input.UsePlainTransfer, ops)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to build deposit ops for chain %d: %w", info.chainSelector, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build funding ops for siloed chain %d: %w", info.chainSelector, err)
 		}
-		usedLockboxes[lockbox] = true
 	}
-
-	unsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetUnsiloedLiquidity, evmChain, evm_contract.FunctionInput[struct{}]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-	})
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed liquidity from old pool %s: %w", oldPoolAddr, err)
-	}
-	unsiloedBalance := unsiloedReport.Output
-	unsiloedAmount := computeAmount(unsiloedBalance, input)
 
 	if unsiloedAmount.Sign() > 0 {
-		depositLockbox := firstLockbox
-		if depositLockbox == (common.Address{}) {
-			for _, lb := range lockboxByChain {
-				depositLockbox = lb
-				break
-			}
-		}
-		if depositLockbox == (common.Address{}) {
-			return sequences.OnChainOutput{}, fmt.Errorf("no lockbox available for unsiloed liquidity deposit")
-		}
-
 		withdrawUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.WithdrawLiquidity, evmChain, evm_contract.FunctionInput[*big.Int]{
 			ChainSelector: chainSel,
 			Address:       oldPoolAddr,
@@ -374,11 +591,10 @@ func migrateSiloedPool(
 		}
 		ops = append(ops, withdrawUnsiloedReport.Output)
 
-		ops, err = appendAuthApproveDeposit(b, evmChain, chainSel, depositLockbox, tokenAddr, timelockAddr, unsiloedAmount, 0, ops)
+		ops, err = appendFundingOps(b, evmChain, chainSel, unsiloedLockBox, tokenAddr, timelockAddr, unsiloedAmount, 0, input.UsePlainTransfer, ops)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to build deposit ops for unsiloed liquidity: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build funding ops for unsiloed liquidity: %w", err)
 		}
-		usedLockboxes[depositLockbox] = true
 	}
 
 	for _, info := range siloInfos {
@@ -407,21 +623,6 @@ func migrateSiloedPool(
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to restore unsiloed rebalancer: %w", err)
 	}
 	ops = append(ops, restoreUnsiloedReport.Output)
-
-	for lb := range usedLockboxes {
-		removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdatesProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
-			ChainSelector: chainSel,
-			Address:       lb,
-			Args: lockbox_ops.AuthorizedCallerArgs{
-				AddedCallers:   []common.Address{},
-				RemovedCallers: []common.Address{timelockAddr},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to remove timelock from lockbox %s authorized callers: %w", lb, err)
-		}
-		ops = append(ops, removeAuthReport.Output)
-	}
 
 	if input.SetPoolConfig != nil {
 		ops, err = appendSetPool(b, evmChain, chainSel, input.SetPoolConfig, newPoolAddr, ops)
@@ -471,27 +672,70 @@ func appendSetRebalancerAndWithdraw(
 	return ops, nil
 }
 
-func appendAuthApproveDeposit(
+// appendFundingOps appends the operations that fund the new pool's lockbox with migrated
+// liquidity. By default it uses the lockbox's deposit() path (emitting the Deposit event). Use
+// usePlainTransfer=true as a break-glass option to transfer the tokens directly, bypassing the
+// Deposit event.
+func appendFundingOps(
 	b cldf_ops.Bundle,
 	evmChain evm.Chain,
 	chainSel uint64,
 	lockboxAddr, tokenAddr, timelockAddr common.Address,
 	amount *big.Int,
 	remoteChainSelector uint64,
+	usePlainTransfer bool,
 	ops []evm_contract.WriteOutput,
 ) ([]evm_contract.WriteOutput, error) {
-	addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdatesProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
-		ChainSelector: chainSel,
-		Address:       lockboxAddr,
-		Args: lockbox_ops.AuthorizedCallerArgs{
-			AddedCallers:   []common.Address{timelockAddr},
-			RemovedCallers: []common.Address{},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to add timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
+	if usePlainTransfer {
+		transferReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.TransferProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.TransferArgs]{
+			ChainSelector: chainSel,
+			Address:       tokenAddr,
+			Args: erc20_ops.TransferArgs{
+				Receiver: lockboxAddr,
+				Amount:   amount,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to transfer tokens to lockbox %s: %w", lockboxAddr, err)
+		}
+		return append(ops, transferReport.Output), nil
 	}
-	ops = append(ops, addAuthReport.Output)
+
+	// Liquidity migration is done in tranches, so the authorize step must be idempotent: only append
+	// the authorized-caller update if the timelock isn't already an authorized caller, avoiding a
+	// redundant MCMS batch op and a spurious AuthorizedCallerAdded event on every subsequent tranche.
+	authCallers, err := cldf_ops.ExecuteOperation(
+		b,
+		lockbox_ops.GetAllAuthorizedCallers,
+		evmChain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       lockboxAddr,
+		},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get authorized callers on lockbox %s: %w", lockboxAddr, err)
+	}
+	if !slices.Contains(authCallers.Output, timelockAddr) {
+		// Deposit path: make the timelock an authorized caller so it can deposit, approve the lockbox,
+		// then deposit via the lockbox's deposit() function (emits the Deposit event). The framework
+		// routes the authorize step automatically based on lockbox ownership: EOA when deployer-owned
+		// or MCMS-batched when timelock-owned. The timelock remains an authorized caller afterward;
+		// this is harmless since the timelock is governance and typically owns the lockbox.
+		addAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdates, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
+			ChainSelector: chainSel,
+			Address:       lockboxAddr,
+			Args: lockbox_ops.AuthorizedCallerArgs{
+				AddedCallers:   []common.Address{timelockAddr},
+				RemovedCallers: []common.Address{},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to add timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
+		}
+		ops = append(ops, addAuthReport.Output)
+	}
 
 	approveReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.ApproveProposalOnly, evmChain, evm_contract.FunctionInput[erc20_ops.ApproveArgs]{
 		ChainSelector: chainSel,
@@ -506,7 +750,7 @@ func appendAuthApproveDeposit(
 	}
 	ops = append(ops, approveReport.Output)
 
-	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.Deposit, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositArgs]{
+	depositReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.DepositProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.DepositArgs]{
 		ChainSelector: chainSel,
 		Address:       lockboxAddr,
 		Args: lockbox_ops.DepositArgs{
@@ -519,39 +763,6 @@ func appendAuthApproveDeposit(
 		return nil, fmt.Errorf("failed to deposit into lockbox %s: %w", lockboxAddr, err)
 	}
 	ops = append(ops, depositReport.Output)
-
-	return ops, nil
-}
-
-func appendCleanup(
-	b cldf_ops.Bundle,
-	evmChain evm.Chain,
-	chainSel uint64,
-	lockboxAddr, oldPoolAddr, timelockAddr, originalRebalancer common.Address,
-	ops []evm_contract.WriteOutput,
-) ([]evm_contract.WriteOutput, error) {
-	removeAuthReport, err := cldf_ops.ExecuteOperation(b, lockbox_ops.ApplyAuthorizedCallerUpdatesProposalOnly, evmChain, evm_contract.FunctionInput[lockbox_ops.AuthorizedCallerArgs]{
-		ChainSelector: chainSel,
-		Address:       lockboxAddr,
-		Args: lockbox_ops.AuthorizedCallerArgs{
-			AddedCallers:   []common.Address{},
-			RemovedCallers: []common.Address{timelockAddr},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove timelock as authorized caller on lockbox %s: %w", lockboxAddr, err)
-	}
-	ops = append(ops, removeAuthReport.Output)
-
-	restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPoolAddr,
-		Args:          originalRebalancer,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to restore rebalancer on old pool %s: %w", oldPoolAddr, err)
-	}
-	ops = append(ops, restoreRebalancerReport.Output)
 
 	return ops, nil
 }

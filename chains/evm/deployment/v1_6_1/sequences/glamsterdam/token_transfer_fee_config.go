@@ -41,8 +41,10 @@ type TokenTransferFeeConfigLane struct {
 	ChainSelector    uint64
 	FeeQuoterAddress common.Address
 	// CandidateTokens are token addresses to check for an existing TokenTransferFeeConfig
-	// override on this lane (e.g. every token this chain's TokenAdminRegistry knows about). Only
-	// tokens with an enabled override are resolved and updated; tokens with no override
+	// override on this lane. This row of the v1.6 mapping table is scoped to USDC lanes only, so
+	// callers should populate this with just the chain's resolved USDC token address, not every
+	// token the TokenAdminRegistry knows about — a non-USDC token with an enabled override would
+	// otherwise wrongly get the USDC-specific ratio applied to it. Tokens with no override
 	// configured for this lane are skipped silently, since that's the common case.
 	CandidateTokens []common.Address
 }

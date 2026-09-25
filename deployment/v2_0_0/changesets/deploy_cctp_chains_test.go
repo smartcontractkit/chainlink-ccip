@@ -154,6 +154,11 @@ func (m *cctpTest_MockCCTPChain) USDCType() adapters.USDCType {
 	return adapters.Canonical
 }
 
+// TokenDecimals returns the number of decimals of the token on the chain.
+func (m *cctpTest_MockCCTPChain) TokenDecimals(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, token string) (uint8, error) {
+	return 6, nil
+}
+
 var cctpTest_BasicMCMSInput = mcms.Input{
 	OverridePreviousRoot: true,
 	ValidUntil:           3759765795,
@@ -520,6 +525,31 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			},
 		},
 		{
+			desc: "success - solana lane with CCTP_V2_WITH_CCV",
+			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
+					5009297550715157269: {
+						USDCType:         adapters.Canonical,
+						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+							chain_selectors.SOLANA_DEVNET.Selector: {
+								LockOrBurnMechanism: "CCTP_V2_WITH_CCV",
+							},
+						},
+					},
+					chain_selectors.SOLANA_DEVNET.Selector: {
+						USDCType:  adapters.Canonical,
+						USDCToken: "11111111111111111111111111111111",
+						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+							5009297550715157269: {
+								LockOrBurnMechanism: "CCTP_V2_WITH_CCV",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "success - empty CCTP v1 token messenger with CCTP_V1 lane in config",
 			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
@@ -542,32 +572,6 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 					},
 				},
 			},
-		},
-		{
-			desc: "failure - solana lanes require CCTP_V1",
-			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
-				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
-					5009297550715157269: {
-						USDCType:         adapters.Canonical,
-						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
-						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
-							chain_selectors.SOLANA_DEVNET.Selector: {
-								LockOrBurnMechanism: "CCTP_V2_WITH_CCV",
-							},
-						},
-					},
-					chain_selectors.SOLANA_DEVNET.Selector: {
-						USDCType:  adapters.Canonical,
-						USDCToken: "11111111111111111111111111111111",
-						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
-							5009297550715157269: {
-								LockOrBurnMechanism: "CCTP_V1",
-							},
-						},
-					},
-				},
-			},
-			expectedError: "solana lanes only support CCTP_V1",
 		},
 		{
 			desc: "failure - invalid CCTP type",
@@ -607,6 +611,18 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			expectedError: "invalid TokenMessengerV2",
 		},
 		{
+			desc: "success - non-canonical chain does not require TokenMessengerV2",
+			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
+					// Non-canonical chains do not use Circle's contracts, so an empty
+					// TokenMessengerV2 must not fail verify.
+					5009297550715157269: {
+						USDCType: adapters.NonCanonical,
+					},
+				},
+			},
+		},
+		{
 			desc: "failure - unknown chain selector",
 			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
@@ -618,7 +634,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			expectedError: "unknown chain selector",
 		},
 		{
-			desc: "failure - unknown remote chain selector",
+			desc: "failure - remote chain not in chains",
 			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
@@ -631,7 +647,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 					},
 				},
 			},
-			expectedError: "unknown chain selector",
+			expectedError: "not found in chains",
 		},
 		{
 			desc: "failure - invalid MCMS timelock action",
@@ -664,7 +680,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 			expectedError: "failed to validate MCMS input",
 		},
 		{
-			desc: "failure - multiple remote chains with one having unknown selector",
+			desc: "failure - multiple remote chains with one not pointing back",
 			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
 				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
 					5009297550715157269: {
@@ -673,7 +689,7 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 						TokenMessengerV2: "0x8888888888888888888888888888888888888888",
 						RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 							15971525489660198786: {},
-							0:                    {}, // Invalid remote chain selector
+							3478487238524512106:  {}, // No back-reference from this chain
 						},
 					},
 					15971525489660198786: {
@@ -684,9 +700,13 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 							5009297550715157269: {},
 						},
 					},
+					3478487238524512106: {
+						USDCType:         adapters.Canonical,
+						TokenMessengerV2: "0x5555555555555555555555555555555555555555",
+					},
 				},
 			},
-			expectedError: "unknown chain selector",
+			expectedError: "does not define a remote chain config for",
 		},
 	}
 

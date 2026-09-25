@@ -168,22 +168,42 @@ func filterCallerUpdate(e cldf.Environment, adapter AuthorizedCallersAdapter, in
 			in.ChainSelector, in.ContractType, in.Version.String(), err)
 	}
 
+	// Normalize both sides through the adapter before comparing. The on-chain values and
+	// the operator-supplied values can spell the same address differently (for EVM, any
+	// mix of letter case), and a raw string compare would treat those as distinct and
+	// re-apply an update that is already in effect.
 	currentSet := make(map[string]struct{}, len(current))
 	for _, c := range current {
-		currentSet[string(c)] = struct{}{}
+		norm, err := adapter.NormalizeCaller(c)
+		if err != nil {
+			return CallerUpdate{}, fmt.Errorf(
+				"invalid caller %q read from chain %d for contract %q v%s: %w",
+				c, in.ChainSelector, in.ContractType, in.Version.String(), err)
+		}
+		currentSet[norm] = struct{}{}
 	}
 
+	// The filtered lists carry the normalized spelling so the resulting proposal always
+	// contains canonical addresses, whatever the input file used.
 	added := make([]Caller, 0, len(in.Update.AddedCallers))
 	for _, c := range in.Update.AddedCallers {
-		if _, exists := currentSet[string(c)]; !exists {
-			added = append(added, c)
+		norm, err := adapter.NormalizeCaller(c)
+		if err != nil {
+			return CallerUpdate{}, fmt.Errorf("invalid addedCallers entry: %w", err)
+		}
+		if _, exists := currentSet[norm]; !exists {
+			added = append(added, norm)
 		}
 	}
 
 	removed := make([]Caller, 0, len(in.Update.RemovedCallers))
 	for _, c := range in.Update.RemovedCallers {
-		if _, exists := currentSet[string(c)]; exists {
-			removed = append(removed, c)
+		norm, err := adapter.NormalizeCaller(c)
+		if err != nil {
+			return CallerUpdate{}, fmt.Errorf("invalid removedCallers entry: %w", err)
+		}
+		if _, exists := currentSet[norm]; exists {
+			removed = append(removed, norm)
 		}
 	}
 

@@ -164,9 +164,10 @@ type FeeInfo struct {
 func TestGetConsensusObservation(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
-		lggr:      lggr,
-		destChain: internal.EvmChainSelector,
-		fRoleDON:  1,
+		lggr:            lggr,
+		destChain:       internal.EvmChainSelector,
+		fRoleDON:        1,
+		metricsReporter: NoopMetrics{},
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 for chain selector 1
@@ -415,7 +416,7 @@ func TestProcessor_Outcome(t *testing.T) {
 				cfg: pluginconfig.CommitOffchainConfig{
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
 				},
-				metricsReporter: plugincommon.NoopReporter{},
+				metricsReporter: NoopMetrics{},
 				homeChain:       homeChainMock,
 			}
 

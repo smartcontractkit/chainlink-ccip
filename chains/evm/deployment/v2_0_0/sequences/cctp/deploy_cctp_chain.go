@@ -25,12 +25,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/usdc_token_pool_proxy"
 	v2_0_0_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/verifier_tags"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
 )
 
 const (
@@ -51,6 +51,11 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		addresses := make([]datastore.AddressRef, 0)
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
+
+		// registeredPoolRef is the pool the CCTP changeset registers on the TokenAdminRegistry for
+		// this chain. It is returned as the FIRST entry of Addresses so the configure phase can
+		// derive it from the deploy output.
+		var registeredPoolRef datastore.AddressRef
 
 		// Resolve chain and existing addresses
 		existingAddresses := dep.DataStore.Addresses().Filter(
@@ -259,6 +264,13 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		addresses = append(addresses, usdcTokenPoolProxyRef)
 		usdcTokenPoolProxyAddress := common.HexToAddress(usdcTokenPoolProxyRef.Address)
 
+		// The pool registered on the TokenAdminRegistry for CCTP canonical EVM chain is always the USDCTokenPoolProxy: it
+		// routes to the underlying per-mechanism pools, for both home and non-home chains.
+		registeredPoolRef = usdcTokenPoolProxyRef
+		if datastore_utils.IsAddressRefEmpty(registeredPoolRef) {
+			return sequences.OnChainOutput{}, fmt.Errorf("could not determine the pool to register on chain %d", input.ChainSelector)
+		}
+
 		// Configure proxy and authorized callers
 		if isHomeChain {
 			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, usdcTokenPoolProxyAddress, siloedLockReleaseTokenPoolAddress)
@@ -319,8 +331,18 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			batchOps = append(batchOps, chainBatchOp)
 		}
 
+		// Addresses[0] is the registered pool ref (convention used by the configure phase).
+		// Dedupe it from the rest of the list.
+		orderedAddresses := make([]datastore.AddressRef, 0, len(addresses)+1)
+		orderedAddresses = append(orderedAddresses, registeredPoolRef)
+		for _, r := range addresses {
+			if r.Address == registeredPoolRef.Address && r.Type == registeredPoolRef.Type {
+				continue
+			}
+			orderedAddresses = append(orderedAddresses, r)
+		}
 		return sequences.OnChainOutput{
-			Addresses: addresses,
+			Addresses: orderedAddresses,
 			BatchOps:  batchOps,
 		}, nil
 	},
@@ -418,7 +440,7 @@ func deployOrResolveCCTPVerifierResolver(
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chain.Selector),
 		datastore.AddressRefByType(datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType)),
-		datastore.AddressRefByVersion(cctp_verifier.Version),
+		datastore.AddressRefByVersion(versioned_verifier_resolver.Version),
 	)
 	if len(refs) == 0 {
 		if create2FactoryAddress == (common.Address{}) {
@@ -427,7 +449,7 @@ func deployOrResolveCCTPVerifierResolver(
 		report, err := cldf_ops.ExecuteSequence(b, v2_0_0_sequences.DeployVerifierResolverViaCREATE2, chain, v2_0_0_sequences.DeployVerifierResolverViaCREATE2Input{
 			ChainSelector:  chainSelector,
 			Type:           datastore.ContractType(versioned_verifier_resolver.CCTPVerifierResolverType),
-			Version:        cctp_verifier.Version,
+			Version:        versioned_verifier_resolver.Version,
 			CREATE2Factory: create2FactoryAddress,
 		})
 		if err != nil {

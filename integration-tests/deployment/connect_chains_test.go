@@ -18,6 +18,7 @@ import (
 
 	evmsequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
@@ -252,6 +253,7 @@ func setupEVM2SVMForConnectChains(t *testing.T) (
 	version = semver.MustParse("1.6.0")
 	for _, chainSel := range allChains {
 		mint, _ := solana.NewRandomPrivateKey()
+		SeedUltraFastCurseMCMS(t, e)
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS: mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{
@@ -307,7 +309,7 @@ func TestConnectChains_EVM2SVM_Lifecycle(t *testing.T) {
 	mcmsRegistry := cs_core.GetRegistry()
 
 	// ── Phase 1: Connect ─────────────────────────────────────────────────
-	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	connectOut, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
@@ -369,6 +371,7 @@ func setupEVM2EVMForConnectChains(t *testing.T, chains []uint64) (
 		GasForCallExactCheck:                    uint16(5000),
 	}
 	for _, chainSel := range chains {
+		SeedUltraFastCurseMCMS(t, e)
 		out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 			MCMS:   mcms.Input{},
 			Chains: map[uint64]deployops.ContractDeploymentConfigPerChain{chainSel: deployCfg},
@@ -411,7 +414,7 @@ func TestConnectChains_EVM2EVM_NoMCMS(t *testing.T) {
 	e, chain1, chain2, srcAdapter, destAdapter, version := setupEVM2EVMForConnectChains(t, chains)
 	mcmsRegistry := cs_core.GetRegistry()
 
-	_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{Version: version, ChainA: chain1, ChainB: chain2},
 		},
@@ -562,7 +565,7 @@ func TestConnectChains_EVM2EVM_Lifecycle(t *testing.T) {
 
 	connect := func(isDisabled bool) {
 		t.Helper()
-		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+		_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 			Lanes: []lanesapi.LaneConfig{
 				{Version: version, ChainA: chain1, ChainB: chain2, IsDisabled: isDisabled},
 			},
@@ -643,7 +646,7 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 	e, chain1, chain2, srcAdapter, destAdapter, version := setupEVM2EVMForConnectChains(t, chains)
 	mcmsRegistry := cs_core.GetRegistry()
 
-	_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{Version: version, ChainA: chain1, ChainB: chain2},
 		},
@@ -693,7 +696,7 @@ func TestConnectChains_EVM2EVM_UpgradeFeeQuoter_ThenLaneExpansion(t *testing.T) 
 	e.OperationsBundle = bundle
 
 	// Run ConnectChains again (lane expansion / configure-as-source with 2.0 FeeQuoter).
-	connectOut2, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	connectOut2, err := lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{Version: version, ChainA: chain1, ChainB: chain2},
 		},
@@ -748,6 +751,12 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 		RemoteChainSelectors: []uint64{chain_selectors.ETHEREUM_MAINNET.Selector},
 	}
 
+	// The chain-contract deploy requires the Ultra Fast Curse timelock, which it uses as the RMN's
+	// curse admin. This flow deploys the real MCMS instances later, so seed the ref: the address is
+	// only ever a constructor argument here, never called.
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chains...)
+	require.NoError(t, err)
+
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -763,7 +772,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
 		GasPrice: big.NewInt(1e9),
 	}
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,
@@ -827,7 +836,7 @@ func TestDowngradeLane_ConnectChains_EVM2EVM(t *testing.T) {
 	for _, chainSel := range chains {
 		fqUpgradeValidation(t, e, chainSel, chains, false, true)
 	}
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,

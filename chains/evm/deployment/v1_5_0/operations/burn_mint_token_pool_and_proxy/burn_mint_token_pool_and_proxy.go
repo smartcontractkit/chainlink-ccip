@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -99,12 +101,118 @@ func (c *BurnMintTokenPoolAndProxyContract) GetPreviousPool(opts *bind.CallOpts)
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *BurnMintTokenPoolAndProxyContract) GetToken(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getToken")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) GetSupportedChains(opts *bind.CallOpts) ([]uint64, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getSupportedChains")
+	if err != nil {
+		var zero []uint64
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]uint64)).(*[]uint64), nil
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) GetRemoteToken(opts *bind.CallOpts, args uint64) ([]byte, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRemoteToken", args)
+	if err != nil {
+		var zero []byte
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new([]byte)).(*[]byte), nil
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) GetRateLimitAdmin(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRateLimitAdmin")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) IsSupportedToken(opts *bind.CallOpts, args common.Address) (bool, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "isSupportedToken", args)
+	if err != nil {
+		var zero bool
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(bool)).(*bool), nil
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) ApplyChainUpdates(opts *bind.TransactOpts, args []ChainUpdate) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "applyChainUpdates", args)
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) SetChainRateLimiterConfig(opts *bind.TransactOpts, remoteChainSelector uint64, outboundConfig Config, inboundConfig Config) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setChainRateLimiterConfig", remoteChainSelector, outboundConfig, inboundConfig)
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) SetRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setRemotePool", remoteChainSelector, remotePoolAddress)
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) SetRateLimitAdmin(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setRateLimitAdmin", args)
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) GetRouter(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRouter")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *BurnMintTokenPoolAndProxyContract) SetRouter(opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "setRouter", args)
+}
+
+type ChainUpdate struct {
+	RemoteChainSelector       uint64
+	Allowed                   bool
+	RemotePoolAddress         []byte
+	RemoteTokenAddress        []byte
+	OutboundRateLimiterConfig Config
+	InboundRateLimiterConfig  Config
+}
+
+type Config struct {
+	IsEnabled bool
+	Capacity  *big.Int
+	Rate      *big.Int
+}
+
 type TokenBucket struct {
 	Tokens      *big.Int
 	LastUpdated uint32
 	IsEnabled   bool
 	Capacity    *big.Int
 	Rate        *big.Int
+}
+
+type SetChainRateLimiterConfigArgs struct {
+	RemoteChainSelector uint64
+	OutboundConfig      Config
+	InboundConfig       Config
+}
+
+type SetRemotePoolArgs struct {
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
 }
 
 type ConstructorArgs struct {
@@ -171,5 +279,161 @@ var GetPreviousPool = contract.NewRead(contract.ReadParams[struct{}, common.Addr
 	NewContract:  NewBurnMintTokenPoolAndProxyContract,
 	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetPreviousPool(opts)
+	},
+})
+
+var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *BurnMintTokenPoolAndProxyContract]{
+	Name:         "burn-mint-token-pool-and-proxy:get-token",
+	Version:      Version,
+	Description:  "Calls getToken on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetToken(opts)
+	},
+})
+
+var GetSupportedChains = contract.NewRead(contract.ReadParams[struct{}, []uint64, *BurnMintTokenPoolAndProxyContract]{
+	Name:         "burn-mint-token-pool-and-proxy:get-supported-chains",
+	Version:      Version,
+	Description:  "Calls getSupportedChains on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args struct{}) ([]uint64, error) {
+		return c.GetSupportedChains(opts)
+	},
+})
+
+var GetRemoteToken = contract.NewRead(contract.ReadParams[uint64, []byte, *BurnMintTokenPoolAndProxyContract]{
+	Name:         "burn-mint-token-pool-and-proxy:get-remote-token",
+	Version:      Version,
+	Description:  "Calls getRemoteToken on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args uint64) ([]byte, error) {
+		return c.GetRemoteToken(opts, args)
+	},
+})
+
+var GetRateLimitAdmin = contract.NewRead(contract.ReadParams[struct{}, common.Address, *BurnMintTokenPoolAndProxyContract]{
+	Name:         "burn-mint-token-pool-and-proxy:get-rate-limit-admin",
+	Version:      Version,
+	Description:  "Calls getRateLimitAdmin on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRateLimitAdmin(opts)
+	},
+})
+
+var IsSupportedToken = contract.NewRead(contract.ReadParams[common.Address, bool, *BurnMintTokenPoolAndProxyContract]{
+	Name:         "burn-mint-token-pool-and-proxy:is-supported-token",
+	Version:      Version,
+	Description:  "Calls isSupportedToken on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args common.Address) (bool, error) {
+		return c.IsSupportedToken(opts, args)
+	},
+})
+
+var ApplyChainUpdates = contract.NewWrite(contract.WriteParams[[]ChainUpdate, *BurnMintTokenPoolAndProxyContract]{
+	Name:            "burn-mint-token-pool-and-proxy:apply-chain-updates",
+	Version:         Version,
+	Description:     "Calls applyChainUpdates on the contract",
+	ContractType:    ContractType,
+	ContractABI:     BurnMintTokenPoolAndProxyABI,
+	NewContract:     NewBurnMintTokenPoolAndProxyContract,
+	IsAllowedCaller: contract.OnlyOwner[*BurnMintTokenPoolAndProxyContract, []ChainUpdate],
+	Validate:        func([]ChainUpdate) error { return nil },
+	CallContract: func(
+		c *BurnMintTokenPoolAndProxyContract,
+		opts *bind.TransactOpts,
+		args []ChainUpdate,
+	) (*types.Transaction, error) {
+		return c.ApplyChainUpdates(opts, args)
+	},
+})
+
+var SetChainRateLimiterConfig = contract.NewWrite(contract.WriteParams[SetChainRateLimiterConfigArgs, *BurnMintTokenPoolAndProxyContract]{
+	Name:            "burn-mint-token-pool-and-proxy:set-chain-rate-limiter-config",
+	Version:         Version,
+	Description:     "Calls setChainRateLimiterConfig on the contract",
+	ContractType:    ContractType,
+	ContractABI:     BurnMintTokenPoolAndProxyABI,
+	NewContract:     NewBurnMintTokenPoolAndProxyContract,
+	IsAllowedCaller: contract.OnlyOwner[*BurnMintTokenPoolAndProxyContract, SetChainRateLimiterConfigArgs],
+	Validate:        func(SetChainRateLimiterConfigArgs) error { return nil },
+	CallContract: func(
+		c *BurnMintTokenPoolAndProxyContract,
+		opts *bind.TransactOpts,
+		args SetChainRateLimiterConfigArgs,
+	) (*types.Transaction, error) {
+		return c.SetChainRateLimiterConfig(opts, args.RemoteChainSelector, args.OutboundConfig, args.InboundConfig)
+	},
+})
+
+var SetRemotePool = contract.NewWrite(contract.WriteParams[SetRemotePoolArgs, *BurnMintTokenPoolAndProxyContract]{
+	Name:            "burn-mint-token-pool-and-proxy:set-remote-pool",
+	Version:         Version,
+	Description:     "Calls setRemotePool on the contract",
+	ContractType:    ContractType,
+	ContractABI:     BurnMintTokenPoolAndProxyABI,
+	NewContract:     NewBurnMintTokenPoolAndProxyContract,
+	IsAllowedCaller: contract.OnlyOwner[*BurnMintTokenPoolAndProxyContract, SetRemotePoolArgs],
+	Validate:        func(SetRemotePoolArgs) error { return nil },
+	CallContract: func(
+		c *BurnMintTokenPoolAndProxyContract,
+		opts *bind.TransactOpts,
+		args SetRemotePoolArgs,
+	) (*types.Transaction, error) {
+		return c.SetRemotePool(opts, args.RemoteChainSelector, args.RemotePoolAddress)
+	},
+})
+
+var SetRateLimitAdmin = contract.NewWrite(contract.WriteParams[common.Address, *BurnMintTokenPoolAndProxyContract]{
+	Name:            "burn-mint-token-pool-and-proxy:set-rate-limit-admin",
+	Version:         Version,
+	Description:     "Calls setRateLimitAdmin on the contract",
+	ContractType:    ContractType,
+	ContractABI:     BurnMintTokenPoolAndProxyABI,
+	NewContract:     NewBurnMintTokenPoolAndProxyContract,
+	IsAllowedCaller: contract.OnlyOwner[*BurnMintTokenPoolAndProxyContract, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(
+		c *BurnMintTokenPoolAndProxyContract,
+		opts *bind.TransactOpts,
+		args common.Address,
+	) (*types.Transaction, error) {
+		return c.SetRateLimitAdmin(opts, args)
+	},
+})
+
+var GetRouter = contract.NewRead(contract.ReadParams[struct{}, common.Address, *BurnMintTokenPoolAndProxyContract]{
+	Name:         "burn-mint-token-pool-and-proxy:get-router",
+	Version:      Version,
+	Description:  "Calls getRouter on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintTokenPoolAndProxyContract,
+	CallContract: func(c *BurnMintTokenPoolAndProxyContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRouter(opts)
+	},
+})
+
+var SetRouter = contract.NewWrite(contract.WriteParams[common.Address, *BurnMintTokenPoolAndProxyContract]{
+	Name:            "burn-mint-token-pool-and-proxy:set-router",
+	Version:         Version,
+	Description:     "Calls setRouter on the contract",
+	ContractType:    ContractType,
+	ContractABI:     BurnMintTokenPoolAndProxyABI,
+	NewContract:     NewBurnMintTokenPoolAndProxyContract,
+	IsAllowedCaller: contract.OnlyOwner[*BurnMintTokenPoolAndProxyContract, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(
+		c *BurnMintTokenPoolAndProxyContract,
+		opts *bind.TransactOpts,
+		args common.Address,
+	) (*types.Transaction, error) {
+		return c.SetRouter(opts, args)
 	},
 })

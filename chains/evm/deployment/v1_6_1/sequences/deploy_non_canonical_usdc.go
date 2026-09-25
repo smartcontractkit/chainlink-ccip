@@ -92,8 +92,20 @@ var DeployNonCanonicalUSDC = cldf_ops.NewSequence(
 		}
 		batchOps = append(batchOps, configureTokenPoolReport.Output.BatchOps...)
 
+		// Addresses[0] is the pool registered on the TokenAdminRegistry (convention used by the
+		// CCTP changeset). Order it first and dedupe it from the rest of the list.
+		registeredPoolRef := burnMintWithLockReleaseFlagTokenPoolRef
+		orderedAddresses := make([]datastore.AddressRef, 0, len(addresses)+1)
+		orderedAddresses = append(orderedAddresses, registeredPoolRef)
+		for _, r := range addresses {
+			if r.Address == registeredPoolRef.Address && r.Type == registeredPoolRef.Type {
+				continue
+			}
+			orderedAddresses = append(orderedAddresses, r)
+		}
+
 		return sequences.OnChainOutput{
-			Addresses: addresses,
+			Addresses: orderedAddresses,
 			BatchOps:  batchOps,
 		}, nil
 	},

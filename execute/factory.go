@@ -151,6 +151,8 @@ func (p PluginFactory) NewReportingPlugin(
 		readerFacades[chain] = cr
 	}
 
+	bhClient := beholder.GetClient().ForPackage("ocr3-ccip-execute")
+
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
@@ -161,6 +163,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
 		offchainConfig.PopulateTxHashEnabled,
+		bhClient.Meter,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create ccip reader: %w", err)
@@ -180,8 +183,6 @@ func (p PluginFactory) NewReportingPlugin(
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
-
-	bhClient := beholder.GetClient().ForPackage("ocr3-ccip-execute")
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector, bhClient)
 	if err != nil {

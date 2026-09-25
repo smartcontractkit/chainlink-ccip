@@ -249,6 +249,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 		addressRefs := make([]datastore.AddressRef, 0)
 		contractMetadata := make([]datastore.ContractMetadata, 0)
 		fquRegistry := GetFQAndRampUpdaterRegistry()
+		transferOwnershipReg := GetTransferOwnershipRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 		for chainSel, perChainInput := range input.Chains {
 			var feeQuoterAddrRef datastore.AddressRef
@@ -373,7 +374,7 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 					feeQuoterAddrRef = reportFQUpdate.Output.Addresses[len(reportFQUpdate.Output.Addresses)-1]
 
 					if isNewFeeQuoterDeployment && timelockAddr != "" {
-						fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef})
+						fqTransferBatches, fqTransferReports, err := TransferToTimelock(chainSel, e, input.MCMS, []datastore.AddressRef{feeQuoterAddrRef}, mcmsRegistry, transferOwnershipReg)
 						if err != nil {
 							return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to timelock for chain %d: %w", chainSel, err)
 						}

@@ -190,6 +190,8 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("validate ocr config: %w", err)
 	}
 
+	bhClient := beholder.GetClient().ForPackage("ocr3-ccip-commit")
+
 	ccipReader, err := readerpkg.NewCCIPChainReader(
 		ctx,
 		logutil.WithComponent(lggr, "CCIPReader"),
@@ -200,6 +202,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.ocrConfig.Config.OfframpAddress,
 		p.addrCodec,
 		offchainConfig.PopulateTxHashEnabled,
+		bhClient.Meter,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create CCIP chain reader: %w", err)
@@ -234,8 +237,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		offchainConfig.PriceFeedChainSelector,
 		p.addrCodec,
 	)
-
-	bhClient := beholder.GetClient().ForPackage("ocr3-ccip-commit")
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector, bhClient)
 	if err != nil {

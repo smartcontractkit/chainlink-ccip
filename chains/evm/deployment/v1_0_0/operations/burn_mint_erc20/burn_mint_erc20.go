@@ -154,3 +154,14 @@ var GrantMintAndBurnRoles = contract.NewWrite(contract.WriteParams[common.Addres
 		return token.GrantMintAndBurnRoles(opts, input)
 	},
 })
+
+var HasRole = contract.NewRead(contract.ReadParams[RoleAssignment, bool, *burn_mint_erc20.BurnMintERC20]{
+	Name:         "burn_mint_erc20:has-role",
+	Version:      utils.Version_1_0_0,
+	Description:  "Checks if an address has a specific role on BurnMintERC20 token contract",
+	ContractType: ContractType,
+	NewContract:  burn_mint_erc20.NewBurnMintERC20,
+	CallContract: func(token *burn_mint_erc20.BurnMintERC20, opts *bind.CallOpts, input RoleAssignment) (bool, error) {
+		return token.HasRole(opts, input.Role, input.To)
+	},
+})

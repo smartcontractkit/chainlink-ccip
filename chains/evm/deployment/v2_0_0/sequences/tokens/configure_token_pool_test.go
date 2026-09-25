@@ -65,10 +65,11 @@ func TestConfigurePool(t *testing.T) {
 				sequences.DeployChainContracts,
 				e.BlockChains.EVMChains()[chainSel],
 				sequences.DeployChainContractsInput{
-					ChainSelector:    chainSel,
-					ContractParams:   testsetup.CreateBasicContractParams(),
-					CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
-					DeployerKeyOwned: true,
+					ChainSelector:     chainSel,
+					ContractParams:    testsetup.CreateBasicContractParams(),
+					CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+					DeployerKeyOwned:  true,
+					ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSel),
 				},
 			)
 			require.NoError(t, err, "ExecuteSequence should not error")

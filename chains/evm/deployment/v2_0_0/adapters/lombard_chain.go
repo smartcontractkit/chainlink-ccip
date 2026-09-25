@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
@@ -81,4 +82,30 @@ func (c *LombardChainAdapter) RemoteTokenPoolAddress(ds datastore.DataStore, cha
 		return nil, fmt.Errorf("failed to get token pool: %w", err)
 	}
 	return c.AddressRefToBytes(tokenPool)
+}
+
+func (c *LombardChainAdapter) RemoteTokenDecimals(bundle operations.Bundle, ds datastore.DataStore, chains chain.BlockChains, selector uint64, tokenQualifier string) (uint8, error) {
+	evmChain, ok := chains.EVMChains()[selector]
+	if !ok {
+		return 0, fmt.Errorf("EVM chain with selector %d not found", selector)
+	}
+	tokenPool, err := c.TokenPool(ds, selector, tokenQualifier)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get token pool: %w", err)
+	}
+	getTokenReport, err := operations.ExecuteOperation(bundle, token_pool.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: selector,
+		Address:       common.HexToAddress(tokenPool.Address),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get token address from pool: %w", err)
+	}
+	report, err := operations.ExecuteOperation(bundle, erc20.GetDecimals, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: selector,
+		Address:       getTokenReport.Output,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get token decimals: %w", err)
+	}
+	return report.Output, nil
 }

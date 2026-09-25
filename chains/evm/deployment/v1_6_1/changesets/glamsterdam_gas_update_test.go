@@ -14,9 +14,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	tarops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	usdcerc20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	routerops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	orops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	usdcpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/changesets"
 	ccipdeploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -35,13 +38,12 @@ var (
 	gg16RmnAddr            = common.HexToAddress("0x5555555555555555555555555555555555555555")
 	gg16TokenAdminRegistry = common.HexToAddress("0x6666666666666666666666666666666666666666")
 	gg16NonceManagerAddr   = common.HexToAddress("0x8888888888888888888888888888888888888888")
-	gg16USDCToken          = common.HexToAddress("0x9999999999999999999999999999999999999999")
 	gg16FeeQuoterFamily    = [4]byte{0x28, 0x12, 0xd5, 0x2c}
 )
 
 // gg16FeeQuoterFixture deploys a v1.6 FeeQuoter with a lane to gg16TargetChainSel and registers
-// it in ds.
-func gg16FeeQuoterFixture(t *testing.T, e *cldf.Environment, ds datastore.MutableDataStore, chainSel uint64, hasLane bool, destGasOverhead uint32, usdcDestGasOverhead uint32) common.Address {
+// it in ds. usdcToken is only used (and must be non-zero) when usdcDestGasOverhead > 0.
+func gg16FeeQuoterFixture(t *testing.T, e *cldf.Environment, ds datastore.MutableDataStore, chainSel uint64, hasLane bool, destGasOverhead uint32, usdcDestGasOverhead uint32, usdcToken common.Address) common.Address {
 	t.Helper()
 	chain := e.BlockChains.EVMChains()[chainSel]
 
@@ -71,7 +73,7 @@ func gg16FeeQuoterFixture(t *testing.T, e *cldf.Environment, ds datastore.Mutabl
 				DestChainSelector: gg16TargetChainSel,
 				TokenTransferFeeConfigs: []fq16ops.TokenTransferFeeConfigSingleTokenArgs{
 					{
-						Token: gg16USDCToken,
+						Token: usdcToken,
 						TokenTransferFeeConfig: fq16ops.TokenTransferFeeConfig{
 							MinFeeUSDCents:    50,
 							MaxFeeUSDCents:    500,
@@ -126,31 +128,70 @@ func gg16OffRampFixture(t *testing.T, e *cldf.Environment, ds datastore.MutableD
 	require.NoError(t, ds.Addresses().Add(out.Output))
 }
 
-// gg16TokenAdminRegistryFixture deploys a TokenAdminRegistry, registers gg16USDCToken as a
-// configured token (via proposeAdministrator, which is enough for getAllConfiguredTokens to
-// return it), and registers the address in ds.
-func gg16TokenAdminRegistryFixture(t *testing.T, e *cldf.Environment, ds datastore.MutableDataStore, chainSel uint64) {
+// gg16USDCTokenPoolFixture deploys a real BurnMintERC20 token plus a
+// BurnMintWithLockReleaseFlagTokenPool wrapping it, and registers both in ds. Per v1.6.1's
+// non-canonical-USDC convention, this pool type is what the changeset resolves per chain (via
+// resolveUSDCTokenPoolRef) to discover "the" USDC token address by calling getToken() on it. It
+// returns the deployed token's address, which callers must also use when configuring the
+// FeeQuoter's TokenTransferFeeConfig override for this chain, so the two agree on which token is
+// "USDC".
+func gg16USDCTokenPoolFixture(t *testing.T, e *cldf.Environment, ds datastore.MutableDataStore, chainSel uint64) common.Address {
 	t.Helper()
 	chain := e.BlockChains.EVMChains()[chainSel]
 
-	out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, tarops.Deploy, chain, contract.DeployInput[tarops.ConstructorArgs]{
+	// The pool constructor needs a real token, RMNProxy, and Router contract deployed on-chain
+	// (not just bare addresses), mirroring sequences.setupNonCanonicalTestEnvironment in
+	// v1_6_1/sequences/non_canonical_usdc_test.go.
+	tokenOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, usdcerc20ops.Deploy, chain, contract.DeployInput[usdcerc20ops.ConstructorArgs]{
 		ChainSelector:  chainSel,
-		TypeAndVersion: cldf.NewTypeAndVersion(tarops.ContractType, *tarops.Version),
-		Args:           tarops.ConstructorArgs{},
-	})
-	require.NoError(t, err)
-	require.NoError(t, ds.Addresses().Add(out.Output))
-	tarAddr := common.HexToAddress(out.Output.Address)
-
-	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, tarops.ProposeAdministrator, chain, contract.FunctionInput[tarops.ProposeAdministratorArgs]{
-		ChainSelector: chainSel,
-		Address:       tarAddr,
-		Args: tarops.ProposeAdministratorArgs{
-			TokenAddress:  gg16USDCToken,
-			Administrator: chain.DeployerKey.From,
+		TypeAndVersion: cldf.NewTypeAndVersion(usdcerc20ops.ContractType, *ccipdeploymentutils.Version_1_0_0),
+		Args: usdcerc20ops.ConstructorArgs{
+			Name:      "USD Coin",
+			Symbol:    "USDC",
+			Decimals:  6,
+			MaxSupply: big.NewInt(0),
+			PreMint:   big.NewInt(0),
 		},
 	})
 	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(tokenOut.Output))
+	usdcTokenAddr := common.HexToAddress(tokenOut.Output.Address)
+
+	rmnOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, rmnproxyops.Deploy, chain, contract.DeployInput[rmnproxyops.ConstructorArgs]{
+		ChainSelector:  chainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(rmnproxyops.ContractType, *rmnproxyops.Version),
+		Args:           rmnproxyops.ConstructorArgs{RMN: chain.DeployerKey.From},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(rmnOut.Output))
+	rmnProxyAddr := common.HexToAddress(rmnOut.Output.Address)
+
+	routerOut, err := cldf_ops.ExecuteOperation(e.OperationsBundle, routerops.Deploy, chain, contract.DeployInput[routerops.ConstructorArgs]{
+		ChainSelector:  chainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(routerops.ContractType, *routerops.Version),
+		Args: routerops.ConstructorArgs{
+			WrappedNative: common.Address{},
+			RMNProxy:      rmnProxyAddr,
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(routerOut.Output))
+	routerAddr := common.HexToAddress(routerOut.Output.Address)
+
+	out, err := cldf_ops.ExecuteOperation(e.OperationsBundle, usdcpoolops.Deploy, chain, contract.DeployInput[usdcpoolops.ConstructorArgs]{
+		ChainSelector:  chainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(usdcpoolops.ContractType, *usdcpoolops.Version),
+		Args: usdcpoolops.ConstructorArgs{
+			Token:              usdcTokenAddr,
+			LocalTokenDecimals: 6,
+			RmnProxy:           rmnProxyAddr,
+			Router:             routerAddr,
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Addresses().Add(out.Output))
+
+	return usdcTokenAddr
 }
 
 func TestUpdateGasConfigForGlamsterdamV16(t *testing.T) {
@@ -164,16 +205,18 @@ func TestUpdateGasConfigForGlamsterdamV16(t *testing.T) {
 
 	ds := datastore.NewMemoryDataStore()
 	// srcA: lane to target, Prague baseline matches exactly, plus a configured USDC override.
-	gg16FeeQuoterFixture(t, e, ds, gg16SrcAChainSel, true, 300_000, 180_000)
-	gg16TokenAdminRegistryFixture(t, e, ds, gg16SrcAChainSel)
+	// The USDC pool must be deployed first so its token address can be used to configure the
+	// FeeQuoter's TokenTransferFeeConfig override for the same token.
+	usdcTokenA := gg16USDCTokenPoolFixture(t, e, ds, gg16SrcAChainSel)
+	gg16FeeQuoterFixture(t, e, ds, gg16SrcAChainSel, true, 300_000, 180_000, usdcTokenA)
 	gg16OffRampFixture(t, e, ds, gg16SrcAChainSel, 5_000)
-	// srcB: lane to target, FeeQuoter.DestGasOverhead mismatched -> exercises fallback. No
-	// TokenAdminRegistry on this chain, so the token-transfer-fee lane is skipped for it.
-	gg16FeeQuoterFixture(t, e, ds, gg16SrcBChainSel, true, 240_000, 0)
+	// srcB: lane to target, FeeQuoter.DestGasOverhead mismatched -> exercises fallback. No USDC
+	// token pool on this chain, so the token-transfer-fee lane is skipped for it.
+	gg16FeeQuoterFixture(t, e, ds, gg16SrcBChainSel, true, 240_000, 0, common.Address{})
 	// srcSkip: has a lane, but is passed in SkipChainSelectors -> must be excluded entirely.
-	gg16FeeQuoterFixture(t, e, ds, gg16SrcSkipChainSel, true, 300_000, 0)
+	gg16FeeQuoterFixture(t, e, ds, gg16SrcSkipChainSel, true, 300_000, 0, common.Address{})
 	// srcNoLane: FeeQuoter deployed, but no dest chain config for target -> discovered, no lane.
-	gg16FeeQuoterFixture(t, e, ds, gg16SrcNoLaneSel, false, 300_000, 0)
+	gg16FeeQuoterFixture(t, e, ds, gg16SrcNoLaneSel, false, 300_000, 0, common.Address{})
 
 	// Only srcA and srcB will end up with batch ops, so only they need a real MCMS+Timelock
 	// deployment for the OutputBuilder to resolve chain metadata against.
@@ -216,5 +259,5 @@ func TestUpdateGasConfigForGlamsterdamV16(t *testing.T) {
 	require.Contains(t, proposal.Description, "chain 4949039107694359620: FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (USDC) matched expected Prague value 180000, applying Glamsterdam value 540000")
 	require.Contains(t, proposal.Description, "chain 5548718428018410741: FeeQuoter.DestChainConfig.DestGasOverhead MISMATCH")
 	require.Contains(t, proposal.Description, "applying fallback value 400000 instead of literal Glamsterdam value 500000")
-	require.Contains(t, proposal.Description, "chain 5548718428018410741: ERROR - could not resolve TokenAdminRegistry address, skipping this chain")
+	require.NotContains(t, proposal.Description, "TokenTransferFeeConfig.DestGasOverhead (USDC)) matched")
 }

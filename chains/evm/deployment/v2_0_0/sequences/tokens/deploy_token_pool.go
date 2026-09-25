@@ -3,16 +3,13 @@ package tokens
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	adaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -74,33 +71,15 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		}
 
 		// If the token pool is already deployed, then apply any dynamic configuration updates the
-		// caller gave (e.g. router, rate-limit admin, fee aggregator, additional-CCVs threshold).
-		// This allows the seq to be re-run idempotently with an updated config without needing to
-		// tear down and re-deploy the pool.
+		// caller gave (e.g. router, rate-limit admin, fee aggregator). This allows the seq to be
+		// re-run idempotently with an updated config without needing to tear down and re-deploy
+		// the pool.
 		if tokenPoolAddress != (common.Address{}) {
 			b.Logger.Infof("Token pool already deployed on chain %d at address %q - updating dynamic pool config if needed", chain.Selector, tokenPoolAddress.Hex())
 			configureInput := ConfigureTokenPoolInput{}
 
 			// Populate configureInput with any dynamic config fields that the caller entered.
 			// Empty/zero values are ignored and result in no change to those fields on-chain.
-			if input.ThresholdAmountForAdditionalCCVs != "" {
-				threshold, ok := new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10)
-				if !ok {
-					return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs '%s': must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
-				}
-				report, err := cldf_ops.ExecuteOperation(b,
-					token_pool.GetAdvancedPoolHooks, chain,
-					contract.FunctionInput[struct{}]{
-						ChainSelector: chain.Selector,
-						Address:       tokenPoolAddress,
-					},
-				)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to read advanced pool hooks address from existing token pool %s on chain %d: %w", tokenPoolAddress, chain.Selector, err)
-				}
-				configureInput.ThresholdAmountForAdditionalCCVs = threshold
-				configureInput.AdvancedPoolHooks = report.Output
-			}
 			if input.RateLimitAdmin != "" {
 				if !common.IsHexAddress(input.RateLimitAdmin) {
 					return sequences.OnChainOutput{}, fmt.Errorf("invalid RateLimitAdmin address '%s'", input.RateLimitAdmin)
@@ -108,11 +87,11 @@ var DeployTokenPool = cldf_ops.NewSequence(
 					configureInput.RateLimitAdmin = common.HexToAddress(input.RateLimitAdmin)
 				}
 			}
-			if input.FeeAggregator != "" {
-				if !common.IsHexAddress(input.FeeAggregator) {
-					return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAggregator address '%s'", input.FeeAggregator)
+			if input.FeeAdmin != "" {
+				if !common.IsHexAddress(input.FeeAdmin) {
+					return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAdmin address '%s'", input.FeeAdmin)
 				} else {
-					configureInput.FeeAggregator = common.HexToAddress(input.FeeAggregator)
+					configureInput.FeeAdmin = common.HexToAddress(input.FeeAdmin)
 				}
 			}
 			if input.RouterRef != nil {
@@ -185,47 +164,60 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				rateLimitAdmin = common.HexToAddress(input.RateLimitAdmin)
 			}
 		}
-		var feeAggregator common.Address
-		if input.FeeAggregator != "" {
-			if !common.IsHexAddress(input.FeeAggregator) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAggregator address '%s'", input.FeeAggregator)
+		var feeAdmin common.Address
+		if input.FeeAdmin != "" {
+			if !common.IsHexAddress(input.FeeAdmin) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid FeeAdmin address '%s'", input.FeeAdmin)
 			} else {
-				feeAggregator = common.HexToAddress(input.FeeAggregator)
-			}
-		}
-		thresholdCCV := big.NewInt(0)
-		if input.ThresholdAmountForAdditionalCCVs != "" {
-			if threshold, ok := new(big.Int).SetString(input.ThresholdAmountForAdditionalCCVs, 10); !ok {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid ThresholdAmountForAdditionalCCVs '%s': must be a decimal integer string", input.ThresholdAmountForAdditionalCCVs)
-			} else {
-				thresholdCCV = threshold
+				feeAdmin = common.HexToAddress(input.FeeAdmin)
 			}
 		}
 
 		// Build the pool deployment input
 		tokenPoolType := datastore.ContractType(input.PoolType)
+
+		// Parse BurnAddress if provided
+		var burnAddr common.Address
+		if input.BurnAddress != "" {
+			if !common.IsHexAddress(input.BurnAddress) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid BurnAddress '%s'", input.BurnAddress)
+			}
+			burnAddr = common.HexToAddress(input.BurnAddress)
+		}
+
 		internalInput := DeployTokenPoolInput{
-			TokenPoolVersion:                 input.TokenPoolVersion,
-			TokenPoolType:                    tokenPoolType,
-			ChainSel:                         chain.Selector,
-			TokenSymbol:                      poolQualifier,
-			RateLimitAdmin:                   rateLimitAdmin,
-			FeeAggregator:                    feeAggregator,
-			ThresholdAmountForAdditionalCCVs: thresholdCCV,
+			TokenPoolVersion: input.TokenPoolVersion,
+			TokenPoolType:    tokenPoolType,
+			ChainSel:         chain.Selector,
+			TokenSymbol:      poolQualifier,
+			RateLimitAdmin:   rateLimitAdmin,
+			FeeAdmin:         feeAdmin,
 			ConstructorArgs: ConstructorArgs{
-				Token:    tokenAddress,
-				Decimals: tokenDecimals,
-				RMNProxy: rmnProxyAddr,
-				Router:   routerAddr,
+				Token:       tokenAddress,
+				Decimals:    tokenDecimals,
+				RMNProxy:    rmnProxyAddr,
+				Router:      routerAddr,
+				BurnAddress: burnAddr,
 			},
 			AdvancedPoolHooksConfig: AdvancedPoolHooksConfig{
 				Allowlist: allowlist,
 			},
+			LockBoxGroups: input.LockBoxGroups,
 		}
 
 		// Deploy the desired pool contract
 		output := sequences.OnChainOutput{}
 		switch {
+		// NOTE: the siloed case must precede the lock-release case below, because
+		// utils.IsLockReleasePoolType deliberately reports true for the siloed type. The siloed pool
+		// has a distinct constructor (no lockbox argument) and needs one lockbox per silo group, so
+		// it cannot share DeployLockReleaseTokenPool.
+		case tokenPoolType == datastore.ContractType(utils.SiloedLockReleaseTokenPool):
+			if report, err := cldf_ops.ExecuteSequence(b, DeploySiloedLockReleaseTokenPool, chain, internalInput); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy siloed lock release token pool on chain %d: %w", chain.Selector, err)
+			} else {
+				output = report.Output
+			}
 		case utils.IsLockReleasePoolType(tokenPoolType.String()):
 			if report, err := cldf_ops.ExecuteSequence(b, DeployLockReleaseTokenPool, chain, internalInput); err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy lock release token pool on chain %d: %w", chain.Selector, err)

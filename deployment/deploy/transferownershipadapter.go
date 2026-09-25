@@ -14,7 +14,9 @@ type TransferOwnershipAdapterRegistry struct {
 	adapters map[string]TransferOwnershipAdapter
 }
 
-func newTransferOwnershipRegistry() *TransferOwnershipAdapterRegistry {
+// NewTransferOwnershipRegistry returns an empty TransferOwnershipAdapterRegistry.
+// Useful for tests that need an isolated registry instead of the global singleton.
+func NewTransferOwnershipRegistry() *TransferOwnershipAdapterRegistry {
 	return &TransferOwnershipAdapterRegistry{
 		mu:       sync.Mutex{},
 		adapters: make(map[string]TransferOwnershipAdapter),
@@ -23,7 +25,7 @@ func newTransferOwnershipRegistry() *TransferOwnershipAdapterRegistry {
 
 func GetTransferOwnershipRegistry() *TransferOwnershipAdapterRegistry {
 	chainAdapterOnce.Do(func() {
-		singletonAdapterRegistry = newTransferOwnershipRegistry()
+		singletonAdapterRegistry = NewTransferOwnershipRegistry()
 	})
 	return singletonAdapterRegistry
 }

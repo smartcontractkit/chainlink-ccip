@@ -1,7 +1,6 @@
 package tokenimpl
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 
@@ -38,8 +37,16 @@ func (tokenBurnMintERC677) RevokeAdminRole(_ operations.Bundle, _ evm.Chain, _, 
 	return nil, fmt.Errorf("admin role revoke not supported for BurnMintERC677 token type")
 }
 
-func (tokenBurnMintERC677) HasAdminRole(_ context.Context, _ evm.Chain, _, _ common.Address) (bool, error) {
+func (tokenBurnMintERC677) HasAdminRole(_ operations.Bundle, _ evm.Chain, _, _ common.Address) (bool, error) {
 	return false, fmt.Errorf("admin role checks not supported for BurnMintERC677 token type")
+}
+
+func (tokenBurnMintERC677) AcceptAdminRole(_ operations.Bundle, _ evm.Chain, _ common.Address) ([]contract.WriteOutput, error) {
+	return nil, nil
+}
+
+func (tokenBurnMintERC677) PendingAdminRoleTarget(_ operations.Bundle, _ evm.Chain, _ common.Address) (common.Address, error) {
+	return common.Address{}, nil
 }
 
 func (tokenBurnMintERC677) GrantAdminRole(_ operations.Bundle, _ evm.Chain, _, _ common.Address) ([]contract.WriteOutput, error) {

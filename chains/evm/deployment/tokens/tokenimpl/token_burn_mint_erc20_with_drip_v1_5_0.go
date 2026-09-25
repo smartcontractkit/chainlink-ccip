@@ -1,7 +1,6 @@
 package tokenimpl
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 
@@ -35,8 +34,16 @@ func (tokenBurnMintERC20WithDripV1_5_0) RevokeAdminRole(b operations.Bundle, cha
 	return revokeDefaultAdminRoleBurnMintERC20(b, chain, token, externalAdmin)
 }
 
-func (tokenBurnMintERC20WithDripV1_5_0) HasAdminRole(ctx context.Context, chain evm.Chain, token, user common.Address) (bool, error) {
-	return hasDefaultAdminRoleBurnMintERC20(ctx, chain, token, user)
+func (tokenBurnMintERC20WithDripV1_5_0) HasAdminRole(b operations.Bundle, chain evm.Chain, token, user common.Address) (bool, error) {
+	return hasDefaultAdminRoleBurnMintERC20(b, chain, token, user)
+}
+
+func (tokenBurnMintERC20WithDripV1_5_0) AcceptAdminRole(_ operations.Bundle, _ evm.Chain, _ common.Address) ([]contract.WriteOutput, error) {
+	return nil, nil
+}
+
+func (tokenBurnMintERC20WithDripV1_5_0) PendingAdminRoleTarget(_ operations.Bundle, _ evm.Chain, _ common.Address) (common.Address, error) {
+	return common.Address{}, nil
 }
 
 func (tokenBurnMintERC20WithDripV1_5_0) GrantAdminRole(b operations.Bundle, chain evm.Chain, token, externalAdmin common.Address) ([]contract.WriteOutput, error) {

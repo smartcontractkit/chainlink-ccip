@@ -70,14 +70,12 @@ flowchart LR
 
 	ccip-contract-examples/chains/evm --> chainlink-ccip
 	click ccip-contract-examples/chains/evm href "https://github.com/smartcontractkit/ccip-contract-examples"
-	ccip-owner-contracts --> chain-selectors
+	ccip-owner-contracts
 	click ccip-owner-contracts href "https://github.com/smartcontractkit/ccip-owner-contracts"
 	chain-selectors
 	click chain-selectors href "https://github.com/smartcontractkit/chain-selectors"
 	chainlink-aptos --> chainlink-common
 	click chainlink-aptos href "https://github.com/smartcontractkit/chainlink-aptos"
-	chainlink-automation
-	click chainlink-automation href "https://github.com/smartcontractkit/chainlink-automation"
 	chainlink-canton --> chainlink-ccv
 	chainlink-canton --> chainlink-ccv/build/devenv
 	chainlink-canton --> chainlink-ccv/deployment
@@ -124,6 +122,7 @@ flowchart LR
 	chainlink-common --> chainlink-protos/billing/go
 	chainlink-common --> chainlink-protos/cre/go
 	chainlink-common --> chainlink-protos/linking-service/go
+	chainlink-common --> chainlink-protos/metering/go
 	chainlink-common --> chainlink-protos/node-platform
 	chainlink-common --> chainlink-protos/storage-service
 	chainlink-common --> chainlink-protos/workflows/go
@@ -131,9 +130,7 @@ flowchart LR
 	chainlink-common --> grpc-proxy
 	chainlink-common --> libocr
 	click chainlink-common href "https://github.com/smartcontractkit/chainlink-common"
-	chainlink-common/keystore --> chainlink-common
-	chainlink-common/keystore --> smdkg
-	chainlink-common/keystore --> wsrpc
+	chainlink-common/keystore
 	click chainlink-common/keystore href "https://github.com/smartcontractkit/chainlink-common"
 	chainlink-common/pkg/chipingress
 	click chainlink-common/pkg/chipingress href "https://github.com/smartcontractkit/chainlink-common"
@@ -147,7 +144,6 @@ flowchart LR
 	chainlink-deployments-framework --> chainlink-testing-framework/seth
 	chainlink-deployments-framework --> mcms
 	click chainlink-deployments-framework href "https://github.com/smartcontractkit/chainlink-deployments-framework"
-	chainlink-evm --> chainlink-automation
 	chainlink-evm --> chainlink-common/keystore
 	chainlink-evm --> chainlink-data-streams
 	chainlink-evm --> chainlink-evm/gethwrappers
@@ -157,6 +153,7 @@ flowchart LR
 	chainlink-evm --> chainlink-framework/multinode
 	chainlink-evm --> chainlink-protos/svr
 	chainlink-evm --> chainlink-tron/relayer
+	chainlink-evm --> wsrpc
 	click chainlink-evm href "https://github.com/smartcontractkit/chainlink-evm"
 	chainlink-evm/gethwrappers --> chainlink-evm/gethwrappers/helpers
 	click chainlink-evm/gethwrappers href "https://github.com/smartcontractkit/chainlink-evm"
@@ -188,6 +185,8 @@ flowchart LR
 	click chainlink-protos/job-distributor href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/linking-service/go
 	click chainlink-protos/linking-service/go href "https://github.com/smartcontractkit/chainlink-protos"
+	chainlink-protos/metering/go
+	click chainlink-protos/metering/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/node-platform
 	click chainlink-protos/node-platform href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/op-catalog
@@ -253,8 +252,6 @@ flowchart LR
 	mcms --> chainlink-ton
 	mcms --> go-daml
 	click mcms href "https://github.com/smartcontractkit/mcms"
-	smdkg
-	click smdkg href "https://github.com/smartcontractkit/smdkg"
 	wsrpc
 	click wsrpc href "https://github.com/smartcontractkit/wsrpc"
 
@@ -317,6 +314,7 @@ flowchart LR
 		 chainlink-protos/cre/go
 		 chainlink-protos/job-distributor
 		 chainlink-protos/linking-service/go
+		 chainlink-protos/metering/go
 		 chainlink-protos/node-platform
 		 chainlink-protos/op-catalog
 		 chainlink-protos/orchestrator

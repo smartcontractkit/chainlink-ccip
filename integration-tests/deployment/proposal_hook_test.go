@@ -97,6 +97,7 @@ func TestProposalHookForCCIPSend(t *testing.T) {
 			GasForCallExactCheck:                    uint16(5000),
 		}
 	}
+	SeedUltraFastCurseMCMS(t, e)
 	out, err := deployops.DeployContracts(dReg).Apply(*e, deployops.ContractDeploymentConfig{
 		MCMS:   mcms.Input{},
 		Chains: chainInput,
@@ -112,7 +113,7 @@ func TestProposalHookForCCIPSend(t *testing.T) {
 		Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
 		GasPrice: big.NewInt(1e9),
 	}
-	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry).Apply(*e, lanesapi.ConnectChainsConfig{
+	_, err = lanesapi.ConnectChains(lanesapi.GetLaneAdapterRegistry(), mcmsRegistry, nil).Apply(*e, lanesapi.ConnectChainsConfig{
 		Lanes: []lanesapi.LaneConfig{
 			{
 				Version: version,

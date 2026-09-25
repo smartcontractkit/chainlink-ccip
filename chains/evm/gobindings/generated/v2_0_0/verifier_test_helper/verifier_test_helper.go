@@ -1,0 +1,1881 @@
+// Code generated - DO NOT EDIT.
+// This file is a generated binding and any manual changes will be lost.
+
+package verifier_test_helper
+
+import (
+	"errors"
+	"math/big"
+	"strings"
+
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
+)
+
+var (
+	_ = errors.New
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+	_ = abi.ConvertType
+)
+
+type BaseVerifierAllowlistConfigArgs struct {
+	DestChainSelector         uint64
+	AllowlistEnabled          bool
+	AddedAllowlistedSenders   []common.Address
+	RemovedAllowlistedSenders []common.Address
+}
+
+type BaseVerifierRemoteChainConfigArgs struct {
+	Router              common.Address
+	RemoteChainSelector uint64
+	AllowlistEnabled    bool
+	FeeUSDCents         uint16
+	GasForVerification  uint32
+	PayloadSizeBytes    uint16
+}
+
+type ClientEVM2AnyMessage struct {
+	Receiver     []byte
+	Data         []byte
+	TokenAmounts []ClientEVMTokenAmount
+	FeeToken     common.Address
+	ExtraArgs    []byte
+}
+
+type ClientEVMTokenAmount struct {
+	Token  common.Address
+	Amount *big.Int
+}
+
+type MessageV1CodecMessageV1 struct {
+	SourceChainSelector uint64
+	DestChainSelector   uint64
+	MessageNumber       uint64
+	ExecutionGasLimit   uint32
+	CcipReceiveGasLimit uint32
+	Finality            [4]byte
+	CcvAndExecutorHash  [32]byte
+	OnRampAddress       []byte
+	OffRampAddress      []byte
+	Sender              []byte
+	Receiver            []byte
+	DestBlob            []byte
+	TokenTransfer       []MessageV1CodecTokenTransferV1
+	Data                []byte
+}
+
+type MessageV1CodecTokenTransferV1 struct {
+	Amount             *big.Int
+	SourcePoolAddress  []byte
+	SourceTokenAddress []byte
+	DestTokenAddress   []byte
+	TokenReceiver      []byte
+	ExtraData          []byte
+}
+
+var VerifierTestHelperMetaData = &bind.MetaData{
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"testRouter\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"testToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"storageLocations\",\"type\":\"string[]\",\"internalType\":\"string[]\"},{\"name\":\"rmn\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"versionTag\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowlistUpdates\",\"inputs\":[{\"name\":\"allowlistConfigArgsItems\",\"type\":\"tuple[]\",\"internalType\":\"struct BaseVerifier.AllowlistConfigArgs[]\",\"components\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"addedAllowlistedSenders\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"removedAllowlistedSenders\",\"type\":\"address[]\",\"internalType\":\"address[]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyRemoteChainConfigUpdates\",\"inputs\":[{\"name\":\"remoteChainConfigArgs\",\"type\":\"tuple[]\",\"internalType\":\"struct BaseVerifier.RemoteChainConfigArgs[]\",\"components\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"contract IRouter\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"feeUSDCents\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"gasForVerification\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"payloadSizeBytes\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"forwardToVerifier\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"struct MessageV1Codec.MessageV1\",\"components\":[{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"messageNumber\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"executionGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"ccipReceiveGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"finality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"ccvAndExecutorHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"onRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destBlob\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenTransfer\",\"type\":\"tuple[]\",\"internalType\":\"struct MessageV1Codec.TokenTransferV1[]\",\"components\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourceTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenReceiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"verifierReturnData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowedFinalityConfig\",\"inputs\":[],\"outputs\":[{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFee\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"struct Client.EVM2AnyMessage\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"struct Client.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"extraArgs\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"requestedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"feeUSDCents\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"gasForVerification\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"payloadSizeBytes\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteChainConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"remoteChainConfig\",\"type\":\"tuple\",\"internalType\":\"struct BaseVerifier.RemoteChainConfigArgs\",\"components\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"contract IRouter\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"feeUSDCents\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"gasForVerification\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"payloadSizeBytes\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"name\":\"allowedSendersList\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStorageLocations\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTestRouter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTestToken\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setAllowedFinalityConfig\",\"inputs\":[{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"verifyMessage\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"struct MessageV1Codec.MessageV1\",\"components\":[{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"messageNumber\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"executionGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"ccipReceiveGasLimit\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"finality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"ccvAndExecutorHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"onRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offRampAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destBlob\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenTransfer\",\"type\":\"tuple[]\",\"internalType\":\"struct MessageV1Codec.TokenTransferV1[]\",\"components\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourceTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"tokenReceiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"versionTag\",\"inputs\":[],\"outputs\":[{\"name\":\"tag\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdrawFeeTokens\",\"inputs\":[{\"name\":\"feeTokens\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AllowListSendersAdded\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"senders\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListSendersRemoved\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"senders\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListStateChanged\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTokenWithdrawn\",\"inputs\":[{\"name\":\"receiver\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"feeToken\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FinalityConfigSet\",\"inputs\":[{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"indexed\":false,\"internalType\":\"bytes4\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemoteChainConfigSet\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"router\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"allowlistEnabled\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StorageLocationsUpdated\",\"inputs\":[{\"name\":\"oldLocations\",\"type\":\"string[]\",\"indexed\":false,\"internalType\":\"string[]\"},{\"name\":\"newLocations\",\"type\":\"string[]\",\"indexed\":false,\"internalType\":\"string[]\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"CallerIsNotARampOnRouter\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CursedByRMN\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"DestGasCannotBeZero\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidAllowListRequest\",\"inputs\":[{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidRemoteChainConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidRequestedFinality\",\"inputs\":[{\"name\":\"requestedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"},{\"name\":\"allowedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}]},{\"type\":\"error\",\"name\":\"MessageCannotHaveSideEffects\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustUseAllowlist\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustUseTestRouter\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustUseTestToken\",\"inputs\":[{\"name\":\"testToken\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"RemoteChainNotSupported\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"RequestedFinalityCanOnlyHaveOneMode\",\"inputs\":[{\"name\":\"encodedFinality\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}]},{\"type\":\"error\",\"name\":\"SafeERC20FailedOperation\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"SenderNotAllowed\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"VersionTagCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	Bin: "0x61010080604052346105415761336b803803809161001d82856105be565b8339810160a08282031261054157610034826105e1565b90610041602084016105e1565b60408401519093906001600160401b03811161054157810182601f8201121561054157805190610070826105f5565b9361007e60405195866105be565b82855260208086019360051b830101918183116105415760208101935b83851061054657505050505060806100b5606083016105e1565b9101519063ffffffff60e01b821692838303610541576001549080516100da836105f5565b926100e860405194856105be565b808452600160009081527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf690602086015b83821061049c5750505060005b81811061040857505060005b8181106102795750507fec9f9416b098576351ada0c342c1381ca08990ee094978ddd1003ef013d07586916101866101789260405193849360408552604085019061069b565b90838203602085015261069b565b0390a16001600160a01b031691821561023557156102685760a052608052331561025757600380546001600160a01b031916331790556001600160a01b038116158015610246575b6102355760c05260e052604051612c5e908161070d8239608051816126e5015260a05181818161013c0152611ebd015260c05181818161060101528181610db501526118bb015260e051818181610b0c01528181610d0601528181611d9201526126110152f35b6342bcdf7f60e11b60005260046000fd5b506001600160a01b038216156101ce565b639b15e16f60e01b60005260046000fd5b631027401f60e21b60005260046000fd5b82518110156103f25760208160051b84010151600154680100000000000000008110156103c6578060016102b0920160015561062f565b9190916103dc578051906001600160401b0382116103c6576102d2835461064a565b601f8111610389575b50602090601f831160011461031e5760019493929160009183610313575b5050600019600383901b1c191690841b1790555b01610132565b0151905038806102f9565b90601f1983169184600052816000209260005b818110610371575091600196959492918388959310610358575b505050811b01905561030d565b015160001960f88460031b161c1916905538808061034b565b92936020600181928786015181550195019301610331565b6103b690846000526020600020601f850160051c810191602086106103bc575b601f0160051c0190610684565b386102db565b90915081906103a9565b634e487b7160e01b600052604160045260246000fd5b634e487b7160e01b600052600060045260246000fd5b634e487b7160e01b600052603260045260246000fd5b600154801561048657600019019061041f8261062f565b9290926103dc57826104336001945461064a565b9081610444575b5050825501610126565b81601f60009311861461045b5750555b388061043a565b8183526020832061047691601f0160051c8101908701610684565b8082528160208120915555610454565b634e487b7160e01b600052603160045260246000fd5b604051600084546104ac8161064a565b808452906001811690811561051e57506001146104e6575b50600192826104d8859460209403826105be565b815201930191019091610119565b6000868152602081209092505b818310610508575050810160200160016104c4565b60018160209254838688010152019201916104f3565b60ff191660208581019190915291151560051b84019091019150600190506104c4565b600080fd5b84516001600160401b0381116105415782019083603f83011215610541576020820151906001600160401b0382116103c65760405161058f601f8401601f1916602001826105be565b8281526040848401018610610541576105b36020949385946040868501910161060c565b81520194019361009b565b601f909101601f19168101906001600160401b038211908210176103c657604052565b51906001600160a01b038216820361054157565b6001600160401b0381116103c65760051b60200190565b60005b83811061061f5750506000910152565b818101518382015260200161060f565b6001548110156103f257600160005260206000200190600090565b90600182811c9216801561067a575b602083101461066457565b634e487b7160e01b600052602260045260246000fd5b91607f1691610659565b81811061068f575050565b60008155600101610684565b9080602083519182815201916020808360051b8301019401926000915b8383106106c757505050505090565b909192939460208080600193601f1986820301875289516106f38151809281855285808601910161060c565b601f01601f1916010197019594919091019201906106b856fe608080604052600436101561001357600080fd5b60003560e01c90816301ffc9a714611ff057508063181f5a7714611f735780632969470614611c80578063597b95c31461183f5780635cb80c5d146115fb57806379ba5097146114ef57806387ae9292146112e2578063898068fc146110f757806389e364c714610b825780638da5cb5b14610b30578063abb28b9214610ac1578063b6cfa3b714610a07578063c9b146b314610625578063e0d9ef59146105b6578063ec6ae7a714610555578063f2fde38b14610443578063f4cdd89e146101655763fe163eed146100e557600080fd5b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760206040517fffffffff000000000000000000000000000000000000000000000000000000007f0000000000000000000000000000000000000000000000000000000000000000168152f35b600080fd5b346101605760807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605761019c6121b2565b60243567ffffffffffffffff81116101605760a07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc823603011261016057604051906101e7826121fa565b806004013567ffffffffffffffff81116101605761020b9060043691840101612291565b8252602481013567ffffffffffffffff8111610160576102319060043691840101612291565b6020830152604481013567ffffffffffffffff811161016057810136602382011215610160576004810135610265816122d8565b916102736040519384612216565b818352602060048185019360061b830101019036821161016057602401915b8183106103c85750505060408301526102ad60648201612160565b6060830152608481013567ffffffffffffffff81116101605760809160046102d89236920101612291565b91015260443567ffffffffffffffff8111610160576102fb903690600401612291565b50606435907fffffffff00000000000000000000000000000000000000000000000000000000821682036101605767ffffffffffffffff168060005260006020526040600020549073ffffffffffffffffffffffffffffffffffffffff82161561039b575061037260609260025460e01b90612854565b61ffff60405191818160a01c16835263ffffffff8160b01c16602084015260d01c166040820152f35b7f4d1aff7e0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b6040833603126101605760405190604082019082821067ffffffffffffffff8311176104145760409260209284526103ff86612160565b81528286013583820152815201920191610292565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b346101605760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760043573ffffffffffffffffffffffffffffffffffffffff8116908181036101605761049c612790565b33821461052b577fffffffffffffffff0000000000000000000000000000000000000000ffffffff77ffffffffffffffffffffffffffffffffffffffff000000006002549260201b1691161760025573ffffffffffffffffffffffffffffffffffffffff600354167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016057602060025460e01b7fffffffff0000000000000000000000000000000000000000000000000000000060405191168152f35b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016057602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346101605760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760043567ffffffffffffffff811161016057610674903690600401612181565b61067c612790565b60005b8181106109ba57506000915b81831061069457005b61069f838383612560565b60808136031261016057604051936080850185811067ffffffffffffffff821117610414576040526106d0826121c9565b85526106de6020830161244b565b9160208601928352604081013567ffffffffffffffff81116101605761070790369083016127ef565b906040870191825260608101359067ffffffffffffffff821161016057610730913691016127ef565b946060870195865267ffffffffffffffff875116600052600060205260406000209060ff825460e01c16855115158091151503610931575b5060016000969201955b875180518210156107f4579073ffffffffffffffffffffffffffffffffffffffff61079f826001946127db565b51166107ab818a612a5d565b6107b7575b5001610772565b7f9ac16e02c9a455144d35e2f0d80817a608340dee3c104f547ceb4433df418d82602067ffffffffffffffff8d511692604051908152a28a6107b0565b50509550959293909193825151610813575b505050506001019161068b565b5192959194909392156108f85760005b855180518210156108e55761084d8273ffffffffffffffffffffffffffffffffffffffff926127db565b511680156108ac57908161086360019388612bf5565b61086f575b5001610823565b7f85682793ee26ba7d2d073ce790a50b388a1791aab25fc368bcce99d3b1d4da80602067ffffffffffffffff8b511692604051908152a288610868565b67ffffffffffffffff8851167f463258ff0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b5050935093506001915090848080610806565b67ffffffffffffffff8651167f463258ff0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b82547fffffff00ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1681151560e01b7cff00000000000000000000000000000000000000000000000000000000161783557f8504171b9fc8a6c38617bdd508715ec759043b69df1608d7b0db90c0f8523492602067ffffffffffffffff8b511692604051908152a288610768565b6109d060206109ca838587612560565b0161243e565b156109dd5760010161067f565b7ffc0a3f380000000000000000000000000000000000000000000000000000000060005260046000fd5b346101605760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610160577f307cf716eade81675bea3ccb6917b0f91baa2160056765d9a83d76f819caf06a6020610a616120a8565b610a69612790565b8060e01c7fffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000060025416176002557fffffffff0000000000000000000000000000000000000000000000000000000060405191168152a1005b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016057602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016057602073ffffffffffffffffffffffffffffffffffffffff60035416604051908152f35b346101605760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760043567ffffffffffffffff811161016057806004016101c07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc83360301126101605760443567ffffffffffffffff811161016057610c14903690600401612291565b50610c26610c21826122f0565b61267f565b67ffffffffffffffff610c38826122f0565b1680600052600060205273ffffffffffffffffffffffffffffffffffffffff6040600020541690811561039b576020906044604051809481937f83826b2b00000000000000000000000000000000000000000000000000000000835260048301523360248301525afa908115611056576000916110bd575b501561108f57610cbf816125a0565b610cec610ce6610cdc610cd6610184860185612305565b90612359565b60608101906123c1565b90612467565b60601c73ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168091036110625750610d37816122f0565b67ffffffffffffffff604051917fe9d68a8e000000000000000000000000000000000000000000000000000000008352166004820152600081602481335afa90811561105657600091610e8d575b5073ffffffffffffffffffffffffffffffffffffffff90511673ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001603610e6357610ce6816101446040610def610e0b956122f0565b67ffffffffffffffff60009116815280602052209401906123c1565b60601c9060ff815460e01c16610e1d57005b60008281526002909101602052604090205415610e3657005b7fd0d259760000000000000000000000000000000000000000000000000000000060005260045260246000fd5b7f1b16420e0000000000000000000000000000000000000000000000000000000060005260046000fd5b3d8083833e610e9c8183612216565b810190602081830312610fd85780519067ffffffffffffffff821161105257019160a083830312610fd55760405192610ed4846121fa565b805173ffffffffffffffffffffffffffffffffffffffff81168103610fd8578452610f01602082016124cd565b6020850152604081015167ffffffffffffffff8111610fd857810183601f82011215610fd8578051610f32816122d8565b91610f406040519384612216565b81835260208084019260051b8201019086821161104e5760208101925b828410610fdc57505050506040850152606081015167ffffffffffffffff8111610fd85783610f8d9183016124fb565b606085015260808101519167ffffffffffffffff8311610fd5575091610fca9173ffffffffffffffffffffffffffffffffffffffff9493016124fb565b608082015290610d85565b80fd5b8280fd5b835167ffffffffffffffff811161104a57820188603f8201121561104a57602081015161100881612257565b916110166040519384612216565b8183526040818301018b10611046579161103b602094928594604086850191016120d7565b815201930192610f5d565b8980fd5b8780fd5b8580fd5b8380fd5b6040513d6000823e3d90fd5b7fbbe6361f0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b7f728fe07b000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b90506020813d6020116110ef575b816110d860209383612216565b81010312610160576110e9906124cd565b83610cb0565b3d91506110cb565b346101605760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605767ffffffffffffffff6111376121b2565b600060a0604051611147816121de565b828152826020820152826040820152826060820152826080820152015216806000526000602052604060002080549160405190611183826121de565b73ffffffffffffffffffffffffffffffffffffffff8416825260208201908152604082019360ff8160e01c1615158552606083019361ffff8260a01c1685526001608085019163ffffffff8460b01c16835261ffff60a087019460d01c168452019460405196879460208854998a81520198899860005260206000209060005b8181106112cc575073ffffffffffffffffffffffffffffffffffffffff60e08b8b8b8f8c63ffffffff8d61ffff8e8e67ffffffffffffffff8f6112498a869a038b612216565b6040519d8e9d8e019b51168d52511660208c015251151560408b01525116606089015251166080870152511660a085015260e060c0850152518091526101008301919060005b81811061129d575050500390f35b825173ffffffffffffffffffffffffffffffffffffffff1684528594506020938401939092019160010161128f565b82548c526020909b019a60019283019201611203565b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760015461131d816122d8565b9061132b6040519283612216565b80825260208201809160016000527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6916000905b8282106113e957848660405191829160208301906020845251809152604083019060408160051b85010192916000905b82821061139e57505050500390f35b919360206113d9827fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0600195979984950301865288516120fa565b960192019201859493919261138f565b604051600085548060011c906001811680156114e5575b6020831081146114b857828552908115611477575060011461143f575b506001928261143185946020940382612216565b81520194019101909261135f565b6000878152602081209092505b8183106114615750508101602001600161141d565b600181602092548386880101520192019161144c565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff001660208581019190915291151560051b840190910191506001905061141d565b6024847f4e487b710000000000000000000000000000000000000000000000000000000081526022600452fd5b91607f1691611400565b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760025473ffffffffffffffffffffffffffffffffffffffff8160201c1633036115d1577fffffffffffffffff0000000000000000000000000000000000000000ffffffff60035491337fffffffffffffffffffffffff00000000000000000000000000000000000000008416176003551660025573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346101605760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760043567ffffffffffffffff81116101605761164a903690600401612181565b73ffffffffffffffffffffffffffffffffffffffff6003541680156118155760005b828110156118135760008160051b8501359073ffffffffffffffffffffffffffffffffffffffff8216809203610fd557604051907f70a08231000000000000000000000000000000000000000000000000000000008252306004830152602082602481865afa9182156118065781926117cf575b50816116f2575b50505060010161166c565b602081604051828101907fa9059cbb0000000000000000000000000000000000000000000000000000000082528860248201528560448201526044815261173a606482612216565b519082875af1156117c35780513d6117ba5750823b155b61178e575090837f508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e602060019594604051908152a39085806116e7565b80837f5274afe70000000000000000000000000000000000000000000000000000000060249352600452fd5b60011415611751565b604051903d90823e3d90fd5b9091506020813d82116117fe575b816117ea60209383612216565b810103126117fa575190876116e0565b5080fd5b3d91506117dd565b50604051903d90823e3d90fd5b005b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b346101605760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760043567ffffffffffffffff811161016057366023820112156101605780600401359067ffffffffffffffff821161016057602460c0830282010136811161016057916118b9612790565b7f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff169060005b8181101561199657600060c0820285016119106064820161243e565b1561196e576024013573ffffffffffffffffffffffffffffffffffffffff81168091036117fa57840361194657506001016118f4565b807f1b16420e0000000000000000000000000000000000000000000000000000000060049252fd5b6004827ffc0a3f38000000000000000000000000000000000000000000000000000000008152fd5b8382866119a2826122d8565b916119b06040519384612216565b825260009260240190602083015b818310611bd3578480855b8051831015611bcf576119dc83826127db565b519267ffffffffffffffff602085015116938415611ba3578484526020849052604080852082518154928401517fffffff00ffffffffffffffff000000000000000000000000000000000000000090931673ffffffffffffffffffffffffffffffffffffffff919091161791151560e01b7cff000000000000000000000000000000000000000000000000000000001691909117815590606081015182546080830163ffffffff81511615611b775773ffffffffffffffffffffffffffffffffffffffff7f4cef55db91890720ca3d94563535726752813bffa29490d6d41218acb6831cc9946040946001999a9b979479ffffffff0000000000000000000000000000000000000000000060ff955160b01b16907fffffffff0000000000000000ffffffffffffffffffffffffffffffffffffffff75ffff00000000000000000000000000000000000000007bffff000000000000000000000000000000000000000000000000000060a087015160d01b169460a01b169116171717809455511691835192835260e01c1615156020820152a20191906119c9565b6024888a7f9e720551000000000000000000000000000000000000000000000000000000008252600452fd5b602484867f97ccaab7000000000000000000000000000000000000000000000000000000008252600452fd5b5080f35b60c083360312611c7c5760405190611bea826121de565b833573ffffffffffffffffffffffffffffffffffffffff81168103611c78578252611c17602085016121c9565b6020830152611c286040850161244b565b6040830152611c3960608501612458565b606083015260808401359063ffffffff82168203611c785782602092608060c0950152611c6860a08701612458565b60a08201528152019201916119be565b8680fd5b8480fd5b346101605760a07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126101605760043567ffffffffffffffff811161016057806004016101c07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc833603011261016057611cfa61213d565b5060843567ffffffffffffffff8111610160573660238201121561016057806004013567ffffffffffffffff8111610160573691016024011161016057611d40816125a0565b6024820191611d51610c21846122f0565b73ffffffffffffffffffffffffffffffffffffffff611d8f611d87611d7d610cd6610184860187612305565b60408101906123c1565b810190612412565b817f0000000000000000000000000000000000000000000000000000000000000000169182911603611062575073ffffffffffffffffffffffffffffffffffffffff611def611d8767ffffffffffffffff94610124611df69501906123c1565b16926122f0565b1680600052600060205260406000209081549073ffffffffffffffffffffffffffffffffffffffff821690811561039b576020906024604051809481937fa8d87a3b00000000000000000000000000000000000000000000000000000000835260048301525afa801561105657600090611f26575b73ffffffffffffffffffffffffffffffffffffffff915016330361108f5760e01c60ff16611f09575b611f056040517fffffffff000000000000000000000000000000000000000000000000000000007f000000000000000000000000000000000000000000000000000000000000000016602082015260048152611ef1602482612216565b6040519182916020835260208301906120fa565b0390f35b60008281526002909101602052604090205415610e365780611e94565b506020813d602011611f6b575b81611f4060209383612216565b8101031261016057611f6673ffffffffffffffffffffffffffffffffffffffff916124da565b611e6b565b3d9150611f33565b346101605760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261016057611f056040805190611fb48183612216565b601882527f56657269666965725465737448656c70657220322e302e3000000000000000006020830152519182916020835260208301906120fa565b346101605760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610160576020907fffffffff0000000000000000000000000000000000000000000000000000000061204b6120a8565b167fd3e969cd00000000000000000000000000000000000000000000000000000000811490811561207e575b5015158152f35b7f01ffc9a70000000000000000000000000000000000000000000000000000000091501483612077565b600435907fffffffff000000000000000000000000000000000000000000000000000000008216820361016057565b60005b8381106120ea5750506000910152565b81810151838201526020016120da565b907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f602093612136815180928187528780880191016120d7565b0116010190565b6044359073ffffffffffffffffffffffffffffffffffffffff8216820361016057565b359073ffffffffffffffffffffffffffffffffffffffff8216820361016057565b9181601f840112156101605782359167ffffffffffffffff8311610160576020808501948460051b01011161016057565b6004359067ffffffffffffffff8216820361016057565b359067ffffffffffffffff8216820361016057565b60c0810190811067ffffffffffffffff82111761041457604052565b60a0810190811067ffffffffffffffff82111761041457604052565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff82111761041457604052565b67ffffffffffffffff811161041457601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe01660200190565b81601f82011215610160578035906122a882612257565b926122b66040519485612216565b8284526020838301011161016057816000926020809301838601378301015290565b67ffffffffffffffff81116104145760051b60200190565b3567ffffffffffffffff811681036101605790565b9035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe181360301821215610160570180359067ffffffffffffffff821161016057602001918160051b3603831361016057565b9015612392578035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff4181360301821215610160570190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b9035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe181360301821215610160570180359067ffffffffffffffff82116101605760200191813603831361016057565b90816020910312610160573573ffffffffffffffffffffffffffffffffffffffff811681036101605790565b3580151581036101605790565b3590811515820361016057565b359061ffff8216820361016057565b919091357fffffffffffffffffffffffffffffffffffffffff0000000000000000000000008116926014811061249b575050565b7fffffffffffffffffffffffffffffffffffffffff000000000000000000000000929350829060140360031b1b161690565b5190811515820361016057565b519073ffffffffffffffffffffffffffffffffffffffff8216820361016057565b9080601f83011215610160578151612512816122d8565b926125206040519485612216565b81845260208085019260051b82010192831161016057602001905b8282106125485750505090565b60208091612555846124da565b81520191019061253b565b91908110156123925760051b810135907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8181360301821215610160570190565b6125ae6101a08201826123c1565b1580159150612664575b61263a576125cd816101806001930190612305565b9050036125d657565b7fbbe6361f0000000000000000000000000000000000000000000000000000000060005273ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001660045260246000fd5b7fec14a34d0000000000000000000000000000000000000000000000000000000060005260046000fd5b50608081013563ffffffff81168091036101605715156125b8565b6040517f2cbc26bb00000000000000000000000000000000000000000000000000000000815277ffffffffffffffff000000000000000000000000000000008260801b16600482015260208160248173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa90811561105657600091612756575b5061271e5750565b67ffffffffffffffff907ffdbd6a72000000000000000000000000000000000000000000000000000000006000521660045260246000fd5b90506020813d602011612788575b8161277160209383612216565b8101031261016057612782906124cd565b38612716565b3d9150612764565b73ffffffffffffffffffffffffffffffffffffffff6003541633036127b157565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b80518210156123925760209160051b010190565b9080601f83011215610160578135612806816122d8565b926128146040519485612216565b81845260208085019260051b82010192831161016057602001905b82821061283c5750505090565b6020809161284984612160565b81520191019061282f565b7fffffffff000000000000000000000000000000000000000000000000000000008116908115612936576128878161293b565b7dffff00000000000000000000000000000000000000000000000000000000601082811c9085901c16166129365761ffff8360e01c168015918215612925575b50506128d1575050565b7fffffffff0000000000000000000000000000000000000000000000000000000092507fdf63778f000000000000000000000000000000000000000000000000000000006000526004521660245260446000fd5b60e01c61ffff1610905038806128c7565b505050565b7fffffffff000000000000000000000000000000000000000000000000000000008116908115612a41577dffff00000000000000000000000000000000000000000000000000000000811615612a385760ff60015b169060f01c806129d3575b506001036129a65750565b7fc512f96c0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b60005b601081106129e4575061299b565b6001811b82166129f7575b6001016129d6565b9160018101809111612a0957916129ef565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60ff6000612990565b5050565b80548210156123925760005260206000200190600090565b9060018201918160005282602052604060002054801515600014612bec577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8101818111612a09578254907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8201918211612a0957818103612b80575b50505080548015612b51577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0190612b128282612a45565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b191690555560005260205260006040812055600190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b612bd5612b90612ba09386612a45565b90549060031b1c92839286612a45565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b905560005283602052604060002055388080612ada565b50505050600090565b6000828152600182016020526040902054612c4a57805490680100000000000000008210156104145782612c33612ba0846001809601855584612a45565b905580549260005201602052604060002055600190565b505060009056fea164736f6c634300081a000a",
+}
+
+var VerifierTestHelperABI = VerifierTestHelperMetaData.ABI
+
+var VerifierTestHelperBin = VerifierTestHelperMetaData.Bin
+
+func DeployVerifierTestHelper(auth *bind.TransactOpts, backend bind.ContractBackend, testRouter common.Address, testToken common.Address, storageLocations []string, rmn common.Address, versionTag [4]byte) (common.Address, *types.Transaction, *VerifierTestHelper, error) {
+	parsed, err := VerifierTestHelperMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(VerifierTestHelperBin), backend, testRouter, testToken, storageLocations, rmn, versionTag)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &VerifierTestHelper{address: address, abi: *parsed, VerifierTestHelperCaller: VerifierTestHelperCaller{contract: contract}, VerifierTestHelperTransactor: VerifierTestHelperTransactor{contract: contract}, VerifierTestHelperFilterer: VerifierTestHelperFilterer{contract: contract}}, nil
+}
+
+type VerifierTestHelper struct {
+	address common.Address
+	abi     abi.ABI
+	VerifierTestHelperCaller
+	VerifierTestHelperTransactor
+	VerifierTestHelperFilterer
+}
+
+type VerifierTestHelperCaller struct {
+	contract *bind.BoundContract
+}
+
+type VerifierTestHelperTransactor struct {
+	contract *bind.BoundContract
+}
+
+type VerifierTestHelperFilterer struct {
+	contract *bind.BoundContract
+}
+
+type VerifierTestHelperSession struct {
+	Contract     *VerifierTestHelper
+	CallOpts     bind.CallOpts
+	TransactOpts bind.TransactOpts
+}
+
+type VerifierTestHelperCallerSession struct {
+	Contract *VerifierTestHelperCaller
+	CallOpts bind.CallOpts
+}
+
+type VerifierTestHelperTransactorSession struct {
+	Contract     *VerifierTestHelperTransactor
+	TransactOpts bind.TransactOpts
+}
+
+type VerifierTestHelperRaw struct {
+	Contract *VerifierTestHelper
+}
+
+type VerifierTestHelperCallerRaw struct {
+	Contract *VerifierTestHelperCaller
+}
+
+type VerifierTestHelperTransactorRaw struct {
+	Contract *VerifierTestHelperTransactor
+}
+
+func NewVerifierTestHelper(address common.Address, backend bind.ContractBackend) (*VerifierTestHelper, error) {
+	abi, err := abi.JSON(strings.NewReader(VerifierTestHelperABI))
+	if err != nil {
+		return nil, err
+	}
+	contract, err := bindVerifierTestHelper(address, backend, backend, backend)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelper{address: address, abi: abi, VerifierTestHelperCaller: VerifierTestHelperCaller{contract: contract}, VerifierTestHelperTransactor: VerifierTestHelperTransactor{contract: contract}, VerifierTestHelperFilterer: VerifierTestHelperFilterer{contract: contract}}, nil
+}
+
+func NewVerifierTestHelperCaller(address common.Address, caller bind.ContractCaller) (*VerifierTestHelperCaller, error) {
+	contract, err := bindVerifierTestHelper(address, caller, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperCaller{contract: contract}, nil
+}
+
+func NewVerifierTestHelperTransactor(address common.Address, transactor bind.ContractTransactor) (*VerifierTestHelperTransactor, error) {
+	contract, err := bindVerifierTestHelper(address, nil, transactor, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperTransactor{contract: contract}, nil
+}
+
+func NewVerifierTestHelperFilterer(address common.Address, filterer bind.ContractFilterer) (*VerifierTestHelperFilterer, error) {
+	contract, err := bindVerifierTestHelper(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperFilterer{contract: contract}, nil
+}
+
+func bindVerifierTestHelper(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := VerifierTestHelperMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _VerifierTestHelper.Contract.VerifierTestHelperCaller.contract.Call(opts, result, method, params...)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.VerifierTestHelperTransactor.contract.Transfer(opts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.VerifierTestHelperTransactor.contract.Transact(opts, method, params...)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _VerifierTestHelper.Contract.contract.Call(opts, result, method, params...)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.contract.Transfer(opts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.contract.Transact(opts, method, params...)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) ForwardToVerifier(opts *bind.CallOpts, message MessageV1CodecMessageV1, arg1 [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) ([]byte, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "forwardToVerifier", message, arg1, arg2, arg3, arg4)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) ForwardToVerifier(message MessageV1CodecMessageV1, arg1 [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) ([]byte, error) {
+	return _VerifierTestHelper.Contract.ForwardToVerifier(&_VerifierTestHelper.CallOpts, message, arg1, arg2, arg3, arg4)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) ForwardToVerifier(message MessageV1CodecMessageV1, arg1 [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) ([]byte, error) {
+	return _VerifierTestHelper.Contract.ForwardToVerifier(&_VerifierTestHelper.CallOpts, message, arg1, arg2, arg3, arg4)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) GetAllowedFinalityConfig(opts *bind.CallOpts) ([4]byte, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "getAllowedFinalityConfig")
+
+	if err != nil {
+		return *new([4]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([4]byte)).(*[4]byte)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) GetAllowedFinalityConfig() ([4]byte, error) {
+	return _VerifierTestHelper.Contract.GetAllowedFinalityConfig(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) GetAllowedFinalityConfig() ([4]byte, error) {
+	return _VerifierTestHelper.Contract.GetAllowedFinalityConfig(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+	error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "getFee", destChainSelector, arg1, arg2, requestedFinality)
+
+	outstruct := new(GetFee)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.FeeUSDCents = *abi.ConvertType(out[0], new(uint16)).(*uint16)
+	outstruct.GasForVerification = *abi.ConvertType(out[1], new(uint32)).(*uint32)
+	outstruct.PayloadSizeBytes = *abi.ConvertType(out[2], new(uint32)).(*uint32)
+
+	return *outstruct, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) GetFee(destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+	error) {
+	return _VerifierTestHelper.Contract.GetFee(&_VerifierTestHelper.CallOpts, destChainSelector, arg1, arg2, requestedFinality)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) GetFee(destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+	error) {
+	return _VerifierTestHelper.Contract.GetFee(&_VerifierTestHelper.CallOpts, destChainSelector, arg1, arg2, requestedFinality)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) GetRemoteChainConfig(opts *bind.CallOpts, remoteChainSelector uint64) (GetRemoteChainConfig,
+
+	error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "getRemoteChainConfig", remoteChainSelector)
+
+	outstruct := new(GetRemoteChainConfig)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.RemoteChainConfig = *abi.ConvertType(out[0], new(BaseVerifierRemoteChainConfigArgs)).(*BaseVerifierRemoteChainConfigArgs)
+	outstruct.AllowedSendersList = *abi.ConvertType(out[1], new([]common.Address)).(*[]common.Address)
+
+	return *outstruct, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) GetRemoteChainConfig(remoteChainSelector uint64) (GetRemoteChainConfig,
+
+	error) {
+	return _VerifierTestHelper.Contract.GetRemoteChainConfig(&_VerifierTestHelper.CallOpts, remoteChainSelector)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) GetRemoteChainConfig(remoteChainSelector uint64) (GetRemoteChainConfig,
+
+	error) {
+	return _VerifierTestHelper.Contract.GetRemoteChainConfig(&_VerifierTestHelper.CallOpts, remoteChainSelector)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) GetStorageLocations(opts *bind.CallOpts) ([]string, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "getStorageLocations")
+
+	if err != nil {
+		return *new([]string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]string)).(*[]string)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) GetStorageLocations() ([]string, error) {
+	return _VerifierTestHelper.Contract.GetStorageLocations(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) GetStorageLocations() ([]string, error) {
+	return _VerifierTestHelper.Contract.GetStorageLocations(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) GetTestRouter(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "getTestRouter")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) GetTestRouter() (common.Address, error) {
+	return _VerifierTestHelper.Contract.GetTestRouter(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) GetTestRouter() (common.Address, error) {
+	return _VerifierTestHelper.Contract.GetTestRouter(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) GetTestToken(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "getTestToken")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) GetTestToken() (common.Address, error) {
+	return _VerifierTestHelper.Contract.GetTestToken(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) GetTestToken() (common.Address, error) {
+	return _VerifierTestHelper.Contract.GetTestToken(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) Owner() (common.Address, error) {
+	return _VerifierTestHelper.Contract.Owner(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) Owner() (common.Address, error) {
+	return _VerifierTestHelper.Contract.Owner(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "supportsInterface", interfaceId)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _VerifierTestHelper.Contract.SupportsInterface(&_VerifierTestHelper.CallOpts, interfaceId)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _VerifierTestHelper.Contract.SupportsInterface(&_VerifierTestHelper.CallOpts, interfaceId)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "typeAndVersion")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) TypeAndVersion() (string, error) {
+	return _VerifierTestHelper.Contract.TypeAndVersion(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) TypeAndVersion() (string, error) {
+	return _VerifierTestHelper.Contract.TypeAndVersion(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) VerifyMessage(opts *bind.CallOpts, message MessageV1CodecMessageV1, arg1 [32]byte, arg2 []byte) error {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "verifyMessage", message, arg1, arg2)
+
+	if err != nil {
+		return err
+	}
+
+	return err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) VerifyMessage(message MessageV1CodecMessageV1, arg1 [32]byte, arg2 []byte) error {
+	return _VerifierTestHelper.Contract.VerifyMessage(&_VerifierTestHelper.CallOpts, message, arg1, arg2)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) VerifyMessage(message MessageV1CodecMessageV1, arg1 [32]byte, arg2 []byte) error {
+	return _VerifierTestHelper.Contract.VerifyMessage(&_VerifierTestHelper.CallOpts, message, arg1, arg2)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCaller) VersionTag(opts *bind.CallOpts) ([4]byte, error) {
+	var out []interface{}
+	err := _VerifierTestHelper.contract.Call(opts, &out, "versionTag")
+
+	if err != nil {
+		return *new([4]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([4]byte)).(*[4]byte)
+
+	return out0, err
+
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) VersionTag() ([4]byte, error) {
+	return _VerifierTestHelper.Contract.VersionTag(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperCallerSession) VersionTag() ([4]byte, error) {
+	return _VerifierTestHelper.Contract.VersionTag(&_VerifierTestHelper.CallOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _VerifierTestHelper.contract.Transact(opts, "acceptOwnership")
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) AcceptOwnership() (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.AcceptOwnership(&_VerifierTestHelper.TransactOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorSession) AcceptOwnership() (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.AcceptOwnership(&_VerifierTestHelper.TransactOpts)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactor) ApplyAllowlistUpdates(opts *bind.TransactOpts, allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error) {
+	return _VerifierTestHelper.contract.Transact(opts, "applyAllowlistUpdates", allowlistConfigArgsItems)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) ApplyAllowlistUpdates(allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.ApplyAllowlistUpdates(&_VerifierTestHelper.TransactOpts, allowlistConfigArgsItems)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorSession) ApplyAllowlistUpdates(allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.ApplyAllowlistUpdates(&_VerifierTestHelper.TransactOpts, allowlistConfigArgsItems)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactor) ApplyRemoteChainConfigUpdates(opts *bind.TransactOpts, remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error) {
+	return _VerifierTestHelper.contract.Transact(opts, "applyRemoteChainConfigUpdates", remoteChainConfigArgs)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) ApplyRemoteChainConfigUpdates(remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.ApplyRemoteChainConfigUpdates(&_VerifierTestHelper.TransactOpts, remoteChainConfigArgs)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorSession) ApplyRemoteChainConfigUpdates(remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.ApplyRemoteChainConfigUpdates(&_VerifierTestHelper.TransactOpts, remoteChainConfigArgs)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactor) SetAllowedFinalityConfig(opts *bind.TransactOpts, allowedFinality [4]byte) (*types.Transaction, error) {
+	return _VerifierTestHelper.contract.Transact(opts, "setAllowedFinalityConfig", allowedFinality)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) SetAllowedFinalityConfig(allowedFinality [4]byte) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.SetAllowedFinalityConfig(&_VerifierTestHelper.TransactOpts, allowedFinality)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorSession) SetAllowedFinalityConfig(allowedFinality [4]byte) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.SetAllowedFinalityConfig(&_VerifierTestHelper.TransactOpts, allowedFinality)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
+	return _VerifierTestHelper.contract.Transact(opts, "transferOwnership", to)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.TransferOwnership(&_VerifierTestHelper.TransactOpts, to)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.TransferOwnership(&_VerifierTestHelper.TransactOpts, to)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactor) WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error) {
+	return _VerifierTestHelper.contract.Transact(opts, "withdrawFeeTokens", feeTokens)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperSession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.WithdrawFeeTokens(&_VerifierTestHelper.TransactOpts, feeTokens)
+}
+
+func (_VerifierTestHelper *VerifierTestHelperTransactorSession) WithdrawFeeTokens(feeTokens []common.Address) (*types.Transaction, error) {
+	return _VerifierTestHelper.Contract.WithdrawFeeTokens(&_VerifierTestHelper.TransactOpts, feeTokens)
+}
+
+type VerifierTestHelperAllowListSendersAddedIterator struct {
+	Event *VerifierTestHelperAllowListSendersAdded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperAllowListSendersAddedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperAllowListSendersAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperAllowListSendersAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperAllowListSendersAddedIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperAllowListSendersAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperAllowListSendersAdded struct {
+	DestChainSelector uint64
+	Senders           common.Address
+	Raw               types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterAllowListSendersAdded(opts *bind.FilterOpts, destChainSelector []uint64) (*VerifierTestHelperAllowListSendersAddedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "AllowListSendersAdded", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperAllowListSendersAddedIterator{contract: _VerifierTestHelper.contract, event: "AllowListSendersAdded", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchAllowListSendersAdded(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperAllowListSendersAdded, destChainSelector []uint64) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "AllowListSendersAdded", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperAllowListSendersAdded)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "AllowListSendersAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseAllowListSendersAdded(log types.Log) (*VerifierTestHelperAllowListSendersAdded, error) {
+	event := new(VerifierTestHelperAllowListSendersAdded)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "AllowListSendersAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperAllowListSendersRemovedIterator struct {
+	Event *VerifierTestHelperAllowListSendersRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperAllowListSendersRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperAllowListSendersRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperAllowListSendersRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperAllowListSendersRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperAllowListSendersRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperAllowListSendersRemoved struct {
+	DestChainSelector uint64
+	Senders           common.Address
+	Raw               types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterAllowListSendersRemoved(opts *bind.FilterOpts, destChainSelector []uint64) (*VerifierTestHelperAllowListSendersRemovedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "AllowListSendersRemoved", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperAllowListSendersRemovedIterator{contract: _VerifierTestHelper.contract, event: "AllowListSendersRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchAllowListSendersRemoved(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperAllowListSendersRemoved, destChainSelector []uint64) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "AllowListSendersRemoved", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperAllowListSendersRemoved)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "AllowListSendersRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseAllowListSendersRemoved(log types.Log) (*VerifierTestHelperAllowListSendersRemoved, error) {
+	event := new(VerifierTestHelperAllowListSendersRemoved)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "AllowListSendersRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperAllowListStateChangedIterator struct {
+	Event *VerifierTestHelperAllowListStateChanged
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperAllowListStateChangedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperAllowListStateChanged)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperAllowListStateChanged)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperAllowListStateChangedIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperAllowListStateChangedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperAllowListStateChanged struct {
+	DestChainSelector uint64
+	AllowlistEnabled  bool
+	Raw               types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterAllowListStateChanged(opts *bind.FilterOpts, destChainSelector []uint64) (*VerifierTestHelperAllowListStateChangedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "AllowListStateChanged", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperAllowListStateChangedIterator{contract: _VerifierTestHelper.contract, event: "AllowListStateChanged", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchAllowListStateChanged(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperAllowListStateChanged, destChainSelector []uint64) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "AllowListStateChanged", destChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperAllowListStateChanged)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "AllowListStateChanged", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseAllowListStateChanged(log types.Log) (*VerifierTestHelperAllowListStateChanged, error) {
+	event := new(VerifierTestHelperAllowListStateChanged)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "AllowListStateChanged", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperFeeTokenWithdrawnIterator struct {
+	Event *VerifierTestHelperFeeTokenWithdrawn
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperFeeTokenWithdrawnIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperFeeTokenWithdrawn)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperFeeTokenWithdrawn)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperFeeTokenWithdrawnIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperFeeTokenWithdrawnIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperFeeTokenWithdrawn struct {
+	Receiver common.Address
+	FeeToken common.Address
+	Amount   *big.Int
+	Raw      types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*VerifierTestHelperFeeTokenWithdrawnIterator, error) {
+
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperFeeTokenWithdrawnIterator{contract: _VerifierTestHelper.contract, event: "FeeTokenWithdrawn", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error) {
+
+	var receiverRule []interface{}
+	for _, receiverItem := range receiver {
+		receiverRule = append(receiverRule, receiverItem)
+	}
+	var feeTokenRule []interface{}
+	for _, feeTokenItem := range feeToken {
+		feeTokenRule = append(feeTokenRule, feeTokenItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "FeeTokenWithdrawn", receiverRule, feeTokenRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperFeeTokenWithdrawn)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseFeeTokenWithdrawn(log types.Log) (*VerifierTestHelperFeeTokenWithdrawn, error) {
+	event := new(VerifierTestHelperFeeTokenWithdrawn)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "FeeTokenWithdrawn", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperFinalityConfigSetIterator struct {
+	Event *VerifierTestHelperFinalityConfigSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperFinalityConfigSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperFinalityConfigSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperFinalityConfigSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperFinalityConfigSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperFinalityConfigSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperFinalityConfigSet struct {
+	AllowedFinality [4]byte
+	Raw             types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterFinalityConfigSet(opts *bind.FilterOpts) (*VerifierTestHelperFinalityConfigSetIterator, error) {
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "FinalityConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperFinalityConfigSetIterator{contract: _VerifierTestHelper.contract, event: "FinalityConfigSet", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchFinalityConfigSet(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperFinalityConfigSet) (event.Subscription, error) {
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "FinalityConfigSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperFinalityConfigSet)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "FinalityConfigSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseFinalityConfigSet(log types.Log) (*VerifierTestHelperFinalityConfigSet, error) {
+	event := new(VerifierTestHelperFinalityConfigSet)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "FinalityConfigSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperOwnershipTransferRequestedIterator struct {
+	Event *VerifierTestHelperOwnershipTransferRequested
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperOwnershipTransferRequestedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperOwnershipTransferRequested)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperOwnershipTransferRequested)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperOwnershipTransferRequestedIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperOwnershipTransferRequestedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperOwnershipTransferRequested struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*VerifierTestHelperOwnershipTransferRequestedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperOwnershipTransferRequestedIterator{contract: _VerifierTestHelper.contract, event: "OwnershipTransferRequested", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperOwnershipTransferRequested)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseOwnershipTransferRequested(log types.Log) (*VerifierTestHelperOwnershipTransferRequested, error) {
+	event := new(VerifierTestHelperOwnershipTransferRequested)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperOwnershipTransferredIterator struct {
+	Event *VerifierTestHelperOwnershipTransferred
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperOwnershipTransferredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperOwnershipTransferred struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*VerifierTestHelperOwnershipTransferredIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperOwnershipTransferredIterator{contract: _VerifierTestHelper.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperOwnershipTransferred)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseOwnershipTransferred(log types.Log) (*VerifierTestHelperOwnershipTransferred, error) {
+	event := new(VerifierTestHelperOwnershipTransferred)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperRemoteChainConfigSetIterator struct {
+	Event *VerifierTestHelperRemoteChainConfigSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperRemoteChainConfigSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperRemoteChainConfigSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperRemoteChainConfigSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperRemoteChainConfigSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperRemoteChainConfigSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperRemoteChainConfigSet struct {
+	RemoteChainSelector uint64
+	Router              common.Address
+	AllowlistEnabled    bool
+	Raw                 types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterRemoteChainConfigSet(opts *bind.FilterOpts, remoteChainSelector []uint64) (*VerifierTestHelperRemoteChainConfigSetIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "RemoteChainConfigSet", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperRemoteChainConfigSetIterator{contract: _VerifierTestHelper.contract, event: "RemoteChainConfigSet", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchRemoteChainConfigSet(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperRemoteChainConfigSet, remoteChainSelector []uint64) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "RemoteChainConfigSet", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperRemoteChainConfigSet)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "RemoteChainConfigSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseRemoteChainConfigSet(log types.Log) (*VerifierTestHelperRemoteChainConfigSet, error) {
+	event := new(VerifierTestHelperRemoteChainConfigSet)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "RemoteChainConfigSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type VerifierTestHelperStorageLocationsUpdatedIterator struct {
+	Event *VerifierTestHelperStorageLocationsUpdated
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *VerifierTestHelperStorageLocationsUpdatedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierTestHelperStorageLocationsUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierTestHelperStorageLocationsUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *VerifierTestHelperStorageLocationsUpdatedIterator) Error() error {
+	return it.fail
+}
+
+func (it *VerifierTestHelperStorageLocationsUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type VerifierTestHelperStorageLocationsUpdated struct {
+	OldLocations []string
+	NewLocations []string
+	Raw          types.Log
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) FilterStorageLocationsUpdated(opts *bind.FilterOpts) (*VerifierTestHelperStorageLocationsUpdatedIterator, error) {
+
+	logs, sub, err := _VerifierTestHelper.contract.FilterLogs(opts, "StorageLocationsUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierTestHelperStorageLocationsUpdatedIterator{contract: _VerifierTestHelper.contract, event: "StorageLocationsUpdated", logs: logs, sub: sub}, nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) WatchStorageLocationsUpdated(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperStorageLocationsUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _VerifierTestHelper.contract.WatchLogs(opts, "StorageLocationsUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(VerifierTestHelperStorageLocationsUpdated)
+				if err := _VerifierTestHelper.contract.UnpackLog(event, "StorageLocationsUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_VerifierTestHelper *VerifierTestHelperFilterer) ParseStorageLocationsUpdated(log types.Log) (*VerifierTestHelperStorageLocationsUpdated, error) {
+	event := new(VerifierTestHelperStorageLocationsUpdated)
+	if err := _VerifierTestHelper.contract.UnpackLog(event, "StorageLocationsUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type GetFee struct {
+	FeeUSDCents        uint16
+	GasForVerification uint32
+	PayloadSizeBytes   uint32
+}
+type GetRemoteChainConfig struct {
+	RemoteChainConfig  BaseVerifierRemoteChainConfigArgs
+	AllowedSendersList []common.Address
+}
+
+func (VerifierTestHelperAllowListSendersAdded) Topic() common.Hash {
+	return common.HexToHash("0x85682793ee26ba7d2d073ce790a50b388a1791aab25fc368bcce99d3b1d4da80")
+}
+
+func (VerifierTestHelperAllowListSendersRemoved) Topic() common.Hash {
+	return common.HexToHash("0x9ac16e02c9a455144d35e2f0d80817a608340dee3c104f547ceb4433df418d82")
+}
+
+func (VerifierTestHelperAllowListStateChanged) Topic() common.Hash {
+	return common.HexToHash("0x8504171b9fc8a6c38617bdd508715ec759043b69df1608d7b0db90c0f8523492")
+}
+
+func (VerifierTestHelperFeeTokenWithdrawn) Topic() common.Hash {
+	return common.HexToHash("0x508d7d183612c18fc339b42618912b9fa3239f631dd7ec0671f950200a0fa66e")
+}
+
+func (VerifierTestHelperFinalityConfigSet) Topic() common.Hash {
+	return common.HexToHash("0x307cf716eade81675bea3ccb6917b0f91baa2160056765d9a83d76f819caf06a")
+}
+
+func (VerifierTestHelperOwnershipTransferRequested) Topic() common.Hash {
+	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
+}
+
+func (VerifierTestHelperOwnershipTransferred) Topic() common.Hash {
+	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
+}
+
+func (VerifierTestHelperRemoteChainConfigSet) Topic() common.Hash {
+	return common.HexToHash("0x4cef55db91890720ca3d94563535726752813bffa29490d6d41218acb6831cc9")
+}
+
+func (VerifierTestHelperStorageLocationsUpdated) Topic() common.Hash {
+	return common.HexToHash("0xec9f9416b098576351ada0c342c1381ca08990ee094978ddd1003ef013d07586")
+}
+
+func (_VerifierTestHelper *VerifierTestHelper) Address() common.Address {
+	return _VerifierTestHelper.address
+}
+
+type VerifierTestHelperInterface interface {
+	ForwardToVerifier(opts *bind.CallOpts, message MessageV1CodecMessageV1, arg1 [32]byte, arg2 common.Address, arg3 *big.Int, arg4 []byte) ([]byte, error)
+
+	GetAllowedFinalityConfig(opts *bind.CallOpts) ([4]byte, error)
+
+	GetFee(opts *bind.CallOpts, destChainSelector uint64, arg1 ClientEVM2AnyMessage, arg2 []byte, requestedFinality [4]byte) (GetFee,
+
+		error)
+
+	GetRemoteChainConfig(opts *bind.CallOpts, remoteChainSelector uint64) (GetRemoteChainConfig,
+
+		error)
+
+	GetStorageLocations(opts *bind.CallOpts) ([]string, error)
+
+	GetTestRouter(opts *bind.CallOpts) (common.Address, error)
+
+	GetTestToken(opts *bind.CallOpts) (common.Address, error)
+
+	Owner(opts *bind.CallOpts) (common.Address, error)
+
+	SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error)
+
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+
+	VerifyMessage(opts *bind.CallOpts, message MessageV1CodecMessageV1, arg1 [32]byte, arg2 []byte) error
+
+	VersionTag(opts *bind.CallOpts) ([4]byte, error)
+
+	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	ApplyAllowlistUpdates(opts *bind.TransactOpts, allowlistConfigArgsItems []BaseVerifierAllowlistConfigArgs) (*types.Transaction, error)
+
+	ApplyRemoteChainConfigUpdates(opts *bind.TransactOpts, remoteChainConfigArgs []BaseVerifierRemoteChainConfigArgs) (*types.Transaction, error)
+
+	SetAllowedFinalityConfig(opts *bind.TransactOpts, allowedFinality [4]byte) (*types.Transaction, error)
+
+	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
+
+	WithdrawFeeTokens(opts *bind.TransactOpts, feeTokens []common.Address) (*types.Transaction, error)
+
+	FilterAllowListSendersAdded(opts *bind.FilterOpts, destChainSelector []uint64) (*VerifierTestHelperAllowListSendersAddedIterator, error)
+
+	WatchAllowListSendersAdded(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperAllowListSendersAdded, destChainSelector []uint64) (event.Subscription, error)
+
+	ParseAllowListSendersAdded(log types.Log) (*VerifierTestHelperAllowListSendersAdded, error)
+
+	FilterAllowListSendersRemoved(opts *bind.FilterOpts, destChainSelector []uint64) (*VerifierTestHelperAllowListSendersRemovedIterator, error)
+
+	WatchAllowListSendersRemoved(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperAllowListSendersRemoved, destChainSelector []uint64) (event.Subscription, error)
+
+	ParseAllowListSendersRemoved(log types.Log) (*VerifierTestHelperAllowListSendersRemoved, error)
+
+	FilterAllowListStateChanged(opts *bind.FilterOpts, destChainSelector []uint64) (*VerifierTestHelperAllowListStateChangedIterator, error)
+
+	WatchAllowListStateChanged(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperAllowListStateChanged, destChainSelector []uint64) (event.Subscription, error)
+
+	ParseAllowListStateChanged(log types.Log) (*VerifierTestHelperAllowListStateChanged, error)
+
+	FilterFeeTokenWithdrawn(opts *bind.FilterOpts, receiver []common.Address, feeToken []common.Address) (*VerifierTestHelperFeeTokenWithdrawnIterator, error)
+
+	WatchFeeTokenWithdrawn(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperFeeTokenWithdrawn, receiver []common.Address, feeToken []common.Address) (event.Subscription, error)
+
+	ParseFeeTokenWithdrawn(log types.Log) (*VerifierTestHelperFeeTokenWithdrawn, error)
+
+	FilterFinalityConfigSet(opts *bind.FilterOpts) (*VerifierTestHelperFinalityConfigSetIterator, error)
+
+	WatchFinalityConfigSet(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperFinalityConfigSet) (event.Subscription, error)
+
+	ParseFinalityConfigSet(log types.Log) (*VerifierTestHelperFinalityConfigSet, error)
+
+	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*VerifierTestHelperOwnershipTransferRequestedIterator, error)
+
+	WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferRequested(log types.Log) (*VerifierTestHelperOwnershipTransferRequested, error)
+
+	FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*VerifierTestHelperOwnershipTransferredIterator, error)
+
+	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferred(log types.Log) (*VerifierTestHelperOwnershipTransferred, error)
+
+	FilterRemoteChainConfigSet(opts *bind.FilterOpts, remoteChainSelector []uint64) (*VerifierTestHelperRemoteChainConfigSetIterator, error)
+
+	WatchRemoteChainConfigSet(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperRemoteChainConfigSet, remoteChainSelector []uint64) (event.Subscription, error)
+
+	ParseRemoteChainConfigSet(log types.Log) (*VerifierTestHelperRemoteChainConfigSet, error)
+
+	FilterStorageLocationsUpdated(opts *bind.FilterOpts) (*VerifierTestHelperStorageLocationsUpdatedIterator, error)
+
+	WatchStorageLocationsUpdated(opts *bind.WatchOpts, sink chan<- *VerifierTestHelperStorageLocationsUpdated) (event.Subscription, error)
+
+	ParseStorageLocationsUpdated(log types.Log) (*VerifierTestHelperStorageLocationsUpdated, error)
+
+	Address() common.Address
+}

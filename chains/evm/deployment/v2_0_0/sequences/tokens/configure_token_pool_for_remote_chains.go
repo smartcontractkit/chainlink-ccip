@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -79,11 +80,45 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				// If GetSupportedChains failed (e.g. active pool is USDCTokenPoolProxy and reverts), skip validation.
 			}
 		}
-		ops := make([]mcms_types.BatchOperation, 0)
+		// A SiloedLockReleaseTokenPool holds no liquidity itself: lockOrBurn/releaseOrMint go through
+		// the ERC20LockBox mapped to the remote chain, and a chain with no lockbox reverts with
+		// LockBoxNotConfigured on its first transfer rather than at configuration time. Lockboxes are
+		// provisioned by DeploySiloedLockReleaseTokenPool from the pool's declared silo groups, so a
+		// chain missing here means it was configured without being covered by those groups. Fail with
+		// an actionable error instead of leaving a lane that looks wired up but cannot transfer.
+		//
+		// getAllLockBoxConfigs only exists on the siloed pool, so a failing call means this is some
+		// other pool type and the check does not apply.
+		lockBoxConfigsReport, err := cldf_ops.ExecuteOperation(b, siloed_lock_release_token_pool.GetAllLockBoxConfigs, chain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: input.ChainSelector,
+			Address:       input.TokenPoolAddress,
+		}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain]())
+		if err == nil {
+			withLockBox := make(map[uint64]struct{}, len(lockBoxConfigsReport.Output))
+			for _, cfg := range lockBoxConfigsReport.Output {
+				if cfg.LockBox != (common.Address{}) {
+					withLockBox[cfg.RemoteChainSelector] = struct{}{}
+				}
+			}
+			var missing []uint64
+			for remoteChainSelector := range input.RemoteChains {
+				if _, ok := withLockBox[remoteChainSelector]; !ok {
+					missing = append(missing, remoteChainSelector)
+				}
+			}
+			if len(missing) > 0 {
+				slices.Sort(missing)
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"siloed lock release pool %s on chain %d has no lock box configured for remote chains %v; add them to the pool's lockBoxGroups",
+					input.TokenPoolAddress, input.ChainSelector, missing,
+				)
+			}
+		}
+
 		supportedChainsReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
-		})
+		}, cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain]())
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get supported chains from pool: %w", err)
 		}
@@ -91,6 +126,8 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		for _, s := range supportedChainsReport.Output {
 			supportedSet[s] = struct{}{}
 		}
+
+		ops := make([]mcms_types.BatchOperation, 0)
 		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
 			_, alreadySupported := supportedSet[remoteChainSelector]
 			report, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPoolForRemoteChain, chain, ConfigureTokenPoolForRemoteChainInput{
@@ -108,6 +145,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 			}
 			ops = append(ops, report.Output.BatchOps...)
 		}
+
 		return sequences.OnChainOutput{BatchOps: ops}, nil
 	},
 )
