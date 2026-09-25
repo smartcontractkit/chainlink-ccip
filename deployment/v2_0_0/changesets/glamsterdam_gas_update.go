@@ -63,9 +63,15 @@ func UpdateGasConfigForGlamsterdamV200(registry *changesets.MCMSReaderRegistry) 
 		if adapter == nil {
 			// Gracefully skip if no adapter is registered for EVM (shouldn't happen in practice)
 			report.AddLine(fmt.Sprintf("EVM family: no gas update adapter registered, skipped"))
+			mcmsInput := cfg.MCMS
+			if mcmsInput.Description == "" {
+				mcmsInput.Description = report.String()
+			} else {
+				mcmsInput.Description = mcmsInput.Description + "\n\n" + report.String()
+			}
 			return changesets.NewOutputBuilder(e, registry).
 				WithBatchOps(allBatchOps).
-				Build(cfg.MCMS)
+				Build(mcmsInput)
 		}
 
 		// Run the orchestration sequence for EVM chains
@@ -88,9 +94,15 @@ func UpdateGasConfigForGlamsterdamV200(registry *changesets.MCMSReaderRegistry) 
 		allBatchOps = append(allBatchOps, seqOutput.BatchOps...)
 
 		// Build the output with MCMS proposal
+		mcmsInput := cfg.MCMS
+		if mcmsInput.Description == "" {
+			mcmsInput.Description = report.String()
+		} else {
+			mcmsInput.Description = mcmsInput.Description + "\n\n" + report.String()
+		}
 		return changesets.NewOutputBuilder(e, registry).
 			WithBatchOps(allBatchOps).
-			Build(cfg.MCMS)
+			Build(mcmsInput)
 	}
 
 	return deployment.CreateChangeSet(apply, validate)

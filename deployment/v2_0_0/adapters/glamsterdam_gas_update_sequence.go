@@ -115,10 +115,15 @@ func GlamsterdamGasUpdateSequence(
 				continue
 			}
 
-			// Resolve token field (v2.0.0 has both Lombard and USDC, determined by token address)
-			tokenFieldSpec := selectTokenFieldSpec(token)
+			// Resolve token field (v2.0.0 has both Lombard and USDC rows, with different
+			// Prague/Glamsterdam baselines, so the adapter must tell us which spec applies).
+			tokenFieldSpec, err := adapter.TokenFieldSpec(b, chains, ds, chainSel, token)
+			if err != nil {
+				report.AddReadError(chainSel, fmt.Sprintf("resolve token field spec for token %x", token), err)
+				continue
+			}
 			result := glamsterdamutils.Resolve(tokenFieldSpec, currentToken)
-			report.AddLine(fmt.Sprintf("chain %d: token %x - %s", chainSel, token, getTokenFieldReportSuffix(result)))
+			glamsterdamutils.AddField(report, chainSel, result)
 
 			// Write token field if value changed
 			if result.AppliedValue != currentToken {
@@ -155,28 +160,6 @@ func getAllFieldSpecsUint8() []glamsterdamutils.FieldSpec[uint8] {
 	return []glamsterdamutils.FieldSpec[uint8]{
 		FeeQuoterDestGasPerPayloadByteBase,
 	}
-}
-
-// selectTokenFieldSpec selects the appropriate token field spec based on token address.
-// For v2.0.0, we have Lombard and USDC token pools. The caller should know which token
-// they're processing; for now we default to USDC and the adapter should map token addresses
-// to the right field if needed.
-func selectTokenFieldSpec(token []byte) glamsterdamutils.FieldSpec[uint32] {
-	// TODO: In a real implementation, the adapter would provide mapping from token address
-	// to field spec, or the changeset would handle this selection. For now, default to USDC.
-	return USDCTokenPoolDestGasOverhead
-}
-
-// getTokenFieldReportSuffix returns a report string suffix for token field results.
-func getTokenFieldReportSuffix(result glamsterdamutils.FieldResult[uint32]) string {
-	if result.Matched {
-		return fmt.Sprintf("%s matched expected Prague value %v, applying Glamsterdam value %v",
-			result.Spec.Name, result.Spec.ExpectedPrague, result.AppliedValue)
-	}
-	return fmt.Sprintf("%s MISMATCH - current value %v does not match expected Prague value %v, "+
-		"applying fallback value %v instead of literal Glamsterdam value %v",
-		result.Spec.Name, result.Current, result.Spec.ExpectedPrague,
-		result.AppliedValue, result.Spec.GlamsterdamValue)
 }
 
 // checkImmutableFields validates immutable fields and adds report lines for mismatches.

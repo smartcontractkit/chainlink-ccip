@@ -2,11 +2,8 @@ package adapters
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -14,32 +11,28 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences/glamsterdam"
-	tar_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 )
 
-// getAllConfiguredTokensInput is the input to getAllConfiguredTokens.
-type getAllConfiguredTokensInput struct {
-	StartIndex uint64
-	MaxCount   uint64
+// resolveUSDCTokenPoolRef finds the chain's non-canonical USDC token pool address ref, if any.
+// v1.6.1 has no USDC-specific ContractType; by this version's convention (see
+// adapters/non_canonical_usdc_chain.go), the USDC pool is deployed as a
+// BurnMintWithLockReleaseFlagTokenPool, and there is at most one per chain, so the first match by
+// type is returned regardless of version or qualifier.
+func resolveUSDCTokenPoolRef(addrs []datastore.AddressRef, sel uint64) datastore.AddressRef {
+	for _, ref := range addrs {
+		if ref.ChainSelector == sel && ref.Type == datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType) {
+			return ref
+		}
+	}
+	return datastore.AddressRef{}
 }
-
-// tokenAdminRegistryGetAllConfiguredTokens reads every token TokenAdminRegistry knows about on a chain.
-var tokenAdminRegistryGetAllConfiguredTokens = contract.NewRead(contract.ReadParams[getAllConfiguredTokensInput, []common.Address, *tar_bindings.TokenAdminRegistry]{
-	Name:         "glamsterdam:token-admin-registry:get-all-configured-tokens",
-	Version:      token_admin_registry.Version,
-	Description:  "Calls getAllConfiguredTokens on TokenAdminRegistry",
-	ContractType: token_admin_registry.ContractType,
-	NewContract:  tar_bindings.NewTokenAdminRegistry,
-	CallContract: func(c *tar_bindings.TokenAdminRegistry, opts *bind.CallOpts, args getAllConfiguredTokensInput) ([]common.Address, error) {
-		return c.GetAllConfiguredTokens(opts, args.StartIndex, args.MaxCount)
-	},
-})
 
 // GlamsterdamGasAdapter implements v1_6_1_adapters.GasUpdateAdapter for EVM chains.
 type GlamsterdamGasAdapter struct{}
@@ -204,8 +197,12 @@ func (a *GlamsterdamGasAdapter) ReadImmutableSanityFields(
 	}, nil
 }
 
-// DiscoverCandidateTokens returns only USDC tokens known to TokenAdminRegistry on the chain.
-// For v1.6.1, only USDC tokens have special gas config overrides.
+// DiscoverCandidateTokens returns the chain's USDC token, resolved via its deployed USDC token
+// pool, if any. For v1.6.1, only USDC has a special per-token gas config override (table row 5),
+// and there is no USDC-specific ContractType to look up directly — per this version's
+// non-canonical-USDC convention, the pool is a BurnMintWithLockReleaseFlagTokenPool, and its
+// getToken() is the source of truth for which token is "USDC" on this chain. Chains with no such
+// pool deployed have nothing to update for this row and return no candidates.
 func (a *GlamsterdamGasAdapter) DiscoverCandidateTokens(
 	b cldf_ops.Bundle,
 	chains cldf_chain.BlockChains,
@@ -218,48 +215,23 @@ func (a *GlamsterdamGasAdapter) DiscoverCandidateTokens(
 	}
 
 	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
-	tarRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, token_admin_registry.ContractType, token_admin_registry.Version, "")
-	if datastore_utils.IsAddressRefEmpty(tarRef) {
-		return nil, fmt.Errorf("could not resolve TokenAdminRegistry address on chain %d", srcChainSelector)
+	usdcPoolRef := resolveUSDCTokenPoolRef(addrs, srcChainSelector)
+	if datastore_utils.IsAddressRefEmpty(usdcPoolRef) {
+		// No non-canonical USDC pool deployed on this chain — nothing to update for the
+		// USDC-specific row of the v1.6 mapping table.
+		return nil, nil
 	}
 
-	// Read all configured tokens
-	result, err := cldf_ops.ExecuteOperation(b, tokenAdminRegistryGetAllConfiguredTokens, chain, contract.FunctionInput[getAllConfiguredTokensInput]{
+	usdcTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, contract.FunctionInput[struct{}]{
 		ChainSelector: srcChainSelector,
-		Address:       common.HexToAddress(tarRef.Address),
-		Args: getAllConfiguredTokensInput{
-			StartIndex: 0,
-			MaxCount:   1000,
-		},
+		Address:       common.HexToAddress(usdcPoolRef.Address),
+		Args:          struct{}{},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to read configured tokens: %w", err)
+		return nil, fmt.Errorf("failed to read underlying token for USDC pool %s on chain %d: %w", usdcPoolRef.Address, srcChainSelector, err)
 	}
 
-	// Filter to only USDC tokens
-	// For v1.6.1, only USDC tokens have special gas config overrides
-	var usdcTokens [][]byte
-	for _, addr := range result.Output {
-		// Query token symbol to identify USDC tokens
-		tokenContract, err := erc20.NewERC20(addr, chain.Client)
-		if err != nil {
-			// If we can't bind the contract, skip it (might not be a standard ERC20)
-			continue
-		}
-
-		symbol, err := tokenContract.Symbol(&bind.CallOpts{})
-		if err != nil {
-			// If we can't read the symbol, skip it (might not be a standard ERC20)
-			continue
-		}
-
-		// Only include tokens that contain "USDC" in their symbol
-		if strings.Contains(symbol, "USDC") {
-			usdcTokens = append(usdcTokens, addr.Bytes())
-		}
-	}
-
-	return usdcTokens, nil
+	return [][]byte{usdcTokenReport.Output.Bytes()}, nil
 }
 
 // ReadTokenGasField reads a token's gas field from FeeQuoter.TokenTransferFeeConfig.
@@ -324,6 +296,24 @@ func (a *GlamsterdamGasAdapter) WriteTokenGasField(
 	feeQuoterAddr := common.HexToAddress(fqRef.Address)
 	tokenAddr := common.BytesToAddress(token)
 
+	// Read the current config first so the write preserves every other field (MinFeeUSDCents,
+	// MaxFeeUSDCents, DestBytesOverhead, IsEnabled, ...) — building a fresh zero-value struct here
+	// would silently write IsEnabled: false, which FeeQuoter rejects for an "enabled" update path
+	// and would otherwise disable the override entirely.
+	cur, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetTokenTransferFeeConfig, chain, contract.FunctionInput[fee_quoter.GetTokenTransferFeeConfigArgs]{
+		ChainSelector: srcChainSelector,
+		Address:       feeQuoterAddr,
+		Args: fee_quoter.GetTokenTransferFeeConfigArgs{
+			DestChainSelector: targetChainSelector,
+			Token:             tokenAddr,
+		},
+	})
+	if err != nil {
+		return mcms_types.BatchOperation{}, fmt.Errorf("failed to read token transfer fee config: %w", err)
+	}
+	newConfig := cur.Output
+	newConfig.DestGasOverhead = value
+
 	// Execute the write operation (exported from sequences)
 	writeOut, err := cldf_ops.ExecuteOperation(b, glamsterdam.ApplyFeeQuoterTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[fee_quoter.ApplyTokenTransferFeeConfigUpdatesArgs]{
 		ChainSelector: srcChainSelector,
@@ -334,10 +324,8 @@ func (a *GlamsterdamGasAdapter) WriteTokenGasField(
 					DestChainSelector: targetChainSelector,
 					TokenTransferFeeConfigs: []fee_quoter.TokenTransferFeeConfigSingleTokenArgs{
 						{
-							Token: tokenAddr,
-							TokenTransferFeeConfig: fee_quoter.TokenTransferFeeConfig{
-								DestGasOverhead: value,
-							},
+							Token:                  tokenAddr,
+							TokenTransferFeeConfig: newConfig,
 						},
 					},
 				},

@@ -107,7 +107,7 @@ func GlamsterdamGasUpdateSequence(
 			// Resolve token field
 			tokenFieldSpec := getTokenFieldSpec()
 			result := glamsterdamutils.Resolve(tokenFieldSpec, currentToken)
-			report.AddLine(fmt.Sprintf("chain %d: token %x - %s", chainSel, token, getTokenFieldReportSuffix(result)))
+			glamsterdamutils.AddField(report, chainSel, result)
 
 			// Write token field if value changed
 			if result.AppliedValue != currentToken {
@@ -137,18 +137,6 @@ func getAllFieldSpecs() []glamsterdamutils.FieldSpec[uint32] {
 // getTokenFieldSpec returns the token field spec for v1.6.1.
 func getTokenFieldSpec() glamsterdamutils.FieldSpec[uint32] {
 	return USDCTokenPoolDestGasOverhead
-}
-
-// getTokenFieldReportSuffix returns a report string suffix for token field results.
-func getTokenFieldReportSuffix(result glamsterdamutils.FieldResult[uint32]) string {
-	if result.Matched {
-		return fmt.Sprintf("%s matched expected Prague value %v, applying Glamsterdam value %v",
-			result.Spec.Name, result.Spec.ExpectedPrague, result.AppliedValue)
-	}
-	return fmt.Sprintf("%s MISMATCH - current value %v does not match expected Prague value %v, "+
-		"applying fallback value %v instead of literal Glamsterdam value %v",
-		result.Spec.Name, result.Current, result.Spec.ExpectedPrague,
-		result.AppliedValue, result.Spec.GlamsterdamValue)
 }
 
 // checkImmutableFields validates immutable fields and adds report lines for mismatches.

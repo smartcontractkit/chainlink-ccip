@@ -3,22 +3,28 @@ package adapters
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/cctp_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_verifier"
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	v2_0_0_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
@@ -26,7 +32,29 @@ import (
 // GlamsterdamGasAdapter implements v2_0_0_adapters.GasUpdateAdapter for EVM chains.
 type GlamsterdamGasAdapter struct{}
 
-// HasLaneToTarget checks if a lane exists by checking OnRamp's Router field.
+// tokenPoolKind describes one TokenPool implementation this version's mapping table drives, and
+// which FieldSpec (Lombard row 9, or USDC row 10) applies to it. USDC has two possible pool
+// implementations — SiloedUSDCTokenPool and CCTPThroughCCVTokenPool (for CCTP-capable EVM
+// remotes) — both governed by the same USDC row.
+type tokenPoolKind struct {
+	ContractType cldf_deployment.ContractType
+	Version      *semver.Version
+	FieldSpec    glamsterdamutils.FieldSpec[uint32]
+}
+
+var glamsterdamTokenPoolKinds = []tokenPoolKind{
+	{lombard_token_pool.ContractType, lombard_token_pool.Version, v2_0_0_adapters.LombardTokenPoolDestGasOverhead},
+	{siloed_usdc_token_pool.ContractType, siloed_usdc_token_pool.Version, v2_0_0_adapters.USDCTokenPoolDestGasOverhead},
+	{cctp_through_ccv_token_pool.ContractType, cctp_through_ccv_token_pool.Version, v2_0_0_adapters.USDCTokenPoolDestGasOverhead},
+}
+
+// HasLaneToTarget checks if a lane exists by checking FeeQuoter's DestChainConfig.IsEnabled,
+// matching the discovery semantics used elsewhere for this version (see
+// v2_0_0/sequences/glamsterdam/discovery.go). OnRamp's Router field is not a reliable signal here:
+// it can be set on a chain whose FeeQuoter has no dest chain config for the target at all (e.g.
+// this chain's OnRamp is configured for other destinations), which would otherwise cause every
+// gas-config write for the rest of the mapping table to be attempted against an undiscovered
+// lane.
 func (a *GlamsterdamGasAdapter) HasLaneToTarget(
 	b cldf_ops.Bundle,
 	chains cldf_chain.BlockChains,
@@ -39,22 +67,22 @@ func (a *GlamsterdamGasAdapter) HasLaneToTarget(
 	}
 
 	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
-	onRampRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, onramp.ContractType, onramp.Version, "")
-	if datastore_utils.IsAddressRefEmpty(onRampRef) {
-		return false, fmt.Errorf("could not resolve OnRamp address on chain %d", srcChainSelector)
+	fqRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, fee_quoter.ContractType, fee_quoter.Version, "")
+	if datastore_utils.IsAddressRefEmpty(fqRef) {
+		return false, fmt.Errorf("could not resolve FeeQuoter address on chain %d", srcChainSelector)
 	}
 
-	onRampAddr := common.HexToAddress(onRampRef.Address)
-	result, err := cldf_ops.ExecuteOperation(b, onramp.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
+	feeQuoterAddr := common.HexToAddress(fqRef.Address)
+	result, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 		ChainSelector: srcChainSelector,
-		Address:       onRampAddr,
+		Address:       feeQuoterAddr,
 		Args:          targetChainSelector,
 	})
 	if err != nil {
-		return false, fmt.Errorf("failed to read OnRamp dest chain config: %w", err)
+		return false, fmt.Errorf("failed to read FeeQuoter dest chain config: %w", err)
 	}
 
-	return result.Output.Router != (common.Address{}), nil
+	return result.Output.IsEnabled, nil
 }
 
 // ReadDestGasFields reads from all relevant contracts (OnRamp, FeeQuoter, verifiers).
@@ -401,6 +429,28 @@ func (a *GlamsterdamGasAdapter) ReadImmutableSanityFields(
 
 // DiscoverCandidateTokens returns token pool addresses from the datastore.
 // For v2.0.0, this returns the addresses of token pools (Lombard/USDC) that are registered.
+// findTokenPoolRef returns the datastore ref (and its tokenPoolKind) for the given pool address
+// on this chain, if it matches one of glamsterdamTokenPoolKinds. "token" candidates from
+// DiscoverCandidateTokens are always pool addresses (see below), so this resolves back to the
+// kind whenever the interface hands us one.
+func findTokenPoolRef(addrs []datastore.AddressRef, poolAddr common.Address) (datastore.AddressRef, tokenPoolKind, bool) {
+	for _, ref := range addrs {
+		if common.HexToAddress(ref.Address) != poolAddr {
+			continue
+		}
+		for _, kind := range glamsterdamTokenPoolKinds {
+			if ref.Type == datastore.ContractType(kind.ContractType) && ref.Version.Equal(kind.Version) {
+				return ref, kind, true
+			}
+		}
+	}
+	return datastore.AddressRef{}, tokenPoolKind{}, false
+}
+
+// DiscoverCandidateTokens returns every Lombard/USDC token pool address deployed on this chain
+// (across every qualifier, since Lombard in particular can have more than one qualifier-scoped
+// pool per chain). Each pool wraps exactly one token, so the pool's own address is what
+// ReadTokenGasField/WriteTokenGasField/TokenFieldSpec key off of.
 func (a *GlamsterdamGasAdapter) DiscoverCandidateTokens(
 	b cldf_ops.Bundle,
 	chains cldf_chain.BlockChains,
@@ -408,23 +458,28 @@ func (a *GlamsterdamGasAdapter) DiscoverCandidateTokens(
 	srcChainSelector uint64,
 ) ([][]byte, error) {
 	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
+	seen := make(map[common.Address]bool)
 	var tokenPools [][]byte
 
-	// Look for token pool addresses in the datastore
 	for _, ref := range addrs {
-		// For v2.0.0 Glamsterdam, we discover any TokenPool type addresses
-		// In practice, these are Lombard and USDC pools
-		if ref.Type == datastore.ContractType(token_pool.ContractType) {
-			tokenAddr := common.HexToAddress(ref.Address)
-			tokenPools = append(tokenPools, tokenAddr.Bytes())
+		for _, kind := range glamsterdamTokenPoolKinds {
+			if ref.Type != datastore.ContractType(kind.ContractType) || !ref.Version.Equal(kind.Version) {
+				continue
+			}
+			addr := common.HexToAddress(ref.Address)
+			if !seen[addr] {
+				seen[addr] = true
+				tokenPools = append(tokenPools, addr.Bytes())
+			}
 		}
 	}
 
 	return tokenPools, nil
 }
 
-// ReadTokenGasField reads the DestGasOverhead from a TokenPool's TokenTransferFeeConfig.
-// Iterates through all token pools to find one that has a config for this token.
+// ReadTokenGasField reads the DestGasOverhead from a TokenPool's TokenTransferFeeConfig. token is
+// the pool's own address (see DiscoverCandidateTokens); v2.0.0's TokenPool.getTokenTransferFeeConfig
+// takes no token argument since each pool wraps exactly one token.
 func (a *GlamsterdamGasAdapter) ReadTokenGasField(
 	b cldf_ops.Bundle,
 	chains cldf_chain.BlockChains,
@@ -437,42 +492,42 @@ func (a *GlamsterdamGasAdapter) ReadTokenGasField(
 		return 0, false, fmt.Errorf("EVM chain %d not found", srcChainSelector)
 	}
 
-	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
-	tokenAddr := common.BytesToAddress(token)
-
-	// Loop through all token pool refs to find one with this token configured
-	for _, ref := range addrs {
-		if ref.Type != datastore.ContractType(token_pool.ContractType) {
-			continue
-		}
-
-		poolAddr := common.HexToAddress(ref.Address)
-		result, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: srcChainSelector,
-			Address:       poolAddr,
-			Args: token_pool.GetTokenTransferFeeConfigArgs{
-				Arg0:              tokenAddr,
-				DestChainSelector: targetChainSelector,
-				Arg2:              [4]byte{},
-				Arg3:              []byte{},
-			},
-		})
-		if err != nil {
-			return 0, false, fmt.Errorf("failed to read token transfer fee config from pool %s: %w", poolAddr, err)
-		}
-
-		// Return the config from the first pool that has it enabled
-		if result.Output.IsEnabled {
-			return result.Output.DestGasOverhead, true, nil
-		}
+	poolAddr := common.BytesToAddress(token)
+	result, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+		ChainSelector: srcChainSelector,
+		Address:       poolAddr,
+		Args:          token_pool.GetTokenTransferFeeConfigArgs{DestChainSelector: targetChainSelector},
+	})
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to read token transfer fee config from pool %s: %w", poolAddr, err)
 	}
 
-	// No pool found with this token configured
-	return 0, false, nil
+	return result.Output.DestGasOverhead, result.Output.IsEnabled, nil
 }
 
-// WriteTokenGasField writes the DestGasOverhead to all TokenPools that have this token configured.
-// Returns a single BatchOperation containing writes to all matching pools.
+// TokenFieldSpec identifies whether token (a pool address) is a Lombard or USDC pool via its
+// datastore ContractType, and returns the matching FieldSpec — the two rows have different
+// Prague/Glamsterdam baselines and must not be conflated.
+func (a *GlamsterdamGasAdapter) TokenFieldSpec(
+	b cldf_ops.Bundle,
+	chains cldf_chain.BlockChains,
+	ds datastore.DataStore,
+	srcChainSelector uint64,
+	token []byte,
+) (glamsterdamutils.FieldSpec[uint32], error) {
+	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
+	poolAddr := common.BytesToAddress(token)
+	_, kind, found := findTokenPoolRef(addrs, poolAddr)
+	if !found {
+		return glamsterdamutils.FieldSpec[uint32]{}, fmt.Errorf(
+			"could not resolve token pool kind for address %s on chain %d", poolAddr, srcChainSelector,
+		)
+	}
+	return kind.FieldSpec, nil
+}
+
+// WriteTokenGasField writes the DestGasOverhead to the TokenPool at token (a pool address),
+// preserving every other field of its current TokenTransferFeeConfig.
 func (a *GlamsterdamGasAdapter) WriteTokenGasField(
 	b cldf_ops.Bundle,
 	chains cldf_chain.BlockChains,
@@ -486,65 +541,34 @@ func (a *GlamsterdamGasAdapter) WriteTokenGasField(
 		return mcms_types.BatchOperation{}, fmt.Errorf("EVM chain %d not found", srcChainSelector)
 	}
 
-	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
-	tokenAddr := common.BytesToAddress(token)
-	var writes []contract.WriteOutput
+	poolAddr := common.BytesToAddress(token)
 
-	// Loop through all token pools and write to each one that has this token configured
-	for _, ref := range addrs {
-		if ref.Type != datastore.ContractType(token_pool.ContractType) {
-			continue
-		}
-
-		poolAddr := common.HexToAddress(ref.Address)
-
-		// Read current config to check if this pool has this token
-		current, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: srcChainSelector,
-			Address:       poolAddr,
-			Args: token_pool.GetTokenTransferFeeConfigArgs{
-				Arg0:              tokenAddr,
-				DestChainSelector: targetChainSelector,
-				Arg2:              [4]byte{},
-				Arg3:              []byte{},
-			},
-		})
-		if err != nil {
-			return mcms_types.BatchOperation{}, fmt.Errorf("failed to read token transfer fee config from pool %s: %w", poolAddr, err)
-		}
-
-		// Skip pools that don't have this token configured
-		if !current.Output.IsEnabled {
-			continue
-		}
-
-		// Update only the DestGasOverhead field
-		updated := current.Output
-		updated.DestGasOverhead = value
-
-		// Execute the write operation
-		writeOut, err := cldf_ops.ExecuteOperation(b, glamsterdam.ApplyTokenPoolTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
-			ChainSelector: srcChainSelector,
-			Address:       poolAddr,
-			Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
-				TokenTransferFeeConfigArgs: []token_pool.TokenTransferFeeConfigArgs{
-					{DestChainSelector: targetChainSelector, TokenTransferFeeConfig: updated},
-				},
-			},
-		})
-		if err != nil {
-			return mcms_types.BatchOperation{}, fmt.Errorf("failed to apply token transfer fee config update to pool %s: %w", poolAddr, err)
-		}
-
-		writes = append(writes, writeOut.Output)
+	current, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+		ChainSelector: srcChainSelector,
+		Address:       poolAddr,
+		Args:          token_pool.GetTokenTransferFeeConfigArgs{DestChainSelector: targetChainSelector},
+	})
+	if err != nil {
+		return mcms_types.BatchOperation{}, fmt.Errorf("failed to read token transfer fee config from pool %s: %w", poolAddr, err)
 	}
 
-	// If no pools had this token configured, return an empty batch operation
-	if len(writes) == 0 {
-		return mcms_types.BatchOperation{}, nil
+	updated := current.Output
+	updated.DestGasOverhead = value
+
+	writeOut, err := cldf_ops.ExecuteOperation(b, glamsterdam.ApplyTokenPoolTokenTransferFeeConfigUpdates, chain, contract.FunctionInput[token_pool.ApplyTokenTransferFeeConfigUpdatesArgs]{
+		ChainSelector: srcChainSelector,
+		Address:       poolAddr,
+		Args: token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{
+			TokenTransferFeeConfigArgs: []token_pool.TokenTransferFeeConfigArgs{
+				{DestChainSelector: targetChainSelector, TokenTransferFeeConfig: updated},
+			},
+		},
+	})
+	if err != nil {
+		return mcms_types.BatchOperation{}, fmt.Errorf("failed to apply token transfer fee config update to pool %s: %w", poolAddr, err)
 	}
 
-	batchOp, err := contract.NewBatchOperationFromWrites(writes)
+	batchOp, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{writeOut.Output})
 	if err != nil {
 		return mcms_types.BatchOperation{}, fmt.Errorf("failed to build batch operation: %w", err)
 	}

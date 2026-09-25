@@ -7,6 +7,8 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 )
 
 // GasUpdateAdapter provides the interface for implementing Glamsterdam gas config updates
@@ -40,10 +42,19 @@ type GasUpdateAdapter interface {
 	DiscoverCandidateTokens(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector uint64) ([][]byte, error)
 
 	// ReadTokenGasField / WriteTokenGasField mirror ReadDestGasFields/WriteDestGasFields but for
-	// the one per-(chain,token) field each version's table defines (TokenPool.TokenTransferFeeConfig).
-	// token is raw address bytes.
+	// the per-(chain,token) field each version's table defines (TokenPool.TokenTransferFeeConfig).
+	// token is raw address bytes — for v2.0.0 this is the token *pool's* address (Lombard/USDC
+	// pools each own a single wrapped token, so the pool address is what identifies the
+	// candidate, matching how DiscoverCandidateTokens enumerates them).
 	ReadTokenGasField(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector, targetChainSelector uint64, token []byte) (uint32, bool, error) // bool = field is configured at all
 	WriteTokenGasField(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector, targetChainSelector uint64, token []byte, value uint32) (mcms_types.BatchOperation, error)
+
+	// TokenFieldSpec returns the FieldSpec to resolve the given token candidate's gas field
+	// against. Unlike v1.6.1 (a single USDC-only row), v2.0.0's mapping table has two distinct
+	// token-pool rows — Lombard (row 9) and USDC (row 10) — with different Prague/Glamsterdam
+	// values, so the spec cannot be hardcoded; the adapter must identify which kind of pool
+	// `token` refers to (e.g. via its datastore ContractType) and return the matching spec.
+	TokenFieldSpec(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector uint64, token []byte) (glamsterdamutils.FieldSpec[uint32], error)
 }
 
 // GasUpdateAdapterRegistry maintains a registry of GasUpdateAdapter implementations, one per chain family.

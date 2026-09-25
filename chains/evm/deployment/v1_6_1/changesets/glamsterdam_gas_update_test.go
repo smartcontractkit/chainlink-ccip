@@ -20,6 +20,7 @@ import (
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	orops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	usdcpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/changesets"
 	ccipdeploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
