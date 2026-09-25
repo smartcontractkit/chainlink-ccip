@@ -9,6 +9,7 @@ import (
 
 	bnmERC20DripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	bmtpapBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/burn_mint_token_pool_and_proxy"
+	lrtpapBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/lock_release_token_pool_and_proxy"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	bnmERC20DripBindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
@@ -93,6 +94,96 @@ func TestTokenExpansion_V1_5_0_ProxyPool(t *testing.T) {
 		"remote pool is stored 32-byte left-padded to match what the protocol sends")
 
 	// Rate limits from the expansion input (100 capacity / 10 rate, scaled by 18 decimals).
+	outbound, err := pool.GetCurrentOutboundRateLimiterState(opts, s.selB)
+	require.NoError(t, err)
+	require.True(t, outbound.IsEnabled)
+	require.Positive(t, outbound.Capacity.Sign())
+
+	// The TokenAdminRegistry was registered and points at this pool.
+	tar, err := tarbindings.NewTokenAdminRegistry(s.tarAddrA, chainA.Client)
+	require.NoError(t, err)
+	cfg, err := tar.GetTokenConfig(opts, s.tokAddrA)
+	require.NoError(t, err)
+	require.Equal(t, s.oldPoolAddrA, cfg.TokenPool)
+	require.False(t, cfg.Administrator == (common.Address{}), "token should have an administrator set")
+}
+
+// TestTokenExpansion_V1_5_0_LockReleaseProxyPool is the lock-release counterpart of the test above:
+// deploy a LockReleaseTokenPoolAndProxy over a v1.5.0 token, wire the lane, register in the TAR.
+//
+// What it adds over the burn-mint case:
+//
+//   - the immutable acceptLiquidity constructor arg survives the expansion path. It is the one
+//     v1.5.0 deploy input with no v1.5.1 analogue, and it cannot be corrected after deployment;
+//   - the pool is driven entirely through the shared TokenPoolAndProxy base surface. Lane wiring
+//     is read back here through the LOCK-RELEASE ABI to confirm the two contracts really do agree
+//     on that surface, which is the premise the single configure sequence rests on;
+//   - the pool must NOT hold MINTER_ROLE/BURNER_ROLE. That is the mirror image of the burn-mint
+//     assertion above and pins the predicate asymmetry in deployment/utils: a lock-release pool
+//     must not be caught by utils.IsBurnMintPoolType, or every lock-release deployment would
+//     start handing out mint authority it has no use for.
+func TestTokenExpansion_V1_5_0_LockReleaseProxyPool(t *testing.T) {
+	acceptLiquidity := true
+	s := setupLegacyConnectedPair(t, cciputils.Version_1_5_0, legacyPairSpec{
+		poolType:        cciputils.LockReleaseTokenPoolAndProxy,
+		tokenType:       bnmERC20DripOps.ContractType,
+		decimalsA:       18,
+		decimalsB:       18,
+		acceptLiquidity: &acceptLiquidity,
+		// Same single-remote-pool-per-lane ABI as the burn-mint proxy pool.
+		singlePool: true,
+	})
+
+	chainA := s.env.BlockChains.EVMChains()[s.selA]
+	opts := &bind.CallOpts{Context: t.Context()}
+
+	pool, err := lrtpapBindings.NewLockReleaseTokenPoolAndProxy(s.oldPoolAddrA, chainA.Client)
+	require.NoError(t, err)
+	token, err := bnmERC20DripBindings.NewBurnMintERC20WithDrip(s.tokAddrA, chainA.Client)
+	require.NoError(t, err)
+
+	tv, err := pool.TypeAndVersion(opts)
+	require.NoError(t, err)
+	require.Equal(t, "LockReleaseTokenPoolAndProxy 1.5.0", tv)
+
+	// The immutable constructor flag made it through TokenExpansion intact.
+	canAccept, err := pool.CanAcceptLiquidity(opts)
+	require.NoError(t, err)
+	require.True(t, canAccept, "acceptLiquidity must survive the expansion path; it cannot be fixed after deploy")
+
+	// Nothing in the expansion path touches lock-release liquidity state.
+	rebalancer, err := pool.GetRebalancer(opts)
+	require.NoError(t, err)
+	require.Equal(t, common.Address{}, rebalancer, "expansion must not set a rebalancer")
+
+	// Pool and token are wired to each other.
+	gotToken, err := pool.GetToken(opts)
+	require.NoError(t, err)
+	require.Equal(t, s.tokAddrA, gotToken)
+	supportsToken, err := pool.IsSupportedToken(opts, s.tokAddrA)
+	require.NoError(t, err)
+	require.True(t, supportsToken)
+
+	// A lock-release pool locks and releases; it must never have been granted mint/burn authority.
+	hasMinter, err := token.HasRole(opts, bnmERC20DripOps.MintRole, s.oldPoolAddrA)
+	require.NoError(t, err)
+	require.False(t, hasMinter, "lock-release pool must not hold MINTER_ROLE")
+	hasBurner, err := token.HasRole(opts, bnmERC20DripOps.BurnRole, s.oldPoolAddrA)
+	require.NoError(t, err)
+	require.False(t, hasBurner, "lock-release pool must not hold BURNER_ROLE")
+
+	// Lane wiring, read back through the lock-release ABI.
+	supported, err := pool.GetSupportedChains(opts)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{s.selB}, supported)
+	remoteToken, err := pool.GetRemoteToken(opts, s.selB)
+	require.NoError(t, err)
+	require.Equal(t, common.LeftPadBytes(s.tokAddrB.Bytes(), 32), remoteToken)
+	remotePool, err := pool.GetRemotePool(opts, s.selB)
+	require.NoError(t, err)
+	require.Equal(t, common.LeftPadBytes(s.oldPoolAddrB.Bytes(), 32), remotePool,
+		"v1.5.0 stores the single remote pool 32-byte left-padded")
+
 	outbound, err := pool.GetCurrentOutboundRateLimiterState(opts, s.selB)
 	require.NoError(t, err)
 	require.True(t, outbound.IsEnabled)

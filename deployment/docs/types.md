@@ -383,7 +383,7 @@ type DeployTokenPoolInput struct {
     PoolType           string                  // BurnMintTokenPool, LockReleaseTokenPool, etc.
     TokenPoolVersion   *semver.Version
     Allowlist          []string
-    AcceptLiquidity    *bool                   // LockReleaseTokenPool v1.5.1 only
+    AcceptLiquidity    *bool                   // Lock-release pools; see note below
     BurnAddress        string                  // BurnToAddressMintTokenPool only
     TokenGovernor      string                  // BurnMintWithExternalMinterTokenPool only
     // Populated programmatically
@@ -391,6 +391,12 @@ type DeployTokenPoolInput struct {
     ExistingDataStore datastore.DataStore
 }
 ```
+
+`AcceptLiquidity` applies to `LockReleaseTokenPool` v1.5.1 and `LockReleaseTokenPoolAndProxy`
+v1.5.0. It is **required for v1.5.0** — the flag is immutable once the pool is constructed, so the
+v1.5.0 deploy sequence rejects a nil value rather than silently defaulting it to `false`, which
+would be unrecoverable. Omitting it fails with
+`AcceptLiquidity is required when deploying LockReleaseTokenPoolAndProxy v1.5.0`.
 
 ### TokenTransferConfig
 

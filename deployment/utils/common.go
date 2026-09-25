@@ -71,26 +71,27 @@ const (
 // HybridLockReleaseUSDCTokenPool and BurnMintWithLockReleaseFlag are intentionally excluded:
 // the former uses the CCTP hybrid migration path; the latter is not a lock-release pool.
 //
-// LockReleaseTokenPoolAndProxy is included: it is the v1.5.0 lock-release pool (pool and proxy in
-// one contract) and behaves like one everywhere this predicate is consulted.
-//
-// ⚠️ It exists ONLY at v1.5.0. Callers that branch on this predicate to pick a contract to deploy
-// must reject it explicitly for later versions rather than relying on the predicate alone. The
-// v2.0.0 DeployTokenPool sequence does NOT do this today: asking it for either *AndProxy type
-// deploys the plain v2.0.0 pool instead of failing. Same caveat as IsBurnMintPoolType below.
+// LockReleaseTokenPoolAndProxy (the v1.5.0 lock-release pool) is also excluded, deliberately and
+// asymmetrically with IsBurnMintPoolType below. The sole consumer of this predicate is the v2.0.0
+// DeployTokenPool dispatch, which has no v1.5.0 contract to offer: including the type there would
+// route it into DeployLockReleaseTokenPool, which deploys a lockbox and an AdvancedPoolHooks
+// before failing on the missing bytecode, leaving both orphaned on-chain. The v1.5.0 deploy
+// sequence keys on the full "Type Version" string and needs no predicate.
 func IsLockReleasePoolType(poolType string) bool {
 	return poolType == LockReleaseTokenPool.String() ||
-		poolType == SiloedLockReleaseTokenPool.String() ||
-		poolType == LockReleaseTokenPoolAndProxy.String()
+		poolType == SiloedLockReleaseTokenPool.String()
 }
 
 // IsBurnMintPoolType reports whether poolType is a standard burn-mint pool variant.
 //
-// BurnMintTokenPoolAndProxy is included: it is the v1.5.0 burn-mint pool (pool and proxy in one
-// contract) and needs the same mint/burn role grant on its token. It exists ONLY at v1.5.0, so
-// callers that branch on this predicate to pick a contract to deploy must reject it explicitly
-// for later versions rather than relying on the predicate alone — see the v2.0.0
-// DeployTokenPool sequence.
+// BurnMintTokenPoolAndProxy is included because the mint/burn role grant in
+// EVMPoolAdapter.TidyTokenPoolRoles is gated on this predicate and the v1.5.0 pool needs it. That is
+// the only reason; it exists ONLY at v1.5.0.
+//
+// ⚠️ Callers that branch on this predicate to pick a contract to DEPLOY must reject it explicitly
+// rather than relying on the predicate alone. The v2.0.0 DeployTokenPool dispatch does not: it
+// routes the type into DeployBurnMintTokenPool, which deploys an AdvancedPoolHooks before hitting
+// its own "unsupported burn mint token pool type" default, leaving the hooks orphaned on-chain.
 func IsBurnMintPoolType(poolType string) bool {
 	return poolType == BurnMintTokenPool.String() ||
 		poolType == BurnFromMintTokenPool.String() ||

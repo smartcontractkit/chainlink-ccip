@@ -185,9 +185,18 @@ type TokenAdapter interface {
 	DeployTokenVerify(e deployment.Environment, in DeployTokenInput) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]
-	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a legacy
-	// LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool. Returns nil if not supported.
+	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a
+	// legacy lock-release pool to a v2.0 lockbox-based pool. Returns nil if not supported.
 	// Used by the standalone MigrateLockReleasePoolLiquidity changeset.
+	//
+	// On EVM the old pool is driven through the v1.6.1 lock-release bindings and dispatched on
+	// its typeAndVersion TYPE (siloed vs not), never its version - so any legacy pool sharing the
+	// getRebalancer/setRebalancer/withdrawLiquidity signatures is migratable. Verified sources:
+	// LockReleaseTokenPool v1.5.1 and v1.6.1, SiloedLockReleaseTokenPool v1.6.1, and
+	// LockReleaseTokenPoolAndProxy v1.5.0.
+	//
+	// NOTE: the adapter is resolved from the NEW pool's version, not the old one, so a legacy
+	// source needs no adapter registered at its own version to be migratable.
 	MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 

@@ -3,8 +3,6 @@
 package lock_release_token_pool_and_proxy
 
 import (
-	"math/big"
-
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -85,23 +83,6 @@ func (c *LockReleaseTokenPoolAndProxyContract) SetRebalancer(opts *bind.Transact
 	return c.contract.Transact(opts, "setRebalancer", args)
 }
 
-func (c *LockReleaseTokenPoolAndProxyContract) TransferLiquidity(opts *bind.TransactOpts, from common.Address, amount *big.Int) (*types.Transaction, error) {
-	return c.contract.Transact(opts, "transferLiquidity", from, amount)
-}
-
-func (c *LockReleaseTokenPoolAndProxyContract) ProvideLiquidity(opts *bind.TransactOpts, args *big.Int) (*types.Transaction, error) {
-	return c.contract.Transact(opts, "provideLiquidity", args)
-}
-
-func (c *LockReleaseTokenPoolAndProxyContract) WithdrawLiquidity(opts *bind.TransactOpts, args *big.Int) (*types.Transaction, error) {
-	return c.contract.Transact(opts, "withdrawLiquidity", args)
-}
-
-type TransferLiquidityArgs struct {
-	From   common.Address
-	Amount *big.Int
-}
-
 type ConstructorArgs struct {
 	Token           common.Address
 	Allowlist       []common.Address
@@ -163,59 +144,5 @@ var SetRebalancer = contract.NewWrite(contract.WriteParams[common.Address, *Lock
 		args common.Address,
 	) (*types.Transaction, error) {
 		return c.SetRebalancer(opts, args)
-	},
-})
-
-var TransferLiquidity = contract.NewWrite(contract.WriteParams[TransferLiquidityArgs, *LockReleaseTokenPoolAndProxyContract]{
-	Name:            "lock-release-token-pool-and-proxy:transfer-liquidity",
-	Version:         Version,
-	Description:     "Calls transferLiquidity on the contract",
-	ContractType:    ContractType,
-	ContractABI:     LockReleaseTokenPoolAndProxyABI,
-	NewContract:     NewLockReleaseTokenPoolAndProxyContract,
-	IsAllowedCaller: contract.OnlyOwner[*LockReleaseTokenPoolAndProxyContract, TransferLiquidityArgs],
-	Validate:        func(TransferLiquidityArgs) error { return nil },
-	CallContract: func(
-		c *LockReleaseTokenPoolAndProxyContract,
-		opts *bind.TransactOpts,
-		args TransferLiquidityArgs,
-	) (*types.Transaction, error) {
-		return c.TransferLiquidity(opts, args.From, args.Amount)
-	},
-})
-
-var ProvideLiquidity = contract.NewWrite(contract.WriteParams[*big.Int, *LockReleaseTokenPoolAndProxyContract]{
-	Name:            "lock-release-token-pool-and-proxy:provide-liquidity",
-	Version:         Version,
-	Description:     "Calls provideLiquidity on the contract",
-	ContractType:    ContractType,
-	ContractABI:     LockReleaseTokenPoolAndProxyABI,
-	NewContract:     NewLockReleaseTokenPoolAndProxyContract,
-	IsAllowedCaller: contract.AllCallersAllowed[*LockReleaseTokenPoolAndProxyContract, *big.Int],
-	Validate:        func(*big.Int) error { return nil },
-	CallContract: func(
-		c *LockReleaseTokenPoolAndProxyContract,
-		opts *bind.TransactOpts,
-		args *big.Int,
-	) (*types.Transaction, error) {
-		return c.ProvideLiquidity(opts, args)
-	},
-})
-
-var WithdrawLiquidity = contract.NewWrite(contract.WriteParams[*big.Int, *LockReleaseTokenPoolAndProxyContract]{
-	Name:            "lock-release-token-pool-and-proxy:withdraw-liquidity",
-	Version:         Version,
-	Description:     "Calls withdrawLiquidity on the contract",
-	ContractType:    ContractType,
-	ContractABI:     LockReleaseTokenPoolAndProxyABI,
-	NewContract:     NewLockReleaseTokenPoolAndProxyContract,
-	IsAllowedCaller: contract.AllCallersAllowed[*LockReleaseTokenPoolAndProxyContract, *big.Int],
-	Validate:        func(*big.Int) error { return nil },
-	CallContract: func(
-		c *LockReleaseTokenPoolAndProxyContract,
-		opts *bind.TransactOpts,
-		args *big.Int,
-	) (*types.Transaction, error) {
-		return c.WithdrawLiquidity(opts, args)
 	},
 })

@@ -35,6 +35,24 @@ var DeployTokenPool = cldf_ops.NewSequence(
 		if input.TokenPoolVersion == nil {
 			return sequences.OnChainOutput{}, errors.New("TokenPoolVersion is required")
 		}
+		// Reject any non-2.0.0 request before anything is deployed.
+		//
+		// This sequence's pool deploy operations each declare a single BytecodeByTypeAndVersion
+		// entry, keyed "<Type> 2.0.0", so 2.0.0 is already the only version it can actually
+		// produce - this check rejects nothing that would otherwise have succeeded. What it buys
+		// is WHERE the rejection happens. The dispatch below selects a branch by pool type alone
+		// (utils.IsLockReleasePoolType / utils.IsBurnMintPoolType are version-agnostic), and both
+		// DeployLockReleaseTokenPool and DeployBurnMintTokenPool deploy an ERC20LockBox and/or an
+		// AdvancedPoolHooks BEFORE reaching the pool deploy that would fail. Without this guard a
+		// v1.5.0-only type such as BurnMintTokenPoolAndProxy - which IsBurnMintPoolType reports
+		// true for, because the mint/burn role grant needs it to - gets far enough to strand those
+		// contracts on-chain before erroring.
+		if !input.TokenPoolVersion.Equal(utils.Version_2_0_0) {
+			return sequences.OnChainOutput{}, fmt.Errorf(
+				"v2.0.0 DeployTokenPool cannot deploy token pool type '%s' at version %s on chain %d: only %s is supported",
+				input.PoolType, input.TokenPoolVersion, chain.Selector, utils.Version_2_0_0,
+			)
+		}
 		if input.TokenRef == nil {
 			return sequences.OnChainOutput{}, errors.New("TokenRef is required")
 		}

@@ -66,10 +66,18 @@ contracts:
     version: "1.5.0"
     functions: []
 
-  # Deploy plus the liquidity surface that TokenPoolAndProxy does not cover. provideLiquidity
-  # and withdrawLiquidity are rebalancer-gated on-chain rather than onlyOwner, and there is no
-  # rebalancer access alias, so they are declared public and rely on that check - same treatment
-  # as SiloedLockReleaseTokenPool 1.6.1 below.
+  # Deploy plus the small lock-release surface that TokenPoolAndProxy does not cover.
+  #
+  # provideLiquidity/withdrawLiquidity/transferLiquidity are deliberately NOT generated. They are
+  # unused - MigrateLockReleasePoolLiquidity drives a v1.5.0 pool through the v1.6.1 lock-release
+  # ops, whose signatures it shares - and neither access alias describes them honestly: on v1.5.0
+  # both provideLiquidity and withdrawLiquidity are gated on the REBALANCER, not the owner
+  # (verified on a simulated chain: the owner is rejected until it is also made rebalancer).
+  # Declaring them `owner` would be wrong, and `public` would only defer to a check the framework
+  # cannot see. Add them with a rebalancer-aware access rule if a v1.5.0-native liquidity path is
+  # ever needed.
+  #
+  # setRebalancer IS onlyOwner (same verification), so it is generated as such.
   - contract_name: LockReleaseTokenPoolAndProxy
     version: "1.5.0"
     functions:
@@ -79,12 +87,6 @@ contracts:
         access: public
       - name: setRebalancer
         access: owner
-      - name: transferLiquidity
-        access: owner
-      - name: provideLiquidity
-        access: public
-      - name: withdrawLiquidity
-        access: public
 
   # 1.6.3
   - contract_name: FeeQuoter
