@@ -246,6 +246,44 @@ type MigrationSetPoolConfig struct {
 	TokenAddress    string
 }
 
+// LockBoxFunder is an optional interface implemented by adapters that can fund a v2.0 lockbox
+// directly, without a legacy pool to migrate from. It powers the standalone FundLockBox changeset,
+// which tops up a lockbox's siloed (per-chain-selector) and unsiloed (shared) buckets.
+type LockBoxFunder interface {
+	// FundLockBoxSequence returns a sequence that deposits tokens into a lockbox. Returns nil if
+	// the adapter does not support direct lockbox funding.
+	FundLockBoxSequence() *cldf_ops.Sequence[FundLockBoxSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// FundLockBoxSequenceInput is the input for the lockbox funding sequence.
+type FundLockBoxSequenceInput struct {
+	ChainSelector uint64
+	// LockBoxAddress is the ERC20LockBox to fund.
+	LockBoxAddress string
+	// TokenAddress is the token to deposit into the lockbox.
+	TokenAddress string
+	// TimelockAddress is the MCMS timelock address that will execute the funding operations.
+	// Required because the timelock must be an authorized caller on the lockbox to deposit.
+	TimelockAddress string
+	// Deposits are the individual deposits to make into the lockbox. Each entry targets one bucket:
+	// a siloed bucket (RemoteChainSelector set to the remote chain) or the unsiloed shared bucket
+	// (RemoteChainSelector zero).
+	Deposits []LockBoxDeposit
+	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer
+	// instead of using the lockbox's deposit() function. This bypasses the Deposit event emission
+	// and the per-bucket accounting. Use only as a break-glass option.
+	UsePlainTransfer bool
+}
+
+// LockBoxDeposit is a single deposit into a lockbox bucket.
+type LockBoxDeposit struct {
+	// RemoteChainSelector identifies the bucket to fund. Zero designates the unsiloed (shared)
+	// bucket; any other value designates the silo for that remote chain.
+	RemoteChainSelector uint64
+	// Amount is the amount to deposit, in raw base units.
+	Amount *big.Int
+}
+
 // RateLimiterConfig specifies configuration for a rate limiter on a token pool.
 type RateLimiterConfig struct {
 	// IsEnabled specifies whether the rate limiter should be enabled.

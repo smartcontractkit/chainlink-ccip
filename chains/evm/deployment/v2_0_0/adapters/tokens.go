@@ -34,10 +34,11 @@ import (
 
 var (
 	_ tokens.TokenPoolDynamicConfigAdapter = &TokenAdapter{}
-	_ tokens.TokenPoolMigrator     = &TokenAdapter{}
-	_ tokens.TokenFeeAdapter       = &TokenAdapter{}
-	_ tokens.RemotePoolRemover     = &TokenAdapter{}
-	_ tokens.TokenAdapter          = &TokenAdapter{}
+	_ tokens.TokenPoolMigrator             = &TokenAdapter{}
+	_ tokens.TokenFeeAdapter               = &TokenAdapter{}
+	_ tokens.RemotePoolRemover             = &TokenAdapter{}
+	_ tokens.TokenAdapter                  = &TokenAdapter{}
+	_ tokens.LockBoxFunder                 = &TokenAdapter{}
 )
 
 // TokenAdapter handles EVM token pools at version 2.0.0.
@@ -200,6 +201,10 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokens.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
 	return evm_tokens.MigrateLockReleasePoolLiquidity
+}
+
+func (t *TokenAdapter) FundLockBoxSequence() *cldf_ops.Sequence[tokens.FundLockBoxSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
+	return evm_tokens.FundLockBox
 }
 
 func (t *TokenAdapter) SetAllowedFinalityConfig(e *deployment.Environment) *cldf_ops.Sequence[tokens.SetAllowedFinalityConfigSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
