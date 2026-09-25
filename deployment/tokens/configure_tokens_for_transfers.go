@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -625,7 +626,7 @@ func applyTokenTransferFeeConfig(
 	// are disabled, then the FeeQuoter fees are used as a fallback.
 	var batches []mcms_types.BatchOperation
 	var reports []cldf_ops.Report[any, any]
-	if fqBatches, fqReports, err := applyTokenTransferFeeConfigOnFeeQuoter(e, src, dst, fullSrcTokenRef, srcToDstFeeCfg); err != nil {
+	if fqBatches, fqReports, err := ApplyTokenTransferFeeConfigOnFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, src, dst, fullSrcTokenRef, srcToDstFeeCfg); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply token transfer fee config on fee quoter for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	} else {
 		batches = append(batches, fqBatches...)
@@ -708,13 +709,18 @@ func applyTokenTransferFeeConfigOnTokenPool(
 	return result.Output.BatchOps, result.ExecutionReports, nil
 }
 
-func applyTokenTransferFeeConfigOnFeeQuoter(
-	e cldf.Environment,
+// ApplyTokenTransferFeeConfigOnFeeQuoter resolves and applies a token transfer fee configuration
+// for a src→dst lane on the chain's FeeQuoter. It takes the bundle/blockchains/datastore directly
+// so versioned sequences can call it without constructing a deployment.Environment.
+func ApplyTokenTransferFeeConfigOnFeeQuoter(
+	b cldf_ops.Bundle,
+	chains cldf_chain.BlockChains,
+	ds datastore.DataStore,
 	src, dst uint64,
 	fullSrcTokenRef datastore.AddressRef,
 	partial PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, src, dst)
+	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(b, chains, ds, src, dst)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
@@ -730,7 +736,7 @@ func applyTokenTransferFeeConfigOnFeeQuoter(
 	// at the moment, but realistically speaking this should not an issue
 	// since we've never had the need to modify it after we initially set
 	// it to MaxUint32.
-	onChainConfig, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, src, dst, fullSrcTokenRef.Address)
+	onChainConfig, err := feeAdapter.GetOnchainTokenTransferFeeConfig(b, chains, fqRef, src, dst, fullSrcTokenRef.Address)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
@@ -764,19 +770,19 @@ func applyTokenTransferFeeConfigOnFeeQuoter(
 	}
 
 	if !requestedConfig.IsEnabled && !onChainConfig.IsEnabled {
-		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since legacy lane fee config is already disabled", src, dst)
+		b.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since legacy lane fee config is already disabled", src, dst)
 		return nil, nil, nil
 	}
 
 	if requestedConfig == onChainConfig {
-		e.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since the desired config is the same as the current on-chain config", src, dst)
+		b.Logger.Infof("Skipping token transfer fee config for chain selector %d and remote chain selector %d since the desired config is the same as the current on-chain config", src, dst)
 		return nil, nil, nil
 	}
 
 	result, err := cldf_ops.ExecuteSequence(
-		e.OperationsBundle,
-		feeAdapter.SetTokenTransferFee(e.DataStore, fqRef),
-		e.BlockChains,
+		b,
+		feeAdapter.SetTokenTransferFee(ds, fqRef),
+		chains,
 		fees.SetTokenTransferFeeSequenceInput{
 			Selector: src,
 			Settings: map[uint64]map[string]*fees.TokenTransferFeeArgs{

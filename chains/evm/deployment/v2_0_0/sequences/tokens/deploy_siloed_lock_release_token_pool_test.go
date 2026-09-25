@@ -1,7 +1,6 @@
 package tokens_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -93,12 +92,11 @@ func setupSiloedPoolDeps(t *testing.T, chainSel uint64) (*deployment.Environment
 	}
 
 	return e, tokens.DeployTokenPoolInput{
-		ChainSel:                         chainSel,
-		TokenPoolType:                    datastore.ContractType(siloed_lock_release_token_pool.ContractType),
-		TokenPoolVersion:                 siloed_lock_release_token_pool.Version,
-		TokenSymbol:                      tokenReport.Input.Args.Symbol,
-		RateLimitAdmin:                   common.HexToAddress("0x01"),
-		ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
+		ChainSel:         chainSel,
+		TokenPoolType:    datastore.ContractType(siloed_lock_release_token_pool.ContractType),
+		TokenPoolVersion: siloed_lock_release_token_pool.Version,
+		TokenSymbol:      tokenReport.Input.Args.Symbol,
+		RateLimitAdmin:   common.HexToAddress("0x01"),
 		ConstructorArgs: tokens.ConstructorArgs{
 			Token:    common.HexToAddress(tokenReport.Output.Address),
 			Decimals: 18,
@@ -125,11 +123,11 @@ func TestDeploySiloedLockReleaseTokenPool(t *testing.T) {
 			input,
 		)
 		require.NoError(t, err, "ExecuteSequence should not error")
-		require.Len(t, poolReport.Output.Addresses, 4, "Expected 4 addresses in output (pool, hooks, 2 lock boxes)")
+		require.Len(t, poolReport.Output.Addresses, 3, "Expected 3 addresses in output (pool, 2 lock boxes)")
 
 		poolAddress := common.HexToAddress(poolReport.Output.Addresses[0].Address)
-		sharedLockBox := common.HexToAddress(poolReport.Output.Addresses[2].Address)
-		siloedLockBox := common.HexToAddress(poolReport.Output.Addresses[3].Address)
+		sharedLockBox := common.HexToAddress(poolReport.Output.Addresses[1].Address)
+		siloedLockBox := common.HexToAddress(poolReport.Output.Addresses[2].Address)
 		require.NotEqual(t, sharedLockBox, siloedLockBox, "Expected a distinct lock box per silo group")
 
 		// The pool holds no liquidity of its own, so the token/router wiring plus the lock box
