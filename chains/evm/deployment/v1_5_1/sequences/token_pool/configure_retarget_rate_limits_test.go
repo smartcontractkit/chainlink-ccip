@@ -134,6 +134,7 @@ func configureRetargetLane(
 
 	_, err := cldf_ops.ExecuteSequence(e.OperationsBundle, ConfigureTokenPoolForRemoteChains, chain,
 		ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    chain.Selector,
 			TokenPoolAddress: poolAddr,
 			TokenPoolVersion: utils.Version_1_5_1,
 			RemoteChains:     map[uint64]tokenapi.RemoteChainConfig[[]byte, string]{retargetRemoteSelector: cfg},

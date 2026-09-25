@@ -32,6 +32,12 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+// ErrCLLTimelockNotConfigured indicates that no CLL RBACTimelock ref exists in the datastore for a
+// chain. Callers use errors.Is to distinguish this legitimate "no timelock" state (skip) from an
+// existing-but-unresolvable ref, which surfaces as a different error (fail closed). Without this the
+// datastore lookup collapses both into one indistinguishable error.
+var ErrCLLTimelockNotConfigured = errors.New("no CLL timelock configured")
+
 var (
 	_ tokensapi.TokenAdminRoleAdapter = &EVMTokenBase{}
 	_ tokensapi.TokenRefResolver      = &EVMTokenBase{}
@@ -419,13 +425,24 @@ func (a *EVMTokenBase) GetTokenAdminRegistryRef(e deployment.Environment, chainS
 	return ref, nil
 }
 
-// GetTimelockAddressCLL looks up the timelock (RBACTimelock) address from the datastore using the CLL qualifier.
+// GetTimelockAddressCLL looks up the timelock (RBACTimelock) address from the datastore using the CLL
+// qualifier. It returns ErrCLLTimelockNotConfigured (matchable via errors.Is) when no such ref exists,
+// and a distinct wrapped error when a ref exists but cannot be resolved (ambiguous/malformed/zero).
 func (a *EVMTokenBase) GetTimelockAddressCLL(ds datastore.DataStore, selector uint64) (common.Address, error) {
 	filter := datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          datastore.ContractType(cciputils.RBACTimelock),
 		Version:       cciputils.Version_1_0_0,
 		Qualifier:     cciputils.CLLQualifier,
+	}
+
+	if len(ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(filter.Type),
+		datastore.AddressRefByVersion(filter.Version),
+		datastore.AddressRefByQualifier(filter.Qualifier),
+	)) == 0 {
+		return common.Address{}, fmt.Errorf("%w on chain %d", ErrCLLTimelockNotConfigured, selector)
 	}
 
 	addr, err := a.ParseNonZeroAddressRef(ds, filter, selector)

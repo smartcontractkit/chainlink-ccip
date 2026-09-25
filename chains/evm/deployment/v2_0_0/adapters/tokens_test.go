@@ -9,9 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	bnm_drip_v1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
@@ -21,6 +20,7 @@ import (
 	burn_mint_token_pool_v1_6_1 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_token_pool"
 	tp_bindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	contract_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -311,7 +311,7 @@ func TestTokenAdapter(t *testing.T) {
 				}, chainSel, evm_datastore_utils.ToEVMAddress)
 				require.NoError(t, err, "Failed to find deployed registry ref in datastore")
 
-				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract.FunctionInput[common.Address]{
+				tokenConfigReport, err := operations.ExecuteOperation(e.OperationsBundle, token_admin_registry.GetTokenConfig, evmChain, contract_utils.FunctionInput[common.Address]{
 					ChainSelector: chainSel,
 					Address:       registryAddr,
 					Args:          tokenAddr,
@@ -320,7 +320,7 @@ func TestTokenAdapter(t *testing.T) {
 				require.Equal(t, tokenPoolAddr, tokenConfigReport.Output.TokenPool, "Token pool address in registry should match deployed token pool address")
 				require.Equal(t, evmChain.DeployerKey.From, tokenConfigReport.Output.Administrator, "Deployer should be the admin of the token in the registry")
 
-				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract.FunctionInput[struct{}]{
+				chainSupportReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetSupportedChains, evmChain, contract_utils.FunctionInput[struct{}]{
 					ChainSelector: chainSel,
 					Address:       tokenPoolAddr,
 				})
@@ -336,7 +336,7 @@ func TestTokenAdapter(t *testing.T) {
 
 				// GetCurrentRateLimiterState is only available in version 2.0.0+
 				if version.GreaterThan(semver.MustParse("1.6.9")) || version.Equal(semver.MustParse("2.0.0")) {
-					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
+					rateLimiterStateReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetCurrentRateLimiterState, evmChain, contract_utils.FunctionInput[token_pool.GetCurrentRateLimiterStateArgs]{
 						ChainSelector: chainSel,
 						Address:       tokenPoolAddr,
 						Args: token_pool.GetCurrentRateLimiterStateArgs{
@@ -503,7 +503,7 @@ func TestTokenExpansion(t *testing.T) {
 		require.NoError(t, err, "Token pool should exist in datastore")
 
 		// Verify token pool points to the correct token
-		getTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract.FunctionInput[struct{}]{
+		getTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetToken, evmChain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chainSel,
 			Address:       poolAddr,
 		})
@@ -511,7 +511,7 @@ func TestTokenExpansion(t *testing.T) {
 		require.Equal(t, tokenAddr, getTokenReport.Output, "Token pool should point to the deployed token")
 
 		// Verify token pool decimals
-		getDecimalsReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract.FunctionInput[struct{}]{
+		getDecimalsReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetTokenDecimals, evmChain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chainSel,
 			Address:       poolAddr,
 		})
@@ -660,7 +660,7 @@ func TestTokenExpansion_RouterRefReconcile(t *testing.T) {
 
 	readDynamicConfig := func(t *testing.T) token_pool.GetDynamicConfigResult {
 		t.Helper()
-		report, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
+		report, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract_utils.FunctionInput[struct{}]{
 			ChainSelector: chainSel,
 			Address:       poolAddr,
 		})
@@ -801,7 +801,7 @@ func TestTokenExpansion_FreshDeployWithRouterRef(t *testing.T) {
 	}, chainSel, evm_datastore_utils.ToEVMAddress)
 	require.NoError(t, err)
 
-	cfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract.FunctionInput[struct{}]{
+	cfgReport, err := operations.ExecuteOperation(e.OperationsBundle, token_pool.GetDynamicConfig, evmChain, contract_utils.FunctionInput[struct{}]{
 		ChainSelector: chainSel,
 		Address:       poolAddr,
 	})
@@ -1036,4 +1036,122 @@ func TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens(t *testing.T
 			require.True(t, hasBurnerRole, "pool should have burner role on v1.5.0 BurnMintERC20WithDrip token (adapter %s)", tc.adapterVersion)
 		}
 	}
+}
+
+// TestTokenExpansionPoolSkipsRoleGrantForExternallyAdministeredToken verifies the admin-role
+// preflight in TidyTokenPoolRoles: when neither the deployer nor the CLL timelock holds the
+// token's DEFAULT_ADMIN_ROLE (a 3rd-party-administered token), TokenExpansion still deploys the
+// pool but SKIPS emitting the pool mint/burn role grants — those writes would revert on-chain,
+// so the external token admin must grant them after deploy. The positive path (deployer is admin
+// → grants ARE emitted) is covered by TestTokenExpansionPoolOnlyGrantsRolesForExistingBurnMintTokens.
+func TestTokenExpansionPoolSkipsRoleGrantForExternallyAdministeredToken(t *testing.T) {
+	adapterVersion := semver.MustParse("2.0.0")
+	chainSel := chainsel.ETHEREUM_MAINNET.Selector
+	const symbol = "EXTADMIN"
+
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{chainSel}))
+	require.NoError(t, err)
+
+	mcmsRegistry := changesets.GetRegistry()
+	ds := datastore.NewMemoryDataStore()
+
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, e.BlockChains.EVMChains()[chainSel], contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
+		ChainSelector:  chainSel,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{e.BlockChains.EVMChains()[chainSel].DeployerKey.From},
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	e.DataStore, err = testsetup.WithUltraFastCurseMCMS(e.DataStore, chainSel)
+	require.NoError(t, err)
+
+	deployChainOut, err := v2_0_0.DeployChainContracts(mcmsRegistry).Apply(*e, changesets.WithMCMS[v2_0_0.DeployChainContractsCfg]{
+		Cfg: v2_0_0.DeployChainContractsCfg{
+			ChainSel:         chainSel,
+			CREATE2Factory:   common.HexToAddress(create2FactoryRef.Address),
+			Params:           testsetup.CreateBasicContractParams(),
+			DeployerKeyOwned: true,
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, ds.Merge(deployChainOut.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+
+	evmChain := e.BlockChains.EVMChains()[chainSel]
+
+	// Deploy the token directly, hand DEFAULT_ADMIN_ROLE to a third party, then strip it from the
+	// deployer. No CLL timelock is seeded (the ultra-fast-curse MCMS uses a different qualifier), so
+	// neither the deployer nor a resolvable CLL timelock holds admin — the skip path's precondition.
+	tokenAddr, tx, token, err := drip_v150_bindings.DeployBurnMintERC20WithDrip(evmChain.DeployerKey, evmChain.Client, symbol+" Token", symbol)
+	require.NoError(t, err)
+	_, err = evmChain.Confirm(tx)
+	require.NoError(t, err)
+
+	externalAdmin := common.HexToAddress("0x000000000000000000000000000000000000dEaD")
+	tx, err = token.GrantRole(evmChain.DeployerKey, drip_v150_ops.DefaultAdminRole, externalAdmin)
+	require.NoError(t, err)
+	_, err = evmChain.Confirm(tx)
+	require.NoError(t, err)
+	tx, err = token.RevokeRole(evmChain.DeployerKey, drip_v150_ops.DefaultAdminRole, evmChain.DeployerKey.From)
+	require.NoError(t, err)
+	_, err = evmChain.Confirm(tx)
+	require.NoError(t, err)
+
+	deployerHasAdmin, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, drip_v150_ops.DefaultAdminRole, evmChain.DeployerKey.From)
+	require.NoError(t, err)
+	require.False(t, deployerHasAdmin, "precondition: deployer must not hold the token admin role")
+
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: chainSel,
+		Address:       tokenAddr.Hex(),
+		Type:          datastore.ContractType(drip_v150_ops.ContractType),
+		Version:       drip_v150_ops.Version,
+		Qualifier:     symbol,
+	}))
+	e.DataStore = ds.Seal()
+
+	poolOut, err := tokens.TokenExpansion().Apply(*e, tokens.TokenExpansionInput{
+		ChainAdapterVersion: adapterVersion,
+		MCMS:                mcms.Input{},
+		TokenExpansionInputPerChain: map[uint64]tokens.TokenExpansionInputPerChain{
+			chainSel: {
+				TokenPoolVersion:      burn_mint_token_pool.Version,
+				SkipOwnershipTransfer: true,
+				DeployTokenInput:      nil,
+				DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+					TokenRef: &datastore.AddressRef{
+						Type:      datastore.ContractType(drip_v150_ops.ContractType),
+						Version:   drip_v150_ops.Version,
+						Qualifier: symbol,
+					},
+					PoolType:           string(burn_mint_token_pool.ContractType),
+					TokenPoolQualifier: symbol,
+				},
+			},
+		},
+	})
+	require.NoError(t, err, "pool-only TokenExpansion should succeed even when the token is externally administered")
+	require.NoError(t, ds.Merge(poolOut.DataStore.Seal()))
+	e.DataStore = ds.Seal()
+
+	// The pool must have been deployed: this proves the skip is specifically the role grant, not a
+	// broader failure of the pool deploy.
+	poolAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+		ChainSelector: chainSel,
+		Type:          datastore.ContractType(string(burn_mint_token_pool.ContractType)),
+		Version:       burn_mint_token_pool.Version,
+		Qualifier:     symbol,
+	}, chainSel, evm_datastore_utils.ToEVMAddress)
+	require.NoError(t, err, "pool should have been deployed and recorded in the datastore")
+
+	// The mint/burn role grants must have been skipped: the pool holds neither role.
+	hasMinterRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, drip_v150_ops.MintRole, poolAddr)
+	require.NoError(t, err)
+	require.False(t, hasMinterRole, "pool mint-role grant must be skipped for an externally-administered token")
+
+	hasBurnerRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, drip_v150_ops.BurnRole, poolAddr)
+	require.NoError(t, err)
+	require.False(t, hasBurnerRole, "pool burn-role grant must be skipped for an externally-administered token")
 }
