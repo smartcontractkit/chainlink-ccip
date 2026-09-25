@@ -585,10 +585,16 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	}
 
 	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
-	if err != nil {
-		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
+	if errors.Is(err, ErrCLLTimelockNotConfigured) {
+		b.Logger.Infof("no CLL timelock configured for chain %d; keeping deployer as token admin", input.ChainSelector)
 		return nil, nil
 	}
+	if err != nil {
+		// A CLL timelock ref exists but is unresolvable (ambiguous/malformed/zero): a real
+		// misconfiguration. Fail closed rather than silently leaving the deployer as permanent admin.
+		return nil, fmt.Errorf("failed to resolve CLL timelock for admin handover on token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+
 	// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the grant below;
 	// grantRole/revokeRole revert unconditionally for their admin role, so RevokeAdminRole has no
 	// equivalent here. Instead, queue AcceptDefaultAdminTransfer into the batch: this function
@@ -685,20 +691,12 @@ func (a *EVMPoolAdapter) canAdministerTokenRoles(
 		return true, nil
 	}
 
-	// lookup returns a non-sentinel error for both, so check existence explicitly first: if no
-	// CLL timelock ref exists, only the deployer path could have worked (and it didn't), so CLD
-	// cannot administer the roles — a legitimate skip, not an error.
-	timelockRefs := input.ExistingDataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(input.ChainSelector),
-		datastore.AddressRefByType(datastore.ContractType(cciputils.RBACTimelock)),
-		datastore.AddressRefByVersion(cciputils.Version_1_0_0),
-		datastore.AddressRefByQualifier(cciputils.CLLQualifier),
-	)
-	if len(timelockRefs) == 0 {
+	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
+	if errors.Is(err, ErrCLLTimelockNotConfigured) {
+		// No CLL timelock configured: only the deployer path could have worked (and it didn't), so
+		// CLD cannot administer the roles — a legitimate skip, not an error.
 		return false, nil
 	}
-
-	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
 	if err != nil {
 		// A CLL timelock ref exists but could not be resolved (ambiguous match or malformed/zero
 		// address): a genuine misconfiguration worth surfacing rather than silently reporting
