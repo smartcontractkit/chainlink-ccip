@@ -406,6 +406,72 @@ var SetPool = operations.NewOperation(
 	},
 )
 
+// UnregisterTokenParams is the input for unregistering a token from the router's TokenAdminRegistry.
+type UnregisterTokenParams struct {
+	Router    solana.PublicKey
+	TokenMint solana.PublicKey
+}
+
+// UnregisterToken unregisters a token from the router's TokenAdminRegistry by setting its pool
+// lookup table to the zero pubkey (the Solana counterpart to EVM setPool(address(0))). The
+// instruction is signed by the token's TAR administrator (or the router authority when no admin
+// is set). The caller is responsible for the read-check guard (only unregister when the token's
+// current active pool is the pool being removed) before executing this operation.
+var UnregisterToken = operations.NewOperation(
+	"router:unregister-token",
+	Version,
+	"Unregisters a token from the Router TokenAdminRegistry by setting its pool lookup table to zero",
+	func(b operations.Bundle, chain cldf_solana.Chain, input UnregisterTokenParams) (sequences.OnChainOutput, error) {
+		ccip_router.SetProgramID(input.Router)
+
+		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
+		currentAdmin := GetAuthority(chain, input.Router)
+		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+			if !tokenAdminRegistryAccount.Administrator.IsZero() {
+				currentAdmin = tokenAdminRegistryAccount.Administrator
+			}
+		}
+
+		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
+		base := ccip_router.NewSetPoolInstruction(
+			[]uint8{},
+			routerConfigPDA,
+			tokenAdminRegistryPDA,
+			input.TokenMint,
+			solana.PublicKey{},
+			currentAdmin,
+		)
+		tempIx, err := base.ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build router unregister token instruction: %w", err)
+		}
+		ixData, err := tempIx.Data()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload from router unregister token instruction: %w", err)
+		}
+		instruction := solana.NewInstruction(input.Router, tempIx.Accounts(), ixData)
+
+		if currentAdmin != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{instruction},
+				input.Router.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm unregister token: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
 var RegisterTokenAdminRegistry = operations.NewOperation(
 	"router:register-token-admin-registry",
 	Version,

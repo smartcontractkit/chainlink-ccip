@@ -1127,9 +1127,11 @@ func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the remote pools for A2 on chains B and C. These should include the newly-migrated B2 and C2 pools, respectively, due to reverse propagation.
-	a2b, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenRefB.ChainSelector)
+	tokenA2, err := adp.AddressRefToBytes(tokenRefA)
 	require.NoError(t, err)
-	a2c, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenRefC.ChainSelector)
+	a2b, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenA2, tokenRefB.ChainSelector)
+	require.NoError(t, err)
+	a2c, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenA2, tokenRefC.ChainSelector)
 	require.NoError(t, err)
 
 	// Check that A2's remote pools for B and C include the newly-migrated B2 and C2 pools, respectively. This is the reverse propagation check.

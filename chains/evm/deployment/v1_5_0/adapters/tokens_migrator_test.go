@@ -41,15 +41,15 @@ func TestTokenAdapter_MigratorReads(t *testing.T) {
 	adapter := NewTokenAdapter()
 	poolBytes := poolAddr.Bytes()
 
-	supported, err := adapter.GetSupportedChains(*e, localSelector, poolBytes)
+	supported, err := adapter.GetSupportedChains(*e, localSelector, poolBytes, testRemoteToken.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []uint64{remoteSelector}, supported)
 
-	remoteToken, err := adapter.GetRemoteToken(*e, localSelector, poolBytes, remoteSelector)
+	remoteToken, err := adapter.GetRemoteToken(*e, localSelector, poolBytes, testRemoteToken.Bytes(), remoteSelector)
 	require.NoError(t, err)
 	require.Equal(t, testRemoteToken.Bytes(), remoteToken)
 
-	remotePools, err := adapter.GetRemotePools(*e, localSelector, poolBytes, remoteSelector)
+	remotePools, err := adapter.GetRemotePools(*e, localSelector, poolBytes, testRemoteToken.Bytes(), remoteSelector)
 	require.NoError(t, err)
 	require.Len(t, remotePools, 1, "a v1.5.0 pool holds exactly one remote pool per lane")
 	require.Equal(t, common.LeftPadBytes(testRemotePool.Bytes(), 32), remotePools[0])
@@ -64,7 +64,7 @@ func TestTokenAdapter_GetRemotePools_UnconfiguredLane(t *testing.T) {
 	adapter := NewTokenAdapter()
 
 	unconfigured := chain_selectors.POLYGON_MAINNET.Selector
-	remotePools, err := adapter.GetRemotePools(*e, localSelector, poolAddr.Bytes(), unconfigured)
+	remotePools, err := adapter.GetRemotePools(*e, localSelector, poolAddr.Bytes(), testRemoteToken.Bytes(), unconfigured)
 	require.NoError(t, err)
 	require.Empty(t, remotePools)
 }

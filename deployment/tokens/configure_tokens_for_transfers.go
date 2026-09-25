@@ -222,9 +222,9 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 		// connectivity from B_new to A and C. The reverse propagation is handled later in the code.
 		var discoveredRemotes []DiscoveredRemoteChain
 		if token.AutoMigrateRemoteChains {
-			tarReader, ok := tokenRegistry.GetTokenAdminRegistryReader(family)
+			tarReader, ok := tokenRegistry.GetTokenAdminRegistryManager(family)
 			if !ok {
-				return nil, nil, nil, fmt.Errorf("no token admin registry reader for chain family %s", family)
+				return nil, nil, nil, fmt.Errorf("no token admin registry manager for chain family %s", family)
 			}
 			activePool, err := tarReader.GetActivePool(e, selector, fullTokenRef, token.RegistryRef)
 			if err != nil {
@@ -236,6 +236,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				allRemoteSelectors    []uint64
 				activePoolRef         datastore.AddressRef
 				localDecimals         uint8
+				localTokenBytes       []byte
 			)
 			if len(activePool) > 0 {
 				targetPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
@@ -274,15 +275,15 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 										activePoolRef.Version, selector,
 									)
 								}
-								tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
+								localTokenBytes, err = legacyAdapter.AddressRefToBytes(fullTokenRef)
 								if err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
 								}
-								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
+								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, localTokenBytes)
 								if err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
 								}
-								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
+								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool, localTokenBytes); err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
 								} else {
 									allRemoteSelectors = supported
@@ -309,7 +310,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if !ok {
 					return nil, nil, nil, fmt.Errorf("no address normalizer found for chain family %s of remote chain selector %d", remoteFamily, remoteSelector)
 				}
-				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, remoteSelector)
+				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, localTokenBytes, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote token for remote chain selector %d: %w", remoteSelector, err)
 				}
@@ -328,9 +329,9 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 						return nil, nil, nil, fmt.Errorf("failed to convert counterpart pool ref to bytes for chain selector %d: %w", remoteSelector, err)
 					}
 				} else {
-					remoteRegReader, ok := tokenRegistry.GetTokenAdminRegistryReader(remoteFamily)
+					remoteRegReader, ok := tokenRegistry.GetTokenAdminRegistryManager(remoteFamily)
 					if !ok {
-						return nil, nil, nil, fmt.Errorf("no admin registry reader for remote chain family %s", remoteFamily)
+						return nil, nil, nil, fmt.Errorf("no admin registry manager for remote chain family %s", remoteFamily)
 					}
 					remotePoolBytes, err = remoteRegReader.GetActivePool(e, remoteSelector, datastore.AddressRef{Address: remoteTokenAddr})
 					if err != nil {
@@ -345,7 +346,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for remote chain selector %d: %w", remoteSelector, err)
 				}
-				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, remoteSelector)
+				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, localTokenBytes, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
 				}
@@ -591,9 +592,9 @@ func snapshotActivePools(e cldf.Environment, tokenRegistry *TokenAdapterRegistry
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chain family for selector %d: %w", selector, err)
 		}
-		reader, ok := tokenRegistry.GetTokenAdminRegistryReader(family)
+		reader, ok := tokenRegistry.GetTokenAdminRegistryManager(family)
 		if !ok {
-			return nil, fmt.Errorf("no token admin registry reader for chain family %s", family)
+			return nil, fmt.Errorf("no token admin registry manager for chain family %s", family)
 		}
 		_, _, _, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, selector, tc.TokenPoolRef, tc.TokenRef)
 		if err != nil {
