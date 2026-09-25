@@ -364,20 +364,22 @@ func removeRemotePoolsReverse(
 			return nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
 		}
 
-		// Resolve the peer's adapter and pool ref from the peer pool address given in the forward
-		// input. The peer token ref is resolved separately below (from the local pool's remote
-		// config) because a Solana pool program ID is shared across mints, so the peer adapter
-		// cannot derive the token from the pool address alone.
-		remoteAdapter, _, _, _, err := ResolveAdapterAndRefs(e, tokenRegistry, remoteSelector, remote.Remote, datastore.AddressRef{})
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to resolve peer adapter on remote chain selector %d: %w", remoteSelector, err)
-		}
-
-		// Resolve the peer's token from the local pool's remote config. This is the token the peer
-		// serves for this lane, and is required to resolve the peer's active pool below.
+		// Resolve the peer's token from the local pool's remote config first, so it can be passed
+		// into the peer adapter resolution below. This is the token the peer serves for this lane,
+		// and is required both to resolve the peer's active pool and to resolve the peer adapter
+		// when the peer pool cannot self-derive its token (a Solana pool program ID is shared
+		// across mints, so the mint cannot be derived from the pool address alone).
 		remoteTokenRef, err := resolvePeerTokenRef(e, tokenRegistry, localAdapter, selector, fullPoolRef, fullTokenRef, remoteSelector)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve peer token on remote chain selector %d: %w", remoteSelector, err)
+		}
+
+		// Resolve the peer's adapter and pool ref from the peer pool address given in the forward
+		// input, passing the resolved token ref so resolution succeeds even when the peer pool is
+		// referenced by a bare program ID (Solana) that cannot self-derive its token.
+		remoteAdapter, _, _, _, err := ResolveAdapterAndRefs(e, tokenRegistry, remoteSelector, remote.Remote, remoteTokenRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to resolve peer adapter on remote chain selector %d: %w", remoteSelector, err)
 		}
 
 		// Resolve the peer's active pool. A hard error (not a silent skip) when it cannot be
