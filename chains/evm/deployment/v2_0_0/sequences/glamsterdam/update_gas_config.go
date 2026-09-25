@@ -12,7 +12,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -22,10 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/lombard_verifier"
 )
 
-// applyOnRampDestChainConfigUpdates mirrors onramp.ApplyDestChainConfigUpdates, but always routes
+// ApplyOnRampDestChainConfigUpdates mirrors onramp.ApplyDestChainConfigUpdates, but always routes
 // the write through MCMS regardless of who the deployer key is, per this feature's "always MCMS"
-// decision.
-var applyOnRampDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]onramp.DestChainConfigArgs, *onramp.OnRampContract]{
+// decision. Exported for use by other packages (e.g., adapters).
+var ApplyOnRampDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]onramp.DestChainConfigArgs, *onramp.OnRampContract]{
 	Name:            "glamsterdam:onramp:apply-dest-chain-config-updates",
 	Version:         semver.MustParse("2.0.0"),
 	Description:     "Calls applyDestChainConfigUpdates on OnRamp, always producing an MCMS proposal",
@@ -39,9 +39,9 @@ var applyOnRampDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[
 	},
 })
 
-// applyFeeQuoterDestChainConfigUpdates mirrors fee_quoter.ApplyDestChainConfigUpdates, but always
-// routes the write through MCMS.
-var applyFeeQuoterDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]fee_quoter.DestChainConfigArgs, *fee_quoter.FeeQuoterContract]{
+// ApplyFeeQuoterDestChainConfigUpdates mirrors fee_quoter.ApplyDestChainConfigUpdates, but always
+// routes the write through MCMS. Exported for use by other packages (e.g., adapters).
+var ApplyFeeQuoterDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]fee_quoter.DestChainConfigArgs, *fee_quoter.FeeQuoterContract]{
 	Name:            "glamsterdam:fee-quoter:apply-dest-chain-config-updates",
 	Version:         semver.MustParse("2.0.0"),
 	Description:     "Calls applyDestChainConfigUpdates on FeeQuoter, always producing an MCMS proposal",
@@ -55,9 +55,10 @@ var applyFeeQuoterDestChainConfigUpdates = contract.NewWrite(contract.WriteParam
 	},
 })
 
-// applyCommitteeVerifierRemoteChainConfigUpdates mirrors
+// ApplyCommitteeVerifierRemoteChainConfigUpdates mirrors
 // committee_verifier.ApplyRemoteChainConfigUpdates, but always routes the write through MCMS.
-var applyCommitteeVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]committee_verifier.RemoteChainConfigArgs, *committee_verifier.CommitteeVerifierContract]{
+// Exported for use by other packages (e.g., adapters).
+var ApplyCommitteeVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]committee_verifier.RemoteChainConfigArgs, *committee_verifier.CommitteeVerifierContract]{
 	Name:            "glamsterdam:committee-verifier:apply-remote-chain-config-updates",
 	Version:         semver.MustParse("2.0.0"),
 	Description:     "Calls applyRemoteChainConfigUpdates on CommitteeVerifier, always producing an MCMS proposal",
@@ -71,9 +72,10 @@ var applyCommitteeVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.
 	},
 })
 
-// applyLombardVerifierRemoteChainConfigUpdates mirrors
+// ApplyLombardVerifierRemoteChainConfigUpdates mirrors
 // lombard_verifier.ApplyRemoteChainConfigUpdates, but always routes the write through MCMS.
-var applyLombardVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]lombard_verifier.RemoteChainConfigArgs, *lombard_verifier.LombardVerifierContract]{
+// Exported for use by other packages (e.g., adapters).
+var ApplyLombardVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]lombard_verifier.RemoteChainConfigArgs, *lombard_verifier.LombardVerifierContract]{
 	Name:            "glamsterdam:lombard-verifier:apply-remote-chain-config-updates",
 	Version:         semver.MustParse("2.1.0"),
 	Description:     "Calls applyRemoteChainConfigUpdates on LombardVerifier, always producing an MCMS proposal",
@@ -87,10 +89,10 @@ var applyLombardVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.Wr
 	},
 })
 
-// applyCCTPVerifierRemoteChainConfigUpdates mirrors cctp_verifier.ApplyRemoteChainConfigUpdates,
+// ApplyCCTPVerifierRemoteChainConfigUpdates mirrors cctp_verifier.ApplyRemoteChainConfigUpdates,
 // but always routes the write through MCMS. The doc refers to this contract as "USDCVerifier";
-// the Solidity/Go type is CCTPVerifier.
-var applyCCTPVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]cctp_verifier.RemoteChainConfigArgs, *cctp_verifier.CCTPVerifierContract]{
+// the Solidity/Go type is CCTPVerifier. Exported for use by other packages (e.g., adapters).
+var ApplyCCTPVerifierRemoteChainConfigUpdates = contract.NewWrite(contract.WriteParams[[]cctp_verifier.RemoteChainConfigArgs, *cctp_verifier.CCTPVerifierContract]{
 	Name:            "glamsterdam:cctp-verifier:apply-remote-chain-config-updates",
 	Version:         semver.MustParse("2.1.0"),
 	Description:     "Calls applyRemoteChainConfigUpdates on CCTPVerifier (USDCVerifier), always producing an MCMS proposal",
@@ -191,7 +193,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 				baseExecResult := glamsterdamutils.Resolve(OnRampBaseExecutionGasCost, onRampCur.Output.BaseExecutionGasCost)
 				glamsterdamutils.AddField(output.Report, lane.ChainSelector, baseExecResult)
 
-				onRampWrite, err := cldf_ops.ExecuteOperation(b, applyOnRampDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
+				onRampWrite, err := cldf_ops.ExecuteOperation(b, ApplyOnRampDestChainConfigUpdates, chain, contract.FunctionInput[[]onramp.DestChainConfigArgs]{
 					ChainSelector: lane.ChainSelector,
 					Address:       lane.OnRampAddress,
 					Args: []onramp.DestChainConfigArgs{
@@ -247,7 +249,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			newFQConfig.DestGasPerPayloadByteBase = destGasPerPayloadByteBaseResult.AppliedValue
 			newFQConfig.DefaultTxGasLimit = defaultTxGasLimitResult.AppliedValue
 
-			fqWrite, err := cldf_ops.ExecuteOperation(b, applyFeeQuoterDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
+			fqWrite, err := cldf_ops.ExecuteOperation(b, ApplyFeeQuoterDestChainConfigUpdates, chain, contract.FunctionInput[[]fee_quoter.DestChainConfigArgs]{
 				ChainSelector: lane.ChainSelector,
 				Address:       lane.FeeQuoterAddress,
 				Args: []fee_quoter.DestChainConfigArgs{
@@ -282,7 +284,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					newCVConfig := cvCur.Output.RemoteChainConfig
 					newCVConfig.GasForVerification = gasForVerificationResult.AppliedValue
 
-					cvWrite, err := cldf_ops.ExecuteOperation(b, applyCommitteeVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
+					cvWrite, err := cldf_ops.ExecuteOperation(b, ApplyCommitteeVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]committee_verifier.RemoteChainConfigArgs]{
 						ChainSelector: lane.ChainSelector,
 						Address:       lane.CommitteeVerifierAddress,
 						Args:          []committee_verifier.RemoteChainConfigArgs{newCVConfig},
@@ -315,7 +317,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					newLVConfig := lvCur.Output.RemoteChainConfig
 					newLVConfig.GasForVerification = gasForVerificationResult.AppliedValue
 
-					lvWrite, err := cldf_ops.ExecuteOperation(b, applyLombardVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]lombard_verifier.RemoteChainConfigArgs]{
+					lvWrite, err := cldf_ops.ExecuteOperation(b, ApplyLombardVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]lombard_verifier.RemoteChainConfigArgs]{
 						ChainSelector: lane.ChainSelector,
 						Address:       lombardVerifierAddress,
 						Args:          []lombard_verifier.RemoteChainConfigArgs{newLVConfig},
@@ -349,7 +351,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					newCCTPConfig := cctpCur.Output.RemoteChainConfig
 					newCCTPConfig.GasForVerification = gasForVerificationResult.AppliedValue
 
-					cctpWrite, err := cldf_ops.ExecuteOperation(b, applyCCTPVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
+					cctpWrite, err := cldf_ops.ExecuteOperation(b, ApplyCCTPVerifierRemoteChainConfigUpdates, chain, contract.FunctionInput[[]cctp_verifier.RemoteChainConfigArgs]{
 						ChainSelector: lane.ChainSelector,
 						Address:       cctpVerifierAddress,
 						Args:          []cctp_verifier.RemoteChainConfigArgs{newCCTPConfig},
