@@ -286,7 +286,7 @@ var CCTPChainDefaultsBySelector = map[uint64]CCTPChainDefaults{
 		TokenMessengerV2: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
 		USDCToken:        "0x7433b41C6c5e1d58D4Da99483609520255ab661B",
 	},
-	chain_selectors.PHAROS_TESTNET.Selector: {
+	chain_selectors.PHAROS_ATLANTIC_TESTNET.Selector: {
 		DomainIdentifier: 31,
 		TokenMessengerV2: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
 		USDCToken:        "0xcfC8330f4BCAB529c625D12781b1C19466A9Fc8B",
