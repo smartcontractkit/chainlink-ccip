@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/big"
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
@@ -14,10 +15,38 @@ import (
 
 	erc20_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
+
+// LockBoxDeposit is a single deposit into a lockbox bucket.
+type LockBoxDeposit struct {
+	// RemoteChainSelector identifies the bucket to fund. Zero designates the unsiloed (shared)
+	// bucket; any other value designates the silo for that remote chain.
+	RemoteChainSelector uint64
+	// Amount is the amount to deposit, in raw base units.
+	Amount *big.Int
+}
+
+// FundLockBoxInput is the input for the lockbox funding sequence.
+type FundLockBoxInput struct {
+	ChainSelector uint64
+	// LockBoxAddress is the ERC20LockBox to fund.
+	LockBoxAddress string
+	// TokenAddress is the token to deposit into the lockbox.
+	TokenAddress string
+	// TimelockAddress is the MCMS timelock address that will execute the funding operations.
+	// Required because the timelock must be an authorized caller on the lockbox to deposit.
+	TimelockAddress string
+	// Deposits are the individual deposits to make into the lockbox. Each entry targets one bucket:
+	// a siloed bucket (RemoteChainSelector set to the remote chain) or the unsiloed shared bucket
+	// (RemoteChainSelector zero).
+	Deposits []LockBoxDeposit
+	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer
+	// instead of using the lockbox's deposit() function. This bypasses the Deposit event emission
+	// and the per-bucket accounting. Use only as a break-glass option.
+	UsePlainTransfer bool
+}
 
 // FundLockBox deposits tokens into a v2.0 ERC20LockBox, funding either a siloed bucket (keyed by
 // remote chain selector) or the unsiloed (shared) bucket. It is the standalone counterpart to the
@@ -31,7 +60,7 @@ var FundLockBox = cldf_ops.NewSequence(
 	"fund-lock-box",
 	semver.MustParse("2.0.0"),
 	"Deposits tokens into a v2.0 ERC20LockBox (siloed and/or unsiloed buckets)",
-	func(b cldf_ops.Bundle, chains chain.BlockChains, input tokens.FundLockBoxSequenceInput) (sequences.OnChainOutput, error) {
+	func(b cldf_ops.Bundle, chains chain.BlockChains, input FundLockBoxInput) (sequences.OnChainOutput, error) {
 		evmChain, ok := chains.EVMChains()[input.ChainSelector]
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
@@ -47,6 +76,10 @@ var FundLockBox = cldf_ops.NewSequence(
 
 		var ops []evm_contract.WriteOutput
 
+		// The deposit path pulls tokens from the caller, so the timelock must be an authorized
+		// caller on the lockbox. The authorize step is idempotent: only append it when the timelock
+		// isn't already authorized, avoiding a redundant MCMS batch op and a spurious
+		// AuthorizedCallerAdded event on every subsequent top-up.
 		if !input.UsePlainTransfer {
 			authCallers, err := cldf_ops.ExecuteOperation(
 				b,
@@ -133,7 +166,7 @@ var FundLockBox = cldf_ops.NewSequence(
 	},
 )
 
-func validateFundLockBoxInput(input tokens.FundLockBoxSequenceInput) error {
+func validateFundLockBoxInput(input FundLockBoxInput) error {
 	if input.LockBoxAddress == "" {
 		return fmt.Errorf("LockBoxAddress must be provided")
 	}

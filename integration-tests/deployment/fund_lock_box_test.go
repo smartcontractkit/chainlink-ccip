@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	bnmERC20DripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	v2changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/changesets"
 	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	erc20LockBoxBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -107,17 +108,19 @@ func TestFundLockBox_SiloedAndUnsiloed(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	fundChangeset := tokens.FundLockBox(tokens.GetTokenAdapterRegistry(), changesets.GetRegistry())
-	fundOut, err := fundChangeset.Apply(*e, tokens.FundLockBoxConfig{
+	fundChangeset := v2changesets.FundLockBox(changesets.GetRegistry())
+	fundOut, err := fundChangeset.Apply(*e, changesets.WithMCMS[v2changesets.FundLockBoxCfg]{
 		MCMS: NewDefaultInputForMCMS("Fund lockbox"),
-		Funding: []tokens.FundLockBoxPerLockBox{
-			{
-				ChainSelector: chainSel,
-				LockBoxRef:    datastore.AddressRef{Address: lockBoxAddr.Hex()},
-				TokenRef:      datastore.AddressRef{Address: tokenAddr.Hex()},
-				Deposits: []tokens.LockBoxDeposit{
-					{RemoteChainSelector: remoteChain, Amount: siloedAmount},
-					{RemoteChainSelector: 0, Amount: unsiloedAmount},
+		Cfg: v2changesets.FundLockBoxCfg{
+			Input: []v2changesets.ChainLockBoxFunding{
+				{
+					Selector:       chainSel,
+					LockBoxAddress: lockBoxAddr,
+					TokenAddress:   tokenAddr,
+					Deposits: []v2changesets.LockBoxDeposit{
+						{RemoteChainSelector: remoteChain, Amount: siloedAmount},
+						{RemoteChainSelector: 0, Amount: unsiloedAmount},
+					},
 				},
 			},
 		},
@@ -138,15 +141,17 @@ func TestFundLockBox_SiloedAndUnsiloed(t *testing.T) {
 	require.Contains(t, authCallers, timelockAddr, "timelock should be an authorized caller after funding")
 
 	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
-	fundOut2, err := fundChangeset.Apply(*e, tokens.FundLockBoxConfig{
+	fundOut2, err := fundChangeset.Apply(*e, changesets.WithMCMS[v2changesets.FundLockBoxCfg]{
 		MCMS: NewDefaultInputForMCMS("Fund lockbox again"),
-		Funding: []tokens.FundLockBoxPerLockBox{
-			{
-				ChainSelector: chainSel,
-				LockBoxRef:    datastore.AddressRef{Address: lockBoxAddr.Hex()},
-				TokenRef:      datastore.AddressRef{Address: tokenAddr.Hex()},
-				Deposits: []tokens.LockBoxDeposit{
-					{RemoteChainSelector: remoteChain, Amount: siloedAmount},
+		Cfg: v2changesets.FundLockBoxCfg{
+			Input: []v2changesets.ChainLockBoxFunding{
+				{
+					Selector:       chainSel,
+					LockBoxAddress: lockBoxAddr,
+					TokenAddress:   tokenAddr,
+					Deposits: []v2changesets.LockBoxDeposit{
+						{RemoteChainSelector: remoteChain, Amount: siloedAmount},
+					},
 				},
 			},
 		},
@@ -163,74 +168,86 @@ func TestFundLockBox_VerifyPreconditions(t *testing.T) {
 	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{chainSel}))
 	require.NoError(t, err)
 
-	cs := tokens.FundLockBox(tokens.GetTokenAdapterRegistry(), changesets.GetRegistry())
-	lockBoxRef := datastore.AddressRef{Address: "0x1111111111111111111111111111111111111111"}
-	tokenRef := datastore.AddressRef{Address: "0x2222222222222222222222222222222222222222"}
+	cs := v2changesets.FundLockBox(changesets.GetRegistry())
+	lockBoxAddr := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	tokenAddr := common.HexToAddress("0x2222222222222222222222222222222222222222")
 
-	validEntry := func() tokens.FundLockBoxPerLockBox {
-		return tokens.FundLockBoxPerLockBox{
-			ChainSelector: chainSel,
-			LockBoxRef:    lockBoxRef,
-			TokenRef:      tokenRef,
-			Deposits:      []tokens.LockBoxDeposit{{RemoteChainSelector: 1, Amount: big.NewInt(1)}},
+	validEntry := func() v2changesets.ChainLockBoxFunding {
+		return v2changesets.ChainLockBoxFunding{
+			Selector:       chainSel,
+			LockBoxAddress: lockBoxAddr,
+			TokenAddress:   tokenAddr,
+			Deposits:       []v2changesets.LockBoxDeposit{{RemoteChainSelector: 1, Amount: big.NewInt(1)}},
 		}
 	}
 
 	cases := []struct {
 		name   string
-		input  tokens.FundLockBoxConfig
+		input  changesets.WithMCMS[v2changesets.FundLockBoxCfg]
 		errors []string
 	}{
 		{
 			name:   "rejects_empty_input",
-			input:  tokens.FundLockBoxConfig{MCMS: mcms.Input{}},
-			errors: []string{"at least one lockbox funding entry"},
+			input:  changesets.WithMCMS[v2changesets.FundLockBoxCfg]{MCMS: mcms.Input{}},
+			errors: []string{"at least one entry is required"},
 		},
 		{
-			name: "rejects_empty_lockbox_ref",
-			input: tokens.FundLockBoxConfig{MCMS: mcms.Input{}, Funding: []tokens.FundLockBoxPerLockBox{
-				{ChainSelector: chainSel, TokenRef: tokenRef, Deposits: []tokens.LockBoxDeposit{{Amount: big.NewInt(1)}}},
+			name: "rejects_zero_lockbox_address",
+			input: changesets.WithMCMS[v2changesets.FundLockBoxCfg]{MCMS: mcms.Input{}, Cfg: v2changesets.FundLockBoxCfg{
+				Input: []v2changesets.ChainLockBoxFunding{
+					{Selector: chainSel, TokenAddress: tokenAddr, Deposits: []v2changesets.LockBoxDeposit{{Amount: big.NewInt(1)}}},
+				},
 			}},
-			errors: []string{"lockbox ref must not be empty"},
+			errors: []string{"zero lockbox address"},
 		},
 		{
-			name: "rejects_empty_token_ref",
-			input: tokens.FundLockBoxConfig{MCMS: mcms.Input{}, Funding: []tokens.FundLockBoxPerLockBox{
-				{ChainSelector: chainSel, LockBoxRef: lockBoxRef, Deposits: []tokens.LockBoxDeposit{{Amount: big.NewInt(1)}}},
+			name: "rejects_zero_token_address",
+			input: changesets.WithMCMS[v2changesets.FundLockBoxCfg]{MCMS: mcms.Input{}, Cfg: v2changesets.FundLockBoxCfg{
+				Input: []v2changesets.ChainLockBoxFunding{
+					{Selector: chainSel, LockBoxAddress: lockBoxAddr, Deposits: []v2changesets.LockBoxDeposit{{Amount: big.NewInt(1)}}},
+				},
 			}},
-			errors: []string{"token ref must not be empty"},
+			errors: []string{"zero token address"},
 		},
 		{
 			name: "rejects_no_deposits",
-			input: tokens.FundLockBoxConfig{MCMS: mcms.Input{}, Funding: []tokens.FundLockBoxPerLockBox{
-				{ChainSelector: chainSel, LockBoxRef: lockBoxRef, TokenRef: tokenRef},
+			input: changesets.WithMCMS[v2changesets.FundLockBoxCfg]{MCMS: mcms.Input{}, Cfg: v2changesets.FundLockBoxCfg{
+				Input: []v2changesets.ChainLockBoxFunding{
+					{Selector: chainSel, LockBoxAddress: lockBoxAddr, TokenAddress: tokenAddr},
+				},
 			}},
-			errors: []string{"at least one deposit is required"},
+			errors: []string{"no deposits listed"},
 		},
 		{
 			name: "rejects_non_positive_amount",
-			input: tokens.FundLockBoxConfig{MCMS: mcms.Input{}, Funding: []tokens.FundLockBoxPerLockBox{
-				{ChainSelector: chainSel, LockBoxRef: lockBoxRef, TokenRef: tokenRef, Deposits: []tokens.LockBoxDeposit{{Amount: big.NewInt(0)}}},
+			input: changesets.WithMCMS[v2changesets.FundLockBoxCfg]{MCMS: mcms.Input{}, Cfg: v2changesets.FundLockBoxCfg{
+				Input: []v2changesets.ChainLockBoxFunding{
+					{Selector: chainSel, LockBoxAddress: lockBoxAddr, TokenAddress: tokenAddr, Deposits: []v2changesets.LockBoxDeposit{{Amount: big.NewInt(0)}}},
+				},
 			}},
 			errors: []string{"amount must be positive"},
 		},
 		{
 			name: "rejects_duplicate_bucket",
-			input: tokens.FundLockBoxConfig{MCMS: mcms.Input{}, Funding: []tokens.FundLockBoxPerLockBox{
-				{ChainSelector: chainSel, LockBoxRef: lockBoxRef, TokenRef: tokenRef, Deposits: []tokens.LockBoxDeposit{
-					{RemoteChainSelector: 1, Amount: big.NewInt(1)},
-					{RemoteChainSelector: 1, Amount: big.NewInt(1)},
-				}},
+			input: changesets.WithMCMS[v2changesets.FundLockBoxCfg]{MCMS: mcms.Input{}, Cfg: v2changesets.FundLockBoxCfg{
+				Input: []v2changesets.ChainLockBoxFunding{
+					{Selector: chainSel, LockBoxAddress: lockBoxAddr, TokenAddress: tokenAddr, Deposits: []v2changesets.LockBoxDeposit{
+						{RemoteChainSelector: 1, Amount: big.NewInt(1)},
+						{RemoteChainSelector: 1, Amount: big.NewInt(1)},
+					}},
+				},
 			}},
 			errors: []string{"duplicate remote chain selector"},
 		},
 		{
-			name: "rejects_duplicate_lockbox_entry",
-			input: tokens.FundLockBoxConfig{MCMS: mcms.Input{}, Funding: []tokens.FundLockBoxPerLockBox{
-				validEntry(),
-				validEntry(),
+			name: "rejects_duplicate_chain_entry",
+			input: changesets.WithMCMS[v2changesets.FundLockBoxCfg]{MCMS: mcms.Input{}, Cfg: v2changesets.FundLockBoxCfg{
+				Input: []v2changesets.ChainLockBoxFunding{
+					validEntry(),
+					validEntry(),
+				},
 			}},
-			errors: []string{"duplicate lockbox entry"},
+			errors: []string{"duplicate entry for chain"},
 		},
 	}
 
