@@ -2,9 +2,11 @@ package token_pools
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
@@ -19,8 +21,8 @@ import (
 )
 
 // RemoveRemotePoolInput is the input for removing a single remote pool address from a Solana
-// token pool's remote chain config. The remote pool address is the raw 32-byte public key of
-// the remote pool, in the remote chain family's native byte encoding.
+// token pool's remote chain config. The remote pool address is the remote pool's address as raw
+// bytes in the remote chain family's native encoding (e.g. 20 bytes for EVM, 32 for Solana).
 type RemoveRemotePoolInput struct {
 	TokenPool         solana.PublicKey
 	TokenMint         solana.PublicKey
@@ -29,8 +31,9 @@ type RemoveRemotePoolInput struct {
 }
 
 // removeRemotePoolTokenPool reads the existing remote chain config, removes the target remote
-// pool address, and rewrites the config via EditChainRemoteConfig. It returns a clear error
-// when the target remote pool is not currently configured. The authority and instruction
+// pool address, and rewrites the config via EditChainRemoteConfig. It skips (with a warning)
+// when the target remote pool, or the remote chain itself, is not currently configured, so
+// re-runs are idempotent. The authority and instruction
 // builders are supplied by the caller so the burnmint and lockrelease programs share the logic.
 func removeRemotePoolTokenPool(
 	b operations.Bundle,
@@ -55,6 +58,12 @@ func removeRemotePoolTokenPool(
 	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
 	err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 	if err != nil {
+		// A missing chain config account means the pool was never configured for this remote
+		// chain, so there is nothing to remove (idempotent, like an absent pairing).
+		if errors.Is(err, rpc.ErrNotFound) {
+			b.Logger.Warnf("skipping removal of remote pool %x for remote chain %d from pool %s on chain %d: remote chain not configured on this pool", input.RemotePoolAddress, input.RemoteSelector, input.TokenPool.String(), chain.Selector)
+			return sequences.OnChainOutput{}, nil
+		}
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chain.Selector, input.RemoteSelector, err)
 	}
 

@@ -2222,6 +2222,25 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, solPoolProgID.Bytes(), solActivePool, "the Solana TAR should register the pool (it stores the pool program ID)")
 
+		t.Run("RemoveNeverConfiguredRemoteIsNoOp", func(t *testing.T) {
+			// The Solana pool was never configured for this chain (it is outside the web), so its
+			// chain config account does not exist and there is nothing to remove.
+			unconfiguredChainSel := chainsel.TEST_90000003.Selector
+			require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+				MCMS: NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily remove never-configured remote"),
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: solChainSel,
+					Pool:          datastore.AddressRef{Address: solPoolPDA.String()},
+					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
+						Selector: unconfiguredChainSel,
+						Remote:   datastore.AddressRef{Address: "0x000000000000000000000000000000000000dEaD"},
+					}},
+				}},
+			}))
+			require.Contains(t, solRemotes(evm1ChainSel), evm1PoolAddr, "Solana pool should still list the EVM1 pool")
+			require.Contains(t, solRemotes(evm2ChainSel), evm2PoolAddr, "Solana pool should still list the EVM2 pool")
+		})
+
 		t.Run("DeactivateEVMPoolWithSolanaPeer", func(t *testing.T) {
 			require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
 				MCMS: NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily deactivate EVM1 pool"),
