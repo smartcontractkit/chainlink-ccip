@@ -2111,6 +2111,166 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			require.True(t, found, "Solana v1 pool should be reverse-propagated to know new pool on chain %d", tc.remoteSel)
 		}
 	})
+
+	// RemoveRemotePoolsCrossFamily tears down a mixed EVM/Solana pool web with the RemoveRemotePools
+	// changeset: first an EVM pool is deactivated (the reverse pass must reach its Solana peer), then
+	// the Solana pool is deactivated (a full Solana teardown, including the Solana TokenAdminRegistry
+	// unregister). The Solana token's TAR administrator is the deployer, so the pool is registered in
+	// the Solana TAR and can later be unregistered without an external signer.
+	t.Run("RemoveRemotePoolsCrossFamily", func(t *testing.T) {
+		evm1ChainSel := evmChainSel
+		evm2ChainSel := newChainSel
+		maxSupply := uint64(1e6)
+		preMint := uint64(1e5)
+
+		const (
+			evm1TokenSymbol = "RRP_EVM1_TOK"
+			evm2TokenSymbol = "RRP_EVM2_TOK"
+			solTokenSymbol  = "RRP_SOL_TOK"
+			evm1PoolQual    = "RRP_EVM1_POOL"
+			evm2PoolQual    = "RRP_EVM2_POOL"
+		)
+
+		defaultRL := tokensapi.RateLimiterConfigFloatInput{Capacity: 100, Rate: 10, IsEnabled: true}
+		remotes := func(sels ...uint64) map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef] {
+			out := map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{}
+			for _, sel := range sels {
+				out[sel] = tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{OutboundRateLimiterConfig: &defaultRL}
+			}
+			return out
+		}
+
+		evmTokenAndPool := func(name, symbol, poolQual string, remoteSels ...uint64) tokensapi.TokenExpansionInputPerChain {
+			return tokensapi.TokenExpansionInputPerChain{
+				TokenPoolVersion: v1_5_1_scenarios,
+				DeployTokenInput: &tokensapi.DeployTokenInput{
+					Name: name, Symbol: symbol, Decimals: 18,
+					Type: bnmERC20ops.ContractType, Supply: &maxSupply, PreMint: &preMint,
+				},
+				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{TokenPoolQualifier: poolQual, PoolType: cciputils.BurnMintTokenPool.String()},
+				TokenTransferConfig:  &tokensapi.TokenTransferConfig{RemoteChains: remotes(remoteSels...)},
+			}
+		}
+
+		// Deploy a fully connected web: EVM1 and EVM2 v1.5.1 BurnMint pools and a Solana v1.6.0 LockRelease pool.
+		out, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily setup"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				evm1ChainSel: evmTokenAndPool("RRP EVM1 Token", evm1TokenSymbol, evm1PoolQual, evm2ChainSel, solChainSel),
+				evm2ChainSel: evmTokenAndPool("RRP EVM2 Token", evm2TokenSymbol, evm2PoolQual, evm1ChainSel, solChainSel),
+				solChainSel: {
+					TokenPoolVersion: v1_6_0_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name: "RRP SOL Token", Symbol: solTokenSymbol, Decimals: 9,
+						Type:                   solanautils.SPLTokens,
+						ExternalAdmin:          solChain.DeployerKey.PublicKey().String(),
+						DisableFreezeAuthority: true,
+						Senders:                []string{solChain.DeployerKey.PublicKey().String()},
+						PreMint:                &preMint,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{PoolType: cciputils.LockReleaseTokenPool.String()},
+					TokenTransferConfig:  &tokensapi.TokenTransferConfig{RemoteChains: remotes(evm1ChainSel, evm2ChainSel)},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, out.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+		// Ensure the EVM tokens exist in the datastore.
+		evm1TokenRef := FindFullRef(t, env, evm1ChainSel, datastore.AddressRef{Qualifier: evm1TokenSymbol})
+		_ = FindFullRef(t, env, evm2ChainSel, datastore.AddressRef{Qualifier: evm2TokenSymbol})
+
+		// Ensure the EVM pools exist in the datastore.
+		evm1PoolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: evm1ChainSel, Qualifier: evm1PoolQual, Type: datastore.ContractType(cciputils.BurnMintTokenPool),
+		})
+		require.NoError(t, err)
+		evm2PoolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
+			ChainSelector: evm2ChainSel, Qualifier: evm2PoolQual, Type: datastore.ContractType(cciputils.BurnMintTokenPool),
+		})
+		require.NoError(t, err)
+
+		// EVM pools store the Solana pool as its per-mint config PDA, not the (shared) program ID.
+		solTokenRef := FindFullRef(t, env, solChainSel, datastore.AddressRef{Qualifier: solTokenSymbol})
+		solPoolRef := FindFullRef(t, env, solChainSel, datastore.AddressRef{Type: datastore.ContractType(cciputils.LockReleaseTokenPool), Version: v1_6_0_scenarios})
+		solMint := solana.MustPublicKeyFromBase58(solTokenRef.Address)
+		solPoolProgID := solana.MustPublicKeyFromBase58(solPoolRef.Address)
+		solPoolPDA, err := tokens.TokenPoolConfigAddress(solMint, solPoolProgID)
+		require.NoError(t, err)
+
+		// solRemotes returns the EVM pools the Solana pool lists for remoteSel (stored as raw EVM addresses).
+		solRemotes := func(remoteSel uint64) []common.Address {
+			return BytesToAddressesEVM(ReadRemotePools(t, env, solChainSel, solPoolRef, solTokenRef, remoteSel))
+		}
+		// evmRemotes returns the raw remote pools the EVM pool on sel lists for remoteSel.
+		evmRemotes := func(pool common.Address, sel, remoteSel uint64) [][]byte {
+			return ReadRemotePools(t, env, sel, datastore.AddressRef{Address: pool.Hex()}, datastore.AddressRef{}, remoteSel)
+		}
+		solTAR, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilySolana)
+		require.True(t, ok, "Solana TAR manager should be registered")
+		evmTAR, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
+		require.True(t, ok, "EVM TAR manager should be registered")
+
+		// Pre-state: the web is fully connected and the Solana pool is registered in the Solana TAR.
+		require.Contains(t, solRemotes(evm1ChainSel), evm1PoolAddr, "Solana pool should list the EVM1 pool")
+		require.Contains(t, solRemotes(evm2ChainSel), evm2PoolAddr, "Solana pool should list the EVM2 pool")
+		require.Contains(t, evmRemotes(evm1PoolAddr, evm1ChainSel, solChainSel), solPoolPDA.Bytes(), "EVM1 pool should list the Solana pool config PDA")
+		require.Contains(t, BytesToAddressesEVM(evmRemotes(evm2PoolAddr, evm2ChainSel, evm1ChainSel)), evm1PoolAddr, "EVM2 pool should list the EVM1 pool")
+		solActivePool, err := solTAR.GetActivePool(*env, solChainSel, solTokenRef)
+		require.NoError(t, err)
+		require.Equal(t, solPoolProgID.Bytes(), solActivePool, "the Solana TAR should register the pool (it stores the pool program ID)")
+
+		t.Run("DeactivateEVMPoolWithSolanaPeer", func(t *testing.T) {
+			require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+				MCMS: NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily deactivate EVM1 pool"),
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: evm1ChainSel,
+					Pool:          datastore.AddressRef{Address: evm1PoolAddr.Hex()},
+					Deactivate:    true,
+				}},
+			}))
+
+			// Forward pass: the EVM1 pool lists nothing on Solana or EVM2.
+			require.Empty(t, evmRemotes(evm1PoolAddr, evm1ChainSel, solChainSel), "EVM1 pool should no longer list the Solana pool")
+			require.Empty(t, evmRemotes(evm1PoolAddr, evm1ChainSel, evm2ChainSel), "EVM1 pool should no longer list the EVM2 pool")
+
+			// Reverse pass: the EVM1 pool is gone from its Solana and EVM2 peers; the Solana<->EVM2 lane is untouched.
+			require.NotContains(t, solRemotes(evm1ChainSel), evm1PoolAddr, "Solana pool should no longer list the EVM1 pool")
+			require.NotContains(t, BytesToAddressesEVM(evmRemotes(evm2PoolAddr, evm2ChainSel, evm1ChainSel)), evm1PoolAddr, "EVM2 pool should no longer list the EVM1 pool")
+			require.Contains(t, solRemotes(evm2ChainSel), evm2PoolAddr, "Solana pool should still list the EVM2 pool")
+
+			// The EVM1 pool is unregistered from the EVM1 TAR.
+			evm1ActivePool, err := evmTAR.GetActivePool(*env, evm1ChainSel, evm1TokenRef)
+			require.NoError(t, err)
+			require.Empty(t, evm1ActivePool, "EVM1 pool should be unregistered from the EVM1 TAR")
+		})
+
+		t.Run("DeactivateSolanaPool", func(t *testing.T) {
+			input := tokensapi.RemoveRemotePoolsInput{
+				MCMS: NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily deactivate Solana pool"),
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: solChainSel,
+					Pool:          datastore.AddressRef{Address: solPoolPDA.String()},
+					Deactivate:    true,
+				}},
+			}
+			require.NoError(t, applyRemoveRemotePools(t, env, input))
+
+			// Forward pass on Solana, and reverse pass into EVM2 (matched by the Solana pool config PDA).
+			require.Empty(t, solRemotes(evm2ChainSel), "Solana pool should no longer list the EVM2 pool")
+			require.NotContains(t, evmRemotes(evm2PoolAddr, evm2ChainSel, solChainSel), solPoolPDA.Bytes(), "EVM2 pool should no longer list the Solana pool")
+
+			// The Solana pool is unregistered from the Solana TAR (set_pool with a zero lookup table).
+			solActivePool, err := solTAR.GetActivePool(*env, solChainSel, solTokenRef)
+			require.NoError(t, err)
+			require.Empty(t, solActivePool, "Solana pool should be unregistered from the Solana TAR")
+
+			// Re-running is a no-op: every pairing is already absent and the TAR entry is already empty.
+			require.NoError(t, applyRemoveRemotePools(t, env, input))
+		})
+	})
 }
 
 // ---------------------------------------------------------------------------

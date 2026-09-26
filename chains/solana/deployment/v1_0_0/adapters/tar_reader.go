@@ -18,7 +18,6 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -72,9 +71,15 @@ func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chai
 		return nil, fmt.Errorf("failed to derive TAR PDA: %w", err)
 	}
 
+	// A missing TAR account means the token was never registered (no active pool). Any other
+	// failure (RPC error, undecodable account) must surface as an error rather than being
+	// reported as "no pool", since callers act on that answer (e.g. skipping an unregister).
 	var tarAccount ccip_common.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), tarPDA, &tarAccount); err != nil {
-		return nil, nil
+		if errors.Is(err, rpc.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read token admin registry %s for mint %s on chain %d: %w", tarPDA, mint, chainSelector, err)
 	}
 	if tarAccount.LookupTable.IsZero() {
 		return nil, nil
@@ -116,12 +121,12 @@ func (a *SolanaAdminRegistryReader) GetTokenAdminRegistryRef(e deployment.Enviro
 // lookup table to the zero pubkey. The caller is responsible for the read-check guard (only
 // unregister when the token's current active pool is the pool being removed) before executing
 // this sequence.
-func (a *SolanaAdminRegistryReader) UnregisterToken() *cldf_ops.Sequence[tokensapi.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
+func (a *SolanaAdminRegistryReader) UnregisterToken() *operations.Sequence[tokensapi.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
 		"solana-admin-registry:unregister-token",
 		common_utils.Version_1_0_0,
 		"Unregister a token from the router TokenAdminRegistry by setting its pool lookup table to zero",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.UnregisterTokenSequenceInput) (sequences.OnChainOutput, error) {
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokensapi.UnregisterTokenSequenceInput) (sequences.OnChainOutput, error) {
 			chain, ok := chains.SolanaChains()[input.Selector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)

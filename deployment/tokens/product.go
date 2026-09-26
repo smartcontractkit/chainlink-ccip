@@ -136,7 +136,11 @@ type RateLimitReaderAdapter interface {
 // of pool version.
 type TokenAdminRegistryReader interface {
 	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
-	// as raw address bytes. Returns empty bytes (no error) when no pool is registered.
+	// as raw address bytes. Returns empty bytes (no error) when no pool is registered; any other
+	// failure to read the registry must be returned as an error, not reported as "no pool".
+	// The bytes must be in the same form the family's TokenAdapter.AddressRefToBytes returns for
+	// the resolved pool ref, so callers can compare them chain-agnostically with bytes.Equal (e.g.
+	// EVM: the pool contract address; Solana: the pool program ID).
 	// Overrides are optional registry refs to use instead of the datastore default;
 	// the first one that resolves from the datastore is used.
 	GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error)

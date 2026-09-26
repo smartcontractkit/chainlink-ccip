@@ -73,3 +73,13 @@ func StringToBytes(sel uint64, addr string) ([]byte, error) {
 
 	return normalizer.StringToBytes(addr)
 }
+
+// NormalizeAddress round-trips an address string through the chain family's address normalizer
+// so that addresses from different sources (user input, datastore, on-chain reads) compare equal.
+func NormalizeAddress(sel uint64, addr string) (string, error) {
+	if b, err := StringToBytes(sel, addr); err != nil {
+		return "", fmt.Errorf("failed to convert address string to bytes: %w", err)
+	} else {
+		return BytesToString(sel, b)
+	}
+}
