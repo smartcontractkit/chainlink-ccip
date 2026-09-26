@@ -44,7 +44,7 @@ func TestSVMLookupTables(t *testing.T) {
 			slot,
 		)
 		require.NoError(t, ierr)
-		testutils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
+		testutils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentFinalized)
 
 		// add entries to lookup table
 		testutils.SendAndConfirm(ctx, t, c, []solana.Instruction{
@@ -52,7 +52,7 @@ func TestSVMLookupTables(t *testing.T) {
 				table, sender.PublicKey(), sender.PublicKey(),
 				k,
 			),
-		}, sender, rpc.CommitmentConfirmed)
+		}, sender, rpc.CommitmentFinalized)
 
 		return table
 	}
@@ -63,11 +63,11 @@ func TestSVMLookupTables(t *testing.T) {
 
 	// fetch lookup table
 	t0data, err := addresslookuptable.GetAddressLookupTableStateWithOpts(ctx, c, table0, &rpc.GetAccountInfoOpts{
-		Commitment: rpc.CommitmentConfirmed,
+		Commitment: rpc.CommitmentFinalized,
 	})
 	require.NoError(t, err)
 	t1data, err := addresslookuptable.GetAddressLookupTableStateWithOpts(ctx, c, table1, &rpc.GetAccountInfoOpts{
-		Commitment: rpc.CommitmentConfirmed,
+		Commitment: rpc.CommitmentFinalized,
 	})
 	require.NoError(t, err)
 
