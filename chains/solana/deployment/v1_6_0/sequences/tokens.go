@@ -751,12 +751,18 @@ func (a *SolanaAdapter) GetSupportedChains(e deployment.Environment, chainSelect
 	}
 
 	supported := []uint64{}
-	args := common.BatchGetAccountsArgs[burnmint_token_pool.ChainConfig]{
+	args := common.BatchGetAccountsArgs{
 		Commitment: cldf_solana.SolDefaultCommitment,
 		AccountMax: 100,
 		PDAs:       pdas,
-		OnFound: func(i int, _ burnmint_token_pool.ChainConfig) error {
-			supported = append(supported, candidates[i])
+		// A chain is supported when its chain-config account exists and is owned by the pool
+		// program. Existence is all that matters, so the account is not decoded (a layout
+		// mismatch must not hide a configured chain). The owner check rules out a system-
+		// owned account created by someone sending lamports to the PDA address.
+		OnFound: func(i int, account *rpc.Account) error {
+			if account.Owner.Equals(poolProgramID) {
+				supported = append(supported, candidates[i])
+			}
 			return nil
 		},
 	}

@@ -4,27 +4,25 @@ import (
 	"context"
 	"fmt"
 
-	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
 
 // BatchGetAccountsArgs configures a batched account fetch. PDAs are fetched in
 // chunks of at most AccountMax accounts per RPC call, and OnFound is invoked for
-// every account that exists and decodes successfully. Accounts that are missing
-// or fail to decode are skipped.
-type BatchGetAccountsArgs[T any] struct {
+// every account that exists, with its index in PDAs. Missing accounts are skipped.
+// Accounts are passed through raw (not decoded).
+type BatchGetAccountsArgs struct {
 	Commitment rpc.CommitmentType
 	AccountMax int
 	PDAs       solana.PublicKeySlice
-	OnFound    func(i int, accountState T) error
+	OnFound    func(i int, account *rpc.Account) error
 }
 
-// BatchGetAccounts fetches the given PDAs in batches and decodes each account
-// into T using a Borsh decoder. It is a thin helper over
+// BatchGetAccounts fetches the given PDAs in batches. It is a thin helper over
 // GetMultipleAccountsWithOpts that avoids exceeding the RPC's per-call account
-// limit and tolerates missing/undecodable accounts.
-func BatchGetAccounts[T any](ctx context.Context, client *rpc.Client, args BatchGetAccountsArgs[T]) error {
+// limit.
+func BatchGetAccounts(ctx context.Context, client *rpc.Client, args BatchGetAccountsArgs) error {
 	if args.AccountMax <= 0 {
 		return fmt.Errorf("account max must be greater than zero, got %d", args.AccountMax)
 	}
@@ -43,13 +41,7 @@ func BatchGetAccounts[T any](ctx context.Context, client *rpc.Client, args Batch
 			if acct == nil {
 				continue
 			}
-
-			var accountState T
-			if err := bin.NewBorshDecoder(acct.Data.GetBinary()).Decode(&accountState); err != nil {
-				continue
-			}
-
-			if err := args.OnFound(start+i, accountState); err != nil {
+			if err := args.OnFound(start+i, acct); err != nil {
 				return err
 			}
 		}
