@@ -720,7 +720,6 @@ func unregisterToken(
 	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, manager.UnregisterToken(), e.BlockChains, UnregisterTokenSequenceInput{
 		Selector:          selector,
 		TokenRef:          fullTokenRef,
-		TokenPoolRef:      fullPoolRef,
 		ExistingDataStore: e.DataStore,
 	})
 	if err != nil {

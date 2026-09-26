@@ -763,12 +763,10 @@ func TestRemoveRemotePools_BidirectionalFailsWhenPeerHasNoActivePool(t *testing.
 	tarManager, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
 	require.True(t, ok, "EVM TAR manager should be registered")
 	tokenRefB := FindFullRef(t, env, harness.selB, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)})
-	poolRefB := FindFullRef(t, env, harness.selB, datastore.AddressRef{Type: datastore.ContractType(bnmOpsV2_0_0.ContractType), Version: bnmOpsV2_0_0.Version})
 	env.OperationsBundle = evm_testsetup.BundleWithFreshReporter(env.OperationsBundle)
 	_, err := cldf_ops.ExecuteSequence(env.OperationsBundle, tarManager.UnregisterToken(), env.BlockChains, tokensapi.UnregisterTokenSequenceInput{
 		Selector:          harness.selB,
 		TokenRef:          tokenRefB,
-		TokenPoolRef:      poolRefB,
 		ExistingDataStore: env.DataStore,
 	})
 	require.NoError(t, err)

@@ -150,10 +150,12 @@ type TokenAdminRegistryReader interface {
 
 // TokenAdminRegistryWriter is a versionless interface for unregistering a token from a chain's
 // TokenAdminRegistry (or equivalent). There is no official unregister on-chain: a pool is
-// unregistered by setting the registry's pool to the null/zero pool. Implementations must only
-// emit the write when the token's current active pool is the pool being removed, and skip (no-op)
-// when the entry already points at a different pool or is already empty, so a live registration
-// that has moved on is never clobbered.
+// unregistered by setting the registry's pool to the null/zero pool.
+//
+// UnregisterToken is unconditional: it clears the token's registry entry whatever pool it
+// currently points at. Callers that must not clobber a registration that has moved on to another
+// pool are responsible for checking the active pool first (e.g. compare GetActivePool with the
+// family adapter's AddressRefToBytes for the pool being removed), as RemoveRemotePools does.
 type TokenAdminRegistryWriter interface {
 	// UnregisterToken returns a sequence that sets the token's registry pool to the null/zero pool.
 	UnregisterToken() *cldf_ops.Sequence[UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
@@ -167,15 +169,12 @@ type TokenAdminRegistryManager interface {
 
 // UnregisterTokenSequenceInput defines the input for unregistering a token from the
 // TokenAdminRegistry. The token is unregistered by setting its registry pool to the null/zero
-// pool. The write is only emitted when the token's current active pool equals TokenPoolRef.
+// pool; see TokenAdminRegistryWriter for the caller's responsibility to check the active pool.
 type UnregisterTokenSequenceInput struct {
 	// Selector is the chain selector for the chain on which the registry lives.
 	Selector uint64 `json:"selector" yaml:"selector"`
 	// TokenRef is the fully resolved token reference.
 	TokenRef datastore.AddressRef `json:"tokenRef" yaml:"tokenRef"`
-	// TokenPoolRef is the fully resolved pool reference that must currently be the token's
-	// active pool for the unregister to be emitted.
-	TokenPoolRef datastore.AddressRef `json:"tokenPoolRef" yaml:"tokenPoolRef"`
 	// RegistryRef optionally overrides the registry ref used instead of the datastore default.
 	RegistryRef datastore.AddressRef `json:"registryRef,omitempty" yaml:"registryRef,omitempty"`
 	// ExistingDataStore is the datastore containing existing deployment data.
