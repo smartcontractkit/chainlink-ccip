@@ -275,8 +275,9 @@ func (a *EVMPoolAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokensap
 
 // RemoveRemotePools removes remote pool entries from an EVM token pool. Version-specific
 // contract calls live in PoolOps.RemoveRemotePools, which reads the current on-chain remote
-// pools for each remote chain and returns a clear error when a requested remote pool is not
-// currently configured. No-op (zero BatchOps) when there are no writes.
+// pools for each remote chain and skips (with a warning) any requested remote pool that is
+// not currently configured, so re-runs are idempotent. No-op (zero BatchOps) when there are
+// no writes.
 func (a *EVMPoolAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokensapi.RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-pool-adapter:remove-remote-pools",

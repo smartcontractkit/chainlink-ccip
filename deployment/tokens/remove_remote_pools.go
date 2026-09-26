@@ -185,6 +185,9 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 				if datastore_utils.IsAddressRefEmpty(remote.Remote) {
 					return fmt.Errorf("remote pool entry for chain selector %d has an empty remote ref", remote.Selector)
 				}
+				if remote.Remote.Address == "" {
+					return fmt.Errorf("remote pool entry for chain selector %d must set remote.address", remote.Selector)
+				}
 				if _, dup := seenRemotes[remote.Selector]; dup {
 					return fmt.Errorf("duplicate remote chain selector %d for pool on chain selector %d", remote.Selector, pool.ChainSelector)
 				}

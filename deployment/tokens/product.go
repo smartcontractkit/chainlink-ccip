@@ -90,8 +90,8 @@ type RemoveRemotePoolsSequenceInput struct {
 }
 
 // RemotePoolToRemove identifies a single remote pool entry to remove from a token pool. The
-// remote pool is referenced by an AddressRef so operators can identify it by qualifier, by
-// address, or by any other unique combination of ref fields.
+// remote pool's Address is required: it is the address the pool stores for the remote (in the
+// remote chain family's address format), and is what the removal matches against on-chain.
 type RemotePoolToRemove struct {
 	Selector uint64               `json:"selector" yaml:"selector"`
 	Remote   datastore.AddressRef `json:"remote" yaml:"remote"`

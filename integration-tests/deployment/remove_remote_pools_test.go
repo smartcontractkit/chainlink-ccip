@@ -91,6 +91,11 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 			errors: []string{"empty remote ref"},
 		},
 		{
+			name:   "rejects_remote_ref_without_address",
+			input:  singlePoolInput(tokensapi.RemotePoolToRemove{Selector: dst, Remote: datastore.AddressRef{Qualifier: "some-pool"}}),
+			errors: []string{"must set remote.address"},
+		},
+		{
 			name: "rejects_duplicate_remote_selectors",
 			input: tokensapi.RemoveRemotePoolsInput{
 				MCMS: mcms.Input{},
