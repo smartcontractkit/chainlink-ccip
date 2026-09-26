@@ -21,11 +21,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var _ tokensapi.TokenAdminRegistryManager = (*SolanaAdminRegistryReader)(nil)
+var _ tokensapi.TokenAdminRegistryManager = (*SolanaAdminRegistryManager)(nil)
 
-type SolanaAdminRegistryReader struct{}
+type SolanaAdminRegistryManager struct{}
 
-func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error) {
+func (a *SolanaAdminRegistryManager) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error) {
 	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -99,7 +99,7 @@ func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chai
 	return entries[2].Bytes(), nil
 }
 
-func (a *SolanaAdminRegistryReader) GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
+func (a *SolanaAdminRegistryManager) GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
 	_, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -121,7 +121,7 @@ func (a *SolanaAdminRegistryReader) GetTokenAdminRegistryRef(e deployment.Enviro
 // lookup table to the zero pubkey. The caller is responsible for the read-check guard (only
 // unregister when the token's current active pool is the pool being removed) before executing
 // this sequence.
-func (a *SolanaAdminRegistryReader) UnregisterToken() *operations.Sequence[tokensapi.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+func (a *SolanaAdminRegistryManager) UnregisterToken() *operations.Sequence[tokensapi.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return operations.NewSequence(
 		"solana-admin-registry:unregister-token",
 		common_utils.Version_1_0_0,
