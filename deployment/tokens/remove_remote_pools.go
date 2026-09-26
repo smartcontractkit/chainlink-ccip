@@ -68,6 +68,13 @@ type RemoveRemotePoolsPerPool struct {
 // pools. The operation version is inferred from the token pool (via the datastore), so the
 // top-level changeset does not require a version field.
 //
+// This changeset tidies up pool topology; it is not a safe decommission and does not protect
+// message flow. Use it on pools that have already been migrated away from (the TAR points at a
+// newer pool), once in-flight messages have settled on the new pools: removing a remote pool
+// makes the peer reject messages still in flight from it. Deactivating a pool that is still the
+// active pool also leaves peers able to send to this chain (removing remote pools does not remove
+// chain support), and those transfers fail on arrival.
+//
 // Example: retiring an old pool after upgrades. Each list below is a pool's remote pools, and TAR
 // shows each chain's registered (active) pool. Start with a mesh of A, B and C:
 //
@@ -221,7 +228,7 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 	// localPool on localSelector. The remote address is normalized so it compares equal to the
 	// address the reverse pass reads back from the peer.
 	forwardPairingKey := func(localSelector uint64, localPool string, remote RemotePoolToRemove) (removeRemotePoolsPairingKey, error) {
-		remotePool, err := deploy.NormalizeAddress(remote.Selector, remote.Remote.Address)
+		remotePool, err := deploy.RoundTripAddress(remote.Selector, remote.Remote.Address)
 		if err != nil {
 			return removeRemotePoolsPairingKey{}, err
 		}
@@ -323,9 +330,10 @@ func removeRemotePoolsApply() func(cldf.Environment, RemoveRemotePoolsInput) (cl
 				removedPairings[key] = struct{}{}
 			}
 
-			// TAR unregister: for deactivate, unregister the pool from the TokenAdminRegistry.
-			// This runs AFTER the forward + reverse cleanup so a peer is never left pointing at
-			// an already-unregistered pool mid-transaction.
+			// TAR unregister: for deactivate, unregister the pool from the TokenAdminRegistry. It is
+			// emitted after the reverse and forward cleanup to keep the topology tidy. This order
+			// does not protect message flow, and across chains it only holds when operations land
+			// immediately: under MCMS each chain's proposal executes independently.
 			if pool.Deactivate {
 				unregisterBatchOps, unregisterReports, err := unregisterToken(e, tokenRegistry, adapter, family, selector, fullPoolRef, fullTokenRef)
 				if err != nil {
@@ -497,7 +505,7 @@ func removeRemotePoolsReverse(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve peer pool ref %s on remote chain selector %d: %w", datastore_utils.SprintRef(remote.Remote), remoteSelector, err)
 		}
-		configuredAddr, err := deploy.NormalizeAddress(remoteSelector, configuredPoolRef.Address)
+		configuredAddr, err := deploy.RoundTripAddress(remoteSelector, configuredPoolRef.Address)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to normalize peer pool address on remote chain selector %d: %w", remoteSelector, err)
 		}
@@ -524,7 +532,7 @@ func removeRemotePoolsReverse(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve active pool ref on remote chain selector %d: %w", remoteSelector, err)
 		}
-		remoteActivePoolAddr, err := deploy.NormalizeAddress(remoteSelector, remoteActivePoolRef.Address)
+		remoteActivePoolAddr, err := deploy.RoundTripAddress(remoteSelector, remoteActivePoolRef.Address)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to normalize active pool address on remote chain selector %d: %w", remoteSelector, err)
 		}
@@ -696,8 +704,16 @@ func unregisterToken(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert pool ref to bytes on chain selector %d: %w", selector, err)
 	}
-	if len(activePool) == 0 || !bytes.Equal(activePool, targetPool) {
-		e.Logger.Warnf("skipping TAR unregister for token on chain %d: active pool does not match pool %s", selector, fullPoolRef.Address)
+	if len(activePool) == 0 {
+		e.Logger.Warnf("skipping TAR unregister for token on chain %d: already unregistered (TAR entry is empty)", selector)
+		return nil, nil, nil
+	}
+	if !bytes.Equal(activePool, targetPool) {
+		activePoolAddr, err := deploy.BytesToString(selector, activePool)
+		if err != nil {
+			activePoolAddr = fmt.Sprintf("%x", activePool)
+		}
+		e.Logger.Warnf("skipping TAR unregister for token on chain %d: TAR points at a different pool (%s), not pool %s; leaving it untouched", selector, activePoolAddr, fullPoolRef.Address)
 		return nil, nil, nil
 	}
 
