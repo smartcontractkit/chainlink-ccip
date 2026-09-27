@@ -170,16 +170,12 @@ type DeployTokenPoolInput struct {
 	// with no lockbox reverts with LockBoxNotConfigured on its first transfer.
 	// EVM 2.0.0+ only.
 	LockBoxGroups [][]uint64 `yaml:"lockBoxGroups,omitempty" json:"lockBoxGroups,omitempty"`
-	// LiquidityMigrationAmount, if set, specifies an exact token amount to seed the new pool's
-	// lockbox from the old pool (read from the TokenAdminRegistry). The migration runs during
-	// deploy, before the pool is registered on TAR or ownership-transferred. Mutually exclusive
-	// with LiquidityMigrationBasisPoints. For cleanup drains of orphaned pools, use the
+	// LiquidityMigrationAmount, if set, specifies how much liquidity to seed the new pool's lockbox
+	// from the old pool (read from the TokenAdminRegistry): either an exact token amount (RAW) or a
+	// percentage of the old pool's balance (BPS). The migration runs during deploy, before the pool
+	// is registered on TAR or ownership-transferred. For cleanup drains of orphaned pools, use the
 	// standalone MigrateLockReleasePoolLiquidity changeset instead.
-	LiquidityMigrationAmount *big.Int `yaml:"liquidityMigrationAmount,omitempty" json:"liquidityMigrationAmount,omitempty"`
-	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to seed
-	// (1-10000, where 10000 = 100%). Mutually exclusive with LiquidityMigrationAmount.
-	// See LiquidityMigrationAmount for details.
-	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,omitempty" json:"liquidityMigrationBasisPoints,omitempty"`
+	LiquidityMigrationAmount *LockReleasePoolLiquidityMigrationAmount `yaml:"liquidityMigrationAmount,omitempty" json:"liquidityMigrationAmount,omitempty"`
 	// UnsiloedLockBoxChainSelector names which lockbox receives the old pool's unsiloed (shared)
 	// balance, by naming any remote chain in the group that owns it. The group's lockbox is used.
 	//
@@ -233,6 +229,12 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 				err = tokenPoolAdapter.DeployTokenVerify(e, *deployTokenInput)
 				if err != nil {
 					return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
+				}
+			}
+			// deploy token pool
+			if deployTokenPoolInput := input.DeployTokenPoolInput; deployTokenPoolInput != nil && deployTokenPoolInput.LiquidityMigrationAmount != nil {
+				if err := deployTokenPoolInput.LiquidityMigrationAmount.Validate(); err != nil {
+					return fmt.Errorf("invalid liquidity migration amount for chain selector %d: %w", selector, err)
 				}
 			}
 		}
@@ -352,7 +354,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenPoolInput.TokenPoolVersion = input.TokenPoolVersion
 				deployTokenPoolInput.ExistingDataStore = e.DataStore
 				deployTokenPoolInput.ChainSelector = selector
-				if cfg.MCMS.TimelockAction != "" || deployTokenPoolInput.LiquidityMigrationAmount != nil || deployTokenPoolInput.LiquidityMigrationBasisPoints != nil {
+				if cfg.MCMS.TimelockAction != "" || deployTokenPoolInput.LiquidityMigrationAmount != nil {
 					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
@@ -413,7 +415,6 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					e, tokenPoolRegistry, selector, *tokenPool, *tokenRef, seedRegistryRef,
 					deployTokenPoolInput.TimelockAddress,
 					deployTokenPoolInput.LiquidityMigrationAmount,
-					deployTokenPoolInput.LiquidityMigrationBasisPoints,
 					unsiloedLockBoxAddress,
 				)
 				if err != nil {
@@ -731,12 +732,23 @@ func buildSeedMigrationBatchOps(
 	tokenPool, tokenRef datastore.AddressRef,
 	registryRef datastore.AddressRef,
 	timelockAddr string,
-	amount *big.Int,
-	basisPoints *uint16,
+	migrationAmount *LockReleasePoolLiquidityMigrationAmount,
 	unsiloedLockBoxAddress string,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	if amount == nil && basisPoints == nil {
+	if migrationAmount == nil {
 		return nil, nil, nil
+	}
+
+	if err := migrationAmount.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("invalid liquidity migration amount on chain selector %d: %w", selector, err)
+	}
+	amount, err := migrationAmount.RawAmount()
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid raw liquidity migration amount on chain selector %d: %w", selector, err)
+	}
+	basisPoints, err := migrationAmount.BasisPoints()
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid liquidity migration basis points on chain selector %d: %w", selector, err)
 	}
 
 	tokenPoolAdapter, family, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, selector, tokenPool, tokenRef)
