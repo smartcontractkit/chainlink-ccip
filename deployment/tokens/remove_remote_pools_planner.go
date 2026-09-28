@@ -299,9 +299,9 @@ func (p *removeRemotePoolsPlanner) planForward(entry *removeRemotePoolsEntry, re
 // empty entry, or one that has moved on to another pool, is left untouched (with a warning).
 // GetActivePool returns the same byte form as AddressRefToBytes, so the two compare directly.
 func (p *removeRemotePoolsPlanner) planUnregister(entry *removeRemotePoolsEntry) error {
-	tar, ok := p.registry.GetTokenAdminRegistryManager(entry.family)
+	tar, ok := p.registry.GetTokenAdminRegistryReader(entry.family)
 	if !ok {
-		return fmt.Errorf("no token admin registry manager for chain family %s", entry.family)
+		return fmt.Errorf("no token admin registry reader for chain family %s", entry.family)
 	}
 	activePool, err := tar.GetActivePool(p.env, entry.selector, entry.tokenRef)
 	if err != nil {
@@ -319,7 +319,13 @@ func (p *removeRemotePoolsPlanner) planUnregister(entry *removeRemotePoolsEntry)
 		p.env.Logger.Warnf("skipping TAR unregister for token on chain %d: TAR points at a different pool (%s), not pool %s; leaving it untouched", entry.selector, activePoolAddr, entry.poolRef.Address)
 		return nil
 	}
-	p.queueUnregister(entry, tar, UnregisterTokenSequenceInput{
+	// Unregistering is a write, so it needs a manager; a reader-only family can still deactivate a
+	// pool that is no longer registered (the skips above).
+	manager, ok := p.registry.GetTokenAdminRegistryManager(entry.family)
+	if !ok {
+		return fmt.Errorf("token admin registry for chain family %s does not support unregistering tokens", entry.family)
+	}
+	p.queueUnregister(entry, manager, UnregisterTokenSequenceInput{
 		Selector:          entry.selector,
 		TokenRef:          entry.tokenRef,
 		ExistingDataStore: p.env.DataStore,
@@ -350,14 +356,14 @@ func (p *removeRemotePoolsPlanner) reverseTargets(entry *removeRemotePoolsEntry,
 		return nil, datastore.AddressRef{}, p.unsupportedPeer(entry, remoteSelector, "chain is not loaded in the environment")
 	}
 
-	// Get the peer's TAR manager, which is needed to read the peer's TAR-active pool.
+	// Get the peer's TAR reader, which is needed to read the peer's TAR-active pool.
 	remoteFamily, err := chainsel.GetSelectorFamily(remoteSelector)
 	if err != nil {
 		return nil, datastore.AddressRef{}, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
 	}
-	tar, ok := p.registry.GetTokenAdminRegistryManager(remoteFamily)
+	tar, ok := p.registry.GetTokenAdminRegistryReader(remoteFamily)
 	if !ok {
-		return nil, datastore.AddressRef{}, p.unsupportedPeer(entry, remoteSelector, fmt.Sprintf("no token admin registry manager for chain family %s", remoteFamily))
+		return nil, datastore.AddressRef{}, p.unsupportedPeer(entry, remoteSelector, fmt.Sprintf("no token admin registry reader for chain family %s", remoteFamily))
 	}
 
 	// Fetch the peer's TAR-active pool.

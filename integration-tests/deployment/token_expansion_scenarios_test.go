@@ -2210,10 +2210,10 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		evmRemotes := func(pool common.Address, sel, remoteSel uint64) [][]byte {
 			return ReadRemotePools(t, env, sel, datastore.AddressRef{Address: pool.Hex()}, datastore.AddressRef{}, remoteSel)
 		}
-		solTAR, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilySolana)
-		require.True(t, ok, "Solana TAR manager should be registered")
-		evmTAR, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
-		require.True(t, ok, "EVM TAR manager should be registered")
+		solTAR, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilySolana)
+		require.True(t, ok, "Solana TAR reader should be registered")
+		evmTAR, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilyEVM)
+		require.True(t, ok, "EVM TAR reader should be registered")
 
 		// Pre-state: the web is fully connected and the Solana pool is registered in the Solana TAR.
 		require.Contains(t, solRemotes(evm1ChainSel), evm1PoolAddr, "Solana pool should list the EVM1 pool")

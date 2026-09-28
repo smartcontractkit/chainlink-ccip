@@ -589,8 +589,8 @@ func TestRemoveRemotePools_Deactivate(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, remotePoolsA, "pool B should have no remote pool for chain A after deactivate")
 
-	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
-	require.True(t, ok, "EVM TAR manager should be registered")
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR reader should be registered")
 	tokenRef, err := datastore_utils.FindAndFormatRef(env.env.DataStore, datastore.AddressRef{ChainSelector: env.selA, Type: datastore.ContractType(bnmERC20ops.ContractType)}, env.selA, datastore_utils.FullRef)
 	require.NoError(t, err)
 	activePool, err := tarReader.GetActivePool(*env.env, env.selA, tokenRef)
@@ -612,8 +612,8 @@ func TestRemoveRemotePools_DeactivateSkipsUnregisterWhenActivePoolEmpty(t *testi
 
 	require.NoError(t, applyRemoveRemotePools(t, env.env, input))
 
-	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
-	require.True(t, ok, "EVM TAR manager should be registered")
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR reader should be registered")
 	fullTokenRef, err := datastore_utils.FindAndFormatRef(env.env.DataStore, datastore.AddressRef{ChainSelector: env.selA, Type: datastore.ContractType(bnmERC20ops.ContractType)}, env.selA, datastore_utils.FullRef)
 	require.NoError(t, err)
 	activePool, err := tarReader.GetActivePool(*env.env, env.selA, fullTokenRef)
@@ -688,9 +688,9 @@ func TestRemoveRemotePools_DeactivateRetiredPoolAfterPeerUpgrade(t *testing.T) {
 	require.Contains(t, remotePools(poolA2, selA, selC), poolC2, "A2 should still list C2")
 
 	// The TAR still points to A2 (the unregister is skipped because A1 is not the active pool).
-	tarManager, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
-	require.True(t, ok, "EVM TAR manager should be registered")
-	activePool, err := tarManager.GetActivePool(*env, selA, web.tokenA)
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR reader should be registered")
+	activePool, err := tarReader.GetActivePool(*env, selA, web.tokenA)
 	require.NoError(t, err)
 	require.Equal(t, poolA2, common.BytesToAddress(activePool), "TAR should still point to A2")
 }
@@ -733,9 +733,9 @@ func TestRemoveRemotePools_DeactivateResumesAfterPartialReverse(t *testing.T) {
 	require.NotContains(t, remotePools(env.poolB, env.selB, env.selA), env.poolA, "B should not list A")
 	require.NotContains(t, remotePools(env.poolC, env.selC, env.selA), env.poolA, "C should not list A")
 
-	tarManager, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
-	require.True(t, ok, "EVM TAR manager should be registered")
-	activePool, err := tarManager.GetActivePool(*e, env.selA, FindFullRef(t, e, env.selA, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)}))
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR reader should be registered")
+	activePool, err := tarReader.GetActivePool(*e, env.selA, FindFullRef(t, e, env.selA, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)}))
 	require.NoError(t, err)
 	require.Empty(t, activePool, "A should be unregistered from the TAR")
 }
@@ -883,10 +883,10 @@ func TestRemoveRemotePools_DeactivateUnresolvableEntryWritesNothing(t *testing.T
 	require.Equal(t, []common.Address{harness.poolC, badPool}, remotePools(harness.poolA, harness.selA, harness.selC), "A should still list C and the bad entry")
 	require.Contains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should still list A")
 	require.Contains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C should still list A")
-	tarManager, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
-	require.True(t, ok, "EVM TAR manager should be registered")
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR reader should be registered")
 	tokenRefA := FindFullRef(t, env, harness.selA, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)})
-	activePool, err := tarManager.GetActivePool(*env, harness.selA, tokenRefA)
+	activePool, err := tarReader.GetActivePool(*env, harness.selA, tokenRefA)
 	require.NoError(t, err)
 	require.Equal(t, harness.poolA.Bytes(), activePool, "A should still be registered in the TAR")
 
@@ -904,7 +904,7 @@ func TestRemoveRemotePools_DeactivateUnresolvableEntryWritesNothing(t *testing.T
 	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selC), "A should have no remote pool for chain C")
 	require.NotContains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should not list A")
 	require.NotContains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C should not list A")
-	activePool, err = tarManager.GetActivePool(*env, harness.selA, tokenRefA)
+	activePool, err = tarReader.GetActivePool(*env, harness.selA, tokenRefA)
 	require.NoError(t, err)
 	require.Empty(t, activePool, "A should be unregistered from the TAR")
 }
@@ -1032,9 +1032,9 @@ func TestRemoveRemotePools_DeactivateWithUnloadedPeer(t *testing.T) {
 	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selC), "A should list nothing for chain C (the forward pass only needs chain A)")
 	require.NotContains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should not list A")
 	require.Contains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C was skipped, so it should still list A")
-	tarManager, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
-	require.True(t, ok, "EVM TAR manager should be registered")
-	activePool, err := tarManager.GetActivePool(*fullEnv, harness.selA, FindFullRef(t, fullEnv, harness.selA, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)}))
+	tarReader, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryReader(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR reader should be registered")
+	activePool, err := tarReader.GetActivePool(*fullEnv, harness.selA, FindFullRef(t, fullEnv, harness.selA, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)}))
 	require.NoError(t, err)
 	require.Empty(t, activePool, "A should be unregistered from the TAR")
 }

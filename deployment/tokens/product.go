@@ -132,8 +132,8 @@ type RateLimitReaderAdapter interface {
 
 // TokenAdminRegistryReader is a versionless interface for reading the active pool from a chain's
 // TokenAdminRegistry (or equivalent). Implementations are registered per chain family via
-// TokenAdapterRegistry.RegisterTokenAdminRegistryManager and can be looked up by family regardless
-// of pool version.
+// TokenAdapterRegistry.RegisterTokenAdminRegistryReader, or implicitly by registering a
+// TokenAdminRegistryManager, and can be looked up by family regardless of pool version.
 type TokenAdminRegistryReader interface {
 	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
 	// as raw address bytes. Returns empty bytes (no error) when no pool is registered; any other
@@ -148,9 +148,10 @@ type TokenAdminRegistryReader interface {
 	GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error)
 }
 
-// TokenAdminRegistryWriter is a versionless interface for unregistering a token from a chain's
-// TokenAdminRegistry (or equivalent). There is no official unregister on-chain: a pool is
-// unregistered by setting the registry's pool to the null/zero pool.
+// TokenAdminRegistryWriter is a versionless interface for write operations on a chain's
+// TokenAdminRegistry (or equivalent). A family provides it by registering a
+// TokenAdminRegistryManager. There is no official unregister on-chain: a pool is unregistered by
+// setting the registry's pool to the null/zero pool.
 //
 // UnregisterToken is unconditional: it clears the token's registry entry whatever pool it
 // currently points at. Callers that must not clobber a registration that has moved on to another
@@ -161,7 +162,8 @@ type TokenAdminRegistryWriter interface {
 	UnregisterToken() *cldf_ops.Sequence[UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
-// TokenAdminRegistryManager combines the versionless TAR reader and writer for a chain family.
+// TokenAdminRegistryManager combines the versionless TAR reader and writer for a chain family. A
+// family whose TAR can only be read registers a TokenAdminRegistryReader instead.
 type TokenAdminRegistryManager interface {
 	TokenAdminRegistryReader
 	TokenAdminRegistryWriter
@@ -563,16 +565,18 @@ type SetTokenTransferFeeSequenceInput struct {
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
 	tokenRefResolverReg          map[string]TokenRefResolver
+	tokenAdminRegistryReaderReg  map[string]TokenAdminRegistryReader
 	tokenAdminRegistryManagerReg map[string]TokenAdminRegistryManager
 	tokenAdapterReg              map[tokenAdapterID]TokenAdapter
 	tokenRefResolverMu           sync.Mutex
-	tokenAdminRegistryManagerMu  sync.Mutex
+	tokenAdminRegistryMu         sync.Mutex // guards both TAR maps, so a manager registration updates them together
 	tokenAdapterMu               sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
 		tokenRefResolverReg:          make(map[string]TokenRefResolver),
+		tokenAdminRegistryReaderReg:  make(map[string]TokenAdminRegistryReader),
 		tokenAdminRegistryManagerReg: make(map[string]TokenAdminRegistryManager),
 		tokenAdapterReg:              make(map[tokenAdapterID]TokenAdapter),
 	}
@@ -595,20 +599,42 @@ func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRef
 	return resolver, ok
 }
 
-// RegisterTokenAdminRegistryManager registers a versionless TAR manager (reader + writer) for the
-// given chain family.
-func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryManager(family string, manager TokenAdminRegistryManager) {
-	r.tokenAdminRegistryManagerMu.Lock()
-	defer r.tokenAdminRegistryManagerMu.Unlock()
-	if _, exists := r.tokenAdminRegistryManagerReg[family]; !exists {
-		r.tokenAdminRegistryManagerReg[family] = manager
+// RegisterTokenAdminRegistryReader registers a versionless TAR reader for the given chain family.
+// It is ignored when the family already has a reader, including one registered as a manager.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryReader(family string, reader TokenAdminRegistryReader) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	if _, exists := r.tokenAdminRegistryReaderReg[family]; !exists {
+		r.tokenAdminRegistryReaderReg[family] = reader
 	}
 }
 
-// GetTokenAdminRegistryManager retrieves a registered TokenAdminRegistryManager for the given chain family.
+// GetTokenAdminRegistryReader retrieves the TAR reader for the given chain family: its manager if
+// one is registered, otherwise its registered reader.
+func (r *TokenAdapterRegistry) GetTokenAdminRegistryReader(family string) (TokenAdminRegistryReader, bool) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	reader, ok := r.tokenAdminRegistryReaderReg[family]
+	return reader, ok
+}
+
+// RegisterTokenAdminRegistryManager registers a versionless TAR manager (reader + writer) for the
+// given chain family. The first manager registered for a family also becomes its reader, replacing
+// a reader-only registration, so reads and writes always go through the same implementation.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryManager(family string, manager TokenAdminRegistryManager) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	if _, exists := r.tokenAdminRegistryManagerReg[family]; !exists {
+		r.tokenAdminRegistryManagerReg[family] = manager
+		r.tokenAdminRegistryReaderReg[family] = manager
+	}
+}
+
+// GetTokenAdminRegistryManager retrieves a registered TokenAdminRegistryManager for the given
+// chain family. A family registered only as a reader has none.
 func (r *TokenAdapterRegistry) GetTokenAdminRegistryManager(family string) (TokenAdminRegistryManager, bool) {
-	r.tokenAdminRegistryManagerMu.Lock()
-	defer r.tokenAdminRegistryManagerMu.Unlock()
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
 	manager, ok := r.tokenAdminRegistryManagerReg[family]
 	return manager, ok
 }

@@ -32,7 +32,9 @@ type RemoveRemotePoolsInput struct {
 //   - deactivate: must be specified alone (no other mode flags and no explicit
 //     remotePoolsToRemove). Unregisters the pool from the TokenAdminRegistry (setPool to zero)
 //     AND performs the allRemotes forward cleanup AND the bidirectional reverse cleanup,
-//     completing the full teardown. The remotes are always discovered automatically.
+//     completing the full teardown. The remotes are always discovered automatically. Unregistering
+//     requires the chain family to register a TokenAdminRegistryManager; a family registered only
+//     as a reader fails at planning when an unregister is needed.
 //
 // The reverse pass removes this pool from up to two pools per peer chain: the peer's TAR-active
 // pool and the peer pool this pool is paired with (they differ once the peer has been upgraded,

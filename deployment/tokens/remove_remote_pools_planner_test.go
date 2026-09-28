@@ -143,6 +143,17 @@ func (m *reverseTestTAR) UnregisterToken() *cldf_ops.Sequence[UnregisterTokenSeq
 	return nil
 }
 
+// reverseTestReaderOnlyTAR is a TokenAdminRegistryReader that cannot unregister.
+type reverseTestReaderOnlyTAR struct{ activePool string }
+
+func (m *reverseTestReaderOnlyTAR) GetActivePool(cldf.Environment, uint64, datastore.AddressRef, ...datastore.AddressRef) ([]byte, error) {
+	return []byte(m.activePool), nil
+}
+
+func (m *reverseTestReaderOnlyTAR) GetTokenAdminRegistryRef(cldf.Environment, uint64) (datastore.AddressRef, error) {
+	return datastore.AddressRef{}, nil
+}
+
 // reverseTestPool describes a peer pool on the remote chain.
 type reverseTestPool struct {
 	address string
@@ -154,6 +165,7 @@ type reverseTestPool struct {
 type reverseTestSetup struct {
 	remoteNotLoaded      bool // the remote chain is not loaded in the environment
 	noTAR                bool // no TAR reader is registered for the remote family
+	readerOnlyTAR        bool // the remote family registers a reader-only TAR
 	skipUnsupportedPeers bool
 }
 
@@ -211,7 +223,11 @@ func runReverseTest(t *testing.T, peerPools []reverseTestPool, pairedPool, activ
 
 	reg := newTokenAdapterRegistry()
 	reg.RegisterTokenAdapter(family, reverseTestV2_0_0, remoteV2)
-	if !setup.noTAR {
+	switch {
+	case setup.noTAR:
+	case setup.readerOnlyTAR:
+		reg.RegisterTokenAdminRegistryReader(family, &reverseTestReaderOnlyTAR{activePool: activePool})
+	default:
 		reg.RegisterTokenAdminRegistryManager(family, &reverseTestTAR{activePool: activePool})
 	}
 
@@ -315,4 +331,57 @@ func TestRemoveRemotePoolsReverse_UnsupportedPeers(t *testing.T) {
 			require.Empty(t, removed)
 		})
 	}
+}
+
+// Test that the reverse pass only reads peer TARs, so a peer family with a reader-only TAR is cleaned.
+func TestRemoveRemotePoolsReverse_ReaderOnlyPeerTAR(t *testing.T) {
+	removed, err := runReverseTest(t, []reverseTestPool{
+		{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_OLD"}},
+	}, "B_NEW", "B_NEW", &reverseTestSetup{readerOnlyTAR: true})
+	require.NoError(t, err)
+	require.Equal(t, []string{"B_NEW"}, removedFrom(t, removed))
+}
+
+// Test that the TAR unregister needs a manager only when it has to write: a reader-only family can
+// deactivate a pool the TAR no longer points at, but fails at planning when the pool is still active.
+func TestRemoveRemotePoolsPlanUnregister_ReaderOnlyTAR(t *testing.T) {
+	family, err := chainsel.GetSelectorFamily(reverseTestLocalSel)
+	require.NoError(t, err)
+	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(family, reverseTestIdentityNormalizer{})
+
+	planUnregister := func(t *testing.T, tar TokenAdminRegistryReader) (*removeRemotePoolsPlanner, error) {
+		reg := newTokenAdapterRegistry()
+		if manager, ok := tar.(TokenAdminRegistryManager); ok {
+			reg.RegisterTokenAdminRegistryManager(family, manager)
+		} else {
+			reg.RegisterTokenAdminRegistryReader(family, tar)
+		}
+		lggr := logger.Test(t)
+		planner := newRemoveRemotePoolsPlanner(cldf.Environment{Logger: lggr}, reg)
+		return planner, planner.planUnregister(&removeRemotePoolsEntry{
+			label:     "A_OLD",
+			selector:  reverseTestLocalSel,
+			family:    family,
+			poolRef:   datastore.AddressRef{ChainSelector: reverseTestLocalSel, Address: "A_OLD"},
+			poolBytes: []byte("A_OLD"),
+		})
+	}
+
+	t.Run("TAR points at another pool: nothing to unregister", func(t *testing.T) {
+		planner, err := planUnregister(t, &reverseTestReaderOnlyTAR{activePool: "A_NEW"})
+		require.NoError(t, err)
+		require.Empty(t, planner.writes)
+	})
+
+	t.Run("TAR points at this pool: fails at planning", func(t *testing.T) {
+		planner, err := planUnregister(t, &reverseTestReaderOnlyTAR{activePool: "A_OLD"})
+		require.ErrorContains(t, err, "does not support unregistering tokens")
+		require.Empty(t, planner.writes)
+	})
+
+	t.Run("TAR points at this pool with a manager: unregister queued", func(t *testing.T) {
+		planner, err := planUnregister(t, &reverseTestTAR{activePool: "A_OLD"})
+		require.NoError(t, err)
+		require.Len(t, planner.writes, 1)
+	})
 }

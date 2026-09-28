@@ -749,10 +749,10 @@ func buildSeedMigrationBatchOps(
 		return nil, nil, fmt.Errorf("adapter for chain selector %d does not support liquidity migration", selector)
 	}
 
-	registryReader, ok := tokenPoolRegistry.GetTokenAdminRegistryManager(family)
+	registryReader, ok := tokenPoolRegistry.GetTokenAdminRegistryReader(family)
 	if !ok {
 		return nil, nil, fmt.Errorf(
-			"no token admin registry manager for chain family %s, which is required for liquidity migration",
+			"no token admin registry reader for chain family %s, which is required for liquidity migration",
 			family,
 		)
 	}
