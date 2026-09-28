@@ -60,6 +60,10 @@ func DeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mcmsRegistr
 	return cldf.CreateChangeSet(makeApplyDeployCCTPChains(cctpChainRegistry, mcmsRegistry), makeVerifyDeployCCTPChains(cctpChainRegistry, mcmsRegistry))
 }
 
+// lockReleaseMechanism is the LockOrBurnMechanism value for lock/release lanes. These
+// are not native CCTP connections, so they are excluded from the native CCTP defaults.
+const lockReleaseMechanism = "LOCK_RELEASE"
+
 // create2FactoryContractType and create2FactoryVersion identify the CREATE2Factory
 // deployment in the datastore used as the default DeployerContract.
 const create2FactoryContractType = datastore.ContractType("CREATE2Factory")
@@ -162,6 +166,21 @@ func withCCTPChainDefaults(blockChains cldf_chain.BlockChains, chainSel uint64, 
 			if remoteCfg.DomainIdentifier == 0 {
 				if remoteDefaults, ok := config.GetCCTPChainDefaults(remoteSel); ok {
 					remoteCfg.DomainIdentifier = remoteDefaults.DomainIdentifier
+				}
+			}
+			// For Native CCTP lanes, if a verifier gas/payload or token transfer fee value
+			// is not provided we write the default. The fee config also drives the
+			// CCTP-through-CCV pool. Lock-release lanes move USDC by locking it on the
+			// source, so they are excluded.
+			if remoteCfg.LockOrBurnMechanism != lockReleaseMechanism {
+				if remoteCfg.GasForVerification == 0 {
+					remoteCfg.GasForVerification = config.DefaultGasForVerification
+				}
+				if remoteCfg.PayloadSizeBytes == 0 {
+					remoteCfg.PayloadSizeBytes = config.DefaultPayloadSizeBytes
+				}
+				if remoteCfg.TokenTransferFeeConfig == nil {
+					remoteCfg.TokenTransferFeeConfig = config.NativeCCTPTokenTransferFeeConfig()
 				}
 			}
 			remoteChains[remoteSel] = remoteCfg
