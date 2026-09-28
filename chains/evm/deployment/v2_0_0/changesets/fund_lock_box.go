@@ -1,5 +1,4 @@
 package changesets
-package changesets
 
 import (
 	"fmt"
