@@ -15,9 +15,27 @@ import (
 
 	erc20_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	lockbox_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
+	siloed_lrtp_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
+
+// LockBoxKind declares whether a lockbox is a silo (dedicated to one remote chain) or the shared
+// (unsiloed) bucket. It is declared explicitly by the operator and verified on-chain against the
+// pool's lockbox mapping before any write is emitted.
+type LockBoxKind string
+
+const (
+	// LockBoxKindSiloed is a lockbox mapped to exactly one remote chain selector.
+	LockBoxKindSiloed LockBoxKind = "siloed"
+	// LockBoxKindUnsiloed is a lockbox shared by more than one remote chain selector.
+	LockBoxKindUnsiloed LockBoxKind = "unsiloed"
+)
+
+// IsValid reports whether k is a recognised lockbox kind.
+func (k LockBoxKind) IsValid() bool {
+	return k == LockBoxKindSiloed || k == LockBoxKindUnsiloed
+}
 
 // LockBoxDeposit is a single deposit into a lockbox bucket.
 type LockBoxDeposit struct {
@@ -31,8 +49,15 @@ type LockBoxDeposit struct {
 // FundLockBoxInput is the input for the lockbox funding sequence.
 type FundLockBoxInput struct {
 	ChainSelector uint64
+	// PoolAddress is the v2.0 SiloedLockReleaseTokenPool that maps LockBoxAddress. Required: the
+	// siloed/unsiloed distinction is defined by the pool's lockbox mapping, so the pool is read to
+	// verify Kind on-chain.
+	PoolAddress string
 	// LockBoxAddress is the ERC20LockBox to fund.
 	LockBoxAddress string
+	// Kind declares whether LockBoxAddress is a silo or the shared (unsiloed) bucket. Verified
+	// on-chain against the pool's lockbox mapping before any write is emitted.
+	Kind LockBoxKind
 	// TokenAddress is the token to deposit into the lockbox.
 	TokenAddress string
 	// TimelockAddress is the MCMS timelock address that will execute the funding operations.
@@ -70,9 +95,25 @@ var FundLockBox = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid fund lockbox input: %w", err)
 		}
 
+		poolAddr := common.HexToAddress(input.PoolAddress)
 		lockBoxAddr := common.HexToAddress(input.LockBoxAddress)
 		tokenAddr := common.HexToAddress(input.TokenAddress)
 		timelockAddr := common.HexToAddress(input.TimelockAddress)
+
+		mappedSelectors, err := verifyLockBoxKind(b, evmChain, input.ChainSelector, poolAddr, lockBoxAddr, input.Kind)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		if input.Kind == LockBoxKindSiloed {
+			for _, deposit := range input.Deposits {
+				if deposit.RemoteChainSelector != mappedSelectors[0] {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"deposit targets remote chain %d but silo lockbox %s on pool %s is mapped to chain %d",
+						deposit.RemoteChainSelector, lockBoxAddr, poolAddr, mappedSelectors[0])
+				}
+			}
+		}
 
 		var ops []evm_contract.WriteOutput
 
@@ -166,9 +207,77 @@ var FundLockBox = cldf_ops.NewSequence(
 	},
 )
 
+// verifyLockBoxKind reads the pool's lockbox mapping and verifies that lockBoxAddr matches the
+// declared kind, returning the remote chain selectors the lockbox is mapped to (sorted).
+//
+// This is the only on-chain definition of the siloed/unsiloed distinction: the ERC20LockBox
+// contract has no silo concept and ignores the remoteChainSelector passed to deposit(). The
+// distinction lives entirely in the pool's s_lockBoxes mapping (configureLockBoxes), where a silo
+// is mapped to exactly one remote chain selector and the shared (unsiloed) bucket is mapped to
+// more than one.
+func verifyLockBoxKind(
+	b cldf_ops.Bundle,
+	evmChain evm.Chain,
+	chainSelector uint64,
+	poolAddr, lockBoxAddr common.Address,
+	kind LockBoxKind,
+) ([]uint64, error) {
+	configsReport, err := cldf_ops.ExecuteOperation(
+		b,
+		siloed_lrtp_ops.GetAllLockBoxConfigs,
+		evmChain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSelector,
+			Address:       poolAddr,
+		},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[struct{}], evm.Chain](),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read lockbox configs from pool %s: %w", poolAddr, err)
+	}
+
+	var mappedSelectors []uint64
+	for _, config := range configsReport.Output {
+		if config.LockBox == lockBoxAddr {
+			mappedSelectors = append(mappedSelectors, config.RemoteChainSelector)
+		}
+	}
+	if len(mappedSelectors) == 0 {
+		return nil, fmt.Errorf(
+			"lockbox %s is not configured on pool %s; configure it with configureLockBoxes before funding",
+			lockBoxAddr, poolAddr)
+	}
+	slices.Sort(mappedSelectors)
+
+	switch kind {
+	case LockBoxKindSiloed:
+		if len(mappedSelectors) != 1 {
+			return nil, fmt.Errorf(
+				"lockbox %s is declared siloed but pool %s maps it to %d chain selectors %v; a silo is mapped to exactly one",
+				lockBoxAddr, poolAddr, len(mappedSelectors), mappedSelectors)
+		}
+	case LockBoxKindUnsiloed:
+		if len(mappedSelectors) < 2 {
+			return nil, fmt.Errorf(
+				"lockbox %s is declared unsiloed but pool %s maps it to only %d chain selector(s) %v; the shared bucket is mapped to more than one",
+				lockBoxAddr, poolAddr, len(mappedSelectors), mappedSelectors)
+		}
+	default:
+		return nil, fmt.Errorf("unknown lockbox kind %q", kind)
+	}
+
+	return mappedSelectors, nil
+}
+
 func validateFundLockBoxInput(input FundLockBoxInput) error {
+	if input.PoolAddress == "" {
+		return fmt.Errorf("PoolAddress must be provided")
+	}
 	if input.LockBoxAddress == "" {
 		return fmt.Errorf("LockBoxAddress must be provided")
+	}
+	if !input.Kind.IsValid() {
+		return fmt.Errorf("Kind must be %q or %q, got %q", LockBoxKindSiloed, LockBoxKindUnsiloed, input.Kind)
 	}
 	if input.TokenAddress == "" {
 		return fmt.Errorf("TokenAddress must be provided")
