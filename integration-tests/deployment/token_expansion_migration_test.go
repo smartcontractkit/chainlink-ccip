@@ -14,7 +14,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmERC20DripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
-	bmtpapOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	tpapOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evmtokensseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -57,11 +57,15 @@ const (
 // legacyPairSpec captures what differs between legacy pool generations when standing up the
 // starting state for an upgrade test.
 type legacyPairSpec struct {
-	poolType   deployment.ContractType
-	tokenType  deployment.ContractType
-	decimalsA  uint8
-	decimalsB  uint8
-	singlePool bool
+	poolType  deployment.ContractType
+	tokenType deployment.ContractType
+	decimalsA uint8
+	decimalsB uint8
+	// acceptLiquidity is required (non-nil) for lock-release pool types and must stay nil for
+	// burn-mint ones. The v1.5.0 deploy sequence rejects a nil value for
+	// LockReleaseTokenPoolAndProxy because the flag is immutable once constructed.
+	acceptLiquidity *bool
+	singlePool      bool
 }
 
 // legacyPairSpecFor derives the spec from the legacy pool version.
@@ -298,6 +302,13 @@ func TestTokenExpansionMigration_ExtendPoolDoesNotRequireAllRemotes(t *testing.T
 // in its TokenAdminRegistry. It returns the resolved addresses for use in upgrade tests.
 func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) legacyBnMPair {
 	t.Helper()
+	return setupLegacyConnectedPair(t, oldPoolVersion, legacyPairSpecFor(oldPoolVersion))
+}
+
+// setupLegacyConnectedPair is setupLegacyConnectedBnMPair with the pool/token shape supplied
+// directly, so a caller can stand up a non-burn-mint legacy pair (see the v1.5.0 lock-release test).
+func setupLegacyConnectedPair(t *testing.T, oldPoolVersion *semver.Version, spec legacyPairSpec) legacyBnMPair {
+	t.Helper()
 
 	const oldPoolQualA = "MIG_OLD_POOL_A"
 	const oldPoolQualB = "MIG_OLD_POOL_B"
@@ -344,7 +355,6 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 
 	// Deploy a legacy BurnMint pool pair (token + pool on each chain), connect them, and register in TAR.
 	tokenPoolRL := tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}
-	spec := legacyPairSpecFor(oldPoolVersion)
 	bnmPoolType := spec.poolType
 	oldOut, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		ChainAdapterVersion: cciputils.Version_1_6_0,
@@ -360,6 +370,7 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: oldPoolQualA,
 					PoolType:           bnmPoolType.String(),
+					AcceptLiquidity:    spec.acceptLiquidity,
 				},
 				TokenTransferConfig: &tokensapi.TokenTransferConfig{
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -377,6 +388,7 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: oldPoolQualB,
 					PoolType:           bnmPoolType.String(),
+					AcceptLiquidity:    spec.acceptLiquidity,
 				},
 				TokenTransferConfig: &tokensapi.TokenTransferConfig{
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -633,7 +645,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		// That is a real behavioural difference from v1.5.1+: there is no window in which the old and
 		// new pool A are both accepted by pool B, so messages already in flight from old pool A are
 		// rejected with InvalidSourcePoolAddress. Asserted here so the cutover is pinned, not implied.
-		oldPoolB, err := bmtpapOps.NewBurnMintTokenPoolAndProxyContract(s.oldPoolAddrB, chainB.Client)
+		oldPoolB, err := tpapOps.NewTokenPoolAndProxyContract(s.oldPoolAddrB, chainB.Client)
 		require.NoError(t, err)
 		gotRemotePoolB, err := oldPoolB.GetRemotePool(&bind.CallOpts{Context: t.Context()}, selA)
 		require.NoError(t, err)
