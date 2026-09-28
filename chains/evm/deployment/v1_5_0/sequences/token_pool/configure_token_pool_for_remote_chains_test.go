@@ -181,6 +181,7 @@ func TestConfigureTokenPoolForRemoteChains_RejectsEnabledZeroRateLimit(t *testin
 	rl := &tokenapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 0, Rate: 0}
 	_, err := cldf_ops.ExecuteSequence(e.OperationsBundle, ConfigureTokenPoolForRemoteChains, chain,
 		ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    testChainSelector,
 			TokenPoolAddress: poolAddr,
 			TokenPoolVersion: utils.Version_1_5_0,
 			RemoteChains: map[uint64]tokenapi.RemoteChainConfig[[]byte, string]{
@@ -211,6 +212,7 @@ func configure(
 
 	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, ConfigureTokenPoolForRemoteChains, chain,
 		ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    chainSelector,
 			TokenPoolAddress: poolAddr,
 			TokenPoolVersion: utils.Version_1_5_0,
 			RemoteChains: map[uint64]tokenapi.RemoteChainConfig[[]byte, string]{
