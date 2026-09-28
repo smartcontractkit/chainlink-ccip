@@ -21,7 +21,7 @@ const CanonicalUSDCDecimals uint8 = 6
 // the CCTP-through-CCV token pool.
 const (
 	// DefaultGasForVerification is the gas allocated to verify a CCTP message on a remote chain.
-	DefaultGasForVerification uint32 = 200_000
+	DefaultGasForVerification uint32 = 220_000
 	// DefaultPayloadSizeBytes is the size of the CCTP verification payload checked on a remote chain.
 	DefaultPayloadSizeBytes uint16 = 1024
 )
