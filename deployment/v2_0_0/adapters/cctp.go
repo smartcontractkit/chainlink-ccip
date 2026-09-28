@@ -6,6 +6,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -159,6 +160,15 @@ type MigrateHybridLockReleaseLiquidityDeps struct {
 	BlockChains cldf_chain.BlockChains
 }
 
+// UpdateAuthoritiesInput specifies the input for the UpdateAuthorities sequence.
+type UpdateAuthoritiesInput struct {
+	// ChainSelector is the selector for the chain whose contracts' ownership is updated.
+	ChainSelector uint64
+	// ContractRefs are the contracts deployed or configured by the CCTP changeset on this chain.
+	// Implementations filter these to the ones that require an ownership transfer.
+	ContractRefs []datastore.AddressRef
+}
+
 // CCTPChain is a configurable CCTP chain.
 type CCTPChain interface {
 	RemoteCCTPChain
@@ -169,6 +179,9 @@ type CCTPChain interface {
 	// MigrateHybridLockReleaseLiquidity migrates liquidity from a HybridLockReleaseUSDCTokenPool
 	// into per-chain siloed lockboxes on the home chain.
 	MigrateHybridLockReleaseLiquidity() *cldf_ops.Sequence[MigrateHybridLockReleaseLiquidityInput, sequences.OnChainOutput, MigrateHybridLockReleaseLiquidityDeps]
+	// UpdateAuthorities transfers ownership of the CCTP contracts on the chain to the MCMS
+	// timelock. Implementations that do not manage ownership return a no-op.
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *cldf.Environment]
 }
 
 // CCTPChainRegistry maintains a registry of CCTP chains.

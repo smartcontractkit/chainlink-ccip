@@ -45,6 +45,9 @@ type CCTPChainConfig struct {
 	USDCType adapters.USDCType
 	// TokenDecimals is the number of decimals of the USDC on the chain.
 	TokenDecimals uint8
+	// SkipOwnershipTransfer leaves the CCTP contracts deployed by this changeset on the
+	// deployer key instead of transferring ownership to the MCMS timelock.
+	SkipOwnershipTransfer bool
 }
 
 // DeployCCTPChainsConfig is the configuration for the DeployCCTPChains changeset.
@@ -261,6 +264,9 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 
 		// Deploy across all chains.
 		newDS := datastore.NewMemoryDataStore()
+		// chainContractRefs tracks the contracts deployed or configured per chain so ownership
+		// can be transferred to the MCMS timelock afterwards.
+		chainContractRefs := make(map[uint64][]datastore.AddressRef, len(cfg.Chains))
 		// registeredPoolRefs maps chain selector -> the pool that should be registered on the
 		// chain's TokenAdminRegistry. It is derived from each chain's CCTP deploy output, whose
 		// first address is, by convention, the registered pool ref.
@@ -311,6 +317,7 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				return cldf.ChangesetOutput{}, fmt.Errorf("CCTP deploy for chain %d produced no addresses; cannot derive the registered pool ref", chainSel)
 			}
 			registeredPoolRefs[chainSel] = deployCCTPChainReport.Output.Addresses[0]
+			chainContractRefs[chainSel] = append(chainContractRefs[chainSel], deployCCTPChainReport.Output.Addresses...)
 		}
 
 		// Configure across all chains.
@@ -373,6 +380,36 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
 				}
 			}
+			chainContractRefs[chainSel] = append(chainContractRefs[chainSel], configureCCTPChainForLanesReport.Output.Addresses...)
+		}
+
+		// Transfer ownership of the deployed CCTP contracts to the MCMS timelock. The adapter
+		// filters the refs to those that actually require a transfer, so this is a no-op when
+		// everything is already owned by the timelock.
+		for chainSel, chainCfg := range cfg.Chains {
+			if chainCfg.SkipOwnershipTransfer {
+				if e.Logger != nil {
+					e.Logger.Infof("skipping CCTP ownership transfer for chain with selector %d", chainSel)
+				}
+				continue
+			}
+			// Ownership is transferred via an MCMS proposal, so there is nothing to do without MCMS.
+			if cfg.MCMS == nil {
+				continue
+			}
+			refs := chainContractRefs[chainSel]
+			if len(refs) == 0 {
+				continue
+			}
+			ownershipReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].UpdateAuthorities(), &e, adapters.UpdateAuthoritiesInput{
+				ChainSelector: chainSel,
+				ContractRefs:  refs,
+			})
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer CCTP contract ownership on chain with selector %d: %w", chainSel, err)
+			}
+			batchOps = append(batchOps, ownershipReport.Output.BatchOps...)
+			reports = append(reports, ownershipReport.ExecutionReports...)
 		}
 
 		// Return the output.
