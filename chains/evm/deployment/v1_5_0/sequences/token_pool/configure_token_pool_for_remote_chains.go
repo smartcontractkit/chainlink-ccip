@@ -23,18 +23,29 @@ import (
 )
 
 type ConfigureTokenPoolForRemoteChainsInput struct {
+	// ChainSelector identifies the chain the pool lives on. It must be carried in the
+	// input (not only the executor dependency) so that two invocations with otherwise
+	// identical inputs on different chains do not collide in the operations report
+	// cache, which keys on the sequence input alone. Without it, configuring two
+	// chains whose pool addresses are identical reuses the first chain's cached report
+	// and emits ops against the wrong chain.
+	ChainSelector    uint64
 	TokenPoolAddress common.Address
 	TokenPoolVersion *semver.Version
 	RemoteChains     map[uint64]tokensapi.RemoteChainConfig[[]byte, string]
 }
 
 type ConfigureTokenPoolForRemoteChainInput struct {
+	ChainSelector       uint64
 	TokenPoolAddress    common.Address
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
 
-func (c ConfigureTokenPoolForRemoteChainInput) Validate() error {
+func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
+	if c.ChainSelector != chain.Selector {
+		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
+	}
 	return evmutils.Wrap(
 		c.RemoteChainConfig.Validate(),
 		fmt.Sprintf("invalid remote chain config for remote chain selector %d", c.RemoteChainSelector),
@@ -97,6 +108,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				ConfigureTokenPoolForRemoteChain,
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
+					ChainSelector:       input.ChainSelector,
 					TokenPoolAddress:    tokenPool.Address(),
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
@@ -120,7 +132,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	tpap.Version,
 	"Configures a v1.5.0 token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (sequences.OnChainOutput, error) {
-		if err := input.Validate(); err != nil {
+		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 
@@ -159,7 +171,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token from token pool: %w", err)
 		}
 		decimalsReport, err := cldf_ops.ExecuteOperation(b, erc20.GetDecimals, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
+			ChainSelector: input.ChainSelector,
 			Address:       localTokenAddr,
 		})
 		if err != nil {
@@ -170,7 +182,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// A pool's type and version is immutable so we can safely use ExecuteOperation here
 		// without worrying about stale data from the cache.
 		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
+			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 			Args:          struct{}{},
 		})

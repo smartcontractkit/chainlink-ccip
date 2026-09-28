@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -55,6 +56,19 @@ func (c *SolanaCCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters
 				return seq_core.OnChainOutput{}, fmt.Errorf("failed to resolve Solana CCTP token pool for chain %d: %w", input.ChainSelector, err)
 			}
 			return seq_core.OnChainOutput{Addresses: []datastore.AddressRef{poolRef}}, nil
+		},
+	)
+}
+
+// UpdateAuthorities is a no-op for Solana: the CCTP pool/program already exists and this
+// changeset only wires remote-chain configuration to it.
+func (c *SolanaCCTPChainAdapter) UpdateAuthorities() *operations.Sequence[adapters.UpdateAuthoritiesInput, seq_core.OnChainOutput, *deployment.Environment] {
+	return operations.NewSequence(
+		"solana-cctp-chain:no-op-update-authorities",
+		common_utils.Version_1_6_0,
+		"Skips Solana CCTP ownership transfer",
+		func(_ operations.Bundle, _ *deployment.Environment, _ adapters.UpdateAuthoritiesInput) (seq_core.OnChainOutput, error) {
+			return seq_core.OnChainOutput{}, nil
 		},
 	)
 }

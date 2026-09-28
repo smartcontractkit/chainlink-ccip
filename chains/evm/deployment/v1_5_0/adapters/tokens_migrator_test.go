@@ -166,6 +166,7 @@ func setupConfiguredPool(t *testing.T, poolType string) (*cldf.Environment, comm
 	rl := &tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}
 	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, tpSeq.ConfigureTokenPoolForRemoteChains, chain,
 		tpSeq.ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    localSelector,
 			TokenPoolAddress: poolAddr,
 			TokenPoolVersion: utils.Version_1_5_0,
 			RemoteChains: map[uint64]tokensapi.RemoteChainConfig[[]byte, string]{

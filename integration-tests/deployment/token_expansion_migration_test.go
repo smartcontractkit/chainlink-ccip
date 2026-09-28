@@ -830,7 +830,10 @@ func TestTokenExpansionMigration_LiquidityMigration(t *testing.T) {
 					TokenPoolQualifier:            newPoolQual,
 					PoolType:                      cciputils.LockReleaseTokenPool.String(),
 					TokenRef:                      &datastore.AddressRef{Address: tokenAddr.Hex()},
-					LiquidityMigrationBasisPoints: new(migrateHalf),
+					LiquidityMigrationAmount: &tokensapi.LockReleasePoolLiquidityMigrationAmount{
+						Format: tokensapi.LiquidityMigrationAmountFormatBPS,
+						Value:  fmt.Sprintf("%d", migrateHalf),
+					},
 				},
 			},
 		},
@@ -957,7 +960,10 @@ func TestTokenExpansionMigration_LiquidityMigration(t *testing.T) {
 					Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
 					Version:       cciputils.Version_2_0_0,
 				},
-				BasisPoints: new(uint16(10000)),
+				LiquidityMigrationAmount: &tokensapi.LockReleasePoolLiquidityMigrationAmount{
+					Format: tokensapi.LiquidityMigrationAmountFormatBPS,
+					Value:  "10000",
+				},
 			},
 		},
 	})

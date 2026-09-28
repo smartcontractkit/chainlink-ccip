@@ -7,6 +7,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
@@ -70,6 +73,18 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				if err == nil {
 					supportedChains := supportedChainsReport.Output
 					for _, sel := range supportedChains {
+						// Sunset/superseded chains cannot be migrated, so they are excluded
+						// from this "must include all" requirement. A deprecation lookup
+						// failure is a hard error: silently treating an unclassifiable
+						// selector as deprecated would drop it from the requirement and
+						// allow a supported lane to be left unconfigured.
+						isDeprecated, err := chainsel.IsDeprecated(sel)
+						if err != nil {
+							return sequences.OnChainOutput{}, fmt.Errorf("failed to check if supported chain selector %d is deprecated: %w", sel, err)
+						}
+						if isDeprecated {
+							continue
+						}
 						if _, ok := input.RemoteChains[sel]; !ok {
 							slices.Sort(supportedChains)
 							return sequences.OnChainOutput{}, fmt.Errorf("remoteChains must include all active pool supported chains: pool has %v, remoteChains has %v",

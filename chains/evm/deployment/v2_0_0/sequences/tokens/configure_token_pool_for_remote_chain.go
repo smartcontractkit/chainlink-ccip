@@ -269,6 +269,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				}
 				// Add active pool's remote pools first to protect inflight messages during cutover.
 				for _, activePoolAddr := range imported.LegacyRemotePools {
+					// Skip empty entries: LeftPadBytes(nil, 32) would otherwise register a 32-zero-byte remote pool.
+					if len(activePoolAddr) == 0 {
+						continue
+					}
 					padded := common.LeftPadBytes(activePoolAddr, 32)
 					if !containsPool(padded) {
 						addReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
@@ -286,7 +290,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						existingPools = append(existingPools, padded)
 					}
 				}
-				if !containsPool(common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)) {
+				// Skip an empty requested pool: LeftPadBytes(nil, 32) would otherwise register a 32-zero-byte remote pool.
+				if len(input.RemoteChainConfig.RemotePool) > 0 && !containsPool(common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)) {
 					addRemotePoolsReport, err := cldf_ops.ExecuteOperation(b, token_pool.AddRemotePool, chain, evm_contract.FunctionInput[token_pool.AddRemotePoolArgs]{
 						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
@@ -320,14 +325,24 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 		// If the chain is not supported, apply the config for the remote chain
 		// Build remote pool list: active pool's remote pools first (for upgrade cutover), then the requested pool.
+		// Dedupe by normalized 32-byte value: the legacy pool may store the same remote pool as both a raw
+		// (20-byte) and a left-padded (32-byte) entry, which LeftPadBytes normalizes to the same value.
+		// Without dedupe the on-chain ApplyChainUpdates add reverts with PoolAlreadyAdded.
 		remotePoolAddresses := make([][]byte, 0, len(imported.LegacyRemotePools)+1)
-		for _, p := range imported.LegacyRemotePools {
-			remotePoolAddresses = append(remotePoolAddresses, common.LeftPadBytes(p, 32))
+		seenPools := make(map[string]struct{}, len(imported.LegacyRemotePools)+1)
+		for _, raw := range slices.Concat(imported.LegacyRemotePools, [][]byte{input.RemoteChainConfig.RemotePool}) {
+			// Skip empty entries: LeftPadBytes(nil, 32) would otherwise register a 32-zero-byte remote pool.
+			if len(raw) > 0 {
+				paddedAddr := common.LeftPadBytes(raw, 32)
+				stringAddr := string(paddedAddr)
+				if _, ok := seenPools[stringAddr]; ok {
+					continue
+				}
+				remotePoolAddresses = append(remotePoolAddresses, paddedAddr)
+				seenPools[stringAddr] = struct{}{}
+			}
 		}
-		inputPoolPadded := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
-		if !slices.ContainsFunc(remotePoolAddresses, func(b []byte) bool { return bytes.Equal(b, inputPoolPadded) }) {
-			remotePoolAddresses = append(remotePoolAddresses, inputPoolPadded)
-		}
+
 		applyChainUpdatesReport, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyChainUpdates, chain, evm_contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
 			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
@@ -534,38 +549,45 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
 	}
 
-	report, err := cldf_ops.ExecuteOperation(
-		b, token_pool.GetTokenTransferFeeConfig, chain,
-		evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-			Args: token_pool.GetTokenTransferFeeConfigArgs{
-				Arg0:              common.Address{},            // unused
-				DestChainSelector: remoteChainSelector,         // this IS used
-				Arg2:              finality.RawWaitForFinality, // unused
-				Arg3:              []byte{},                    // unused
+	// Only read the on-chain fee config when the remote chain is already supported by the pool.
+	// For a not-yet-supported remote (e.g. a brand-new lane) pools that resolve their CCVs per
+	// destination can revert (CCVNotSetOnResolver) because the resolver and chain-update writes in
+	// this same batch have not been executed yet. In that case treat the current config as unset and
+	// rely on the defaults.
+	var currentConfig tokens.TokenTransferFeeConfig
+	if input.RemoteChainAlreadySupported {
+		report, err := cldf_ops.ExecuteOperation(
+			b, token_pool.GetTokenTransferFeeConfig, chain,
+			evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+				Args: token_pool.GetTokenTransferFeeConfigArgs{
+					Arg0:              common.Address{},            // unused
+					DestChainSelector: remoteChainSelector,         // this IS used
+					Arg2:              finality.RawWaitForFinality, // unused
+					Arg3:              []byte{},                    // unused
+				},
 			},
-		},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
-	)
-	if err != nil {
-		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
+			cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
+		)
+		if err != nil {
+			return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
+		}
+		currentConfig = tokens.TokenTransferFeeConfig{
+			DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
+			CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
+			DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
+			CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
+			DestBytesOverhead:             report.Output.DestBytesOverhead,
+			DestGasOverhead:               report.Output.DestGasOverhead,
+			IsEnabled:                     report.Output.IsEnabled,
+		}
 	}
 
 	defaultConfig := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(
 		input.ChainSelector,
 		input.RemoteChainSelector,
 	)
-
-	currentConfig := tokens.TokenTransferFeeConfig{
-		DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
-		CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
-		DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
-		CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
-		DestBytesOverhead:             report.Output.DestBytesOverhead,
-		DestGasOverhead:               report.Output.DestGasOverhead,
-		IsEnabled:                     report.Output.IsEnabled,
-	}
 
 	// Resolution strategy:
 	// (1) If on-chain config is enabled, merge it with the user's provided config (giving precedence to user's config)

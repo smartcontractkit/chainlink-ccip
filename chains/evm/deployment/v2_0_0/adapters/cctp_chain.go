@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
@@ -40,6 +41,11 @@ func (c *CCTPChainAdapter) ConfigureCCTPChainForLanes() *operations.Sequence[ada
 // into per-chain siloed lockboxes on the home chain.
 func (c *CCTPChainAdapter) MigrateHybridLockReleaseLiquidity() *operations.Sequence[adapters.MigrateHybridLockReleaseLiquidityInput, seq_core.OnChainOutput, adapters.MigrateHybridLockReleaseLiquidityDeps] {
 	return cctp.MigrateHybridLockReleaseLiquidity
+}
+
+// UpdateAuthorities returns the sequence that transfers ownership of the CCTP contracts to the CLLCCIP timelock.
+func (c *CCTPChainAdapter) UpdateAuthorities() *operations.Sequence[adapters.UpdateAuthoritiesInput, seq_core.OnChainOutput, *deployment.Environment] {
+	return cctp.UpdateAuthorities
 }
 
 // CCTPV2AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain.
