@@ -11,6 +11,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/config"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -141,6 +143,84 @@ func TestApplyCCTPDefaults_FillsRemoteDomainIdentifier(t *testing.T) {
 	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
 
 	require.Equal(t, uint32(1), got.Chains[localSel].RemoteChains[remoteSel].DomainIdentifier)
+}
+
+func TestApplyCCTPDefaults_NativeRemoteGetsCCTPDefaults(t *testing.T) {
+	localSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	remoteSel := chain_selectors.AVALANCHE_TESTNET_FUJI.Selector
+	cfg := DeployCCTPChainsConfig{
+		Chains: map[uint64]CCTPChainConfig{
+			localSel: {
+				USDCType: adapters.Canonical,
+				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+					remoteSel: {LockOrBurnMechanism: "CCTP_V2_WITH_CCV"},
+				},
+			},
+		},
+	}
+
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
+
+	remote := got.Chains[localSel].RemoteChains[remoteSel]
+	require.Equal(t, config.DefaultGasForVerification, remote.GasForVerification)
+	require.Equal(t, config.DefaultPayloadSizeBytes, remote.PayloadSizeBytes)
+	require.NotNil(t, remote.TokenTransferFeeConfig)
+	require.Equal(t, uint32(32), remote.TokenTransferFeeConfig.DestBytesOverhead.GetOrDefault(0))
+	require.Equal(t, uint32(90_000), remote.TokenTransferFeeConfig.DestGasOverhead.GetOrDefault(0))
+	require.True(t, remote.TokenTransferFeeConfig.IsEnabled.GetOrDefault(false))
+	require.Equal(t, uint16(0), remote.TokenTransferFeeConfig.DefaultFinalityTransferFeeBps.GetOrDefault(1))
+	require.Equal(t, uint32(0), remote.TokenTransferFeeConfig.CustomFinalityFeeUSDCents.GetOrDefault(1))
+}
+
+func TestApplyCCTPDefaults_LockReleaseRemoteIsExcluded(t *testing.T) {
+	localSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	remoteSel := chain_selectors.AVALANCHE_TESTNET_FUJI.Selector
+	cfg := DeployCCTPChainsConfig{
+		Chains: map[uint64]CCTPChainConfig{
+			localSel: {
+				USDCType: adapters.Canonical,
+				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+					remoteSel: {LockOrBurnMechanism: lockReleaseMechanism},
+				},
+			},
+		},
+	}
+
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
+
+	remote := got.Chains[localSel].RemoteChains[remoteSel]
+	require.Zero(t, remote.GasForVerification)
+	require.Zero(t, remote.PayloadSizeBytes)
+	require.Nil(t, remote.TokenTransferFeeConfig)
+}
+
+func TestApplyCCTPDefaults_ExplicitRemoteCCTPDefaultsTakePrecedence(t *testing.T) {
+	localSel := chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector
+	remoteSel := chain_selectors.AVALANCHE_TESTNET_FUJI.Selector
+	cfg := DeployCCTPChainsConfig{
+		Chains: map[uint64]CCTPChainConfig{
+			localSel: {
+				USDCType: adapters.Canonical,
+				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
+					remoteSel: {
+						LockOrBurnMechanism: "CCTP_V2_WITH_CCV",
+						GasForVerification:  123,
+						PayloadSizeBytes:    456,
+						TokenTransferFeeConfig: &tokens.PartialTokenTransferFeeConfig{
+							DestGasOverhead: utils.NewOptional(uint32(7)),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	got := applyCCTPDefaults(emptyBlockChains, nil, cfg)
+
+	remote := got.Chains[localSel].RemoteChains[remoteSel]
+	require.Equal(t, uint32(123), remote.GasForVerification)
+	require.Equal(t, uint16(456), remote.PayloadSizeBytes)
+	require.Equal(t, uint32(7), remote.TokenTransferFeeConfig.DestGasOverhead.GetOrDefault(0))
 }
 
 func TestApplyCCTPDefaults_ResolvesDeployerContractFromDatastore(t *testing.T) {
