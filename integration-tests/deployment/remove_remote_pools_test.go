@@ -21,6 +21,7 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -96,7 +97,7 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 			errors: []string{"must set remote.address"},
 		},
 		{
-			name: "rejects_duplicate_remote_selectors",
+			name: "rejects_duplicate_remote_pools",
 			input: tokensapi.RemoveRemotePoolsInput{
 				MCMS: mcms.Input{},
 				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
@@ -108,7 +109,40 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 					},
 				}},
 			},
-			errors: []string{"duplicate remote chain selector"},
+			errors: []string{"duplicate remote pool"},
+		},
+		{
+			name: "rejects_duplicate_remote_pools_in_different_encodings",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: sel,
+					Pool:          poolRef,
+					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{
+						{Selector: dst, Remote: datastore.AddressRef{Address: "0x000000000000000000000000000000000000dEaD"}},
+						{Selector: dst, Remote: datastore.AddressRef{Address: "0x000000000000000000000000000000000000dead"}},
+					},
+				}},
+			},
+			errors: []string{"duplicate remote pool"},
+		},
+		{
+			name: "rejects_skip_unsupported_peers_without_reverse_pass",
+			input: tokensapi.RemoveRemotePoolsInput{
+				MCMS: mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector:        sel,
+					Pool:                 poolRef,
+					RemotePoolsToRemove:  []tokensapi.RemotePoolToRemove{{Selector: dst, Remote: remoteRef}},
+					SkipUnsupportedPeers: true,
+				}},
+			},
+			errors: []string{"skipUnsupportedPeers requires bidirectional or deactivate"},
+		},
+		{
+			name:   "rejects_invalid_remote_pool_address",
+			input:  singlePoolInput(tokensapi.RemotePoolToRemove{Selector: dst, Remote: datastore.AddressRef{Address: "not-an-address"}}),
+			errors: []string{"invalid remote pool address"},
 		},
 		{
 			name: "rejects_duplicate_pool_entries",
@@ -787,6 +821,235 @@ func TestRemoveRemotePools_BidirectionalFailsWhenPeerHasNoActivePool(t *testing.
 	// The reverse pass failed before the forward pass ran, so both sides are unchanged.
 	require.Contains(t, remotePools(harness.poolA, harness.selA, harness.selB), harness.poolB, "A should still list B")
 	require.Contains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should still list A")
+}
+
+// TestRemoveRemotePools_DeactivateSkipsZeroAddressEntry covers a pool that lists the zero address
+// as a remote pool (pools only reject empty remote pool bytes, so older tooling could write 32 zero
+// bytes). The zero address names no peer pool, so the reverse pass skips it as a target while the
+// forward pass still removes it, and deactivate completes.
+func TestRemoveRemotePools_DeactivateSkipsZeroAddressEntry(t *testing.T) {
+	harness := setupV2PoolsForRemoveRemotePools(t)
+	env := harness.env
+	remotePools := func(pool common.Address, sel, remoteSel uint64) []common.Address {
+		return BytesToAddressesEVM(ReadRemotePools(t, env, sel, datastore.AddressRef{Address: pool.Hex()}, datastore.AddressRef{}, remoteSel))
+	}
+
+	addRawRemotePool(t, env, harness.selA, harness.poolA, harness.selC, make([]byte, 32))
+	require.Contains(t, remotePools(harness.poolA, harness.selA, harness.selC), common.Address{}, "A should list the zero address for C")
+
+	require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: harness.selA,
+			Pool:          datastore.AddressRef{Address: harness.poolA.Hex()},
+			Deactivate:    true,
+		}},
+	}))
+
+	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selB), "A should have no remote pool for chain B")
+	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selC), "A should have no remote pool for chain C, including the zero address")
+	require.NotContains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should not list A")
+	require.NotContains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C should not list A")
+}
+
+// TestRemoveRemotePools_DeactivateUnresolvableEntryWritesNothing covers a pool that lists a remote
+// pool the tooling cannot resolve (here an address with no pool behind it). Deactivate must fail
+// before writing to any chain, even for peers ordered before the bad entry, and must point the
+// operator at a lane-only removal. After that removal, a re-run completes the teardown.
+func TestRemoveRemotePools_DeactivateUnresolvableEntryWritesNothing(t *testing.T) {
+	harness := setupV2PoolsForRemoveRemotePools(t)
+	env := harness.env
+	remotePools := func(pool common.Address, sel, remoteSel uint64) []common.Address {
+		return BytesToAddressesEVM(ReadRemotePools(t, env, sel, datastore.AddressRef{Address: pool.Hex()}, datastore.AddressRef{}, remoteSel))
+	}
+
+	// A lists C's real pool first and the bad entry second, so the bad entry is resolved only after
+	// the reverse removals from B and C are already planned.
+	badPool := common.HexToAddress("0x000000000000000000000000000000000000dEaD")
+	addRawRemotePool(t, env, harness.selA, harness.poolA, harness.selC, common.LeftPadBytes(badPool.Bytes(), 32))
+	require.Equal(t, []common.Address{harness.poolC, badPool}, remotePools(harness.poolA, harness.selA, harness.selC))
+
+	deactivateA := tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: harness.selA,
+			Pool:          datastore.AddressRef{Address: harness.poolA.Hex()},
+			Deactivate:    true,
+		}},
+	}
+	err := applyRemoveRemotePools(t, env, deactivateA)
+	require.ErrorContains(t, err, "remove it from this pool with a lane-only removal")
+
+	// Nothing was written on any chain.
+	require.Equal(t, []common.Address{harness.poolB}, remotePools(harness.poolA, harness.selA, harness.selB), "A should still list B")
+	require.Equal(t, []common.Address{harness.poolC, badPool}, remotePools(harness.poolA, harness.selA, harness.selC), "A should still list C and the bad entry")
+	require.Contains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should still list A")
+	require.Contains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C should still list A")
+	tarManager, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR manager should be registered")
+	tokenRefA := FindFullRef(t, env, harness.selA, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)})
+	activePool, err := tarManager.GetActivePool(*env, harness.selA, tokenRefA)
+	require.NoError(t, err)
+	require.Equal(t, harness.poolA.Bytes(), activePool, "A should still be registered in the TAR")
+
+	// Recovery: remove the bad entry with a lane-only removal, then re-run deactivate.
+	require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:       harness.selA,
+			Pool:                datastore.AddressRef{Address: harness.poolA.Hex()},
+			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: harness.selC, Remote: datastore.AddressRef{Address: badPool.Hex()}}},
+		}},
+	}))
+	require.NoError(t, applyRemoveRemotePools(t, env, deactivateA))
+
+	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selB), "A should have no remote pool for chain B")
+	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selC), "A should have no remote pool for chain C")
+	require.NotContains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should not list A")
+	require.NotContains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C should not list A")
+	activePool, err = tarManager.GetActivePool(*env, harness.selA, tokenRefA)
+	require.NoError(t, err)
+	require.Empty(t, activePool, "A should be unregistered from the TAR")
+}
+
+// TestRemoveRemotePools_SeveralRemotePoolsForOneChain removes two remote pools that A lists for
+// the same remote chain with one explicit entry each, in a single run.
+func TestRemoveRemotePools_SeveralRemotePoolsForOneChain(t *testing.T) {
+	harness := setupV2PoolsForRemoveRemotePools(t)
+	env := harness.env
+	remotePools := func(pool common.Address, sel, remoteSel uint64) []common.Address {
+		return BytesToAddressesEVM(ReadRemotePools(t, env, sel, datastore.AddressRef{Address: pool.Hex()}, datastore.AddressRef{}, remoteSel))
+	}
+
+	extraPool := common.HexToAddress("0x000000000000000000000000000000000000dEaD")
+	addRawRemotePool(t, env, harness.selA, harness.poolA, harness.selB, common.LeftPadBytes(extraPool.Bytes(), 32))
+	require.Equal(t, []common.Address{harness.poolB, extraPool}, remotePools(harness.poolA, harness.selA, harness.selB))
+
+	require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: harness.selA,
+			Pool:          datastore.AddressRef{Address: harness.poolA.Hex()},
+			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{
+				{Selector: harness.selB, Remote: datastore.AddressRef{Address: harness.poolB.Hex()}},
+				{Selector: harness.selB, Remote: datastore.AddressRef{Address: extraPool.Hex()}},
+			},
+		}},
+	}))
+
+	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selB), "A should list no pool for chain B")
+	require.Equal(t, []common.Address{harness.poolC}, remotePools(harness.poolA, harness.selA, harness.selC), "A should still list C")
+}
+
+// TestRemoveRemotePools_ExplicitRemovesBothEncodings covers a pool that lists the same EVM remote
+// pool twice: left-padded to 32 bytes and raw 20 bytes (legacy pools may hold either or both). An
+// explicit removal of that address removes both entries.
+func TestRemoveRemotePools_ExplicitRemovesBothEncodings(t *testing.T) {
+	harness := setupV2PoolsForRemoveRemotePools(t)
+	env := harness.env
+
+	addRawRemotePool(t, env, harness.selA, harness.poolA, harness.selB, harness.poolB.Bytes())
+	require.ElementsMatch(t,
+		[][]byte{common.LeftPadBytes(harness.poolB.Bytes(), 32), harness.poolB.Bytes()},
+		ReadRemotePools(t, env, harness.selA, datastore.AddressRef{Address: harness.poolA.Hex()}, datastore.AddressRef{}, harness.selB),
+		"A should list B in both encodings")
+
+	require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:       harness.selA,
+			Pool:                datastore.AddressRef{Address: harness.poolA.Hex()},
+			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: harness.selB, Remote: datastore.AddressRef{Address: harness.poolB.Hex()}}},
+		}},
+	}))
+
+	require.Empty(t, ReadRemotePools(t, env, harness.selA, datastore.AddressRef{Address: harness.poolA.Hex()}, datastore.AddressRef{}, harness.selB), "A should list B in neither encoding")
+}
+
+// TestRemoveRemotePools_DeactivateRemovesBothEncodings covers raw 20-byte entries alongside the
+// padded ones on both the local pool (forward pass) and a peer (reverse pass): deactivate removes
+// every encoding of each pairing.
+func TestRemoveRemotePools_DeactivateRemovesBothEncodings(t *testing.T) {
+	harness := setupV2PoolsForRemoveRemotePools(t)
+	env := harness.env
+	rawRemotePools := func(pool common.Address, sel, remoteSel uint64) [][]byte {
+		return ReadRemotePools(t, env, sel, datastore.AddressRef{Address: pool.Hex()}, datastore.AddressRef{}, remoteSel)
+	}
+
+	addRawRemotePool(t, env, harness.selA, harness.poolA, harness.selB, harness.poolB.Bytes())
+	addRawRemotePool(t, env, harness.selA, harness.poolA, harness.selC, harness.poolC.Bytes())
+	addRawRemotePool(t, env, harness.selB, harness.poolB, harness.selA, harness.poolA.Bytes())
+	require.Len(t, rawRemotePools(harness.poolB, harness.selB, harness.selA), 2, "B should list A in both encodings")
+
+	require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: harness.selA,
+			Pool:          datastore.AddressRef{Address: harness.poolA.Hex()},
+			Deactivate:    true,
+		}},
+	}))
+
+	require.Empty(t, rawRemotePools(harness.poolA, harness.selA, harness.selB), "A should list nothing for chain B")
+	require.Empty(t, rawRemotePools(harness.poolA, harness.selA, harness.selC), "A should list nothing for chain C")
+	require.Empty(t, rawRemotePools(harness.poolB, harness.selB, harness.selA), "B should list A in neither encoding")
+	require.NotContains(t, BytesToAddressesEVM(rawRemotePools(harness.poolC, harness.selC, harness.selA)), harness.poolA, "C should not list A")
+}
+
+// TestRemoveRemotePools_DeactivateWithUnloadedPeer covers a peer chain the environment does not
+// load. Deactivate fails before writing anything unless skipUnsupportedPeers is set; with it, the
+// unloaded peer is skipped (and keeps listing A) while the rest of the teardown completes.
+func TestRemoveRemotePools_DeactivateWithUnloadedPeer(t *testing.T) {
+	harness := setupV2PoolsForRemoveRemotePools(t)
+	fullEnv := harness.env
+	remotePools := func(pool common.Address, sel, remoteSel uint64) []common.Address {
+		return BytesToAddressesEVM(ReadRemotePools(t, fullEnv, sel, datastore.AddressRef{Address: pool.Hex()}, datastore.AddressRef{}, remoteSel))
+	}
+
+	// An environment that does not load chain C.
+	loaded := map[uint64]cldf_chain.BlockChain{}
+	for sel, chain := range fullEnv.BlockChains.All() {
+		if sel != harness.selC {
+			loaded[sel] = chain
+		}
+	}
+	envWithoutC := *fullEnv
+	envWithoutC.BlockChains = cldf_chain.NewBlockChains(loaded)
+
+	deactivateA := func(skip bool) tokensapi.RemoveRemotePoolsInput {
+		return tokensapi.RemoveRemotePoolsInput{
+			Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+				ChainSelector:        harness.selA,
+				Pool:                 datastore.AddressRef{Address: harness.poolA.Hex()},
+				Deactivate:           true,
+				SkipUnsupportedPeers: skip,
+			}},
+		}
+	}
+
+	err := applyRemoveRemotePools(t, &envWithoutC, deactivateA(false))
+	require.ErrorContains(t, err, "chain is not loaded in the environment")
+	require.ErrorContains(t, err, "skipUnsupportedPeers")
+	require.Contains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should still list A (nothing was written)")
+	require.Equal(t, []common.Address{harness.poolC}, remotePools(harness.poolA, harness.selA, harness.selC), "A should still list C (nothing was written)")
+
+	require.NoError(t, applyRemoveRemotePools(t, &envWithoutC, deactivateA(true)))
+	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selB), "A should list nothing for chain B")
+	require.Empty(t, remotePools(harness.poolA, harness.selA, harness.selC), "A should list nothing for chain C (the forward pass only needs chain A)")
+	require.NotContains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should not list A")
+	require.Contains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C was skipped, so it should still list A")
+	tarManager, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdminRegistryManager(chainsel.FamilyEVM)
+	require.True(t, ok, "EVM TAR manager should be registered")
+	activePool, err := tarManager.GetActivePool(*fullEnv, harness.selA, FindFullRef(t, fullEnv, harness.selA, datastore.AddressRef{Type: datastore.ContractType(bnmERC20ops.ContractType)}))
+	require.NoError(t, err)
+	require.Empty(t, activePool, "A should be unregistered from the TAR")
+}
+
+// addRawRemotePool writes remotePool (raw bytes, unvalidated) to the v2.0.0 pool's remote pool list
+// for remoteSel, using the deployer key.
+func addRawRemotePool(t *testing.T, e *cldf_deployment.Environment, sel uint64, pool common.Address, remoteSel uint64, remotePool []byte) {
+	t.Helper()
+	chain := e.BlockChains.EVMChains()[sel]
+	tp, err := tokenpoolV2_0_0.NewTokenPool(pool, chain.Client)
+	require.NoError(t, err)
+	tx, err := tp.AddRemotePool(chain.DeployerKey, remoteSel, remotePool)
+	require.NoError(t, err)
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
 }
 
 // applyRemoveRemotePools verifies and applies input with a fresh operations reporter (so repeated

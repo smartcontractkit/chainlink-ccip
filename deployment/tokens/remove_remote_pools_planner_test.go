@@ -11,12 +11,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -26,13 +26,13 @@ import (
 var (
 	reverseTestLocalSel  = chainsel.APTOS_LOCALNET.Selector
 	reverseTestRemoteSel = chainsel.APTOS_TESTNET.Selector
-	reverseTestV1_5_0    = utils.Version_1_5_0
 	reverseTestV2_0_0    = semver.MustParse("2.0.0")
 )
 
 type reverseTestIdentityNormalizer struct{}
 
 func (reverseTestIdentityNormalizer) NormalizeAddress(a string) (string, error) { return a, nil }
+
 func (reverseTestIdentityNormalizer) BytesToString(b []byte) (string, error) { return string(b), nil }
 
 func (reverseTestIdentityNormalizer) StringToBytes(a string) ([]byte, error) { return []byte(a), nil }
@@ -44,7 +44,6 @@ type reverseTestAdapter struct {
 	supportedChains []uint64
 	remoteToken     string
 	remotePools     map[string][]string // pool address -> remote pools it lists for the other chain
-	removeErr       error               // returned by the remover (mirrors the v1.5.0 adapter)
 	removed         *[]RemoveRemotePoolsSequenceInput
 }
 
@@ -84,9 +83,6 @@ func (a *reverseTestAdapter) RemoveRemotePools() *cldf_ops.Sequence[RemoveRemote
 		semver.MustParse("1.0.0"),
 		"Records remote pool removals for the reverse-pass unit tests",
 		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, in RemoveRemotePoolsSequenceInput) (sequences.OnChainOutput, error) {
-			if a.removeErr != nil {
-				return sequences.OnChainOutput{}, a.removeErr
-			}
 			*a.removed = append(*a.removed, in)
 			return sequences.OnChainOutput{}, nil
 		},
@@ -154,14 +150,25 @@ type reverseTestPool struct {
 	lists   []string // local pools this peer pool lists as remotes
 }
 
-// runReverseTest runs removeRemotePoolsReverse for local pool A_OLD against a single remote chain
+// reverseTestSetup varies the environment of runReverseTest; the zero value is a fully supported peer.
+type reverseTestSetup struct {
+	remoteNotLoaded      bool // the remote chain is not loaded in the environment
+	noTAR                bool // no TAR reader is registered for the remote family
+	skipUnsupportedPeers bool
+}
+
+// runReverseTest plans and executes the reverse pass for local pool A_OLD against a single remote chain
 // whose pools are described by peerPools. pairedPool is the peer pool named by the remote entry;
 // activePool is the peer's TAR-active pool. It returns the recorded removals and the error.
-func runReverseTest(t *testing.T, peerPools []reverseTestPool, pairedPool, activePool string) ([]RemoveRemotePoolsSequenceInput, error) {
+func runReverseTest(t *testing.T, peerPools []reverseTestPool, pairedPool, activePool string, setup *reverseTestSetup) ([]RemoveRemotePoolsSequenceInput, error) {
 	t.Helper()
+
 	family, err := chainsel.GetSelectorFamily(reverseTestRemoteSel)
 	require.NoError(t, err)
 	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(family, reverseTestIdentityNormalizer{})
+	if setup == nil {
+		setup = &reverseTestSetup{}
+	}
 
 	// Seed the datastore with the peer pools and the peer token so ref resolution hits the cache.
 	ds := datastore.NewMemoryDataStore()
@@ -181,12 +188,17 @@ func runReverseTest(t *testing.T, peerPools []reverseTestPool, pairedPool, activ
 		Version:       semver.MustParse("1.0.0"),
 	}))
 
+	loadedChains := map[uint64]cldf_chain.BlockChain{}
+	if !setup.remoteNotLoaded {
+		loadedChains[reverseTestRemoteSel] = cldf_aptos.Chain{Selector: reverseTestRemoteSel}
+	}
+
 	lggr := logger.Test(t)
 	e := cldf.Environment{
 		Logger:           lggr,
 		OperationsBundle: cldf_ops.NewBundle(func() context.Context { return t.Context() }, lggr, cldf_ops.NewMemoryReporter()),
 		DataStore:        ds.Seal(),
-		BlockChains:      cldf_chain.NewBlockChains(nil),
+		BlockChains:      cldf_chain.NewBlockChains(loadedChains),
 	}
 
 	removed := []RemoveRemotePoolsSequenceInput{}
@@ -196,25 +208,31 @@ func runReverseTest(t *testing.T, peerPools []reverseTestPool, pairedPool, activ
 	}
 	local := &reverseTestAdapter{supportedChains: []uint64{reverseTestRemoteSel}, remoteToken: "TOKEN_REMOTE"}
 	remoteV2 := &reverseTestAdapter{remotePools: remotePools, removed: &removed}
-	remoteV150 := &reverseTestAdapter{
-		remotePools: remotePools,
-		removed:     &removed,
-		removeErr:   errors.New("removing individual remote pools is not supported on v1.5.0 token pools"),
-	}
 
 	reg := newTokenAdapterRegistry()
 	reg.RegisterTokenAdapter(family, reverseTestV2_0_0, remoteV2)
-	reg.RegisterTokenAdapter(family, reverseTestV1_5_0, remoteV150)
-	reg.RegisterTokenAdminRegistryManager(family, &reverseTestTAR{activePool: activePool})
+	if !setup.noTAR {
+		reg.RegisterTokenAdminRegistryManager(family, &reverseTestTAR{activePool: activePool})
+	}
 
-	_, _, err = removeRemotePoolsReverse(
-		e, reg, local, reverseTestLocalSel,
-		datastore.AddressRef{ChainSelector: reverseTestLocalSel, Address: "A_OLD", Version: reverseTestV2_0_0},
-		datastore.AddressRef{ChainSelector: reverseTestLocalSel, Address: "TOKEN_LOCAL"},
-		[]RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: pairedPool}}},
-		map[removeRemotePoolsPairingKey]struct{}{},
-	)
-	return removed, err
+	planner := newRemoveRemotePoolsPlanner(e, reg)
+	entry := &removeRemotePoolsEntry{
+		pool:       RemoveRemotePoolsPerPool{SkipUnsupportedPeers: setup.skipUnsupportedPeers},
+		label:      "A_OLD",
+		selector:   reverseTestLocalSel,
+		adapter:    local,
+		migrator:   local,
+		poolRef:    datastore.AddressRef{ChainSelector: reverseTestLocalSel, Address: "A_OLD", Version: reverseTestV2_0_0},
+		tokenRef:   datastore.AddressRef{ChainSelector: reverseTestLocalSel, Address: "TOKEN_LOCAL"},
+		poolBytes:  []byte("A_OLD"),
+		tokenBytes: []byte("TOKEN_LOCAL"),
+	}
+	if err := planner.planReverse(entry, []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: pairedPool}}}); err != nil {
+		return nil, err
+	}
+	_, _, err = planner.execute()
+	require.NoError(t, err)
+	return removed, nil
 }
 
 // removedFrom returns the peer pool addresses that received a removal, requiring that each removal
@@ -231,36 +249,13 @@ func removedFrom(t *testing.T, removed []RemoveRemotePoolsSequenceInput) []strin
 	return pools
 }
 
-// Test the v1.5.0 guard. A retired (non-active) v1.5.0 peer pool cannot remove individual remote
-// pools, so it is skipped while the active pool is still cleaned. An active v1.5.0 peer pool is not
-// skipped: the remover's error is surfaced.
-func TestRemoveRemotePoolsReverse_V150Guard(t *testing.T) {
-	t.Run("retired v1.5.0 paired pool is skipped and the active pool is cleaned", func(t *testing.T) {
-		removed, err := runReverseTest(t, []reverseTestPool{
-			{address: "B_OLD", version: reverseTestV1_5_0, lists: []string{"A_NEW", "A_OLD"}},
-			{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_NEW", "A_OLD"}},
-		}, "B_OLD", "B_NEW")
-		require.NoError(t, err)
-		require.Equal(t, []string{"B_NEW"}, removedFrom(t, removed))
-	})
-
-	t.Run("active v1.5.0 pool surfaces the remover error", func(t *testing.T) {
-		removed, err := runReverseTest(t, []reverseTestPool{
-			{address: "B_OLD", version: reverseTestV2_0_0, lists: []string{"A_OLD"}},
-			{address: "B_NEW", version: reverseTestV1_5_0, lists: []string{"A_NEW", "A_OLD"}},
-		}, "B_OLD", "B_NEW")
-		require.ErrorContains(t, err, "not supported on v1.5.0")
-		require.Empty(t, removed)
-	})
-}
-
 // Test target dedupe. When the paired pool is the active pool (a peer that was never upgraded), it is
 // cleaned exactly once; when they differ, both are cleaned.
 func TestRemoveRemotePoolsReverse_TargetDedupe(t *testing.T) {
 	t.Run("paired pool equals active pool: cleaned once", func(t *testing.T) {
 		removed, err := runReverseTest(t, []reverseTestPool{
 			{address: "B_OLD", version: reverseTestV2_0_0, lists: []string{"A_NEW", "A_OLD"}},
-		}, "B_OLD", "B_OLD")
+		}, "B_OLD", "B_OLD", nil)
 		require.NoError(t, err)
 		require.Equal(t, []string{"B_OLD"}, removedFrom(t, removed))
 	})
@@ -269,8 +264,55 @@ func TestRemoveRemotePoolsReverse_TargetDedupe(t *testing.T) {
 		removed, err := runReverseTest(t, []reverseTestPool{
 			{address: "B_OLD", version: reverseTestV2_0_0, lists: []string{"A_NEW", "A_OLD"}},
 			{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_NEW", "A_OLD"}},
-		}, "B_OLD", "B_NEW")
+		}, "B_OLD", "B_NEW", nil)
 		require.NoError(t, err)
 		require.ElementsMatch(t, []string{"B_NEW", "B_OLD"}, removedFrom(t, removed))
 	})
+}
+
+// Test that a zero-address remote entry is skipped as a reverse target: it names no peer pool, so
+// only the peer's active pool is cleaned instead of failing to resolve the zero address.
+func TestRemoveRemotePoolsReverse_ZeroAddressPairedPool(t *testing.T) {
+	removed, err := runReverseTest(t, []reverseTestPool{
+		{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_NEW", "A_OLD"}},
+	}, "\x00\x00\x00\x00", "B_NEW", nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{"B_NEW"}, removedFrom(t, removed))
+}
+
+// Test that a remote entry naming an unknown pool fails planning with the lane-only removal hint,
+// and that nothing is removed.
+func TestRemoveRemotePoolsReverse_UnresolvablePairedPool(t *testing.T) {
+	removed, err := runReverseTest(t, []reverseTestPool{
+		{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_NEW", "A_OLD"}},
+	}, "NOT_A_POOL", "B_NEW", nil)
+	require.ErrorContains(t, err, "remove it from this pool with a lane-only removal")
+	require.Empty(t, removed)
+}
+
+// Test that peers this tooling cannot process fail the reverse pass, naming skipUnsupportedPeers, and
+// that with skipUnsupportedPeers they are skipped without removing anything.
+func TestRemoveRemotePoolsReverse_UnsupportedPeers(t *testing.T) {
+	supportedPeer := []reverseTestPool{{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_OLD"}}}
+	cases := []struct {
+		name      string
+		peerPools []reverseTestPool
+		setup     reverseTestSetup
+	}{
+		{name: "remote chain not loaded", peerPools: supportedPeer, setup: reverseTestSetup{remoteNotLoaded: true}},
+		{name: "no TAR reader for the remote family", peerPools: supportedPeer, setup: reverseTestSetup{noTAR: true}},
+		{name: "no adapter for the peer pool version", peerPools: []reverseTestPool{{address: "B_NEW", version: semver.MustParse("9.9.9"), lists: []string{"A_OLD"}}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			removed, err := runReverseTest(t, tc.peerPools, "B_NEW", "B_NEW", &tc.setup)
+			require.ErrorContains(t, err, "skipUnsupportedPeers")
+			require.Empty(t, removed)
+
+			tc.setup.skipUnsupportedPeers = true
+			removed, err = runReverseTest(t, tc.peerPools, "B_NEW", "B_NEW", &tc.setup)
+			require.NoError(t, err)
+			require.Empty(t, removed)
+		})
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
@@ -29,6 +30,7 @@ import (
 	tokenpoolV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
+	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
@@ -2288,6 +2290,102 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 
 			// Re-running is a no-op: every pairing is already absent and the TAR entry is already empty.
 			require.NoError(t, applyRemoveRemotePools(t, env, input))
+		})
+
+		t.Run("RemoveSeveralRemotePoolsForOneChain", func(t *testing.T) {
+			// The Solana pool is owned by the timelock, so the removals below are batched into one
+			// proposal and every read sees the state before it executes. A Solana pool rewrites a
+			// remote chain's whole pool list on each removal, so several removals for one remote
+			// chain must be combined into a single rewrite or the later ones undo the earlier ones.
+			owner, err := tokenpoolops.GetAuthorityLockRelease(solChain, solPoolProgID, solMint)
+			require.NoError(t, err)
+			require.NotEqual(t, solChain.DeployerKey.PublicKey(), owner, "the Solana pool should be owned by the timelock")
+
+			// List two more pools for EVM2 on the Solana pool, one proposal each (each upsert writes
+			// the pool list it read, so they must not share a proposal either).
+			extraPools := []common.Address{
+				common.HexToAddress("0x000000000000000000000000000000000000dEaD"),
+				common.HexToAddress("0x000000000000000000000000000000000000bEEF"),
+			}
+			evm2TokenRef := FindFullRef(t, env, evm2ChainSel, datastore.AddressRef{Qualifier: evm2TokenSymbol})
+			for _, pool := range extraPools {
+				env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
+				report, err := operations.ExecuteOperation(env.OperationsBundle, tokenpoolops.UpsertRemoteChainConfigLockRelease, solChain, tokenpoolops.RemoteChainConfig{
+					TokenPool:          solPoolProgID,
+					TokenMint:          solMint,
+					TokenProgramID:     solana.TokenProgramID,
+					RemoteSelector:     evm2ChainSel,
+					RemoteTokenAddress: common.HexToAddress(evm2TokenRef.Address).Bytes(),
+					RemotePoolAddress:  pool.Bytes(),
+					RemoteDecimals:     18,
+				})
+				require.NoError(t, err)
+				upsertOut, err := changesets.NewOutputBuilder(*env, changesets.GetRegistry()).
+					WithBatchOps(report.Output.BatchOps).
+					Build(NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily list extra EVM2 pool"))
+				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, upsertOut.MCMSTimelockProposals, false)
+			}
+			require.ElementsMatch(t, extraPools, solRemotes(evm2ChainSel), "Solana pool should list both extra EVM2 pools")
+
+			require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+				MCMS: NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily remove several EVM2 pools"),
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: solChainSel,
+					Pool:          datastore.AddressRef{Address: solPoolPDA.String()},
+					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{
+						{Selector: evm2ChainSel, Remote: datastore.AddressRef{Address: extraPools[0].Hex()}},
+						{Selector: evm2ChainSel, Remote: datastore.AddressRef{Address: extraPools[1].Hex()}},
+					},
+				}},
+			}))
+			require.Empty(t, solRemotes(evm2ChainSel), "Solana pool should list no EVM2 pool")
+		})
+
+		t.Run("DiscoversRemoteChainNotLoadedInEnv", func(t *testing.T) {
+			// A Solana pool has no on-chain list of its remote chains, so discovery probes candidate
+			// chains. A chain the environment does not load (e.g. a deprecated chain with no RPC) must
+			// still be found when it is in the datastore.
+			unloadedChainSel := chainsel.TEST_90000003.Selector
+			require.NotContains(t, env.BlockChains.ListChainSelectors(), unloadedChainSel, "the remote chain must not be loaded in the environment")
+			unloadedDS := datastore.NewMemoryDataStore()
+			require.NoError(t, unloadedDS.Addresses().Add(datastore.AddressRef{
+				ChainSelector: unloadedChainSel,
+				Address:       "0x00000000000000000000000000000000000000A1",
+				Type:          datastore.ContractType("Router"),
+				Version:       semver.MustParse("1.2.0"),
+			}))
+			MergeAddresses(t, env, unloadedDS)
+
+			// Configure the Solana pool for the unloaded chain.
+			unloadedPool := common.HexToAddress("0x00000000000000000000000000000000000000B2")
+			env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
+			report, err := operations.ExecuteOperation(env.OperationsBundle, tokenpoolops.UpsertRemoteChainConfigLockRelease, solChain, tokenpoolops.RemoteChainConfig{
+				TokenPool:          solPoolProgID,
+				TokenMint:          solMint,
+				TokenProgramID:     solana.TokenProgramID,
+				RemoteSelector:     unloadedChainSel,
+				RemoteTokenAddress: common.HexToAddress("0x00000000000000000000000000000000000000C3").Bytes(),
+				RemotePoolAddress:  unloadedPool.Bytes(),
+				RemoteDecimals:     18,
+			})
+			require.NoError(t, err)
+			upsertOut, err := changesets.NewOutputBuilder(*env, changesets.GetRegistry()).
+				WithBatchOps(report.Output.BatchOps).
+				Build(NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily configure unloaded remote chain"))
+			require.NoError(t, err)
+			testhelpers.ProcessTimelockProposals(t, *env, upsertOut.MCMSTimelockProposals, false)
+			require.Equal(t, []common.Address{unloadedPool}, solRemotes(unloadedChainSel), "Solana pool should list the pool on the unloaded chain")
+
+			require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+				MCMS: NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily remove unloaded remote chain"),
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+					ChainSelector: solChainSel,
+					Pool:          datastore.AddressRef{Address: solPoolPDA.String()},
+					AllRemotes:    true,
+				}},
+			}))
+			require.Empty(t, solRemotes(unloadedChainSel), "Solana pool should list no pool on the unloaded chain")
 		})
 	})
 }
