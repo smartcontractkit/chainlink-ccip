@@ -9,12 +9,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/cctp"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -44,6 +46,12 @@ func (c *NonCanonicalUSDCChainAdapter) MigrateHybridLockReleaseLiquidity() *oper
 			return seq_core.OnChainOutput{}, fmt.Errorf("liquidity migration is not supported on non-canonical USDC chains")
 		},
 	)
+}
+
+// UpdateAuthorities transfers ownership of the token pools deployed on a non-canonical
+// USDC chain to the CLLCCIP MCMS timelock.
+func (c *NonCanonicalUSDCChainAdapter) UpdateAuthorities() *operations.Sequence[adapters.UpdateAuthoritiesInput, seq_core.OnChainOutput, *deployment.Environment] {
+	return cctp.UpdateAuthorities
 }
 
 // CCTPV1AllowedCallerOnDest is not implemented for non-canonical USDC chains, as there is no caller of CCTP.

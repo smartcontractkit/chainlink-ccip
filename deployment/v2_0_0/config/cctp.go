@@ -2,6 +2,9 @@ package config
 
 import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 // CanonicalUSDCDecimals is the number of decimals used by canonical USDC on every
@@ -11,6 +14,32 @@ import (
 // on-chain instead. Stellar is the documented exception, using 7 decimals, but it is
 // not supported by the CCTP deployment changeset.
 const CanonicalUSDCDecimals uint8 = 6
+
+// Defaults for native CCTP lanes, i.e. lanes that move USDC with CCTP burn/mint
+// rather than lock/release. They are applied to the CCTPVerifier remote chain
+// config (gas/payload) and the token transfer fee config used by the FeeQuoter and
+// the CCTP-through-CCV token pool.
+const (
+	// DefaultGasForVerification is the gas allocated to verify a CCTP message on a remote chain.
+	DefaultGasForVerification uint32 = 220_000
+	// DefaultPayloadSizeBytes is the size of the CCTP verification payload checked on a remote chain.
+	DefaultPayloadSizeBytes uint16 = 1024
+)
+
+// NativeCCTPTokenTransferFeeConfig returns the default token transfer fee config for
+// native (non-lock-release) CCTP lanes. The destination overheads account for the CCTP
+// message, and the finality fees default to zero.
+func NativeCCTPTokenTransferFeeConfig() *tokens.PartialTokenTransferFeeConfig {
+	return &tokens.PartialTokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: utils.NewOptional(uint16(0)),
+		CustomFinalityTransferFeeBps:  utils.NewOptional(uint16(0)),
+		DefaultFinalityFeeUSDCents:    utils.NewOptional(uint32(0)),
+		CustomFinalityFeeUSDCents:     utils.NewOptional(uint32(0)),
+		DestBytesOverhead:             utils.NewOptional(uint32(32)),
+		DestGasOverhead:               utils.NewOptional(uint32(90_000)),
+		IsEnabled:                     utils.NewOptional(true),
+	}
+}
 
 // CCTPChainDefaults holds the Circle-defined CCTP contract addresses and the
 // Circle domain identifier for a chain. These values are sourced from Circle's

@@ -549,38 +549,45 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
 	}
 
-	report, err := cldf_ops.ExecuteOperation(
-		b, token_pool.GetTokenTransferFeeConfig, chain,
-		evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-			Args: token_pool.GetTokenTransferFeeConfigArgs{
-				Arg0:              common.Address{},            // unused
-				DestChainSelector: remoteChainSelector,         // this IS used
-				Arg2:              finality.RawWaitForFinality, // unused
-				Arg3:              []byte{},                    // unused
+	// Only read the on-chain fee config when the remote chain is already supported by the pool.
+	// For a not-yet-supported remote (e.g. a brand-new lane) pools that resolve their CCVs per
+	// destination can revert (CCVNotSetOnResolver) because the resolver and chain-update writes in
+	// this same batch have not been executed yet. In that case treat the current config as unset and
+	// rely on the defaults.
+	var currentConfig tokens.TokenTransferFeeConfig
+	if input.RemoteChainAlreadySupported {
+		report, err := cldf_ops.ExecuteOperation(
+			b, token_pool.GetTokenTransferFeeConfig, chain,
+			evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+				Args: token_pool.GetTokenTransferFeeConfigArgs{
+					Arg0:              common.Address{},            // unused
+					DestChainSelector: remoteChainSelector,         // this IS used
+					Arg2:              finality.RawWaitForFinality, // unused
+					Arg3:              []byte{},                    // unused
+				},
 			},
-		},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
-	)
-	if err != nil {
-		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
+			cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
+		)
+		if err != nil {
+			return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
+		}
+		currentConfig = tokens.TokenTransferFeeConfig{
+			DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
+			CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
+			DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
+			CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
+			DestBytesOverhead:             report.Output.DestBytesOverhead,
+			DestGasOverhead:               report.Output.DestGasOverhead,
+			IsEnabled:                     report.Output.IsEnabled,
+		}
 	}
 
 	defaultConfig := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(
 		input.ChainSelector,
 		input.RemoteChainSelector,
 	)
-
-	currentConfig := tokens.TokenTransferFeeConfig{
-		DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
-		CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
-		DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
-		CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
-		DestBytesOverhead:             report.Output.DestBytesOverhead,
-		DestGasOverhead:               report.Output.DestGasOverhead,
-		IsEnabled:                     report.Output.IsEnabled,
-	}
 
 	// Resolution strategy:
 	// (1) If on-chain config is enabled, merge it with the user's provided config (giving precedence to user's config)
