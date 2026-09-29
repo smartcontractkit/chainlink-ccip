@@ -296,6 +296,26 @@ func TestRemoveRemotePoolsReverse_ZeroAddressPairedPool(t *testing.T) {
 	require.Equal(t, []string{"B_NEW"}, removedFrom(t, removed))
 }
 
+// Test that a peer token with no TAR-active pool does not fail the reverse pass: the active pool is
+// dropped as a target and the pool named by the remote entry is still cleaned. When the remote
+// entry is also the zero address there is no target at all, so nothing is cleaned and no error is
+// returned.
+func TestRemoveRemotePoolsReverse_NoActivePool(t *testing.T) {
+	t.Run("named pool is still cleaned", func(t *testing.T) {
+		removed, err := runReverseTest(t, []reverseTestPool{
+			{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_NEW", "A_OLD"}},
+		}, "B_NEW", "", nil)
+		require.NoError(t, err)
+		require.Equal(t, []string{"B_NEW"}, removedFrom(t, removed))
+	})
+
+	t.Run("zero-address remote with no active pool cleans nothing", func(t *testing.T) {
+		removed, err := runReverseTest(t, nil, "\x00\x00\x00\x00", "", nil)
+		require.NoError(t, err)
+		require.Empty(t, removed)
+	})
+}
+
 // Test that a remote entry naming an unknown pool fails planning with the lane-only removal hint,
 // and that nothing is removed.
 func TestRemoveRemotePoolsReverse_UnresolvablePairedPool(t *testing.T) {
@@ -370,18 +390,81 @@ func TestRemoveRemotePoolsPlanUnregister_ReaderOnlyTAR(t *testing.T) {
 	t.Run("TAR points at another pool: nothing to unregister", func(t *testing.T) {
 		planner, err := planUnregister(t, &reverseTestReaderOnlyTAR{activePool: "A_NEW"})
 		require.NoError(t, err)
-		require.Empty(t, planner.writes)
+		require.Empty(t, planner.unregisters)
 	})
 
 	t.Run("TAR points at this pool: fails at planning", func(t *testing.T) {
 		planner, err := planUnregister(t, &reverseTestReaderOnlyTAR{activePool: "A_OLD"})
 		require.ErrorContains(t, err, "does not support unregistering tokens")
-		require.Empty(t, planner.writes)
+		require.Empty(t, planner.unregisters)
 	})
 
 	t.Run("TAR points at this pool with a manager: unregister queued", func(t *testing.T) {
 		planner, err := planUnregister(t, &reverseTestTAR{activePool: "A_OLD"})
 		require.NoError(t, err)
-		require.Len(t, planner.writes, 1)
+		require.Len(t, planner.unregisters, 1)
 	})
+}
+
+// Test that a peer listing the local pool more than once (e.g. in both EVM encodings, which decode to
+// the same address) gets a single removal: the remover removes every stored encoding of the address,
+// and a duplicate entry would queue duplicate removals that revert under MCMS.
+func TestRemoveRemotePoolsReverse_PeerListsPoolTwice(t *testing.T) {
+	removed, err := runReverseTest(t, []reverseTestPool{
+		{address: "B_NEW", version: reverseTestV2_0_0, lists: []string{"A_OLD", "A_NEW", "A_OLD"}},
+	}, "B_NEW", "B_NEW", nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{"B_NEW"}, removedFrom(t, removed))
+}
+
+// Test that removals queued for the same target pool run as one removal call (so a family that
+// rewrites the whole list per call cannot undo its own removals under MCMS), that pools serving
+// different tokens are not merged, and that peers are cleaned before entries' own pools.
+func TestRemoveRemotePoolsPlanner_GroupsRemovalsPerPool(t *testing.T) {
+	family, err := chainsel.GetSelectorFamily(reverseTestRemoteSel)
+	require.NoError(t, err)
+	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(family, reverseTestIdentityNormalizer{})
+
+	lggr := logger.Test(t)
+	env := cldf.Environment{
+		Logger:           lggr,
+		OperationsBundle: cldf_ops.NewBundle(func() context.Context { return t.Context() }, lggr, cldf_ops.NewMemoryReporter()),
+		BlockChains:      cldf_chain.NewBlockChains(nil),
+	}
+	removed := []RemoveRemotePoolsSequenceInput{}
+	remover := &reverseTestAdapter{removed: &removed}
+	removal := func(pool, token string, remotes ...string) RemoveRemotePoolsSequenceInput {
+		in := RemoveRemotePoolsSequenceInput{
+			Selector:     reverseTestRemoteSel,
+			TokenPoolRef: datastore.AddressRef{Address: pool},
+			TokenRef:     datastore.AddressRef{Address: token},
+		}
+		for _, r := range remotes {
+			in.RemotePoolsToRemove = append(in.RemotePoolsToRemove, RemotePoolToRemove{Selector: reverseTestLocalSel, Remote: datastore.AddressRef{Address: r}})
+		}
+		return in
+	}
+	remotesOf := func(in RemoveRemotePoolsSequenceInput) []string {
+		out := []string{}
+		for _, r := range in.RemotePoolsToRemove {
+			out = append(out, r.Remote.Address)
+		}
+		return out
+	}
+
+	planner := newRemoveRemotePoolsPlanner(env, newTokenAdapterRegistry())
+	require.NoError(t, planner.queueRemoval(remover, removal("P", "TOKEN", "X"), true))        // P is an entry's own pool
+	require.NoError(t, planner.queueRemoval(remover, removal("Q", "TOKEN", "Y"), false))       // Q is only a peer
+	require.NoError(t, planner.queueRemoval(remover, removal("P", "TOKEN", "Z"), false))       // another entry's reverse pass hits P
+	require.NoError(t, planner.queueRemoval(remover, removal("P", "OTHER_TOKEN", "W"), false)) // same program, different token
+	_, _, err = planner.execute()
+	require.NoError(t, err)
+
+	require.Len(t, removed, 3)
+	require.Equal(t, "Q", removed[0].TokenPoolRef.Address, "a pool that is only a peer is cleaned first")
+	require.Equal(t, "P", removed[1].TokenPoolRef.Address)
+	require.Equal(t, "OTHER_TOKEN", removed[1].TokenRef.Address, "a different token's config on the same pool is its own call")
+	require.Equal(t, "P", removed[2].TokenPoolRef.Address)
+	require.Equal(t, "TOKEN", removed[2].TokenRef.Address)
+	require.Equal(t, []string{"X", "Z"}, remotesOf(removed[2]), "both removals on P run as one call, after the peers")
 }

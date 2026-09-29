@@ -732,7 +732,10 @@ func (a *SolanaAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokenapi.RemoveRe
 // enumerated directly. Instead, we derive the chain-config PDA for every candidate chain and
 // treat the ones that exist as the pool's supported chains. Known limitation: a remote chain
 // with no refs in the environment's datastore that is not loaded in the environment is not
-// found; remove such remotes with an explicit remote pool list.
+// found; remove such remotes with an explicit remote pool list. A datastore chain unknown to the
+// linked chain-selectors version is still a candidate, so a pool configured for it is reported and
+// then fails later processing (its chain family can't be resolved) instead of being silently
+// skipped; bump chain-selectors to handle it.
 //
 // NOTE: a Solana pool implementing these reads is NOT a migration source. The auto-migrate gate
 // requires a v2.0.0+ target pool, which no Solana pool has, so Solana always bails at the graceful

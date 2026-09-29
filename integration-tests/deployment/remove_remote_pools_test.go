@@ -268,7 +268,7 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 }
 
 // TestRemoveRemotePools_V2 removes a remote pool from a v2.0.0 pool and verifies the on-chain
-// state, then confirms that removing an already-removed pool errors clearly.
+// state, then confirms that removing an already-removed pool is skipped with a warning.
 func TestRemoveRemotePools_V2(t *testing.T) {
 	tc := setupV2PoolsForConfigureImpl(t, "RRP_V2", false)
 
@@ -352,7 +352,7 @@ type removeRemotePoolsTestEnv struct {
 
 // setupV2PoolsForRemoveRemotePools deploys a fully-connected three-chain v2.0.0 BurnMint pool
 // (A↔B, A↔C, B↔C) so tests can exercise partial remote-pool removal (removing only a subset of a
-// pool's remote entries) and the error path for addresses that are not configured.
+// pool's remote entries) and the warn-and-skip path for addresses that are not configured.
 func setupV2PoolsForRemoveRemotePools(t *testing.T) removeRemotePoolsTestEnv {
 	t.Helper()
 
@@ -430,7 +430,7 @@ func setupV2PoolsForRemoveRemotePools(t *testing.T) removeRemotePoolsTestEnv {
 // TestRemoveRemotePools_PartialRemoval deploys a fully-connected three-chain pool and removes only
 // a subset of one pool's remote entries, verifying that the targeted remote pool is removed while
 // the untouched remote pool remains configured. It then verifies that removing a remote pool
-// address that is not configured (a non-existent address) errors clearly.
+// address that is not configured (a non-existent address) is skipped with a warning.
 func TestRemoveRemotePools_PartialRemoval(t *testing.T) {
 	env := setupV2PoolsForRemoveRemotePools(t)
 

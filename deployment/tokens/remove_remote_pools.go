@@ -38,9 +38,10 @@ type RemoveRemotePoolsInput struct {
 //
 // The reverse pass removes this pool from up to two pools per peer chain: the peer's TAR-active
 // pool and the peer pool this pool is paired with (they differ once the peer has been upgraded,
-// since remote-pool lists are append-only across upgrades). Retired pools on this chain are not
-// swept automatically: to retire several pools (e.g. the old pools left behind by upgrades), list
-// each one as its own entry.
+// since remote-pool lists are append-only across upgrades). The peer's TAR-active pool is dropped
+// as a target when the peer has none, in which case only the paired pool is cleaned. Retired pools
+// on this chain are not swept automatically: to retire several pools (e.g. the old pools left
+// behind by upgrades), list each one as its own entry.
 //
 // Every entry is resolved before anything is written: if any pool, remote entry, or peer cannot be
 // resolved, the changeset fails without touching any chain. A remote entry holding the zero
@@ -49,23 +50,31 @@ type RemoveRemotePoolsInput struct {
 // address) fails resolution; remove it with a lane-only removal (remotePoolsToRemove without
 // bidirectional, which never resolves the peer) and re-run.
 //
+// All removals on one pool run as a single call, since some families rewrite a remote chain's whole
+// pool list per call and, under MCMS, separate rewrites would undo each other. Writes run in
+// phases: pools that are only peers, then each entry's own pool, then the TAR unregisters.
+//
 // Partial failures and re-runs: a write can still fail partway (e.g. a reverted transaction), so
-// the reverse pass runs before the forward pass. For allRemotes/deactivate (whose remotes are
-// discovered from this pool's own remote list) a re-run after a partial failure rediscovers the
-// same peers and completes the teardown. Caveat: when ownership is mixed, execution order follows
-// ownership rather than code order. Operations the deployer key owns land immediately, while MCMS-
-// owned ones land only when the proposal executes. If this pool is deployer-owned and a peer pool
-// is MCMS-owned, the forward removal can land while the peer's removal is still pending; if that
-// proposal is then dropped, a discovery-based re-run no longer sees the peer. To recover, re-run
-// with bidirectional and an explicit remotePoolsToRemove listing the peer pools, which does not
-// depend on this pool's remote list.
+// peers are cleaned before this pool (except when a peer is also a later entry's own pool). For
+// allRemotes/deactivate (whose remotes are discovered from this pool's own remote list) a re-run
+// after a partial failure rediscovers the same peers and completes the teardown. Caveat: when
+// ownership is mixed, execution order follows ownership rather than code order. Operations the
+// deployer key owns land immediately, while MCMS-owned ones land only when the proposal executes.
+// If this pool is deployer-owned and a peer pool is MCMS-owned, the forward removal can land while
+// the peer's removal is still pending; if that proposal is then dropped, a discovery-based re-run
+// no longer sees the peer. To recover, re-run with bidirectional and an explicit
+// remotePoolsToRemove listing the peer pools, which does not depend on this pool's remote list.
 //
 // The SkipUnsupportedPeers flag makes the reverse pass skip (with a warning) peers this tooling
 // cannot process instead of failing: a peer chain not loaded in the environment, a peer family with
 // no registered TAR reader, or a peer pool whose adapter does not support remote pool discovery and
 // removal. A skipped peer keeps listing this pool; clean it up on that chain with its own
-// tooling. Other failures (RPC errors, unresolvable remote entries, a peer with no active pool)
-// still fail. Requires bidirectional or deactivate.
+// tooling. Other failures (RPC errors, unresolvable remote entries) still fail. A peer token with
+// no active pool is not fatal: the reverse pass drops the TAR-active pool as a target and still
+// cleans the pool named by the remote entry, skipping the remote only when that entry is also the
+// zero address. The remote chain's family must still register an address normalizer, since the
+// forward pass needs it to decode and remove that family's remote entries. Requires bidirectional
+// or deactivate.
 type RemoveRemotePoolsPerPool struct {
 	ChainSelector        uint64               `yaml:"selector" json:"selector,string"`
 	Pool                 datastore.AddressRef `yaml:"pool" json:"pool"`
