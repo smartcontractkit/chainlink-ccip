@@ -29,11 +29,19 @@ type LockBoxDeposit struct {
 // chain and nesting them keeps the selector written once per chain.
 type ChainLockBoxFunding struct {
 	Selector uint64 `json:"selector" yaml:"selector"`
+	// PoolAddress is the v2.0 SiloedLockReleaseTokenPool that maps LockBoxAddress. Required: the
+	// siloed/unsiloed distinction is defined by the pool's lockbox mapping, so the pool is read to
+	// verify Kind on-chain before any write is emitted.
+	PoolAddress common.Address `json:"poolAddress" yaml:"poolAddress"`
 	// LockBoxAddress is the ERC20LockBox to fund. Named by address rather than by datastore
 	// qualifier: qualifiers are a side-effect of whichever sequence deployed the lockbox
 	// ("<poolQualifier>-silo(<minRemoteSelector>)" per silo group), so they are not a stable
 	// addressing scheme. A wrong address fails on-chain when the read or write reverts.
 	LockBoxAddress common.Address `json:"lockBoxAddress" yaml:"lockBoxAddress"`
+	// Kind declares whether LockBoxAddress is a silo (dedicated to one remote chain) or the shared
+	// (unsiloed) bucket. Verified on-chain against the pool's lockbox mapping before any write is
+	// emitted, so a misdeclared lockbox fails before the proposal is built.
+	Kind evm_tokens.LockBoxKind `json:"kind" yaml:"kind"`
 	// TokenAddress is the token to deposit into the lockbox.
 	TokenAddress common.Address `json:"tokenAddress" yaml:"tokenAddress"`
 	// Deposits are the individual deposits to make. Each entry targets one bucket: a siloed bucket
@@ -94,8 +102,16 @@ func verifyFundLockBox(
 			return fmt.Errorf(
 				"duplicate entry for chain %d: merge its lockboxes into a single entry", sel)
 		}
+		if funding.PoolAddress == (common.Address{}) {
+			return fmt.Errorf("zero pool address for chain %d", sel)
+		}
 		if funding.LockBoxAddress == (common.Address{}) {
 			return fmt.Errorf("zero lockbox address for chain %d", sel)
+		}
+		if !funding.Kind.IsValid() {
+			return fmt.Errorf(
+				"kind for chain %d must be %q or %q, got %q",
+				sel, evm_tokens.LockBoxKindSiloed, evm_tokens.LockBoxKindUnsiloed, funding.Kind)
 		}
 		if funding.TokenAddress == (common.Address{}) {
 			return fmt.Errorf("zero token address for chain %d", sel)
@@ -158,7 +174,9 @@ func applyFundLockBox(
 				e.OperationsBundle, evm_tokens.FundLockBox, e.BlockChains,
 				evm_tokens.FundLockBoxInput{
 					ChainSelector:    sel,
+					PoolAddress:      funding.PoolAddress.Hex(),
 					LockBoxAddress:   funding.LockBoxAddress.Hex(),
+					Kind:             funding.Kind,
 					TokenAddress:     funding.TokenAddress.Hex(),
 					TimelockAddress:  timelockRef.Address,
 					Deposits:         deposits,
