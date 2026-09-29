@@ -261,6 +261,8 @@ flowchart LR
 	mcms --> chainlink-testing-framework/framework
 	mcms --> chainlink-ton
 	click mcms href "https://github.com/smartcontractkit/mcms"
+	quarantine
+	click quarantine href "https://github.com/smartcontractkit/quarantine"
 	wsrpc
 	click wsrpc href "https://github.com/smartcontractkit/wsrpc"
 
