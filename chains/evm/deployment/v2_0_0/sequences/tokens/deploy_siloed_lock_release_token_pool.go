@@ -15,7 +15,6 @@ import (
 	evm_contract "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/erc20_lock_box"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
 )
@@ -47,33 +46,19 @@ var DeploySiloedLockReleaseTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("invalid lock box groups: %w", err)
 		}
 
-		hooksDeployReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.Deploy, chain, evm_contract.DeployInput[advanced_pool_hooks.ConstructorArgs]{
-			ChainSelector:  input.ChainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(advanced_pool_hooks.ContractType, *advanced_pool_hooks.Version),
-			Args: advanced_pool_hooks.ConstructorArgs{
-				Allowlist:                        input.AdvancedPoolHooksConfig.Allowlist,
-				ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
-				PolicyEngine:                     input.AdvancedPoolHooksConfig.PolicyEngine,
-				AuthorizedCallers:                input.AdvancedPoolHooksConfig.AuthorizedCallers,
-			},
-			Qualifier: &input.TokenSymbol,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy advanced pool hooks to %s: %w", chain, err)
-		}
-		hooksAddr := common.HexToAddress(hooksDeployReport.Output.Address)
-
 		typeAndVersion := deployment.NewTypeAndVersion(
 			deployment.ContractType(input.TokenPoolType),
 			*input.TokenPoolVersion,
 		)
+		// AdvancedPoolHooks are not deployed by the token expansion flow. The pool is
+		// constructed with the zero address so no hooks contract is wired in.
 		tpDeployReport, err := cldf_ops.ExecuteOperation(b, siloed_lock_release_token_pool.Deploy, chain, evm_contract.DeployInput[siloed_lock_release_token_pool.ConstructorArgs]{
 			ChainSelector:  input.ChainSel,
 			TypeAndVersion: typeAndVersion,
 			Args: siloed_lock_release_token_pool.ConstructorArgs{
 				Token:              input.ConstructorArgs.Token,
 				LocalTokenDecimals: input.ConstructorArgs.Decimals,
-				AdvancedPoolHooks:  hooksAddr,
+				AdvancedPoolHooks:  common.Address{},
 				RmnProxy:           input.ConstructorArgs.RMNProxy,
 				Router:             input.ConstructorArgs.Router,
 			},
@@ -85,12 +70,10 @@ var DeploySiloedLockReleaseTokenPool = cldf_ops.NewSequence(
 		poolAddr := common.HexToAddress(tpDeployReport.Output.Address)
 
 		configureReport, err := cldf_ops.ExecuteSequence(b, ConfigureTokenPool, chain, ConfigureTokenPoolInput{
-			ChainSelector:                    input.ChainSel,
-			TokenPoolAddress:                 poolAddr,
-			RateLimitAdmin:                   input.RateLimitAdmin,
-			AdvancedPoolHooks:                hooksAddr,
-			RouterAddress:                    input.ConstructorArgs.Router,
-			ThresholdAmountForAdditionalCCVs: input.ThresholdAmountForAdditionalCCVs,
+			ChainSelector:    input.ChainSel,
+			TokenPoolAddress: poolAddr,
+			RateLimitAdmin:   input.RateLimitAdmin,
+			RouterAddress:    input.ConstructorArgs.Router,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to configure token pool with address %s on %s: %w", poolAddr, chain, err)
@@ -98,33 +81,11 @@ var DeploySiloedLockReleaseTokenPool = cldf_ops.NewSequence(
 
 		var writes []evm_contract.WriteOutput
 
-		// Add the newly deployed token pool as an authorized caller on the hooks.
-		getAuthorizedCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetAllAuthorizedCallers, chain, evm_contract.FunctionInput[struct{}]{
-			ChainSelector: input.ChainSel,
-			Address:       hooksAddr,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get authorized callers from advanced pool hooks %s on %s: %w", hooksAddr, chain, err)
-		}
-		if !slices.Contains(getAuthorizedCallersReport.Output, poolAddr) {
-			applyHooksCallersReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.ApplyAuthorizedCallerUpdates, chain, evm_contract.FunctionInput[advanced_pool_hooks.AuthorizedCallerArgs]{
-				ChainSelector: input.ChainSel,
-				Address:       hooksAddr,
-				Args: advanced_pool_hooks.AuthorizedCallerArgs{
-					AddedCallers: []common.Address{poolAddr},
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize token pool %s on advanced pool hooks with address %s on %s: %w", poolAddr, hooksAddr, chain, err)
-			}
-			writes = append(writes, applyHooksCallersReport.Output)
-		}
-
 		// Deploy one lockbox per silo group and authorize the pool on each. Every remote chain in a
 		// group maps to that group's lockbox, so chains within a group share liquidity while chains
 		// in different groups are isolated.
 		// NOTE: Addresses[0] must remain the pool ref - DeployTokenPool relies on that convention.
-		addresses := []datastore.AddressRef{tpDeployReport.Output, hooksDeployReport.Output}
+		addresses := []datastore.AddressRef{tpDeployReport.Output}
 		lockBoxConfigs := make([]siloed_lock_release_token_pool.LockBoxConfig, 0, len(input.LockBoxGroups))
 		for _, group := range input.LockBoxGroups {
 			qualifier := LockBoxQualifier(input.TokenSymbol, group)

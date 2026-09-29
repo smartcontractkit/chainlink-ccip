@@ -3,7 +3,6 @@ package tokens
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -57,8 +56,6 @@ type DeployTokenPoolInput struct {
 	// RateLimitAdmin is an additional address allowed to set rate limiters.
 	// If left empty, setRateLimitAdmin will not be attempted.
 	RateLimitAdmin common.Address
-	// ThresholdAmountForAdditionalCCVs is the transfer amount above which additional CCVs are required.
-	ThresholdAmountForAdditionalCCVs *big.Int
 	// FeeAdmin is an additional address (besides the pool owner) allowed to call
 	// withdrawFeeTokens on the pool.
 	FeeAdmin common.Address
@@ -120,9 +117,6 @@ func (c DeployTokenPoolInput) Validate(chain evm.Chain) error {
 	}
 	if c.ConstructorArgs.Router == (common.Address{}) {
 		return errors.New("router address must be defined")
-	}
-	if c.ThresholdAmountForAdditionalCCVs == nil {
-		return errors.New("threshold amount for additional ccvs must be defined")
 	}
 	// Fee aggregator can be zero address; it's optional
 

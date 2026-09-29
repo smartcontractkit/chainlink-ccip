@@ -41,7 +41,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
           bytes32(uint256(uint160(receiver))),
           TRANSFER_AMOUNT,
           ALLOWED_CALLER,
-          abi.encodePacked(VERSION_TAG_V2_0_0, messageId)
+          abi.encodePacked(VERSION_TAG_V2_2_0, messageId)
         )
       )
     );
@@ -196,7 +196,7 @@ contract LombardVerifier_forwardToVerifier is LombardVerifierSetup {
           bytes32(uint256(uint160(receiver))),
           TRANSFER_AMOUNT,
           ALLOWED_CALLER,
-          abi.encodePacked(VERSION_TAG_V2_0_0, messageId)
+          abi.encodePacked(VERSION_TAG_V2_2_0, messageId)
         )
       )
     );

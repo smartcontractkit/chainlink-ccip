@@ -6,6 +6,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -41,8 +42,10 @@ type RemoteCCTPChainConfig struct {
 	LockOrBurnMechanism string
 	// DomainIdentifier is the identifier of the remote domain.
 	DomainIdentifier uint32
-	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this remote chain.
-	TokenTransferFeeConfig tokens.TokenTransferFeeConfig
+	// TokenTransferFeeConfig specifies the desired token transfer fee configuration for this
+	// remote chain. Optional: a nil value is a true no-op (leave the on-chain config unchanged),
+	// while a partial value merges with the current/default config.
+	TokenTransferFeeConfig *tokens.PartialTokenTransferFeeConfig
 	// InboundRateLimiterConfig specifies the desired rate limiter configuration for inbound traffic.
 	// DO NOT SET THIS VALUE WHEN PASSING IN INPUTS.
 	// This value is derived from the configuration specified for outbound traffic to the remote chain, as the same limits should apply in both directions.
@@ -57,10 +60,6 @@ type ConfigureCCTPChainForLanesInput struct {
 	ChainSelector uint64
 	// USDCToken is the address of the USDCToken contract.
 	USDCToken string
-	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain.
-	RegisteredPoolRef datastore.AddressRef
-	// RemoteRegisteredPoolRefs is a map of remote chain selectors to references to the pool that should be set on the registry on the remote chain.
-	RemoteRegisteredPoolRefs map[uint64]datastore.AddressRef
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteCCTPChainConfig
 }
@@ -105,6 +104,12 @@ type ConfigureCCTPChainForLanesDeps struct {
 	DataStore datastore.DataStore
 	// RemoteChains are the remote chains in the environment.
 	RemoteChains map[uint64]RemoteCCTPChain
+	// RegisteredPoolRef is a reference to the pool that should be set on the registry on this chain,
+	// derived by the changeset from the chain's CCTP deploy output (its first address).
+	RegisteredPoolRef datastore.AddressRef
+	// RemoteRegisteredPoolRefs maps remote chain selectors to references to the pool that should be
+	// set on the registry on the remote chain.
+	RemoteRegisteredPoolRefs map[uint64]datastore.AddressRef
 }
 
 // RemoteCCTPChain is a connectable remote CCTP chain.
@@ -114,6 +119,10 @@ type RemoteCCTPChain interface {
 	PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error)
 	// TokenAddress returns the address of the token on the remote chain in bytes.
 	TokenAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64) ([]byte, error)
+	// TokenDecimals returns the number of decimals of the token at the given address on the
+	// chain. Used to resolve a token's decimals from its address rather than assuming a
+	// hardcoded value.
+	TokenDecimals(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, token string) (uint8, error)
 	// USDCType returns the type of the USDC on the remote chain.
 	USDCType() USDCType
 	// CCTPV1AllowedCallerOnDest returns the address allowed to trigger message reception on the remote domain for CCTP V1.
@@ -151,6 +160,15 @@ type MigrateHybridLockReleaseLiquidityDeps struct {
 	BlockChains cldf_chain.BlockChains
 }
 
+// UpdateAuthoritiesInput specifies the input for the UpdateAuthorities sequence.
+type UpdateAuthoritiesInput struct {
+	// ChainSelector is the selector for the chain whose contracts' ownership is updated.
+	ChainSelector uint64
+	// ContractRefs are the contracts deployed or configured by the CCTP changeset on this chain.
+	// Implementations filter these to the ones that require an ownership transfer.
+	ContractRefs []datastore.AddressRef
+}
+
 // CCTPChain is a configurable CCTP chain.
 type CCTPChain interface {
 	RemoteCCTPChain
@@ -161,6 +179,9 @@ type CCTPChain interface {
 	// MigrateHybridLockReleaseLiquidity migrates liquidity from a HybridLockReleaseUSDCTokenPool
 	// into per-chain siloed lockboxes on the home chain.
 	MigrateHybridLockReleaseLiquidity() *cldf_ops.Sequence[MigrateHybridLockReleaseLiquidityInput, sequences.OnChainOutput, MigrateHybridLockReleaseLiquidityDeps]
+	// UpdateAuthorities transfers ownership of the CCTP contracts on the chain to the MCMS
+	// timelock. Implementations that do not manage ownership return a no-op.
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *cldf.Environment]
 }
 
 // CCTPChainRegistry maintains a registry of CCTP chains.

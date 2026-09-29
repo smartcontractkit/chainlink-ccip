@@ -16,7 +16,7 @@ import {MockLombardMailbox} from "../../mocks/MockLombardMailbox.sol";
 import {BaseVerifierSetup} from "../components/BaseVerifier/BaseVerifierSetup.t.sol";
 
 contract LombardVerifierSetup is BaseVerifierSetup {
-  bytes4 internal constant VERSION_TAG_V2_0_0 = bytes4(keccak256("LombardVerifier 2.0.0"));
+  bytes4 internal constant VERSION_TAG_V2_2_0 = bytes4(keccak256("LombardVerifier 2.2.0"));
   uint8 internal constant LOMBARD_VERSION = 2;
 
   LombardVerifier internal s_lombardVerifier;
@@ -36,14 +36,14 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     s_mockBridge = new MockLombardBridge();
     s_mockMailbox = MockLombardMailbox(s_mockBridge.s_mailbox());
     // Set default execution result matching the version tag format.
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, bytes32(0)));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, bytes32(0)));
 
     s_lombardVerifier = new LombardVerifier(
       LombardVerifier.DynamicConfig({feeAggregator: FEE_AGGREGATOR}),
       IBridgeV3(address(s_mockBridge)),
       s_storageLocations,
       address(s_mockRMNRemote),
-      VERSION_TAG_V2_0_0
+      VERSION_TAG_V2_2_0
     );
 
     // Deploy test token and add it as a supported token.
@@ -138,6 +138,7 @@ contract LombardVerifierSetup is BaseVerifierSetup {
   ///   bytes 65..96: recipient (32 bytes)
   ///   bytes 97..128: amount (32 bytes)
   ///   bytes 129..164: optionalMessage (36 bytes: versionTag + messageId)
+  ///   bytes 165..176: optional zero padding for Lombard's padded representation (12 bytes)
   /// @param destToken The destination token address.
   /// @param sender The sender address.
   /// @param tokenReceiver The token receiver address.
@@ -152,6 +153,28 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     bytes32 messageId
   ) internal view returns (bytes memory) {
     return _generateRawPayload(destToken, sender, tokenReceiver, amount, address(s_lombardVerifier), messageId);
+  }
+
+  /// @notice Generates a valid rawPayload with explicit optional-message padding.
+  function _generateValidRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    bytes32 messageId,
+    bytes memory optionalMessagePadding
+  ) internal view returns (bytes memory) {
+    return _generateRawPayload(
+      destToken,
+      sender,
+      tokenReceiver,
+      amount,
+      address(s_lombardVerifier),
+      REMOTE_BRIDGE_SENDER,
+      address(s_mockBridge),
+      messageId,
+      optionalMessagePadding
+    );
   }
 
   /// @notice Generates a rawPayload with an explicit destinationCaller. The envelope sender and recipient default to
@@ -196,14 +219,32 @@ contract LombardVerifierSetup is BaseVerifierSetup {
     address recipient,
     bytes32 messageId
   ) internal pure returns (bytes memory) {
+    return _generateRawPayload(
+      destToken, sender, tokenReceiver, amount, destinationCaller, envelopeSender, recipient, messageId, ""
+    );
+  }
+
+  /// @notice Generates a rawPayload with explicit optional-message padding.
+  function _generateRawPayload(
+    bytes memory destToken,
+    bytes memory sender,
+    bytes memory tokenReceiver,
+    uint256 amount,
+    address destinationCaller,
+    bytes32 envelopeSender,
+    address recipient,
+    bytes32 messageId,
+    bytes memory optionalMessagePadding
+  ) internal pure returns (bytes memory) {
     bytes memory msgBody = abi.encodePacked(
       LOMBARD_VERSION,
       Internal._leftPadBytesToBytes32(destToken),
       Internal._leftPadBytesToBytes32(sender),
       Internal._leftPadBytesToBytes32(tokenReceiver),
       bytes32(amount),
-      VERSION_TAG_V2_0_0,
-      messageId
+      VERSION_TAG_V2_2_0,
+      messageId,
+      optionalMessagePadding
     );
 
     // Encode the full payload structure

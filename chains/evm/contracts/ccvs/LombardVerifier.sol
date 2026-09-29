@@ -27,7 +27,7 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error ZeroRemoteBridgeSender();
   error PathNotExist(uint64 remoteChainSelector);
   error ExecutionError();
-  error InvalidMessageLength(uint256 expected, uint256 actual);
+  error InvalidMessageLength(uint256 expected, uint256 expectedPadded, uint256 actual);
   error InvalidMessageId(bytes32 messageMessageId, bytes32 bridgeMessageId);
   error InvalidReceiver(bytes);
   error InvalidMessageVersion(uint8 expected, uint8 actual);
@@ -42,7 +42,8 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
   error InvalidRemoteBridgeSender(bytes32 expected, bytes32 actual);
   error InvalidAmount(uint256 expected, uint256 actual);
   error RemoteTokenOrAdapterMismatch(bytes32 bridgeToken, bytes32 remoteToken, bytes32 remoteAdapter);
-  error InvalidBridgeMessageLength(uint256 expected, uint256 actual);
+  error InvalidBridgeMessageLength(uint256 expected, uint256 expectedPadded, uint256 actual);
+  error InvalidMessagePadding();
 
   /// @param remoteChainSelector CCIP selector of destination chain.
   /// @param lChainId The chain id of destination chain by Lombard Multi Chain Id conversion.
@@ -96,20 +97,29 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     address localAdapter;
   }
 
-  string public constant typeAndVersion = "LombardVerifier 2.1.0";
+  string public constant typeAndVersion = "LombardVerifier 2.2.0";
   /// @notice The size of the version tag in bytes.
   uint256 private constant VERSION_TAG_SIZE = 4;
   /// @notice The size of a bytes32 in bytes.
   uint256 private constant BYTES32_SIZE = 32;
-  /// @notice The expected size of the bridged message (version tag + message ID).
-  uint256 private constant BRIDGED_MESSAGE_SIZE = VERSION_TAG_SIZE + BYTES32_SIZE;
+  /// @notice The size of the bridge message (version tag + message ID).
+  /// @dev The Lombard's `optionalMessage` field (`versionTag || messageId`), is returned by
+  /// the mailbox as `bridgedMessage`.
+  uint256 private constant BRIDGE_MESSAGE_SIZE = VERSION_TAG_SIZE + BYTES32_SIZE;
+  /// @notice The size of the zero padding in Lombard's padded bridge message representation.
+  uint256 private constant BRIDGE_MESSAGE_PADDING_SIZE = 12;
+  /// @notice The size of Lombard's padded bridge message representation.
+  uint256 private constant PADDED_BRIDGE_MESSAGE_SIZE = BRIDGE_MESSAGE_SIZE + BRIDGE_MESSAGE_PADDING_SIZE;
   /// @notice The size of the rawPayload length field in ccvData.
   uint256 private constant RAW_PAYLOAD_LENGTH_SIZE = 2;
   uint256 private constant PAYLOAD_START_INDEX = VERSION_TAG_SIZE + RAW_PAYLOAD_LENGTH_SIZE;
   // version + token + sender + recipient + amount
-  uint256 private constant BRIDGE_MESSAGE_FIXED_SIZE = 1 + 4 * BYTES32_SIZE;
-  // fixed Bridge body + versionTag + messageId
-  uint256 private constant EXPECTED_BRIDGE_MESSAGE_SIZE = BRIDGE_MESSAGE_FIXED_SIZE + BRIDGED_MESSAGE_SIZE;
+  uint256 private constant BRIDGE_MESSAGE_FIXED_FIELDS_SIZE = 1 + 4 * BYTES32_SIZE;
+  // Full GMP msgBody: fixed bridge fields + bridge message (Lombard optionalMessage).
+  uint256 private constant EXPECTED_MSG_BODY_SIZE = BRIDGE_MESSAGE_FIXED_FIELDS_SIZE + BRIDGE_MESSAGE_SIZE;
+  // Full GMP msgBody with a padded bridge message.
+  uint256 private constant PADDED_EXPECTED_MSG_BODY_SIZE = BRIDGE_MESSAGE_FIXED_FIELDS_SIZE
+    + PADDED_BRIDGE_MESSAGE_SIZE;
 
   /// @notice Supported bridge message version.
   uint8 internal constant SUPPORTED_BRIDGE_MSG_VERSION = 2;
@@ -257,6 +267,10 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       revert MustTransferTokens();
     }
 
+    if (ccvData.length < PAYLOAD_START_INDEX) {
+      revert InvalidVerifierResults();
+    }
+
     {
       bytes4 versionPrefix = bytes4(ccvData[:VERSION_TAG_SIZE]);
       if (versionPrefix != versionTag()) {
@@ -264,9 +278,6 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       }
     }
 
-    if (ccvData.length < PAYLOAD_START_INDEX) {
-      revert InvalidVerifierResults();
-    }
     uint256 rawPayloadLength = uint16(bytes2(ccvData[VERSION_TAG_SIZE:PAYLOAD_START_INDEX]));
 
     if (ccvData.length < PAYLOAD_START_INDEX + rawPayloadLength + RAW_PAYLOAD_LENGTH_SIZE) {
@@ -300,8 +311,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       if (!executed) {
         revert ExecutionError();
       }
-      if (bridgedMessage.length != BRIDGED_MESSAGE_SIZE) {
-        revert InvalidMessageLength(BRIDGED_MESSAGE_SIZE, bridgedMessage.length);
+      uint256 bridgedMessageLength = bridgedMessage.length;
+      if (bridgedMessageLength == PADDED_BRIDGE_MESSAGE_SIZE) {
+        _validateZeroPadding(bridgedMessage, BRIDGE_MESSAGE_SIZE);
+      } else if (bridgedMessageLength != BRIDGE_MESSAGE_SIZE) {
+        revert InvalidMessageLength(BRIDGE_MESSAGE_SIZE, PADDED_BRIDGE_MESSAGE_SIZE, bridgedMessageLength);
       }
       bytes4 version;
       bytes32 returnedMessageId;
@@ -365,8 +379,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     {
       bytes memory msgBody = _validateEnvelope(rawPayload, sourceChainSelector);
 
-      if (msgBody.length != EXPECTED_BRIDGE_MESSAGE_SIZE) {
-        revert InvalidBridgeMessageLength(EXPECTED_BRIDGE_MESSAGE_SIZE, msgBody.length);
+      uint256 msgBodyLength = msgBody.length;
+      if (msgBodyLength == PADDED_EXPECTED_MSG_BODY_SIZE) {
+        _validateZeroPadding(msgBody, EXPECTED_MSG_BODY_SIZE);
+      } else if (msgBodyLength != EXPECTED_MSG_BODY_SIZE) {
+        revert InvalidBridgeMessageLength(EXPECTED_MSG_BODY_SIZE, PADDED_EXPECTED_MSG_BODY_SIZE, msgBodyLength);
       }
 
       uint8 bridgeMessageVersion = uint8(msgBody[0]);
@@ -409,6 +426,23 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
     }
     if (amount != expectedAmount) {
       revert InvalidAmount(expectedAmount, amount);
+    }
+  }
+
+  /// @notice Validates that the `BRIDGE_MESSAGE_PADDING_SIZE` bytes starting at `paddingStart` are zero.
+  /// @dev Lombard supports both the 36-byte bridge message (`versionTag || messageId`) and a 48-byte padded
+  /// representation. The semantic message occupies the first 36 bytes and the trailing 12 bytes must be zero.
+  function _validateZeroPadding(
+    bytes memory data,
+    uint256 paddingStart
+  ) internal pure {
+    uint256 padding;
+    assembly {
+      // Load the 32-byte word starting at the padding and keep only the top 12 bytes.
+      padding := shr(160, mload(add(add(data, 0x20), paddingStart)))
+    }
+    if (padding != 0) {
+      revert InvalidMessagePadding();
     }
   }
 

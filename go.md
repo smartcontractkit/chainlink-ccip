@@ -76,8 +76,6 @@ flowchart LR
 	click chain-selectors href "https://github.com/smartcontractkit/chain-selectors"
 	chainlink-aptos --> chainlink-common
 	click chainlink-aptos href "https://github.com/smartcontractkit/chainlink-aptos"
-	chainlink-automation
-	click chainlink-automation href "https://github.com/smartcontractkit/chainlink-automation"
 	chainlink-canton --> chainlink-ccv
 	chainlink-canton --> chainlink-ccv/build/devenv
 	chainlink-canton --> chainlink-ccv/deployment
@@ -133,9 +131,7 @@ flowchart LR
 	chainlink-common --> grpc-proxy
 	chainlink-common --> libocr
 	click chainlink-common href "https://github.com/smartcontractkit/chainlink-common"
-	chainlink-common/keystore --> chainlink-common
-	chainlink-common/keystore --> smdkg
-	chainlink-common/keystore --> wsrpc
+	chainlink-common/keystore
 	click chainlink-common/keystore href "https://github.com/smartcontractkit/chainlink-common"
 	chainlink-common/pkg/chipingress
 	click chainlink-common/pkg/chipingress href "https://github.com/smartcontractkit/chainlink-common"
@@ -149,7 +145,6 @@ flowchart LR
 	chainlink-deployments-framework --> chainlink-testing-framework/seth
 	chainlink-deployments-framework --> mcms
 	click chainlink-deployments-framework href "https://github.com/smartcontractkit/chainlink-deployments-framework"
-	chainlink-evm --> chainlink-automation
 	chainlink-evm --> chainlink-common/keystore
 	chainlink-evm --> chainlink-data-streams
 	chainlink-evm --> chainlink-evm/gethwrappers
@@ -159,6 +154,7 @@ flowchart LR
 	chainlink-evm --> chainlink-framework/multinode
 	chainlink-evm --> chainlink-protos/svr
 	chainlink-evm --> chainlink-tron/relayer
+	chainlink-evm --> wsrpc
 	click chainlink-evm href "https://github.com/smartcontractkit/chainlink-evm"
 	chainlink-evm/gethwrappers --> chainlink-evm/gethwrappers/helpers
 	click chainlink-evm/gethwrappers href "https://github.com/smartcontractkit/chainlink-evm"
@@ -265,10 +261,6 @@ flowchart LR
 	mcms --> chainlink-testing-framework/framework
 	mcms --> chainlink-ton
 	click mcms href "https://github.com/smartcontractkit/mcms"
-	quarantine
-	click quarantine href "https://github.com/smartcontractkit/quarantine"
-	smdkg
-	click smdkg href "https://github.com/smartcontractkit/smdkg"
 	wsrpc
 	click wsrpc href "https://github.com/smartcontractkit/wsrpc"
 

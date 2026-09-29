@@ -1,7 +1,6 @@
 package tokens_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -13,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -48,13 +46,12 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.ContractType),
-					TokenPoolVersion:                 burn_mint_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					FeeAdmin:                    common.HexToAddress("0x03"),
+					ChainSel:         chainReport.Input.ChainSelector,
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenSymbol:      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:   common.HexToAddress("0x01"),
+					FeeAdmin:         common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
@@ -79,13 +76,12 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType(burn_mint_token_pool.ContractType),
-					TokenPoolVersion:                 burn_mint_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					FeeAdmin:                    common.HexToAddress("0x03"),
+					ChainSel:         chainReport.Input.ChainSelector,
+					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
+					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenSymbol:      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:   common.HexToAddress("0x01"),
+					FeeAdmin:         common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:    common.HexToAddress(tokenReport.Output.Address),
 						Decimals: 18,
@@ -188,33 +184,6 @@ func TestDeployTokenPool(t *testing.T) {
 			expectedErr: "router address must be defined",
 		},
 		{
-			desc: "threshold amount for additional ccvs not defined",
-			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
-				var rmnProxyAddress common.Address
-				var routerAddress common.Address
-				for _, addr := range chainReport.Output.Addresses {
-					if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
-						rmnProxyAddress = common.HexToAddress(addr.Address)
-					}
-					if addr.Type == datastore.ContractType(router.ContractType) {
-						routerAddress = common.HexToAddress(addr.Address)
-					}
-				}
-				return tokens.DeployTokenPoolInput{
-					ChainSel:         chainReport.Input.ChainSelector,
-					TokenSymbol:      tokenReport.Input.Args.Symbol,
-					TokenPoolType:    datastore.ContractType(burn_mint_token_pool.ContractType),
-					TokenPoolVersion: burn_mint_token_pool.Version,
-					ConstructorArgs: tokens.ConstructorArgs{
-						Token:    common.HexToAddress(tokenReport.Output.Address),
-						RMNProxy: rmnProxyAddress,
-						Router:   routerAddress,
-					},
-				}
-			},
-			expectedErr: "threshold amount for additional ccvs must be defined",
-		},
-		{
 			desc: "happy path - burn to address mint",
 			makeInput: func(tokenReport operations.Report[contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs], datastore.AddressRef], chainReport operations.SequenceReport[sequences.DeployChainContractsInput, changesetadapters.DeployChainContractsOutput]) tokens.DeployTokenPoolInput {
 				var rmnProxyAddress common.Address
@@ -228,13 +197,12 @@ func TestDeployTokenPool(t *testing.T) {
 					}
 				}
 				return tokens.DeployTokenPoolInput{
-					ChainSel:                         chainReport.Input.ChainSelector,
-					TokenPoolType:                    datastore.ContractType("BurnToAddressMintTokenPool"),
-					TokenPoolVersion:                 burn_mint_token_pool.Version,
-					TokenSymbol:                      tokenReport.Input.Args.Symbol,
-					RateLimitAdmin:                   common.HexToAddress("0x01"),
-					ThresholdAmountForAdditionalCCVs: big.NewInt(1e18),
-					FeeAdmin:                    common.HexToAddress("0x03"),
+					ChainSel:         chainReport.Input.ChainSelector,
+					TokenPoolType:    datastore.ContractType("BurnToAddressMintTokenPool"),
+					TokenPoolVersion: burn_mint_token_pool.Version,
+					TokenSymbol:      tokenReport.Input.Args.Symbol,
+					RateLimitAdmin:   common.HexToAddress("0x01"),
+					FeeAdmin:         common.HexToAddress("0x03"),
 					ConstructorArgs: tokens.ConstructorArgs{
 						Token:       common.HexToAddress(tokenReport.Output.Address),
 						Decimals:    18,
@@ -309,10 +277,9 @@ func TestDeployTokenPool(t *testing.T) {
 				return
 			}
 			require.NoError(t, err, "ExecuteSequence should not error")
-			require.Len(t, poolReport.Output.Addresses, 2, "Expected 2 addresses in output")
+			require.Len(t, poolReport.Output.Addresses, 1, "Expected 1 address in output")
 
 			poolAddress := poolReport.Output.Addresses[0].Address
-			hooksAddress := poolReport.Output.Addresses[1].Address
 
 			// Check token
 			getTokenReport, err := operations.ExecuteOperation(
@@ -353,47 +320,6 @@ func TestDeployTokenPool(t *testing.T) {
 			)
 			require.NoError(t, err, "ExecuteOperation should not error")
 			require.Equal(t, input.ConstructorArgs.RMNProxy, getRmnProxyReport.Output, "Expected rmn proxy address to be the same as the deployed rmn proxy")
-
-			// Check threshold amount for additional ccvs
-			getThresholdAmountReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetThresholdAmount,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
-				},
-			)
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Equal(t, input.ThresholdAmountForAdditionalCCVs, getThresholdAmountReport.Output, "Expected threshold amount for additional ccvs to be the same as the inputted threshold amount for additional ccvs")
-
-			// If a policy engine was configured, ensure it was set.
-			if input.AdvancedPoolHooksConfig.PolicyEngine != (common.Address{}) {
-				getPolicyEngineReport, err := operations.ExecuteOperation(
-					testsetup.BundleWithFreshReporter(e.OperationsBundle),
-					advanced_pool_hooks.GetPolicyEngine,
-					e.BlockChains.EVMChains()[chainSel],
-					contract.FunctionInput[struct{}]{
-						ChainSelector: chainSel,
-						Address:       common.HexToAddress(hooksAddress),
-					},
-				)
-				require.NoError(t, err, "ExecuteOperation should not error")
-				require.Equal(t, input.AdvancedPoolHooksConfig.PolicyEngine, getPolicyEngineReport.Output, "Expected policy engine address to be the same as the inputted policy engine address")
-			}
-
-			// Verify the newly deployed token pool is authorized on the hooks.
-			getAuthorizedCallersReport, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(e.OperationsBundle),
-				advanced_pool_hooks.GetAllAuthorizedCallers,
-				e.BlockChains.EVMChains()[chainSel],
-				contract.FunctionInput[struct{}]{
-					ChainSelector: chainSel,
-					Address:       common.HexToAddress(hooksAddress),
-				},
-			)
-			require.NoError(t, err, "ExecuteOperation should not error")
-			require.Contains(t, getAuthorizedCallersReport.Output, common.HexToAddress(poolAddress), "Expected token pool address to be in the on-chain authorized callers")
 		})
 	}
 }

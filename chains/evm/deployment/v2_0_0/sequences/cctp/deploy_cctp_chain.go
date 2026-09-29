@@ -52,6 +52,11 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		writes := make([]contract_utils.WriteOutput, 0)
 		batchOps := make([]mcms_types.BatchOperation, 0)
 
+		// registeredPoolRef is the pool the CCTP changeset registers on the TokenAdminRegistry for
+		// this chain. It is returned as the FIRST entry of Addresses so the configure phase can
+		// derive it from the deploy output.
+		var registeredPoolRef datastore.AddressRef
+
 		// Resolve chain and existing addresses
 		existingAddresses := dep.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
@@ -259,6 +264,13 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 		addresses = append(addresses, usdcTokenPoolProxyRef)
 		usdcTokenPoolProxyAddress := common.HexToAddress(usdcTokenPoolProxyRef.Address)
 
+		// The pool registered on the TokenAdminRegistry for CCTP canonical EVM chain is always the USDCTokenPoolProxy: it
+		// routes to the underlying per-mechanism pools, for both home and non-home chains.
+		registeredPoolRef = usdcTokenPoolProxyRef
+		if datastore_utils.IsAddressRefEmpty(registeredPoolRef) {
+			return sequences.OnChainOutput{}, fmt.Errorf("could not determine the pool to register on chain %d", input.ChainSelector)
+		}
+
 		// Configure proxy and authorized callers
 		if isHomeChain {
 			siloedPoolWrites, err := configureSiloedPoolProxyWiring(b, chain, input.ChainSelector, usdcTokenPoolProxyAddress, siloedLockReleaseTokenPoolAddress)
@@ -319,8 +331,18 @@ var DeployCCTPChain = cldf_ops.NewSequence(
 			batchOps = append(batchOps, chainBatchOp)
 		}
 
+		// Addresses[0] is the registered pool ref (convention used by the configure phase).
+		// Dedupe it from the rest of the list.
+		orderedAddresses := make([]datastore.AddressRef, 0, len(addresses)+1)
+		orderedAddresses = append(orderedAddresses, registeredPoolRef)
+		for _, r := range addresses {
+			if r.Address == registeredPoolRef.Address && r.Type == registeredPoolRef.Type {
+				continue
+			}
+			orderedAddresses = append(orderedAddresses, r)
+		}
 		return sequences.OnChainOutput{
-			Addresses: addresses,
+			Addresses: orderedAddresses,
 			BatchOps:  batchOps,
 		}, nil
 	},

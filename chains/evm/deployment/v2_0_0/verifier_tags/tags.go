@@ -4,7 +4,7 @@ package verifier_tags
 var (
 	cctpVerifierV2      = [4]byte{0x91, 0xb3, 0x33, 0x8e} // bytes4(keccak256("CCTPVerifier 2.1.0"))
 	committeeVerifierV2 = [4]byte{0xe9, 0xa0, 0x5a, 0x20} // bytes4(keccak256("CommitteeVerifier 2.0.0"))
-	lombardVerifierV2   = [4]byte{0x5b, 0x92, 0x53, 0xce} // bytes4(keccak256("LombardVerifier 2.1.0"))
+	lombardVerifierV2   = [4]byte{0xd5, 0x1b, 0x22, 0x1b} // bytes4(keccak256("LombardVerifier 2.2.0"))
 )
 
 func CCTPVerifierV2() [4]byte {

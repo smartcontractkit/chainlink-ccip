@@ -57,6 +57,14 @@ type DeployTokenInput struct {
 	CCIPAdmin string `yaml:"ccipAdmin" json:"ccipAdmin"`
 	// Currency is the TIP20 token currency. This field is only applicable for TIP20 tokens on Tempo. If this field is empty, then a sensible default will be chosen.
 	Currency string `yaml:"currency" json:"currency"`
+	// Pauser is granted PAUSER_ROLE at deploy time. Only applicable to
+	// BurnMintERC20PausableFreezableTransparentToken (EVM). If empty, PAUSER_ROLE is not granted to
+	// anyone at deploy time.
+	Pauser string `yaml:"pauser,omitempty" json:"pauser,omitempty"`
+	// Freezer is granted FREEZER_ROLE at deploy time. Only applicable to
+	// BurnMintERC20PausableFreezableTransparentToken (EVM). If empty, FREEZER_ROLE is not granted to
+	// anyone at deploy time.
+	Freezer string `yaml:"freezer,omitempty" json:"freezer,omitempty"`
 	// list of addresses who may need special processing in order to send tokens
 	// e.g. for Solana, addresses that need associated token accounts created
 	Senders []string `yaml:"senders" json:"senders"`
@@ -73,6 +81,14 @@ type DeployTokenInput struct {
 	// below are not specified by the user, filled in by the deployment system to pass to chain operations
 	ChainSelector     uint64
 	ExistingDataStore datastore.DataStore
+	// TimelockAddress is always resolved from the MCMS config by TokenExpansion, mirroring
+	// DeployTokenPoolInput.TimelockAddress. EVM adapters that support a 2-step admin transfer
+	// (e.g. upgradeable BurnMintERC20 variants using AccessControlDefaultAdminRulesUpgradeable)
+	// compare it against ExternalAdmin to decide whether the second step (acceptance) can be
+	// safely queued into an MCMS proposal for the timelock to execute itself, versus a
+	// customer-provided address, where acceptance must happen out-of-band.
+	// Users should not set this field in durable pipeline inputs.
+	TimelockAddress string `yaml:"-" json:"-"`
 }
 
 // Right now this is only used for Solana tokens but we can extend this to other VMs if needed in the future
@@ -110,8 +126,10 @@ type DeployTokenPoolInput struct {
 	// For Solana: If empty, DeployTokenPoolForToken sets the timelock signer PDA from the datastore;
 	// if non-empty, sets this base58 pubkey. On EVM, empty leaves the pool default (unchanged from contract deploy).
 	RateLimitAdmin string `yaml:"rateLimitAdmin" json:"rateLimitAdmin"`
-	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1 only) to indicate
-	// whether the pool should accept liquidity from liquidity providers
+	// AcceptLiquidity is used by LockReleaseTokenPool (v1.5.1) and
+	// LockReleaseTokenPoolAndProxy (v1.5.0) to indicate whether the pool should accept liquidity
+	// from liquidity providers. It is immutable on-chain, so the v1.5.0 sequence requires it
+	// rather than defaulting a nil to false.
 	AcceptLiquidity *bool `yaml:"acceptLiquidity" json:"acceptLiquidity"`
 	// BurnAddress is used by BurnToAddressMintTokenPool to specify the address
 	// where tokens will be burned to
@@ -119,11 +137,6 @@ type DeployTokenPoolInput struct {
 	// TokenGovernor is used by BurnMintWithExternalMinterTokenPool kind of pools to specify the token governor contract address
 	// if it is not provided, the token governor will be fetched from the datastore based on the token symbol
 	TokenGovernor string `yaml:"tokenGovernor,omitempty" json:"tokenGovernor,omitempty"`
-	// ThresholdAmountForAdditionalCCVs is the transfer amount (in base units, as a decimal string)
-	// above which additional CCVs are required. Matches AdvancedPoolHooks'
-	// thresholdAmountForAdditionalCCVs. Applicable to EVM 2.0.0+ token pools.
-	// If empty or "0", no threshold is set.
-	ThresholdAmountForAdditionalCCVs string `yaml:"thresholdAmountForAdditionalCCVs,omitempty" json:"thresholdAmountForAdditionalCCVs,omitempty"`
 	// RouterRef optionally selects which router to wire into the pool. To target
 	// the test router, set Type to the chain's TestRouter contract type (e.g. on
 	// EVM: datastore.ContractType(router.TestRouterContractType)). An explicit
@@ -159,16 +172,12 @@ type DeployTokenPoolInput struct {
 	// with no lockbox reverts with LockBoxNotConfigured on its first transfer.
 	// EVM 2.0.0+ only.
 	LockBoxGroups [][]uint64 `yaml:"lockBoxGroups,omitempty" json:"lockBoxGroups,omitempty"`
-	// LiquidityMigrationAmount, if set, specifies an exact token amount to seed the new pool's
-	// lockbox from the old pool (read from the TokenAdminRegistry). The migration runs during
-	// deploy, before the pool is registered on TAR or ownership-transferred. Mutually exclusive
-	// with LiquidityMigrationBasisPoints. For cleanup drains of orphaned pools, use the
+	// LiquidityMigrationAmount, if set, specifies how much liquidity to seed the new pool's lockbox
+	// from the old pool (read from the TokenAdminRegistry): either an exact token amount (RAW) or a
+	// percentage of the old pool's balance (BPS). The migration runs during deploy, before the pool
+	// is registered on TAR or ownership-transferred. For cleanup drains of orphaned pools, use the
 	// standalone MigrateLockReleasePoolLiquidity changeset instead.
-	LiquidityMigrationAmount *big.Int `yaml:"liquidityMigrationAmount,omitempty" json:"liquidityMigrationAmount,omitempty"`
-	// LiquidityMigrationBasisPoints specifies a percentage of the old pool's balance to seed
-	// (1-10000, where 10000 = 100%). Mutually exclusive with LiquidityMigrationAmount.
-	// See LiquidityMigrationAmount for details.
-	LiquidityMigrationBasisPoints *uint16 `yaml:"liquidityMigrationBasisPoints,omitempty" json:"liquidityMigrationBasisPoints,omitempty"`
+	LiquidityMigrationAmount *LockReleasePoolLiquidityMigrationAmount `yaml:"liquidityMigrationAmount,omitempty" json:"liquidityMigrationAmount,omitempty"`
 	// UnsiloedLockBoxChainSelector names which lockbox receives the old pool's unsiloed (shared)
 	// balance, by naming any remote chain in the group that owns it. The group's lockbox is used.
 	//
@@ -224,6 +233,12 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 					return fmt.Errorf("failed to verify deploy token input for chain selector %d: %w", selector, err)
 				}
 			}
+			// deploy token pool
+			if deployTokenPoolInput := input.DeployTokenPoolInput; deployTokenPoolInput != nil && deployTokenPoolInput.LiquidityMigrationAmount != nil {
+				if err := deployTokenPoolInput.LiquidityMigrationAmount.Validate(); err != nil {
+					return fmt.Errorf("invalid liquidity migration amount for chain selector %d: %w", selector, err)
+				}
+			}
 		}
 		return nil
 	}
@@ -263,36 +278,39 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenInput.ExistingDataStore = e.DataStore
 				deployTokenInput.ChainSelector = selector
 
+				// TimelockAddress is always resolved, regardless of whether ExternalAdmin/CCIPAdmin
+				// were explicitly provided: EVM adapters compare ExternalAdmin against it to decide
+				// whether a 2-step admin transfer's acceptance can be auto-queued (see
+				// DeployTokenInput.TimelockAddress) - if a caller happens to pass the timelock's own
+				// address as ExternalAdmin, that comparison must still work. GetTimelockRef never
+				// errors (it just returns an empty ref when MCMS/the timelock isn't set up), so
+				// resolving it unconditionally here is safe.
+				mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
+				if !ok {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
+				}
+				timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
+				}
+				if datastore_utils.IsAddressRefEmpty(timelockRef) {
+					e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter is expected to provide fallbacks for ExternalAdmin and/or CCIPAdmin", selector)
+				} else {
+					deployTokenInput.TimelockAddress = timelockRef.Address
+				}
+
 				// External admin defaults to timelock admin if not provided. CCIP admin is
 				// only applicable for BnM ERC20 tokens. If unspecified, then it falls back
 				// to the same value as ExternalAdmin, and if ExternalAdmin is unspecified,
 				// then it falls back to timelock.
-				//
-				// Please note that the timelock ref is lazy loaded from the datastore. This
-				// is intentional as some tests may not setup MCMS (so querying the timelock
-				// ref too eagerly will cause failures in those tests).
 				if deployTokenInput.CCIPAdmin == "" && deployTokenInput.ExternalAdmin != "" {
 					deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
 				}
-				if deployTokenInput.CCIPAdmin == "" || deployTokenInput.ExternalAdmin == "" {
-					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
-					if !ok {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
-					}
-					timelockRef, err := mcmsReader.GetTimelockRef(e, selector, cfg.MCMS)
-					if err != nil {
-						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get timelock ref for chain selector %d: %w", selector, err)
-					}
-					if datastore_utils.IsAddressRefEmpty(timelockRef) {
-						e.Logger.Warnf("timelock ref is empty for chain selector %d - adapter is expected to provide fallbacks for ExternalAdmin and/or CCIPAdmin", selector)
-					} else {
-						if deployTokenInput.ExternalAdmin == "" {
-							deployTokenInput.ExternalAdmin = timelockRef.Address
-						}
-						if deployTokenInput.CCIPAdmin == "" {
-							deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
-						}
-					}
+				if deployTokenInput.ExternalAdmin == "" && deployTokenInput.TimelockAddress != "" {
+					deployTokenInput.ExternalAdmin = deployTokenInput.TimelockAddress
+				}
+				if deployTokenInput.CCIPAdmin == "" {
+					deployTokenInput.CCIPAdmin = deployTokenInput.ExternalAdmin
 				}
 				deployTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, tokenPoolAdapter.DeployToken(), e.BlockChains, *deployTokenInput)
 				if err != nil {
@@ -338,7 +356,7 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 				deployTokenPoolInput.TokenPoolVersion = input.TokenPoolVersion
 				deployTokenPoolInput.ExistingDataStore = e.DataStore
 				deployTokenPoolInput.ChainSelector = selector
-				if cfg.MCMS.TimelockAction != "" || deployTokenPoolInput.LiquidityMigrationAmount != nil || deployTokenPoolInput.LiquidityMigrationBasisPoints != nil {
+				if cfg.MCMS.TimelockAction != "" || deployTokenPoolInput.LiquidityMigrationAmount != nil {
 					mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 					if !ok {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to get MCMS reader for chain family '%s'", family)
@@ -399,7 +417,6 @@ func tokenExpansionApply() func(cldf.Environment, TokenExpansionInput) (cldf.Cha
 					e, tokenPoolRegistry, selector, *tokenPool, *tokenRef, seedRegistryRef,
 					deployTokenPoolInput.TimelockAddress,
 					deployTokenPoolInput.LiquidityMigrationAmount,
-					deployTokenPoolInput.LiquidityMigrationBasisPoints,
 					unsiloedLockBoxAddress,
 				)
 				if err != nil {
@@ -717,12 +734,23 @@ func buildSeedMigrationBatchOps(
 	tokenPool, tokenRef datastore.AddressRef,
 	registryRef datastore.AddressRef,
 	timelockAddr string,
-	amount *big.Int,
-	basisPoints *uint16,
+	migrationAmount *LockReleasePoolLiquidityMigrationAmount,
 	unsiloedLockBoxAddress string,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	if amount == nil && basisPoints == nil {
+	if migrationAmount == nil {
 		return nil, nil, nil
+	}
+
+	if err := migrationAmount.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("invalid liquidity migration amount on chain selector %d: %w", selector, err)
+	}
+	amount, err := migrationAmount.RawAmount()
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid raw liquidity migration amount on chain selector %d: %w", selector, err)
+	}
+	basisPoints, err := migrationAmount.BasisPoints()
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid liquidity migration basis points on chain selector %d: %w", selector, err)
 	}
 
 	tokenPoolAdapter, family, fullPoolRef, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenPoolRegistry, selector, tokenPool, tokenRef)

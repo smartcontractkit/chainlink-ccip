@@ -105,8 +105,9 @@ jobs:
         uses: actions/setup-go@v6 # v6
         with:
           cache: true
-          go-version-file: devenv/go.mod
+          go-version: "1.26.6"
           cache-dependency-path: |
+            devenv/go.mod
             devenv/go.sum
       - name: Download Go dependencies
         run: |

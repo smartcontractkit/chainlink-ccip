@@ -45,8 +45,11 @@ var ConfigureTokenPool = cldf_ops.NewSequence(
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolInput) (output sequences.OnChainOutput, err error) {
 		writes := make([]evm_contract.WriteOutput, 0)
 
-		// Set threshold amount for additional CCVs (if necessary)
-		if input.ThresholdAmountForAdditionalCCVs != nil {
+		// Set threshold amount for additional CCVs (if necessary). The threshold lives on the
+		// AdvancedPoolHooks contract, so it can only be configured when hooks are wired into the
+		// pool. Token expansion does not deploy hooks and passes the zero address, in which case
+		// there is nothing to configure.
+		if input.AdvancedPoolHooks != (common.Address{}) && input.ThresholdAmountForAdditionalCCVs != nil {
 			currentThresholdAmountReport, err := cldf_ops.ExecuteOperation(b, advanced_pool_hooks.GetThresholdAmount, chain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: input.ChainSelector,
 				Address:       input.AdvancedPoolHooks,
