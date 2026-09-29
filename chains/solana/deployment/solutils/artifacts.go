@@ -172,13 +172,36 @@ func downloadProgramArtifacts(ctx context.Context, url string, targetDir string,
 			return fmt.Errorf("archive total size exceeds limit (limit: %d bytes)", maxTotalSize)
 		}
 
-		// Copy the file to the target directory
-		outPath := filepath.Join(targetDir, filepath.Base(header.Name))
-		if err := os.MkdirAll(filepath.Dir(outPath), os.ModePerm); err != nil {
+		// Validate archive entry name and ensure extraction stays within targetDir.
+		entryName := header.Name
+		if entryName == "" || strings.Contains(entryName, "..") {
+			return fmt.Errorf("invalid archive entry name: %q", entryName)
+		}
+
+		cleanName := filepath.Clean(filepath.Base(entryName))
+		outPath := filepath.Join(targetDir, cleanName)
+
+		targetDirAbs, err := filepath.Abs(targetDir)
+		if err != nil {
+			return err
+		}
+		outPathAbs, err := filepath.Abs(outPath)
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(targetDirAbs, outPathAbs)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
+			return fmt.Errorf("archive entry resolves outside target directory: %q", entryName)
+		}
+
+		if err := os.MkdirAll(filepath.Dir(outPathAbs), os.ModePerm); err != nil {
 			return err
 		}
 
-		outFile, err := os.Create(outPath)
+		outFile, err := os.Create(outPathAbs)
 		if err != nil {
 			return err
 		}
