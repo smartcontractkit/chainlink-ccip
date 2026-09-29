@@ -19,21 +19,22 @@ import (
 type LockReleasePoolMigration struct {
 	// ChainSelector identifies the chain on which both the old and new pools live.
 	ChainSelector uint64
-	// OldPoolRef is a reference to the legacy LockReleaseTokenPool (v1.5.1 or v1.6.1) to migrate from.
+	// OldPoolRef is a reference to the legacy lock-release pool to migrate from: v1.5.1 or
+	// v1.6.1 LockReleaseTokenPool, or v1.5.0 LockReleaseTokenPoolAndProxy - all three share the
+	// getRebalancer/setRebalancer/withdrawLiquidity signatures the migration drives.
 	// Required because in step-2 migrations, the TAR already points to the new pool.
 	OldPoolRef datastore.AddressRef
 	// NewPoolRef is a reference to the new v2.0 LockReleaseTokenPool (with lockbox) to migrate to.
 	NewPoolRef datastore.AddressRef
-	// Amount specifies an exact token amount to migrate. Mutually exclusive with BasisPoints.
-	Amount *big.Int
-	// BasisPoints specifies a percentage (1-10000, where 10000 = 100%) of the old pool's balance to migrate.
-	// Mutually exclusive with Amount.
-	BasisPoints *uint16
+	// LiquidityMigrationAmount specifies how much liquidity to migrate, either as a raw token amount
+	// (RAW) or as a percentage of the old pool's balance (BPS). Mutually exclusive with
+	// SiloExactAmounts/UnsiloedExactAmount.
+	LiquidityMigrationAmount *LockReleasePoolLiquidityMigrationAmount
 	// SiloExactAmounts specifies exact per-silo migration amounts, keyed by remote chain selector.
-	// Mutually exclusive with Amount/BasisPoints. See MigrateLockReleasePoolLiquidityInput.SiloExactAmounts.
+	// Mutually exclusive with LiquidityMigrationAmount. See MigrateLockReleasePoolLiquidityInput.SiloExactAmounts.
 	SiloExactAmounts []SiloExactAmount
 	// UnsiloedExactAmount specifies the exact amount to migrate from the unsiloed (shared) balance.
-	// Mutually exclusive with Amount/BasisPoints. See MigrateLockReleasePoolLiquidityInput.UnsiloedExactAmount.
+	// Mutually exclusive with LiquidityMigrationAmount. See MigrateLockReleasePoolLiquidityInput.UnsiloedExactAmount.
 	UnsiloedExactAmount *big.Int
 	// UnsiloedLockBoxRef references the lockbox that receives the old pool's unsiloed (shared)
 	// balance. Required when migrating a siloed pool that holds unsiloed liquidity; ignored for
@@ -71,25 +72,18 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 		}
 		for i, migration := range cfg.Migrations {
 			exactMode := len(migration.SiloExactAmounts) > 0 || migration.UnsiloedExactAmount != nil
-			legacyMode := migration.Amount != nil || migration.BasisPoints != nil
+			legacyMode := migration.LiquidityMigrationAmount != nil
 
 			if exactMode && legacyMode {
-				return fmt.Errorf("migration[%d]: SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints", i)
+				return fmt.Errorf("migration[%d]: SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with LiquidityMigrationAmount", i)
 			}
 			if !exactMode && !legacyMode {
-				return fmt.Errorf("migration[%d]: one of Amount, BasisPoints, or SiloExactAmounts/UnsiloedExactAmount must be provided", i)
+				return fmt.Errorf("migration[%d]: one of LiquidityMigrationAmount or SiloExactAmounts/UnsiloedExactAmount must be provided", i)
 			}
-			if migration.Amount != nil && migration.BasisPoints != nil {
-				return fmt.Errorf("migration[%d]: Amount and BasisPoints are mutually exclusive", i)
-			}
-			if migration.BasisPoints != nil {
-				bp := *migration.BasisPoints
-				if bp == 0 || bp > 10000 {
-					return fmt.Errorf("migration[%d]: BasisPoints must be between 1 and 10000, got %d", i, bp)
+			if migration.LiquidityMigrationAmount != nil {
+				if err := migration.LiquidityMigrationAmount.Validate(); err != nil {
+					return fmt.Errorf("migration[%d]: invalid LiquidityMigrationAmount: %w", i, err)
 				}
-			}
-			if migration.Amount != nil && migration.Amount.Sign() <= 0 {
-				return fmt.Errorf("migration[%d]: Amount must be positive", i)
 			}
 			if exactMode {
 				if migration.UnsiloedExactAmount != nil && len(migration.SiloExactAmounts) == 0 {
@@ -193,13 +187,26 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				unsiloedLockBoxAddress = resolved.Address
 			}
 
+			var basisPoints *uint16
+			var rawAmount *big.Int
+			if migration.LiquidityMigrationAmount != nil {
+				basisPoints, err = migration.LiquidityMigrationAmount.BasisPoints()
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to parse basis points: %w", i, err)
+				}
+				rawAmount, err = migration.LiquidityMigrationAmount.RawAmount()
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to parse raw amount: %w", i, err)
+				}
+			}
+
 			migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
 				ChainSelector:          migration.ChainSelector,
 				OldPoolAddress:         oldPoolRef.Address,
 				NewPoolAddress:         newPoolRef.Address,
 				TimelockAddress:        timelockRef.Address,
-				Amount:                 migration.Amount,
-				BasisPoints:            migration.BasisPoints,
+				Amount:                 rawAmount,
+				BasisPoints:            basisPoints,
 				SiloExactAmounts:       migration.SiloExactAmounts,
 				UnsiloedExactAmount:    migration.UnsiloedExactAmount,
 				UnsiloedLockBoxAddress: unsiloedLockBoxAddress,

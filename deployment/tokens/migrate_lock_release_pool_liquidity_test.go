@@ -24,27 +24,26 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *tes
 		expectedErr string
 	}{
 		{
-			name: "SiloExactAmounts and BasisPoints mutually exclusive",
+			name: "SiloExactAmounts and LiquidityMigrationAmount mutually exclusive",
 			mutate: func(m *LockReleasePoolMigration) {
-				bp := uint16(5000)
-				m.BasisPoints = &bp
+				m.LiquidityMigrationAmount = &LockReleasePoolLiquidityMigrationAmount{Format: LiquidityMigrationAmountFormatBPS, Value: "5000"}
 				m.SiloExactAmounts = []SiloExactAmount{{ChainSelector: 2, Amount: big.NewInt(100)}}
 			},
-			expectedErr: "SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints",
+			expectedErr: "SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with LiquidityMigrationAmount",
 		},
 		{
-			name: "UnsiloedExactAmount and Amount mutually exclusive",
+			name: "UnsiloedExactAmount and LiquidityMigrationAmount mutually exclusive",
 			mutate: func(m *LockReleasePoolMigration) {
-				m.Amount = big.NewInt(100)
+				m.LiquidityMigrationAmount = &LockReleasePoolLiquidityMigrationAmount{Format: LiquidityMigrationAmountFormatRAW, Value: "100"}
 				m.UnsiloedExactAmount = big.NewInt(50)
 			},
-			expectedErr: "SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints",
+			expectedErr: "SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with LiquidityMigrationAmount",
 		},
 		{
 			name: "no migration mode provided",
 			mutate: func(m *LockReleasePoolMigration) {
 			},
-			expectedErr: "one of Amount, BasisPoints, or SiloExactAmounts/UnsiloedExactAmount must be provided",
+			expectedErr: "one of LiquidityMigrationAmount or SiloExactAmounts/UnsiloedExactAmount must be provided",
 		},
 		{
 			name: "duplicate ChainSelector in SiloExactAmounts",
@@ -104,6 +103,61 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *tes
 			cs := MigrateLockReleasePoolLiquidity(nil, nil)
 			err := cs.VerifyPreconditions(cldf.Environment{}, MigrateLockReleasePoolLiquidityConfig{
 				Migrations: []LockReleasePoolMigration{migration},
+			})
+
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_AmountFormat(t *testing.T) {
+	tests := []struct {
+		name        string
+		amount      *LockReleasePoolLiquidityMigrationAmount
+		expectedErr string
+	}{
+		{
+			name:   "valid raw amount",
+			amount: &LockReleasePoolLiquidityMigrationAmount{Format: LiquidityMigrationAmountFormatRAW, Value: "100"},
+		},
+		{
+			name:   "valid basis points",
+			amount: &LockReleasePoolLiquidityMigrationAmount{Format: LiquidityMigrationAmountFormatBPS, Value: "5000"},
+		},
+		{
+			name:        "out of range basis points",
+			amount:      &LockReleasePoolLiquidityMigrationAmount{Format: LiquidityMigrationAmountFormatBPS, Value: "10001"},
+			expectedErr: "must be between 1 and 10000",
+		},
+		{
+			name:        "unknown format",
+			amount:      &LockReleasePoolLiquidityMigrationAmount{Format: LiquidityMigrationAmountFormat("bogus"), Value: "100"},
+			expectedErr: "invalid format",
+		},
+		{
+			name:        "empty value",
+			amount:      &LockReleasePoolLiquidityMigrationAmount{Format: LiquidityMigrationAmountFormatBPS, Value: ""},
+			expectedErr: "value must be provided",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cs := MigrateLockReleasePoolLiquidity(nil, nil)
+			err := cs.VerifyPreconditions(cldf.Environment{}, MigrateLockReleasePoolLiquidityConfig{
+				Migrations: []LockReleasePoolMigration{
+					{
+						ChainSelector:            1,
+						OldPoolRef:               datastore.AddressRef{},
+						NewPoolRef:               datastore.AddressRef{},
+						LiquidityMigrationAmount: tc.amount,
+					},
+				},
 			})
 
 			if tc.expectedErr == "" {

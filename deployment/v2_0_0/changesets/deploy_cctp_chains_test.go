@@ -59,7 +59,8 @@ func (m *cctpTest_MockReader) GetTimelockRef(e deployment.Environment, selector 
 }
 
 type cctpTest_MockCCTPChain struct {
-	sequenceErrorMsg string
+	sequenceErrorMsg      string
+	updateAuthoritiesCall int
 }
 
 // DeployCCTPChain returns a sequence that accepts resolved adapter input (with string addresses)
@@ -111,6 +112,22 @@ func (m *cctpTest_MockCCTPChain) MigrateHybridLockReleaseLiquidity() *cldf_ops.S
 		semver.MustParse("1.0.0"),
 		"Mock sequence for testing hybrid lock-release liquidity migration",
 		func(bundle cldf_ops.Bundle, deps adapters.MigrateHybridLockReleaseLiquidityDeps, input adapters.MigrateHybridLockReleaseLiquidityInput) (sequences.OnChainOutput, error) {
+			if m.sequenceErrorMsg != "" {
+				return sequences.OnChainOutput{}, errors.New(m.sequenceErrorMsg)
+			}
+			return sequences.OnChainOutput{}, nil
+		},
+	)
+}
+
+// UpdateAuthorities returns a mock sequence for transferring ownership of CCTP contracts.
+func (m *cctpTest_MockCCTPChain) UpdateAuthorities() *cldf_ops.Sequence[adapters.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
+	return cldf_ops.NewSequence(
+		"mock-update-authorities-sequence",
+		semver.MustParse("1.0.0"),
+		"Mock sequence for transferring CCTP contract ownership",
+		func(bundle cldf_ops.Bundle, deps *deployment.Environment, input adapters.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+			m.updateAuthoritiesCall++
 			if m.sequenceErrorMsg != "" {
 				return sequences.OnChainOutput{}, errors.New(m.sequenceErrorMsg)
 			}
@@ -457,6 +474,76 @@ func TestDeployCCTPChains_Apply_NilMCMS_Succeeds(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, out)
+}
+
+func TestDeployCCTPChains_Apply_OwnershipTransfer(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+
+	tests := []struct {
+		desc      string
+		skip      bool
+		withMCMS  bool
+		wantCalls int
+	}{
+		{desc: "transfers ownership when MCMS is configured", wantCalls: 1, withMCMS: true},
+		{desc: "skips ownership transfer when requested", skip: true, withMCMS: true, wantCalls: 0},
+		{desc: "skips ownership transfer without MCMS", withMCMS: false, wantCalls: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			lggr, err := logger.New()
+			require.NoError(t, err)
+			bundle := cldf_ops.NewBundle(
+				func() context.Context { return context.Background() },
+				lggr,
+				cldf_ops.NewMemoryReporter(),
+			)
+
+			ds := datastore.NewMemoryDataStore()
+			require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+				ChainSelector: chainSelector,
+				Address:       "0x4444444444444444444444444444444444444444",
+				Type:          datastore.ContractType("MCM"),
+				Version:       semver.MustParse("1.0.0"),
+			}))
+			require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+				ChainSelector: chainSelector,
+				Address:       "0x5555555555555555555555555555555555555555",
+				Type:          datastore.ContractType("Timelock"),
+				Version:       semver.MustParse("1.0.0"),
+			}))
+
+			e := deployment.Environment{
+				OperationsBundle: bundle,
+				DataStore:        ds.Seal(),
+			}
+
+			mock := &cctpTest_MockCCTPChain{}
+			cctpChainRegistry := adapters.NewCCTPChainRegistry()
+			cctpChainRegistry.RegisterCCTPChain("evm", mock)
+			mcmsRegistry := changesets.GetRegistry()
+			mcmsRegistry.RegisterMCMSReader("evm", &cctpTest_MockReader{})
+
+			cfg := v2_0_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
+					chainSelector: {
+						USDCType:              adapters.Canonical,
+						TokenMessengerV2:      "0x9999999999999999999999999999999999999999",
+						SkipOwnershipTransfer: tt.skip,
+						RemoteChains:          make(map[uint64]adapters.RemoteCCTPChainConfig),
+					},
+				},
+			}
+			if tt.withMCMS {
+				cfg.MCMS = &cctpTest_BasicMCMSInput
+			}
+
+			_, err = v2_0_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry).Apply(e, cfg)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantCalls, mock.updateAuthoritiesCall)
+		})
+	}
 }
 
 func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
