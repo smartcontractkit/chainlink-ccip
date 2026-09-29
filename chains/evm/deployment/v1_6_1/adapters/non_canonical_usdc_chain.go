@@ -5,14 +5,18 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	tokens "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/cctp"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
@@ -44,6 +48,12 @@ func (c *NonCanonicalUSDCChainAdapter) MigrateHybridLockReleaseLiquidity() *oper
 	)
 }
 
+// UpdateAuthorities transfers ownership of the token pools deployed on a non-canonical
+// USDC chain to the CLLCCIP MCMS timelock.
+func (c *NonCanonicalUSDCChainAdapter) UpdateAuthorities() *operations.Sequence[adapters.UpdateAuthoritiesInput, seq_core.OnChainOutput, *deployment.Environment] {
+	return cctp.UpdateAuthorities
+}
+
 // CCTPV1AllowedCallerOnDest is not implemented for non-canonical USDC chains, as there is no caller of CCTP.
 func (c *NonCanonicalUSDCChainAdapter) CCTPV1AllowedCallerOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
 	return nil, fmt.Errorf("chain with selector %d does not support CCTP", chainSelector)
@@ -62,6 +72,22 @@ func (c *NonCanonicalUSDCChainAdapter) AllowedCallerOnSource(d datastore.DataSto
 // MintRecipientOnDest is not implemented for non-canonical USDC chains, as there is no mint recipient.
 func (c *NonCanonicalUSDCChainAdapter) MintRecipientOnDest(d datastore.DataStore, b chain.BlockChains, chainSelector uint64) ([]byte, error) {
 	return nil, fmt.Errorf("chain with selector %d does not support CCTP", chainSelector)
+}
+
+// TokenDecimals returns the number of decimals of the token at the given address on the chain.
+func (c *NonCanonicalUSDCChainAdapter) TokenDecimals(bundle operations.Bundle, ds datastore.DataStore, chains chain.BlockChains, selector uint64, token string) (uint8, error) {
+	evmChain, ok := chains.EVMChains()[selector]
+	if !ok {
+		return 0, fmt.Errorf("EVM chain with selector %d not found", selector)
+	}
+	report, err := operations.ExecuteOperation(bundle, erc20.GetDecimals, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: selector,
+		Address:       common.HexToAddress(token),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get decimals for token %s on chain %d: %w", token, selector, err)
+	}
+	return report.Output, nil
 }
 
 // USDCType returns the type of the USDC on the chain.

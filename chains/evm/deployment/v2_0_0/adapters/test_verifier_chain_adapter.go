@@ -10,11 +10,13 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	evmds "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/test_verifier"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 )
 
 var _ ccvadapters.TestVerifierChainAdapter = (*EVMTestVerifierChainAdapter)(nil)
@@ -42,6 +44,22 @@ func (a *EVMTestVerifierChainAdapter) TokenAddress(d datastore.DataStore, b cldf
 		return nil, fmt.Errorf("resolve TESTVTR token on chain %d: %w", chainSelector, err)
 	}
 	return ref, nil
+}
+
+// TokenDecimals returns the number of decimals of the token at the given address on the chain.
+func (a *EVMTestVerifierChainAdapter) TokenDecimals(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, token string) (uint8, error) {
+	evmChain, ok := chains.EVMChains()[selector]
+	if !ok {
+		return 0, fmt.Errorf("EVM chain with selector %d not found", selector)
+	}
+	report, err := cldf_ops.ExecuteOperation(bundle, erc20.GetDecimals, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: selector,
+		Address:       common.HexToAddress(token),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get decimals for token %s on chain %d: %w", token, selector, err)
+	}
+	return report.Output, nil
 }
 
 // PoolAddress returns the TESTVTR pool address on the given chain in bytes.

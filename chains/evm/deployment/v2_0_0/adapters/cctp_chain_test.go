@@ -44,6 +44,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_message_transmitter_proxy"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -54,6 +55,13 @@ const (
 	mechanismCCTPV2WithCCV = "CCTP_V2_WITH_CCV"
 	mechanismLockRelease   = "LOCK_RELEASE"
 )
+
+// cctpFee converts a full TokenTransferFeeConfig into an all-present partial pointer for
+// RemoteCCTPChainConfig, matching the field's pointer-to-partial type.
+func cctpFee(f tokens.TokenTransferFeeConfig) *tokens.PartialTokenTransferFeeConfig {
+	p := (tokens.PartialTokenTransferFeeConfig{}).Populate(f)
+	return &p
+}
 
 func convertMechanismToUint8(mechanism string) (uint8, error) {
 	switch mechanism {
@@ -72,6 +80,7 @@ func convertMechanismToUint8(mechanism string) (uint8, error) {
 
 type cctpTestSetup struct {
 	Router             common.Address
+	OnRamp             common.Address
 	RMN                common.Address
 	TokenAdminRegistry common.Address
 	USDCToken          common.Address
@@ -119,10 +128,13 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 	require.NoError(t, err)
 	e.DataStore = ds.Seal()
 
-	var routerAddr, rmnAddr, tokenAdminRegistryAddr common.Address
+	var routerAddr, rmnAddr, tokenAdminRegistryAddr, onRampAddr common.Address
 	for _, addr := range chainReport.Output.Addresses {
 		if addr.Type == datastore.ContractType(router.ContractType) {
 			routerAddr = common.HexToAddress(addr.Address)
+		}
+		if addr.Type == datastore.ContractType(onramp.ContractType) {
+			onRampAddr = common.HexToAddress(addr.Address)
 		}
 		if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
 			rmnAddr = common.HexToAddress(addr.Address)
@@ -132,6 +144,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 		}
 	}
 	require.NotEqual(t, common.Address{}, routerAddr, "Router address should be set")
+	require.NotEqual(t, common.Address{}, onRampAddr, "OnRamp address should be set")
 	require.NotEqual(t, common.Address{}, rmnAddr, "RMN address should be set")
 	require.NotEqual(t, common.Address{}, tokenAdminRegistryAddr, "TokenAdminRegistry address should be set")
 
@@ -223,6 +236,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 
 	return cctpTestSetup{
 		Router:             routerAddr,
+		OnRamp:             onRampAddr,
 		RMN:                rmnAddr,
 		TokenAdminRegistry: tokenAdminRegistryAddr,
 		USDCToken:          usdcTokenAddr,
@@ -234,6 +248,7 @@ func setupCCTPTestEnvironment(t *testing.T, e *deployment.Environment, chainSele
 
 type nonCanonicalTestSetup struct {
 	Router             common.Address
+	OnRamp             common.Address
 	RMN                common.Address
 	TokenAdminRegistry common.Address
 	USDCToken          common.Address
@@ -242,32 +257,59 @@ type nonCanonicalTestSetup struct {
 func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, chainSelector uint64) nonCanonicalTestSetup {
 	chain := e.BlockChains.EVMChains()[chainSelector]
 
-	rmnProxyRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, rmn_proxy.Deploy, chain, contract_utils.DeployInput[rmn_proxy.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(rmn_proxy.ContractType, *rmn_proxy.Version),
+	// Deploy the full chain-contract stack so the chain has a Router, OnRamp and FeeQuoter.
+	// Non-canonical USDC pools still live on a CCIP-enabled chain, and the token transfer fee
+	// config is resolved and applied through the on-ramp's FeeQuoter.
+	create2FactoryRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, create2_factory.Deploy, chain, contract_utils.DeployInput[create2_factory.ConstructorArgs]{
+		TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *semver.MustParse("2.0.0")),
 		ChainSelector:  chainSelector,
-		Args:           rmn_proxy.ConstructorArgs{RMN: chain.DeployerKey.From},
-	}, nil)
-	require.NoError(t, err, "Failed to deploy RMN proxy")
-	rmnAddr := common.HexToAddress(rmnProxyRef.Address)
-
-	routerRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, router.Deploy, chain, contract_utils.DeployInput[router.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(router.ContractType, *router.Version),
-		ChainSelector:  chainSelector,
-		Args: router.ConstructorArgs{
-			WrappedNative: common.Address{},
-			RMNProxy:      rmnAddr,
+		Args: create2_factory.ConstructorArgs{
+			AllowList: []common.Address{chain.DeployerKey.From},
 		},
 	}, nil)
-	require.NoError(t, err, "Failed to deploy Router")
-	routerAddr := common.HexToAddress(routerRef.Address)
+	require.NoError(t, err, "Failed to deploy CREATE2Factory")
+	chainReport, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		sequences.DeployChainContracts,
+		chain,
+		sequences.DeployChainContractsInput{
+			ChainSelector:     chainSelector,
+			ContractParams:    testsetup.CreateBasicContractParams(),
+			CREATE2Factory:    common.HexToAddress(create2FactoryRef.Address),
+			DeployerKeyOwned:  true,
+			ExistingAddresses: testsetup.UltraFastCurseMCMSRefs(chainSelector),
+		},
+	)
+	require.NoError(t, err, "Failed to deploy chain contracts")
 
-	tarRef, err := contract_utils.MaybeDeployContract(e.OperationsBundle, token_admin_registry.Deploy, chain, contract_utils.DeployInput[token_admin_registry.ConstructorArgs]{
-		TypeAndVersion: deployment.NewTypeAndVersion(token_admin_registry.ContractType, *token_admin_registry.Version),
-		ChainSelector:  chainSelector,
-		Args:           token_admin_registry.ConstructorArgs{},
-	}, nil)
-	require.NoError(t, err, "Failed to deploy TokenAdminRegistry")
-	tarAddr := common.HexToAddress(tarRef.Address)
+	ds := datastore.NewMemoryDataStore()
+	if e.DataStore != nil {
+		require.NoError(t, ds.Merge(e.DataStore))
+	}
+	for _, addr := range chainReport.Output.Addresses {
+		require.NoError(t, ds.Addresses().Add(addr))
+	}
+	require.NoError(t, ds.Addresses().Add(create2FactoryRef))
+
+	var routerAddr, rmnAddr, tarAddr, onRampAddr common.Address
+	for _, addr := range chainReport.Output.Addresses {
+		if addr.Type == datastore.ContractType(router.ContractType) {
+			routerAddr = common.HexToAddress(addr.Address)
+		}
+		if addr.Type == datastore.ContractType(onramp.ContractType) {
+			onRampAddr = common.HexToAddress(addr.Address)
+		}
+		if addr.Type == datastore.ContractType(rmn_proxy.ContractType) {
+			rmnAddr = common.HexToAddress(addr.Address)
+		}
+		if addr.Type == datastore.ContractType(token_admin_registry.ContractType) {
+			tarAddr = common.HexToAddress(addr.Address)
+		}
+	}
+	require.NotEqual(t, common.Address{}, routerAddr, "Router address should be set")
+	require.NotEqual(t, common.Address{}, onRampAddr, "OnRamp address should be set")
+	require.NotEqual(t, common.Address{}, rmnAddr, "RMN address should be set")
+	require.NotEqual(t, common.Address{}, tarAddr, "TokenAdminRegistry address should be set")
 
 	usdcAddr, tx, _, err := burn_mint_erc20_bindings.DeployBurnMintERC20(
 		chain.DeployerKey,
@@ -282,13 +324,6 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err, "Failed to confirm USDC deployment")
 
-	ds := datastore.NewMemoryDataStore()
-	if e.DataStore != nil {
-		require.NoError(t, ds.Merge(e.DataStore))
-	}
-	require.NoError(t, ds.Addresses().Add(rmnProxyRef))
-	require.NoError(t, ds.Addresses().Add(routerRef))
-	require.NoError(t, ds.Addresses().Add(tarRef))
 	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Address:       usdcAddr.Hex(),
@@ -300,10 +335,32 @@ func setupNonCanonicalTestEnvironment(t *testing.T, e *deployment.Environment, c
 
 	return nonCanonicalTestSetup{
 		Router:             routerAddr,
+		OnRamp:             onRampAddr,
 		RMN:                rmnAddr,
 		TokenAdminRegistry: tarAddr,
 		USDCToken:          usdcAddr,
 	}
+}
+
+// setLaneOnRamp registers the chain's OnRamp for a destination so the FeeQuoter for that lane is
+// resolvable. Token transfer fee application resolves the FeeQuoter through the on-ramp, so a lane
+// (router -> on-ramp) must exist for the fee config to be applied.
+func setLaneOnRamp(t *testing.T, e *deployment.Environment, chainSelector uint64, routerAddr, onRampAddr common.Address, remoteSelector uint64) {
+	t.Helper()
+	chain := e.BlockChains.EVMChains()[chainSelector]
+	_, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(e.OperationsBundle),
+		router.ApplyRampUpdates,
+		chain,
+		contract_utils.FunctionInput[router.ApplyRampsUpdatesArgs]{
+			ChainSelector: chainSelector,
+			Address:       routerAddr,
+			Args: router.ApplyRampsUpdatesArgs{
+				OnRampUpdates: []router.OnRamp{{DestChainSelector: remoteSelector, OnRamp: onRampAddr}},
+			},
+		},
+	)
+	require.NoError(t, err, "failed to set on-ramp for chain %d -> %d", chainSelector, remoteSelector)
 }
 
 func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
@@ -324,6 +381,10 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	// Set up both chains (this will update the shared datastore)
 	homeSetup := setupCCTPTestEnvironment(t, e, homeChainSelector)
 	nonHomeSetup := setupCCTPTestEnvironment(t, e, nonHomeChainSelector)
+
+	// Wire the lanes so token transfer fee application can resolve each chain's FeeQuoter.
+	setLaneOnRamp(t, e, homeChainSelector, homeSetup.Router, homeSetup.OnRamp, nonHomeChainSelector)
+	setLaneOnRamp(t, e, nonHomeChainSelector, nonHomeSetup.Router, nonHomeSetup.OnRamp, homeChainSelector)
 
 	homeChain := e.BlockChains.EVMChains()[homeChainSelector]
 	nonHomeChain := e.BlockChains.EVMChains()[nonHomeChainSelector]
@@ -407,10 +468,6 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				TokenMessengerV1: homeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: homeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        homeSetup.USDCToken.Hex(),
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
-					Version: usdc_token_pool_proxy.Version,
-				},
 				DeployerContract: homeCreate2FactoryRef.Address,
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
@@ -422,7 +479,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 						PayloadSizeBytes:    6*64 + 2*32,
 						LockOrBurnMechanism: mechanismCCTPV2WithCCV,
 						DomainIdentifier:    1,
-						TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
+						TokenTransferFeeConfig: cctpFee(tokens.TokenTransferFeeConfig{
 							IsEnabled:                     true,
 							DestGasOverhead:               200_000,
 							DestBytesOverhead:             32,
@@ -430,7 +487,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 							CustomFinalityFeeUSDCents:     200,
 							DefaultFinalityTransferFeeBps: 100,
 							CustomFinalityTransferFeeBps:  100,
-						},
+						}),
 					},
 				},
 			},
@@ -440,10 +497,6 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 				TokenMessengerV1: nonHomeSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: nonHomeSetup.TokenMessengerV2.Hex(),
 				USDCToken:        nonHomeSetup.USDCToken.Hex(),
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType("USDCTokenPool"),
-					Version: semver.MustParse("1.6.5"),
-				},
 				DeployerContract: nonHomeCreate2FactoryRef.Address,
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
@@ -455,7 +508,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 						PayloadSizeBytes:    6*64 + 2*32,
 						LockOrBurnMechanism: mechanismCCTPV2WithCCV,
 						DomainIdentifier:    1,
-						TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
+						TokenTransferFeeConfig: cctpFee(tokens.TokenTransferFeeConfig{
 							IsEnabled:                     true,
 							DestGasOverhead:               200_000,
 							DestBytesOverhead:             32,
@@ -463,7 +516,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 							CustomFinalityFeeUSDCents:     200,
 							DefaultFinalityTransferFeeBps: 100,
 							CustomFinalityTransferFeeBps:  100,
-						},
+						}),
 					},
 				},
 			},
@@ -668,7 +721,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 	require.Equal(t, common.LeftPadBytes(nonHomeSetup.USDCToken.Bytes(), 32), homeCCTPV2RemoteToken, "CCTP V2 pool remote token should be non-home USDC on home chain")
 	homeCCTPV2RemotePools, err := homeCCTPV2TokenPool.GetRemotePools(nil, nonHomeChainSelector)
 	require.NoError(t, err, "Failed to get remote pools from CCTP V2 token pool on home chain")
-	require.Contains(t, homeCCTPV2RemotePools, common.LeftPadBytes(nonHomeCCTPV1Pool.Bytes(), 32), "CCTP V2 pool should have non-home CCTP V1 pool as remote pool on home chain")
+	require.Contains(t, homeCCTPV2RemotePools, common.LeftPadBytes(nonHomeUSDCTokenPoolProxyAddr.Bytes(), 32), "CCTP V2 pool should have non-home proxy as remote pool on home chain")
 
 	// Check CCTP V1 token pool remote chain config on home chain.
 	// This lane is configured as CCTP_V2_WITH_CCV, so CCTP V1 should not be configured.
@@ -721,7 +774,7 @@ func TestCCTPChainAdapter_HomeToNonHomeChain(t *testing.T) {
 		},
 	)
 	require.NoError(t, err, "Failed to get token config from token admin registry on non-home chain")
-	require.Equal(t, nonHomeCCTPV1Pool, nonHomeTokenConfigReport.Output.TokenPool, "Token pool in registry should be the CCTP V1 pool on non-home chain")
+	require.Equal(t, nonHomeUSDCTokenPoolProxyAddr, nonHomeTokenConfigReport.Output.TokenPool, "Token pool in registry should be the USDCTokenPoolProxy on non-home chain")
 
 	// Check CCTPTokenPool dynamic config on non-home chain
 	nonHomeCCTPTokenPool, err := cctp_through_ccv_token_pool_bindings.NewCCTPThroughCCVTokenPool(nonHomeCCTPTokenPoolAddr, nonHomeChain.Client)
@@ -819,7 +872,7 @@ func remoteChainConfigForNonCanonical() adapters.RemoteCCTPChainConfig {
 	return adapters.RemoteCCTPChainConfig{
 		InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 		OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
-		TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
+		TokenTransferFeeConfig: cctpFee(tokens.TokenTransferFeeConfig{
 			IsEnabled:                     true,
 			DestGasOverhead:               200_000,
 			DestBytesOverhead:             32,
@@ -827,7 +880,7 @@ func remoteChainConfigForNonCanonical() adapters.RemoteCCTPChainConfig {
 			CustomFinalityFeeUSDCents:     200,
 			DefaultFinalityTransferFeeBps: 100,
 			CustomFinalityTransferFeeBps:  100,
-		},
+		}),
 	}
 }
 
@@ -851,9 +904,13 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 	canonicalSetup := setupCCTPTestEnvironment(t, e, canonicalChainSelector)
 	canonicalChain := e.BlockChains.EVMChains()[canonicalChainSelector]
 
-	// Setup non-canonical chain (RMN, Router, TAR, USDC only)
+	// Setup non-canonical chain (chain contracts incl. OnRamp/FeeQuoter, USDC)
 	nonCanonicalSetup := setupNonCanonicalTestEnvironment(t, e, nonCanonicalChainSelector)
 	nonCanonicalChain := e.BlockChains.EVMChains()[nonCanonicalChainSelector]
+
+	// Wire the lanes so token transfer fee application can resolve each chain's FeeQuoter.
+	setLaneOnRamp(t, e, canonicalChainSelector, canonicalSetup.Router, canonicalSetup.OnRamp, nonCanonicalChainSelector)
+	setLaneOnRamp(t, e, nonCanonicalChainSelector, nonCanonicalSetup.Router, nonCanonicalSetup.OnRamp, canonicalChainSelector)
 
 	// Deploy CCTP V1 pool on canonical chain and add to datastore (required for proxy's CCTP V1 pool ref)
 	homeCCTPV1Pool, tx, _, err := v1_6_1_burn_mint_token_pool.DeployBurnMintTokenPool(
@@ -898,10 +955,6 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 				TokenMessengerV1: canonicalSetup.TokenMessengerV1.Hex(),
 				TokenMessengerV2: canonicalSetup.TokenMessengerV2.Hex(),
 				USDCToken:        canonicalSetup.USDCToken.Hex(),
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType(usdc_token_pool_proxy.ContractType),
-					Version: usdc_token_pool_proxy.Version,
-				},
 				DeployerContract: canonicalCreate2FactoryRef.Address,
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
@@ -909,7 +962,7 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 					nonCanonicalChainSelector: {
 						LockOrBurnMechanism: mechanismLockRelease,
-						TokenTransferFeeConfig: tokens.TokenTransferFeeConfig{
+						TokenTransferFeeConfig: cctpFee(tokens.TokenTransferFeeConfig{
 							IsEnabled:                     true,
 							DestGasOverhead:               200_000,
 							DestBytesOverhead:             32,
@@ -917,7 +970,7 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 							CustomFinalityFeeUSDCents:     200,
 							DefaultFinalityTransferFeeBps: 100,
 							CustomFinalityTransferFeeBps:  100,
-						},
+						}),
 						InboundRateLimiterConfig:  tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 						OutboundRateLimiterConfig: tokens.RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 0, Rate: 0},
 					},
@@ -933,10 +986,6 @@ func TestCCTPChainAdapter_CanonicalToNonCanonicalChain(t *testing.T) {
 				StorageLocations: []string{"https://test.chain.link.fake"},
 				FeeAggregator:    common.HexToAddress("0x04").Hex(),
 				FastFinalityBps:  100,
-				RegisteredPoolRef: datastore.AddressRef{
-					Type:    datastore.ContractType(burn_mint_with_lock_release_flag_token_pool.ContractType),
-					Version: burn_mint_with_lock_release_flag_token_pool.Version,
-				},
 				RemoteChains: map[uint64]adapters.RemoteCCTPChainConfig{
 					canonicalChainSelector: remoteChainConfigForNonCanonical(),
 				},

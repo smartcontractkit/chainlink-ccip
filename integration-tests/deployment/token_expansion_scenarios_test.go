@@ -18,6 +18,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
+	bnmPausableFreezableTransparentOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_pausable_freezable_transparent"
 	bnmTransparentOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20_transparent"
 	erc20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
@@ -50,6 +51,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
+	bnmPausableFreezableTransparentGen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20_pausable_freezable_transparent"
 	bnmTransparentGen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20_transparent"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
@@ -1051,6 +1053,98 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		evmAdapter := evmseqV1_6_0.EVMAdapter{}
 		poolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: selA, Qualifier: poolQual, Type: datastore.ContractType(bmPoolType)})
 		require.NoError(t, err)
+		minterRole, err := token.MINTERROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		burnerRole, err := token.BURNERROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		hasMinterRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, minterRole, poolAddr)
+		require.NoError(t, err)
+		require.True(t, hasMinterRole, "pool should hold MINTER_ROLE")
+		hasBurnerRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, burnerRole, poolAddr)
+		require.NoError(t, err)
+		require.True(t, hasBurnerRole, "pool should hold BURNER_ROLE")
+	})
+
+	// -----------------------------------------------------------------------
+	// Scenario 7: Upgradeable BurnMintERC20PausableFreezableTransparent token, with Pauser/Freezer
+	// -----------------------------------------------------------------------
+	t.Run("Scenario7_UpgradeableBurnMintPausableFreezableTransparentToken", func(t *testing.T) {
+		tokenSymbol := "S7_TOK_PFT"
+		poolQual := "S7_POOL_PFT"
+		pauserAddr := common.HexToAddress("0x6666666666666666666666666666666666666666")
+		freezerAddr := common.HexToAddress("0x7777777777777777777777777777777777777777")
+
+		output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("Scenario 7"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				selA: {
+					TokenPoolVersion: v1_5_1_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name:     "Scenario7 Pausable Freezable Token",
+						Symbol:   tokenSymbol,
+						Decimals: 18,
+						Type:     bnmPausableFreezableTransparentOps.ContractType,
+						Supply:   &defaultMaxSupply,
+						PreMint:  &defaultPreMint,
+						Pauser:   pauserAddr.Hex(),
+						Freezer:  freezerAddr.Hex(),
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: poolQual,
+						PoolType:           bmPoolType.String(),
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, output.DataStore)
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+		// Token exists, deployed behind a proxy, with the expected ERC20 metadata.
+		tokAddr := assertTokenExists(t, env, selA, tokenSymbol, "Scenario7 Pausable Freezable Token", 18)
+
+		chainA := env.BlockChains.EVMChains()[selA]
+		token, err := bnmPausableFreezableTransparentGen.NewBurnMintERC20PausableFreezableTransparent(tokAddr, chainA.Client)
+		require.NoError(t, err)
+
+		// initialize(...) ran through the proxy: maxSupply/preMint were set correctly - same
+		// initialize() signature as BurnMintERC20Transparent (see Scenario6).
+		expectedMaxSupply := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(defaultMaxSupply), 18)
+		onChainMaxSupply, err := token.MaxSupply(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		require.Equal(t, expectedMaxSupply.String(), onChainMaxSupply.String())
+
+		expectedPreMint := tokensapi.ScaleTokenAmount(new(big.Int).SetUint64(defaultPreMint), 18)
+		onChainTotalSupply, err := token.TotalSupply(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		require.Equal(t, expectedPreMint.String(), onChainTotalSupply.String())
+
+		// Pauser/Freezer were granted PAUSER_ROLE/FREEZER_ROLE at deploy time.
+		pauserRole, err := token.PAUSERROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		hasPauserRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, pauserRole, pauserAddr)
+		require.NoError(t, err)
+		require.True(t, hasPauserRole, "pauser should hold PAUSER_ROLE")
+
+		freezerRole, err := token.FREEZERROLE(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		hasFreezerRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, freezerRole, freezerAddr)
+		require.NoError(t, err)
+		require.True(t, hasFreezerRole, "freezer should hold FREEZER_ROLE")
+
+		// The pool address never accidentally received the Pausable/Freezable roles.
+		evmAdapter := evmseqV1_6_0.EVMAdapter{}
+		poolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: selA, Qualifier: poolQual, Type: datastore.ContractType(bmPoolType)})
+		require.NoError(t, err)
+		poolHasPauserRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, pauserRole, poolAddr)
+		require.NoError(t, err)
+		require.False(t, poolHasPauserRole, "pool should not hold PAUSER_ROLE")
+		poolHasFreezerRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, freezerRole, poolAddr)
+		require.NoError(t, err)
+		require.False(t, poolHasFreezerRole, "pool should not hold FREEZER_ROLE")
+
+		// Pool minter/burner roles were granted (ParticipatesInPoolRoleGrant), same as Scenario6.
 		minterRole, err := token.MINTERROLE(&bind.CallOpts{Context: t.Context()})
 		require.NoError(t, err)
 		burnerRole, err := token.BURNERROLE(&bind.CallOpts{Context: t.Context()})

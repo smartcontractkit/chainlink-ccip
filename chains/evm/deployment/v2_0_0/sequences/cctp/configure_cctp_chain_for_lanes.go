@@ -96,7 +96,7 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		allowedFinality := defaultAllowedFinalityForChain(chain.Selector)
 
 		// Resolve address refs
-		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, input.RegisteredPoolRef)
+		refs, siloedUSDCRef, err := resolveConfigureCCTPChainRefs(dep.DataStore, chain.Selector, isHomeChainAndConfigureSiloedPool, dep.RegisteredPoolRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -294,6 +294,30 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		batchOps = append(batchOps, configureTokenForTransfersReport.Output.BatchOps...)
 
+		// Apply the token transfer fee config on the FeeQuoter for every lane, so the fee logic is
+		// the same regardless of USDC type. The v2 pool additionally carries its own per-lane fee
+		// config (applied above); the FeeQuoter is always configured so a lane behaves identically
+		// whether or not the pool holds the fee.
+		feeTokenRef := datastore.AddressRef{ChainSelector: input.ChainSelector, Address: input.USDCToken}
+		for remoteChainSelector, remoteChainConfig := range input.RemoteChains {
+			if remoteChainConfig.TokenTransferFeeConfig == nil {
+				continue
+			}
+			feeBatchOps, _, err := tokens_core.ApplyTokenTransferFeeConfigOnFeeQuoter(
+				b,
+				dep.BlockChains,
+				dep.DataStore,
+				input.ChainSelector,
+				remoteChainSelector,
+				feeTokenRef,
+				*remoteChainConfig.TokenTransferFeeConfig,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply token transfer fee config for remote chain %d: %w", remoteChainSelector, err)
+			}
+			batchOps = append(batchOps, feeBatchOps...)
+		}
+
 		return sequences.OnChainOutput{
 			Addresses: addresses,
 			BatchOps:  batchOps,
@@ -490,7 +514,7 @@ func maybeAddRemotePoolUSDCTokenPoolV162(
 func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input adapters.ConfigureCCTPChainForLanesInput) (map[uint64]tokens_core.RemoteChainConfig[[]byte, string], error) {
 	configs := make(map[uint64]tokens_core.RemoteChainConfig[[]byte, string], len(input.RemoteChains))
 	for remoteChainSelector, remoteChain := range input.RemoteChains {
-		remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, input.RemoteRegisteredPoolRefs[remoteChainSelector])
+		remotePoolAddress, err := dep.RemoteChains[remoteChainSelector].PoolAddress(dep.DataStore, dep.BlockChains, remoteChainSelector, dep.RemoteRegisteredPoolRefs[remoteChainSelector])
 		if err != nil {
 			return nil, fmt.Errorf("failed to get remote pool address: %w", err)
 		}
@@ -499,11 +523,10 @@ func buildRemoteChainConfigs(dep adapters.ConfigureCCTPChainForLanesDeps, input 
 			return nil, fmt.Errorf("failed to get remote token address: %w", err)
 		}
 
-		feeCfg := (tokens_core.PartialTokenTransferFeeConfig{}).Populate(remoteChain.TokenTransferFeeConfig)
 		configs[remoteChainSelector] = tokens_core.RemoteChainConfig[[]byte, string]{
 			RemotePool:                common.LeftPadBytes(remotePoolAddress, 32),
 			RemoteToken:               common.LeftPadBytes(remoteTokenAddress, 32),
-			TokenTransferFeeConfig:    &feeCfg,
+			TokenTransferFeeConfig:    remoteChain.TokenTransferFeeConfig,
 			OutboundRateLimiterConfig: &remoteChain.OutboundRateLimiterConfig,
 			InboundRateLimiterConfig:  &remoteChain.InboundRateLimiterConfig,
 		}

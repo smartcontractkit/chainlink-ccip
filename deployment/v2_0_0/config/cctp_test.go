@@ -69,3 +69,17 @@ func TestCCTPChainDefaultsBySelector_AllHaveUSDCToken(t *testing.T) {
 		require.NotEmptyf(t, defaults.USDCToken, "chain selector %d is missing a USDC token", chainSel)
 	}
 }
+
+func TestNativeCCTPTokenTransferFeeConfig(t *testing.T) {
+	fee := NativeCCTPTokenTransferFeeConfig()
+
+	require.Equal(t, uint16(0), fee.DefaultFinalityTransferFeeBps.GetOrDefault(1))
+	require.Equal(t, uint16(0), fee.CustomFinalityTransferFeeBps.GetOrDefault(1))
+	require.Equal(t, uint32(0), fee.DefaultFinalityFeeUSDCents.GetOrDefault(1))
+	require.Equal(t, uint32(0), fee.CustomFinalityFeeUSDCents.GetOrDefault(1))
+	require.Equal(t, uint32(32), fee.DestBytesOverhead.GetOrDefault(0))
+	require.Equal(t, uint32(90_000), fee.DestGasOverhead.GetOrDefault(0))
+	// IsEnabled must be explicitly true, not merely defaulted.
+	require.True(t, fee.IsEnabled.IsPresent())
+	require.True(t, fee.IsEnabled.GetOrDefault(false))
+}

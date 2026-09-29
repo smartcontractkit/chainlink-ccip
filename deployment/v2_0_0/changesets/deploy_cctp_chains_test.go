@@ -59,7 +59,8 @@ func (m *cctpTest_MockReader) GetTimelockRef(e deployment.Environment, selector 
 }
 
 type cctpTest_MockCCTPChain struct {
-	sequenceErrorMsg string
+	sequenceErrorMsg      string
+	updateAuthoritiesCall int
 }
 
 // DeployCCTPChain returns a sequence that accepts resolved adapter input (with string addresses)
@@ -119,6 +120,22 @@ func (m *cctpTest_MockCCTPChain) MigrateHybridLockReleaseLiquidity() *cldf_ops.S
 	)
 }
 
+// UpdateAuthorities returns a mock sequence for transferring ownership of CCTP contracts.
+func (m *cctpTest_MockCCTPChain) UpdateAuthorities() *cldf_ops.Sequence[adapters.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
+	return cldf_ops.NewSequence(
+		"mock-update-authorities-sequence",
+		semver.MustParse("1.0.0"),
+		"Mock sequence for transferring CCTP contract ownership",
+		func(bundle cldf_ops.Bundle, deps *deployment.Environment, input adapters.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+			m.updateAuthoritiesCall++
+			if m.sequenceErrorMsg != "" {
+				return sequences.OnChainOutput{}, errors.New(m.sequenceErrorMsg)
+			}
+			return sequences.OnChainOutput{}, nil
+		},
+	)
+}
+
 // PoolAddress returns the address of the token pool on the remote chain in bytes
 func (m *cctpTest_MockCCTPChain) PoolAddress(d datastore.DataStore, b cldf_chain.BlockChains, chainSelector uint64, registeredPoolRef datastore.AddressRef) ([]byte, error) {
 	return []byte("pool-address"), nil
@@ -152,6 +169,11 @@ func (m *cctpTest_MockCCTPChain) MintRecipientOnDest(d datastore.DataStore, b cl
 // USDCType returns the type of the USDC on the remote chain
 func (m *cctpTest_MockCCTPChain) USDCType() adapters.USDCType {
 	return adapters.Canonical
+}
+
+// TokenDecimals returns the number of decimals of the token on the chain.
+func (m *cctpTest_MockCCTPChain) TokenDecimals(bundle cldf_ops.Bundle, ds datastore.DataStore, chains cldf_chain.BlockChains, selector uint64, token string) (uint8, error) {
+	return 6, nil
 }
 
 var cctpTest_BasicMCMSInput = mcms.Input{
@@ -454,6 +476,76 @@ func TestDeployCCTPChains_Apply_NilMCMS_Succeeds(t *testing.T) {
 	require.NotNil(t, out)
 }
 
+func TestDeployCCTPChains_Apply_OwnershipTransfer(t *testing.T) {
+	chainSelector := uint64(5009297550715157269)
+
+	tests := []struct {
+		desc      string
+		skip      bool
+		withMCMS  bool
+		wantCalls int
+	}{
+		{desc: "transfers ownership when MCMS is configured", wantCalls: 1, withMCMS: true},
+		{desc: "skips ownership transfer when requested", skip: true, withMCMS: true, wantCalls: 0},
+		{desc: "skips ownership transfer without MCMS", withMCMS: false, wantCalls: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			lggr, err := logger.New()
+			require.NoError(t, err)
+			bundle := cldf_ops.NewBundle(
+				func() context.Context { return context.Background() },
+				lggr,
+				cldf_ops.NewMemoryReporter(),
+			)
+
+			ds := datastore.NewMemoryDataStore()
+			require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+				ChainSelector: chainSelector,
+				Address:       "0x4444444444444444444444444444444444444444",
+				Type:          datastore.ContractType("MCM"),
+				Version:       semver.MustParse("1.0.0"),
+			}))
+			require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+				ChainSelector: chainSelector,
+				Address:       "0x5555555555555555555555555555555555555555",
+				Type:          datastore.ContractType("Timelock"),
+				Version:       semver.MustParse("1.0.0"),
+			}))
+
+			e := deployment.Environment{
+				OperationsBundle: bundle,
+				DataStore:        ds.Seal(),
+			}
+
+			mock := &cctpTest_MockCCTPChain{}
+			cctpChainRegistry := adapters.NewCCTPChainRegistry()
+			cctpChainRegistry.RegisterCCTPChain("evm", mock)
+			mcmsRegistry := changesets.GetRegistry()
+			mcmsRegistry.RegisterMCMSReader("evm", &cctpTest_MockReader{})
+
+			cfg := v2_0_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
+					chainSelector: {
+						USDCType:              adapters.Canonical,
+						TokenMessengerV2:      "0x9999999999999999999999999999999999999999",
+						SkipOwnershipTransfer: tt.skip,
+						RemoteChains:          make(map[uint64]adapters.RemoteCCTPChainConfig),
+					},
+				},
+			}
+			if tt.withMCMS {
+				cfg.MCMS = &cctpTest_BasicMCMSInput
+			}
+
+			_, err = v2_0_0_changesets.DeployCCTPChains(cctpChainRegistry, mcmsRegistry).Apply(e, cfg)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantCalls, mock.updateAuthoritiesCall)
+		})
+	}
+}
+
 func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 	tests := []struct {
 		desc          string
@@ -604,6 +696,18 @@ func TestDeployCCTPChains_VerifyPreconditions(t *testing.T) {
 				},
 			},
 			expectedError: "invalid TokenMessengerV2",
+		},
+		{
+			desc: "success - non-canonical chain does not require TokenMessengerV2",
+			cfg: v2_0_0_changesets.DeployCCTPChainsConfig{
+				Chains: map[uint64]v2_0_0_changesets.CCTPChainConfig{
+					// Non-canonical chains do not use Circle's contracts, so an empty
+					// TokenMessengerV2 must not fail verify.
+					5009297550715157269: {
+						USDCType: adapters.NonCanonical,
+					},
+				},
+			},
 		},
 		{
 			desc: "failure - unknown chain selector",
