@@ -7,7 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	bnmERC20DripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	lrtpOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool"
+	tpapOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	bmtpapBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/burn_mint_token_pool_and_proxy"
 	lrtpapBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/lock_release_token_pool_and_proxy"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -196,4 +199,122 @@ func TestTokenExpansion_V1_5_0_LockReleaseProxyPool(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, s.oldPoolAddrA, cfg.TokenPool)
 	require.False(t, cfg.Administrator == (common.Address{}), "token should have an administrator set")
+}
+
+// TestTokenExpansion_V1_5_0_PlainPools covers the expansion step for the plain (non-proxy) v1.5.0
+// pools, BurnMintTokenPool and LockReleaseTokenPool. They are separate contracts from the *AndProxy
+// pools above but share the v1.5.0 TokenPool base, so the same adapter, deploy sequence, and
+// configure sequence must drive them. The v2.0.0 upgrade off the plain burn-mint pool is covered by
+// the v1_5_0_plain cases in TestTokenExpansionMigration_AutoMigrate.
+//
+// The lane is read back through the shared TokenPoolAndProxy ops contract rather than each pool's
+// own binding, because that is the binding the adapter uses against them - reading through it here
+// is what proves the shared surface really covers the plain pools.
+func TestTokenExpansion_V1_5_0_PlainPools(t *testing.T) {
+	acceptLiquidity := true
+	cases := []struct {
+		name           string
+		spec           legacyPairSpec
+		typeAndVersion string
+		isBurnMint     bool
+	}{
+		{
+			name: "BurnMintTokenPool",
+			spec: legacyPairSpec{
+				poolType:   cciputils.BurnMintTokenPool,
+				tokenType:  bnmERC20DripOps.ContractType,
+				decimalsA:  18,
+				decimalsB:  18,
+				singlePool: true,
+			},
+			typeAndVersion: "BurnMintTokenPool 1.5.0",
+			isBurnMint:     true,
+		},
+		{
+			name: "LockReleaseTokenPool",
+			spec: legacyPairSpec{
+				poolType:        cciputils.LockReleaseTokenPool,
+				tokenType:       bnmERC20DripOps.ContractType,
+				decimalsA:       18,
+				decimalsB:       18,
+				acceptLiquidity: &acceptLiquidity,
+				singlePool:      true,
+			},
+			typeAndVersion: "LockReleaseTokenPool 1.5.0",
+			isBurnMint:     false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := setupLegacyConnectedPair(t, cciputils.Version_1_5_0, tc.spec)
+
+			chainA := s.env.BlockChains.EVMChains()[s.selA]
+			opts := &bind.CallOpts{Context: t.Context()}
+
+			// The plain v1.5.0 contract was deployed, not the *AndProxy one.
+			tvContract, err := type_and_version.NewTypeAndVersionContract(s.oldPoolAddrA, chainA.Client)
+			require.NoError(t, err)
+			tv, err := tvContract.TypeAndVersion(opts)
+			require.NoError(t, err)
+			require.Equal(t, tc.typeAndVersion, tv)
+
+			pool, err := tpapOps.NewTokenPoolAndProxyContract(s.oldPoolAddrA, chainA.Client)
+			require.NoError(t, err)
+			token, err := bnmERC20DripBindings.NewBurnMintERC20WithDrip(s.tokAddrA, chainA.Client)
+			require.NoError(t, err)
+
+			// Pool and token are wired to each other.
+			gotToken, err := pool.GetToken(opts)
+			require.NoError(t, err)
+			require.Equal(t, s.tokAddrA, gotToken)
+			supportsToken, err := pool.IsSupportedToken(opts, s.tokAddrA)
+			require.NoError(t, err)
+			require.True(t, supportsToken)
+
+			// Mint/burn authority follows the pool type: granted to the burn-mint pool (the plain
+			// type was always in utils.IsBurnMintPoolType), never to the lock-release one.
+			hasMinter, err := token.HasRole(opts, bnmERC20DripOps.MintRole, s.oldPoolAddrA)
+			require.NoError(t, err)
+			require.Equal(t, tc.isBurnMint, hasMinter, "MINTER_ROLE must be held iff the pool is burn-mint")
+			hasBurner, err := token.HasRole(opts, bnmERC20DripOps.BurnRole, s.oldPoolAddrA)
+			require.NoError(t, err)
+			require.Equal(t, tc.isBurnMint, hasBurner, "BURNER_ROLE must be held iff the pool is burn-mint")
+
+			if !tc.isBurnMint {
+				lr, err := lrtpOps.NewLockReleaseTokenPoolContract(s.oldPoolAddrA, chainA.Client)
+				require.NoError(t, err)
+				canAccept, err := lr.CanAcceptLiquidity(opts)
+				require.NoError(t, err)
+				require.True(t, canAccept, "acceptLiquidity must survive the expansion path; it cannot be fixed after deploy")
+				rebalancer, err := lr.GetRebalancer(opts)
+				require.NoError(t, err)
+				require.Equal(t, common.Address{}, rebalancer, "expansion must not set a rebalancer")
+			}
+
+			// Lane wiring: same single-remote-pool-per-lane ABI as the *AndProxy pools.
+			supported, err := pool.GetSupportedChains(opts)
+			require.NoError(t, err)
+			require.Equal(t, []uint64{s.selB}, supported)
+			remoteToken, err := pool.GetRemoteToken(opts, s.selB)
+			require.NoError(t, err)
+			require.Equal(t, common.LeftPadBytes(s.tokAddrB.Bytes(), 32), remoteToken)
+			remotePool, err := pool.GetRemotePool(opts, s.selB)
+			require.NoError(t, err)
+			require.Equal(t, common.LeftPadBytes(s.oldPoolAddrB.Bytes(), 32), remotePool)
+
+			outbound, err := pool.GetCurrentOutboundRateLimiterState(opts, s.selB)
+			require.NoError(t, err)
+			require.True(t, outbound.IsEnabled)
+			require.Positive(t, outbound.Capacity.Sign())
+
+			// The TokenAdminRegistry was registered and points at this pool.
+			tar, err := tarbindings.NewTokenAdminRegistry(s.tarAddrA, chainA.Client)
+			require.NoError(t, err)
+			cfg, err := tar.GetTokenConfig(opts, s.tokAddrA)
+			require.NoError(t, err)
+			require.Equal(t, s.oldPoolAddrA, cfg.TokenPool)
+			require.False(t, cfg.Administrator == (common.Address{}), "token should have an administrator set")
+		})
+	}
 }

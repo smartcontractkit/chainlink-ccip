@@ -392,11 +392,11 @@ type DeployTokenPoolInput struct {
 }
 ```
 
-`AcceptLiquidity` applies to `LockReleaseTokenPool` v1.5.1 and `LockReleaseTokenPoolAndProxy`
-v1.5.0. It is **required for v1.5.0** — the flag is immutable once the pool is constructed, so the
-v1.5.0 deploy sequence rejects a nil value rather than silently defaulting it to `false`, which
-would be unrecoverable. Omitting it fails with
-`AcceptLiquidity is required when deploying LockReleaseTokenPoolAndProxy v1.5.0`.
+`AcceptLiquidity` applies to `LockReleaseTokenPool` v1.5.0/v1.5.1 and `LockReleaseTokenPoolAndProxy`
+v1.5.0. It is **required for both v1.5.0 lock-release types** — the flag is immutable once the pool
+is constructed, so the v1.5.0 deploy sequence rejects a nil value rather than silently defaulting
+it to `false`, which would be unrecoverable. Omitting it fails with
+`AcceptLiquidity is required when deploying <LockReleaseTokenPool|LockReleaseTokenPoolAndProxy> v1.5.0`.
 
 ### TokenTransferConfig
 
