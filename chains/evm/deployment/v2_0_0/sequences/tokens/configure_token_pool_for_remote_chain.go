@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
@@ -25,6 +27,7 @@ import (
 
 	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
+	v150adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -116,6 +119,38 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		case imported.LegacyRateLimits != nil:
 			outboundRateLimiterConfig = imported.LegacyRateLimits.Outbound
 			inboundRateLimiterConfig = imported.LegacyRateLimits.Inbound
+
+			// EMERGENCY EXCEPTION: a v1.5.0 *AndProxy pool forwards every transfer
+			// to a previous pool that applies its OWN rate limiter, so the
+			// effective limit is the tighter of the two. The legacy reader only saw
+			// the proxy pool. Remove this once legacy pools are migrated.
+			if imported.LegacyPoolVersion != nil &&
+				imported.LegacyPoolVersion.Equal(utils.Version_1_5_0) &&
+				strings.Contains(imported.LegacyPoolType, "AndProxy") {
+				if len(imported.LegacyPoolAddress) == 0 {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"v1.5.0 *AndProxy pool detected for lane %d but LegacyPoolAddress is empty",
+						input.RemoteChainSelector,
+					)
+				}
+				effective, err := v150adapters.EffectiveMigrationRateLimits(
+					b,
+					chain,
+					common.BytesToAddress(imported.LegacyPoolAddress),
+					input.RemoteChainSelector,
+					outboundRateLimiterConfig,
+					inboundRateLimiterConfig,
+					input.RemoteChainConfig.RemoteDecimals,
+					localDecimalsReport.Output,
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"failed to resolve effective rate limits for v1.5.0 *AndProxy pool: %w", err,
+					)
+				}
+				outboundRateLimiterConfig = effective.Outbound
+				inboundRateLimiterConfig = effective.Inbound
+			}
 
 		case (!defaultOutboundExists && !defaultInboundExists) && imported.LegacyRateLimits == nil:
 			if input.RemoteChainAlreadySupported {

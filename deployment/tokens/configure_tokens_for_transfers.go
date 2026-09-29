@@ -400,6 +400,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				rc.MigrationMetadata = MigrationMetadata{
 					LegacyPoolVersion:            activePoolRef.Version,
 					LegacyPoolType:               activePoolRef.Type.String(),
+					LegacyPoolAddress:            activePool,
 					LegacyRemotePools:            remotePools,
 					LegacyTokenTransferFeeConfig: legacyFC,
 					LegacyRateLimits:             legacyRL,
