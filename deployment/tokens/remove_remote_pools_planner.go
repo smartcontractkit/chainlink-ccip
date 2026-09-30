@@ -27,9 +27,11 @@ import (
 // rewrite a remote chain's whole pool list on every removal (Solana), and under MCMS every
 // rewrite is built from the initial state, so two calls on one pool would undo each other.
 // execute runs the grouped removals in phases: pools that are only peers of an entry first, then
-// pools that are some entry's own pool, then the TAR unregisters. Each entry's peers are therefore
-// cleaned before its own pool (whose list records the remaining work), except when a peer is also
-// the own pool of a later entry.
+// pools that are some entry's own pool (in the order they were first queued), then the TAR
+// unregisters. An entry queues its peers before its own pool, so its peers are cleaned before its
+// own pool (whose list records the remaining work). The exception: if an entry's own pool was
+// already queued as an earlier entry's peer, it can run before one of its peers that is itself some
+// entry's own pool.
 type removeRemotePoolsPlanner struct {
 	env             cldf.Environment
 	registry        *TokenAdapterRegistry
@@ -259,8 +261,8 @@ func (p *removeRemotePoolsPlanner) queueUnregister(entry *removeRemotePoolsEntry
 	p.unregisters = append(p.unregisters, func() (sequences.OnChainOutput, []cldf_ops.Report[any, any], error) {
 		report, err := cldf_ops.ExecuteSequence(p.env.OperationsBundle, writer.UnregisterToken(), p.env.BlockChains, input)
 		if err != nil {
-			return sequences.OnChainOutput{}, nil, fmt.Errorf("failed to execute removal for pool %s on chain selector %d: failed to unregister token on chain selector %d: %w",
-				entry.label, entry.selector, input.Selector, err)
+			return sequences.OnChainOutput{}, nil, fmt.Errorf("failed to unregister token for pool %s on chain selector %d: %w",
+				entry.label, entry.selector, err)
 		}
 		return report.Output, report.ExecutionReports, nil
 	})
@@ -448,14 +450,14 @@ func (p *removeRemotePoolsPlanner) reverseTargets(entry *removeRemotePoolsEntry,
 	}
 
 	// Clean up target 1: the pool that the remote entry names
-	var remotePoolRefr datastore.AddressRef
+	var namedPoolRef datastore.AddressRef
 	var remotePoolAddr string
 	isZero, err := deploy.IsZeroAddress(remoteSelector, remote.Remote.Address)
 	if err != nil {
 		return nil, datastore.AddressRef{}, fmt.Errorf("failed to decode peer pool address %s on remote chain selector %d: %w", remote.Remote.Address, remoteSelector, err)
 	}
 	if !isZero {
-		remotePoolRefr, err = ResolveTokenPoolRef(p.env, p.registry, remoteSelector, remote.Remote)
+		namedPoolRef, err = ResolveTokenPoolRef(p.env, p.registry, remoteSelector, remote.Remote)
 		if err != nil {
 			return nil, datastore.AddressRef{}, fmt.Errorf(
 				"failed to resolve peer pool ref %s on remote chain selector %d (if this remote entry is not a real pool, "+
@@ -463,25 +465,25 @@ func (p *removeRemotePoolsPlanner) reverseTargets(entry *removeRemotePoolsEntry,
 				datastore_utils.SprintRef(remote.Remote), remoteSelector, err,
 			)
 		}
-		remotePoolAddr, err = deploy.RoundTripAddress(remoteSelector, remotePoolRefr.Address)
+		remotePoolAddr, err = deploy.RoundTripAddress(remoteSelector, namedPoolRef.Address)
 		if err != nil {
 			return nil, datastore.AddressRef{}, fmt.Errorf("failed to normalize peer pool address on remote chain selector %d: %w", remoteSelector, err)
 		}
 	}
 
 	// Clean up target 2: the peer's TAR-active pool, which may be absent (the peer may not have registered one)
-	var activePoolRefr datastore.AddressRef
+	var activePoolRef datastore.AddressRef
 	var activePoolAddr string
 	if len(activePoolBytes) != 0 {
 		activePoolString, err := deploy.BytesToString(remoteSelector, activePoolBytes)
 		if err != nil {
 			return nil, datastore.AddressRef{}, fmt.Errorf("failed to normalize active pool address on remote chain selector %d: %w", remoteSelector, err)
 		}
-		activePoolRefr, err = ResolveTokenPoolRef(p.env, p.registry, remoteSelector, datastore.AddressRef{Address: activePoolString})
+		activePoolRef, err = ResolveTokenPoolRef(p.env, p.registry, remoteSelector, datastore.AddressRef{Address: activePoolString})
 		if err != nil {
 			return nil, datastore.AddressRef{}, fmt.Errorf("failed to resolve active pool ref on remote chain selector %d: %w", remoteSelector, err)
 		}
-		activePoolAddr, err = deploy.RoundTripAddress(remoteSelector, activePoolRefr.Address)
+		activePoolAddr, err = deploy.RoundTripAddress(remoteSelector, activePoolRef.Address)
 		if err != nil {
 			return nil, datastore.AddressRef{}, fmt.Errorf("failed to normalize active pool address on remote chain selector %d: %w", remoteSelector, err)
 		}
@@ -493,15 +495,15 @@ func (p *removeRemotePoolsPlanner) reverseTargets(entry *removeRemotePoolsEntry,
 	// missing active pool is reported exactly once rather than at each step that observes it.
 	switch {
 	case remotePoolAddr != "" && activePoolAddr != "" && remotePoolAddr != activePoolAddr:
-		return []datastore.AddressRef{activePoolRefr, remotePoolRefr}, remoteTokenRef, nil
+		return []datastore.AddressRef{activePoolRef, namedPoolRef}, remoteTokenRef, nil
 	case remotePoolAddr != "" && activePoolAddr != "" && remotePoolAddr == activePoolAddr:
-		return []datastore.AddressRef{remotePoolRefr}, remoteTokenRef, nil
+		return []datastore.AddressRef{namedPoolRef}, remoteTokenRef, nil
 	case remotePoolAddr != "" && activePoolAddr == "":
 		p.env.Logger.Warnf("token on remote chain selector %d has no active pool registered; cleaning only the pool named by the remote entry", remoteSelector)
-		return []datastore.AddressRef{remotePoolRefr}, remoteTokenRef, nil
+		return []datastore.AddressRef{namedPoolRef}, remoteTokenRef, nil
 	case remotePoolAddr == "" && activePoolAddr != "":
 		p.env.Logger.Warnf("remote entry for chain %d on pool %s (chain %d) is the zero address; only the peer's active pool is targeted by the reverse pass", remoteSelector, entry.poolRef.Address, entry.selector)
-		return []datastore.AddressRef{activePoolRefr}, remoteTokenRef, nil
+		return []datastore.AddressRef{activePoolRef}, remoteTokenRef, nil
 	default:
 		p.env.Logger.Warnf("remote entry for chain %d on pool %s (chain %d) is the zero address and the peer has no active pool; nothing to clean", remoteSelector, entry.poolRef.Address, entry.selector)
 		return nil, remoteTokenRef, nil
