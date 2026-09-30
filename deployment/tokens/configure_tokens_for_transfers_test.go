@@ -1251,16 +1251,16 @@ type transfersTest_MigratingMockTokenAdapter struct {
 	getSupportedChainsCalls int
 }
 
-func (ma *transfersTest_MigratingMockTokenAdapter) GetSupportedChains(_ deployment.Environment, _ uint64, _ []byte) ([]uint64, error) {
+func (ma *transfersTest_MigratingMockTokenAdapter) GetSupportedChains(_ deployment.Environment, _ uint64, _, _ []byte) ([]uint64, error) {
 	ma.getSupportedChainsCalls++
 	return []uint64{5009297550715157269}, nil
 }
 
-func (ma *transfersTest_MigratingMockTokenAdapter) GetRemoteToken(_ deployment.Environment, _ uint64, _ []byte, _ uint64) ([]byte, error) {
+func (ma *transfersTest_MigratingMockTokenAdapter) GetRemoteToken(_ deployment.Environment, _ uint64, _, _ []byte, _ uint64) ([]byte, error) {
 	return []byte("mocked-remote-token-address"), nil
 }
 
-func (ma *transfersTest_MigratingMockTokenAdapter) GetRemotePools(_ deployment.Environment, _ uint64, _ []byte, _ uint64) ([][]byte, error) {
+func (ma *transfersTest_MigratingMockTokenAdapter) GetRemotePools(_ deployment.Environment, _ uint64, _, _ []byte, _ uint64) ([][]byte, error) {
 	return [][]byte{[]byte("mocked-remote-pool")}, nil
 }
 
