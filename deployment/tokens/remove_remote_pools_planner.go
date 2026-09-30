@@ -467,8 +467,6 @@ func (p *removeRemotePoolsPlanner) reverseTargets(entry *removeRemotePoolsEntry,
 		if err != nil {
 			return nil, datastore.AddressRef{}, fmt.Errorf("failed to normalize peer pool address on remote chain selector %d: %w", remoteSelector, err)
 		}
-	} else {
-		p.env.Logger.Warnf("remote entry for chain %d on pool %s (chain %d) is the zero address", remoteSelector, entry.poolRef.Address, entry.selector)
 	}
 
 	// Clean up target 2: the peer's TAR-active pool, which may be absent (the peer may not have registered one)
@@ -487,20 +485,22 @@ func (p *removeRemotePoolsPlanner) reverseTargets(entry *removeRemotePoolsEntry,
 		if err != nil {
 			return nil, datastore.AddressRef{}, fmt.Errorf("failed to normalize active pool address on remote chain selector %d: %w", remoteSelector, err)
 		}
-	} else {
-		p.env.Logger.Warnf("token on remote chain selector %d has no active pool registered; continuing without the peer's TAR-active pool", remoteSelector)
 	}
 
 	// Select the targets: both when they differ, one when only one exists or they coincide, none
-	// when neither exists (the remote entry is the zero address and the peer has no active pool)
+	// when neither exists (the remote entry is the zero address and the peer has no active pool).
+	// The cases that clean only one side or nothing warn once, so a zero-address entry or a
+	// missing active pool is reported exactly once rather than at each step that observes it.
 	switch {
 	case remotePoolAddr != "" && activePoolAddr != "" && remotePoolAddr != activePoolAddr:
 		return []datastore.AddressRef{activePoolRefr, remotePoolRefr}, remoteTokenRef, nil
 	case remotePoolAddr != "" && activePoolAddr != "" && remotePoolAddr == activePoolAddr:
 		return []datastore.AddressRef{remotePoolRefr}, remoteTokenRef, nil
 	case remotePoolAddr != "" && activePoolAddr == "":
+		p.env.Logger.Warnf("token on remote chain selector %d has no active pool registered; cleaning only the pool named by the remote entry", remoteSelector)
 		return []datastore.AddressRef{remotePoolRefr}, remoteTokenRef, nil
 	case remotePoolAddr == "" && activePoolAddr != "":
+		p.env.Logger.Warnf("remote entry for chain %d on pool %s (chain %d) is the zero address; only the peer's active pool is targeted by the reverse pass", remoteSelector, entry.poolRef.Address, entry.selector)
 		return []datastore.AddressRef{activePoolRefr}, remoteTokenRef, nil
 	default:
 		p.env.Logger.Warnf("remote entry for chain %d on pool %s (chain %d) is the zero address and the peer has no active pool; nothing to clean", remoteSelector, entry.poolRef.Address, entry.selector)

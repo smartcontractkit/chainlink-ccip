@@ -782,10 +782,11 @@ func TestRemoveRemotePools_ExplicitModeRecoversDroppedReverse(t *testing.T) {
 	require.NotContains(t, remotePools(harness.poolC, harness.selC, harness.selA), harness.poolA, "C should no longer list A after recovery")
 }
 
-// TestRemoveRemotePools_BidirectionalFailsWhenPeerHasNoActivePool checks that the reverse pass
-// hard-errors (rather than silently skipping) when the peer's token has no active pool in the TAR,
-// and that nothing is changed on the local pool, since the reverse pass runs before the forward pass.
-func TestRemoveRemotePools_BidirectionalFailsWhenPeerHasNoActivePool(t *testing.T) {
+// TestRemoveRemotePools_BidirectionalCleansNamedPoolWhenPeerHasNoActivePool covers a peer whose
+// token has no active pool in the TAR. The peer's TAR-active pool is dropped as a reverse target,
+// but the pool named by the remote entry is still valid and is cleaned, so the bidirectional
+// removal completes: A drops B and B drops A.
+func TestRemoveRemotePools_BidirectionalCleansNamedPoolWhenPeerHasNoActivePool(t *testing.T) {
 	harness := setupV2PoolsForRemoveRemotePools(t)
 	env := harness.env
 
@@ -808,19 +809,22 @@ func TestRemoveRemotePools_BidirectionalFailsWhenPeerHasNoActivePool(t *testing.
 	require.NoError(t, err)
 	require.Empty(t, activePoolB, "B's token should have no active pool")
 
-	err = applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
+	require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
 		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
 			ChainSelector:       harness.selA,
 			Pool:                datastore.AddressRef{Address: harness.poolA.Hex()},
 			Bidirectional:       true,
 			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: harness.selB, Remote: datastore.AddressRef{Address: harness.poolB.Hex()}}},
 		}},
-	})
-	require.ErrorContains(t, err, "no active pool registered")
+	}))
 
-	// The reverse pass failed before the forward pass ran, so both sides are unchanged.
-	require.Contains(t, remotePools(harness.poolA, harness.selA, harness.selB), harness.poolB, "A should still list B")
-	require.Contains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should still list A")
+	// B's missing active pool does not block the teardown: A drops B (forward) and B drops A
+	// (reverse, matched through the pool the remote entry names).
+	require.NotContains(t, remotePools(harness.poolA, harness.selA, harness.selB), harness.poolB, "A should no longer list B")
+	require.NotContains(t, remotePools(harness.poolB, harness.selB, harness.selA), harness.poolA, "B should no longer list A")
+	// The lanes to C are untouched.
+	require.Contains(t, remotePools(harness.poolA, harness.selA, harness.selC), harness.poolC, "A should still list C")
+	require.Contains(t, remotePools(harness.poolB, harness.selB, harness.selC), harness.poolC, "B should still list C")
 }
 
 // TestRemoveRemotePools_DeactivateSkipsZeroAddressEntry covers a pool that lists the zero address

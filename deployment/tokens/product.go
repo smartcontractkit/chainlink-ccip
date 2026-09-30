@@ -73,9 +73,9 @@ type TokenAdminRoleAdapter interface {
 }
 
 // RemotePoolRemover is an optional interface for adapters that support removing remote pool
-// entries from a token pool. Implementations must read the current on-chain remote pools and
-// return a clear error when a requested remote pool is not currently configured, rather than
-// emitting a no-op transaction.
+// entries from a token pool. Implementations must read the current on-chain remote pools and skip
+// (with a warning) a requested remote pool that is not currently configured, rather than emitting a
+// no-op transaction, so removals are idempotent across re-runs.
 type RemotePoolRemover interface {
 	RemoveRemotePools() *cldf_ops.Sequence[RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
