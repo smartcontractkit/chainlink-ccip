@@ -73,9 +73,9 @@ type TokenAdminRoleAdapter interface {
 }
 
 // RemotePoolRemover is an optional interface for adapters that support removing remote pool
-// entries from a token pool. Implementations must read the current on-chain remote pools and
-// return a clear error when a requested remote pool is not currently configured, rather than
-// emitting a no-op transaction.
+// entries from a token pool. Implementations must read the current on-chain remote pools and skip
+// (with a warning) a requested remote pool that is not currently configured, rather than emitting a
+// no-op transaction, so removals are idempotent across re-runs.
 type RemotePoolRemover interface {
 	RemoveRemotePools() *cldf_ops.Sequence[RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
@@ -90,8 +90,8 @@ type RemoveRemotePoolsSequenceInput struct {
 }
 
 // RemotePoolToRemove identifies a single remote pool entry to remove from a token pool. The
-// remote pool is referenced by an AddressRef so operators can identify it by qualifier, by
-// address, or by any other unique combination of ref fields.
+// remote pool's Address is required: it is the address the pool stores for the remote (in the
+// remote chain family's address format), and is what the removal matches against on-chain.
 type RemotePoolToRemove struct {
 	Selector uint64               `json:"selector" yaml:"selector"`
 	Remote   datastore.AddressRef `json:"remote" yaml:"remote"`
@@ -132,11 +132,15 @@ type RateLimitReaderAdapter interface {
 
 // TokenAdminRegistryReader is a versionless interface for reading the active pool from a chain's
 // TokenAdminRegistry (or equivalent). Implementations are registered per chain family via
-// TokenAdapterRegistry.RegisterTokenAdminRegistryManager and can be looked up by family regardless
-// of pool version.
+// TokenAdapterRegistry.RegisterTokenAdminRegistryReader, or implicitly by registering a
+// TokenAdminRegistryManager, and can be looked up by family regardless of pool version.
 type TokenAdminRegistryReader interface {
 	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
-	// as raw address bytes. Returns empty bytes (no error) when no pool is registered.
+	// as raw address bytes. Returns empty bytes (no error) when no pool is registered; any other
+	// failure to read the registry must be returned as an error, not reported as "no pool".
+	// The bytes must be in the same form the family's TokenAdapter.AddressRefToBytes returns for
+	// the resolved pool ref, so callers can compare them chain-agnostically with bytes.Equal (e.g.
+	// EVM: the pool contract address; Solana: the pool program ID).
 	// Overrides are optional registry refs to use instead of the datastore default;
 	// the first one that resolves from the datastore is used.
 	GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error)
@@ -144,18 +148,22 @@ type TokenAdminRegistryReader interface {
 	GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error)
 }
 
-// TokenAdminRegistryWriter is a versionless interface for unregistering a token from a chain's
-// TokenAdminRegistry (or equivalent). There is no official unregister on-chain: a pool is
-// unregistered by setting the registry's pool to the null/zero pool. Implementations must only
-// emit the write when the token's current active pool is the pool being removed, and skip (no-op)
-// when the entry already points at a different pool or is already empty, so a live registration
-// that has moved on is never clobbered.
+// TokenAdminRegistryWriter is a versionless interface for write operations on a chain's
+// TokenAdminRegistry (or equivalent). A family provides it by registering a
+// TokenAdminRegistryManager. There is no official unregister on-chain: a pool is unregistered by
+// setting the registry's pool to the null/zero pool.
+//
+// UnregisterToken is unconditional: it clears the token's registry entry whatever pool it
+// currently points at. Callers that must not clobber a registration that has moved on to another
+// pool are responsible for checking the active pool first (e.g. compare GetActivePool with the
+// family adapter's AddressRefToBytes for the pool being removed), as RemoveRemotePools does.
 type TokenAdminRegistryWriter interface {
 	// UnregisterToken returns a sequence that sets the token's registry pool to the null/zero pool.
 	UnregisterToken() *cldf_ops.Sequence[UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
-// TokenAdminRegistryManager combines the versionless TAR reader and writer for a chain family.
+// TokenAdminRegistryManager combines the versionless TAR reader and writer for a chain family. A
+// family whose TAR can only be read registers a TokenAdminRegistryReader instead.
 type TokenAdminRegistryManager interface {
 	TokenAdminRegistryReader
 	TokenAdminRegistryWriter
@@ -163,15 +171,12 @@ type TokenAdminRegistryManager interface {
 
 // UnregisterTokenSequenceInput defines the input for unregistering a token from the
 // TokenAdminRegistry. The token is unregistered by setting its registry pool to the null/zero
-// pool. The write is only emitted when the token's current active pool equals TokenPoolRef.
+// pool; see TokenAdminRegistryWriter for the caller's responsibility to check the active pool.
 type UnregisterTokenSequenceInput struct {
 	// Selector is the chain selector for the chain on which the registry lives.
 	Selector uint64 `json:"selector" yaml:"selector"`
 	// TokenRef is the fully resolved token reference.
 	TokenRef datastore.AddressRef `json:"tokenRef" yaml:"tokenRef"`
-	// TokenPoolRef is the fully resolved pool reference that must currently be the token's
-	// active pool for the unregister to be emitted.
-	TokenPoolRef datastore.AddressRef `json:"tokenPoolRef" yaml:"tokenPoolRef"`
 	// RegistryRef optionally overrides the registry ref used instead of the datastore default.
 	RegistryRef datastore.AddressRef `json:"registryRef,omitempty" yaml:"registryRef,omitempty"`
 	// ExistingDataStore is the datastore containing existing deployment data.
@@ -569,16 +574,18 @@ type SetTokenTransferFeeSequenceInput struct {
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
 	tokenRefResolverReg          map[string]TokenRefResolver
+	tokenAdminRegistryReaderReg  map[string]TokenAdminRegistryReader
 	tokenAdminRegistryManagerReg map[string]TokenAdminRegistryManager
 	tokenAdapterReg              map[tokenAdapterID]TokenAdapter
 	tokenRefResolverMu           sync.Mutex
-	tokenAdminRegistryManagerMu  sync.Mutex
+	tokenAdminRegistryMu         sync.Mutex // guards both TAR maps, so a manager registration updates them together
 	tokenAdapterMu               sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
 		tokenRefResolverReg:          make(map[string]TokenRefResolver),
+		tokenAdminRegistryReaderReg:  make(map[string]TokenAdminRegistryReader),
 		tokenAdminRegistryManagerReg: make(map[string]TokenAdminRegistryManager),
 		tokenAdapterReg:              make(map[tokenAdapterID]TokenAdapter),
 	}
@@ -601,20 +608,42 @@ func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRef
 	return resolver, ok
 }
 
-// RegisterTokenAdminRegistryManager registers a versionless TAR manager (reader + writer) for the
-// given chain family.
-func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryManager(family string, manager TokenAdminRegistryManager) {
-	r.tokenAdminRegistryManagerMu.Lock()
-	defer r.tokenAdminRegistryManagerMu.Unlock()
-	if _, exists := r.tokenAdminRegistryManagerReg[family]; !exists {
-		r.tokenAdminRegistryManagerReg[family] = manager
+// RegisterTokenAdminRegistryReader registers a versionless TAR reader for the given chain family.
+// It is ignored when the family already has a reader, including one registered as a manager.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryReader(family string, reader TokenAdminRegistryReader) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	if _, exists := r.tokenAdminRegistryReaderReg[family]; !exists {
+		r.tokenAdminRegistryReaderReg[family] = reader
 	}
 }
 
-// GetTokenAdminRegistryManager retrieves a registered TokenAdminRegistryManager for the given chain family.
+// GetTokenAdminRegistryReader retrieves the TAR reader for the given chain family: its manager if
+// one is registered, otherwise its registered reader.
+func (r *TokenAdapterRegistry) GetTokenAdminRegistryReader(family string) (TokenAdminRegistryReader, bool) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	reader, ok := r.tokenAdminRegistryReaderReg[family]
+	return reader, ok
+}
+
+// RegisterTokenAdminRegistryManager registers a versionless TAR manager (reader + writer) for the
+// given chain family. The first manager registered for a family also becomes its reader, replacing
+// a reader-only registration, so reads and writes always go through the same implementation.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryManager(family string, manager TokenAdminRegistryManager) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	if _, exists := r.tokenAdminRegistryManagerReg[family]; !exists {
+		r.tokenAdminRegistryManagerReg[family] = manager
+		r.tokenAdminRegistryReaderReg[family] = manager
+	}
+}
+
+// GetTokenAdminRegistryManager retrieves a registered TokenAdminRegistryManager for the given
+// chain family. A family registered only as a reader has none.
 func (r *TokenAdapterRegistry) GetTokenAdminRegistryManager(family string) (TokenAdminRegistryManager, bool) {
-	r.tokenAdminRegistryManagerMu.Lock()
-	defer r.tokenAdminRegistryManagerMu.Unlock()
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
 	manager, ok := r.tokenAdminRegistryManagerReg[family]
 	return manager, ok
 }

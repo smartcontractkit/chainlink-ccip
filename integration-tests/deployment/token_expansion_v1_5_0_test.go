@@ -11,7 +11,9 @@ import (
 	bmtpapBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/burn_mint_token_pool_and_proxy"
 	lrtpapBindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/lock_release_token_pool_and_proxy"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	bnmERC20DripBindings "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 )
 
@@ -196,4 +198,98 @@ func TestTokenExpansion_V1_5_0_LockReleaseProxyPool(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, s.oldPoolAddrA, cfg.TokenPool)
 	require.False(t, cfg.Administrator == (common.Address{}), "token should have an administrator set")
+}
+
+// TestRemoveRemotePools_V1_5_0_Deactivate deactivates a v1.5.0 pool whose peer is also v1.5.0.
+// v1.5.0 stores a single remote pool per chain and has no removeRemotePool, so both the forward
+// removal (on A) and the reverse removal (on peer B) clear the slot with setRemotePool(chain, empty
+// bytes). The slot must read back empty (not a zero-address pool) while the chain stays supported,
+// and A is unregistered from its TAR because it is the active pool.
+func TestRemoveRemotePools_V1_5_0_Deactivate(t *testing.T) {
+	s := setupLegacyConnectedBnMPair(t, cciputils.Version_1_5_0)
+	opts := &bind.CallOpts{Context: t.Context()}
+	chainA := s.env.BlockChains.EVMChains()[s.selA]
+	poolA, err := bmtpapBindings.NewBurnMintTokenPoolAndProxy(s.oldPoolAddrA, chainA.Client)
+	require.NoError(t, err)
+	poolB, err := bmtpapBindings.NewBurnMintTokenPoolAndProxy(s.oldPoolAddrB, s.env.BlockChains.EVMChains()[s.selB].Client)
+	require.NoError(t, err)
+
+	// Pre-state: each pool's single remote-pool slot points at the other pool.
+	remoteOfA, err := poolA.GetRemotePool(opts, s.selB)
+	require.NoError(t, err)
+	require.Equal(t, s.oldPoolAddrB, common.BytesToAddress(remoteOfA), "A should list B's pool")
+	remoteOfB, err := poolB.GetRemotePool(opts, s.selA)
+	require.NoError(t, err)
+	require.Equal(t, s.oldPoolAddrA, common.BytesToAddress(remoteOfB), "B should list A's pool")
+
+	input := tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: s.selA,
+			Pool:          datastore.AddressRef{Address: s.oldPoolAddrA.Hex()},
+			Deactivate:    true,
+		}},
+	}
+	require.NoError(t, applyRemoveRemotePools(t, s.env, input))
+
+	// Both slots are cleared (empty, not a zero-address pool); the chain configs are kept.
+	remoteOfA, err = poolA.GetRemotePool(opts, s.selB)
+	require.NoError(t, err)
+	require.Empty(t, remoteOfA, "A's remote pool for B should be cleared")
+	remoteOfB, err = poolB.GetRemotePool(opts, s.selA)
+	require.NoError(t, err)
+	require.Empty(t, remoteOfB, "B's remote pool for A should be cleared")
+	supported, err := poolA.IsSupportedChain(opts, s.selB)
+	require.NoError(t, err)
+	require.True(t, supported, "A should still support chain B (only the remote pool is cleared)")
+
+	// A was the active pool, so it is unregistered from A's TAR.
+	tar, err := tarbindings.NewTokenAdminRegistry(s.tarAddrA, chainA.Client)
+	require.NoError(t, err)
+	cfg, err := tar.GetTokenConfig(opts, s.tokAddrA)
+	require.NoError(t, err)
+	require.Equal(t, common.Address{}, cfg.TokenPool, "A should be unregistered from A's TAR")
+
+	// Re-running is a no-op: both slots are already empty and the TAR entry is already cleared.
+	require.NoError(t, applyRemoveRemotePools(t, s.env, input))
+}
+
+// TestRemoveRemotePools_V1_5_0_DeactivateRawEncodedSlots covers v1.5.0 slots holding the raw 20-byte
+// form of the remote pool instead of the usual 32-byte padded form: deactivate clears both slots.
+func TestRemoveRemotePools_V1_5_0_DeactivateRawEncodedSlots(t *testing.T) {
+	s := setupLegacyConnectedBnMPair(t, cciputils.Version_1_5_0)
+	opts := &bind.CallOpts{Context: t.Context()}
+	chainA := s.env.BlockChains.EVMChains()[s.selA]
+	chainB := s.env.BlockChains.EVMChains()[s.selB]
+	poolA, err := bmtpapBindings.NewBurnMintTokenPoolAndProxy(s.oldPoolAddrA, chainA.Client)
+	require.NoError(t, err)
+	poolB, err := bmtpapBindings.NewBurnMintTokenPoolAndProxy(s.oldPoolAddrB, chainB.Client)
+	require.NoError(t, err)
+
+	// Rewrite both slots in the raw 20-byte form.
+	tx, err := poolA.SetRemotePool(chainA.DeployerKey, s.selB, s.oldPoolAddrB.Bytes())
+	require.NoError(t, err)
+	_, err = chainA.Confirm(tx)
+	require.NoError(t, err)
+	tx, err = poolB.SetRemotePool(chainB.DeployerKey, s.selA, s.oldPoolAddrA.Bytes())
+	require.NoError(t, err)
+	_, err = chainB.Confirm(tx)
+	require.NoError(t, err)
+	remoteOfA, err := poolA.GetRemotePool(opts, s.selB)
+	require.NoError(t, err)
+	require.Equal(t, s.oldPoolAddrB.Bytes(), remoteOfA, "A's slot should hold B's pool as raw 20 bytes")
+
+	require.NoError(t, applyRemoveRemotePools(t, s.env, tokensapi.RemoveRemotePoolsInput{
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: s.selA,
+			Pool:          datastore.AddressRef{Address: s.oldPoolAddrA.Hex()},
+			Deactivate:    true,
+		}},
+	}))
+
+	remoteOfA, err = poolA.GetRemotePool(opts, s.selB)
+	require.NoError(t, err)
+	require.Empty(t, remoteOfA, "A's remote pool for B should be cleared")
+	remoteOfB, err := poolB.GetRemotePool(opts, s.selA)
+	require.NoError(t, err)
+	require.Empty(t, remoteOfB, "B's remote pool for A should be cleared")
 }

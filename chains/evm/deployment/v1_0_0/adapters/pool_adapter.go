@@ -1,17 +1,21 @@
 package adapters
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -48,10 +52,10 @@ type PoolOps interface {
 	SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
 	// RemoveRemotePools removes the given remote pool entries from the pool. Implementations
-	// read the current on-chain remote pools for each remote chain and return a clear error when
-	// a requested remote pool is not currently configured, rather than emitting a no-op
-	// transaction. Remote pool addresses are stored left-padded to 32 bytes on-chain, so
-	// implementations must pad the input address the same way before matching and removal.
+	// read the current on-chain remote pools for each remote chain, match them with
+	// MatchingRemotePools, and remove each match by its stored bytes. A requested remote pool that
+	// is not configured is skipped (with a warning) rather than emitting a no-op transaction, so
+	// re-runs are idempotent.
 	RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error)
 	Version() *semver.Version
 }
@@ -275,8 +279,9 @@ func (a *EVMPoolAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokensap
 
 // RemoveRemotePools removes remote pool entries from an EVM token pool. Version-specific
 // contract calls live in PoolOps.RemoveRemotePools, which reads the current on-chain remote
-// pools for each remote chain and returns a clear error when a requested remote pool is not
-// currently configured. No-op (zero BatchOps) when there are no writes.
+// pools for each remote chain and skips (with a warning) any requested remote pool that is
+// not currently configured, so re-runs are idempotent. No-op (zero BatchOps) when there are
+// no writes.
 func (a *EVMPoolAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokensapi.RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-pool-adapter:remove-remote-pools",
@@ -709,4 +714,35 @@ func (a *EVMPoolAdapter) canAdministerTokenRoles(
 	}
 
 	return hasTimelockAdmin, nil
+}
+
+// MatchingRemotePools returns the entries of stored (a pool's remote pools for remoteSelector) that
+// encode address. An EVM remote pool can be stored raw (20 bytes) or left-padded to 32 bytes, and
+// legacy pools may hold either or both, so an EVM address matches both forms; other families are
+// matched in their single native encoding. Entries are returned as stored, so callers remove each
+// one by its exact on-chain bytes.
+func MatchingRemotePools(stored [][]byte, remoteSelector uint64, address string) ([][]byte, error) {
+	family, err := chainsel.GetSelectorFamily(remoteSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get selector family for chain %d: %w", remoteSelector, err)
+	}
+
+	native, err := deployapi.StringToBytes(remoteSelector, address)
+	if err != nil {
+		return nil, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remoteSelector, address, err)
+	}
+
+	encodings := [][]byte{native}
+	if family == chainsel.FamilyEVM {
+		encodings = append(encodings, common.LeftPadBytes(native, 32))
+	}
+
+	var matches [][]byte
+	for _, remote := range stored {
+		if slices.ContainsFunc(encodings, func(encoding []byte) bool { return bytes.Equal(remote, encoding) }) {
+			matches = append(matches, remote)
+		}
+	}
+
+	return matches, nil
 }

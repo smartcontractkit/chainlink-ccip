@@ -11,5 +11,5 @@ import (
 func init() {
 	fees.GetRegistry().RegisterFeeResolver(chainsel.FamilySolana, &SolanaFeeResolver{})
 	deployapi.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chainsel.FamilySolana, &SolanaAddressNormalizer{})
-	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdminRegistryManager(chainsel.FamilySolana, &SolanaAdminRegistryReader{})
+	tokensapi.GetTokenAdapterRegistry().RegisterTokenAdminRegistryManager(chainsel.FamilySolana, &SolanaAdminRegistryManager{})
 }

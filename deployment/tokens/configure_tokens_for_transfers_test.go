@@ -1146,27 +1146,16 @@ func TestLegacyRateLimitsForAutoMigrate(t *testing.T) {
 	}
 }
 
-type transfersTest_MockTokenAdminRegistryManager struct {
+type transfersTest_MockTokenAdminRegistryReader struct {
 	activePool []byte
 }
 
-func (r *transfersTest_MockTokenAdminRegistryManager) GetActivePool(_ deployment.Environment, _ uint64, _ datastore.AddressRef, _ ...datastore.AddressRef) ([]byte, error) {
+func (r *transfersTest_MockTokenAdminRegistryReader) GetActivePool(_ deployment.Environment, _ uint64, _ datastore.AddressRef, _ ...datastore.AddressRef) ([]byte, error) {
 	return r.activePool, nil
 }
 
-func (r *transfersTest_MockTokenAdminRegistryManager) GetTokenAdminRegistryRef(_ deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
+func (r *transfersTest_MockTokenAdminRegistryReader) GetTokenAdminRegistryRef(_ deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
 	return datastore.AddressRef{ChainSelector: chainSelector}, nil
-}
-
-func (r *transfersTest_MockTokenAdminRegistryManager) UnregisterToken() *cldf_ops.Sequence[tokens.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"mock:unregister-token",
-		utils.Version_1_0_0,
-		"Mock unregister token",
-		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokens.UnregisterTokenSequenceInput) (sequences.OnChainOutput, error) {
-			return sequences.OnChainOutput{}, nil
-		},
-	)
 }
 
 // transfersTest_IdentityNormalizer passes addresses through unchanged. It is registered for the
@@ -1209,7 +1198,7 @@ func TestAutoMigrate_NonMigratableSourceSkips(t *testing.T) {
 	mockAdapter := &transfersTest_MockTokenAdapter{}
 	tokenRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.5.0"), mockAdapter)
 	tokenRegistry.RegisterTokenRefResolver("evm", mockAdapter)
-	tokenRegistry.RegisterTokenAdminRegistryManager("evm", &transfersTest_MockTokenAdminRegistryManager{activePool: []byte(activePoolAddr)})
+	tokenRegistry.RegisterTokenAdminRegistryReader("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
 	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, transfersTest_IdentityNormalizer{})
 	changesets.GetRegistry().RegisterMCMSReader("evm", &MockReader{})
 
@@ -1292,7 +1281,7 @@ func TestAutoMigrate_V2TargetRequired(t *testing.T) {
 	mockAdapter := &transfersTest_MigratingMockTokenAdapter{transfersTest_MockTokenAdapter: &transfersTest_MockTokenAdapter{}}
 	tokenRegistry.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), mockAdapter)
 	tokenRegistry.RegisterTokenRefResolver("evm", mockAdapter)
-	tokenRegistry.RegisterTokenAdminRegistryManager("evm", &transfersTest_MockTokenAdminRegistryManager{activePool: []byte(activePoolAddr)})
+	tokenRegistry.RegisterTokenAdminRegistryReader("evm", &transfersTest_MockTokenAdminRegistryReader{activePool: []byte(activePoolAddr)})
 	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(chain_selectors.FamilyEVM, transfersTest_IdentityNormalizer{})
 	changesets.GetRegistry().RegisterMCMSReader("evm", &MockReader{})
 

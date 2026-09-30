@@ -2,9 +2,12 @@ package token_pools
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
@@ -18,20 +21,24 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 )
 
-// RemoveRemotePoolInput is the input for removing a single remote pool address from a Solana
-// token pool's remote chain config. The remote pool address is the raw 32-byte public key of
-// the remote pool, in the remote chain family's native byte encoding.
+// RemoveRemotePoolInput is the input for removing remote pool addresses from a Solana token pool's
+// remote chain config for one remote chain. Each remote pool address is the remote pool's address
+// as raw bytes in the remote chain family's native encoding (e.g. 20 bytes for EVM, 32 for Solana).
 type RemoveRemotePoolInput struct {
-	TokenPool         solana.PublicKey
-	TokenMint         solana.PublicKey
-	RemoteSelector    uint64
-	RemotePoolAddress []byte
+	TokenPool           solana.PublicKey
+	TokenMint           solana.PublicKey
+	RemoteSelector      uint64
+	RemotePoolAddresses [][]byte
 }
 
 // removeRemotePoolTokenPool reads the existing remote chain config, removes the target remote
-// pool address, and rewrites the config via EditChainRemoteConfig. It returns a clear error
-// when the target remote pool is not currently configured. The authority and instruction
-// builders are supplied by the caller so the burnmint and lockrelease programs share the logic.
+// pool addresses, and rewrites the config via EditChainRemoteConfig. The rewrite replaces the whole
+// pool list with the list read here, so every removal for one remote chain must go through a single
+// call: under MCMS each call reads the state before the proposal executes, and a second call would
+// restore the addresses the first one removed. Targets that are not configured, or a remote chain
+// that is not configured at all, are skipped (with a warning) so re-runs are idempotent. The
+// authority and instruction builders are supplied by the caller so the burnmint and lockrelease
+// programs share the logic.
 func removeRemotePoolTokenPool(
 	b operations.Bundle,
 	chain cldf_solana.Chain,
@@ -55,27 +62,33 @@ func removeRemotePoolTokenPool(
 	var remoteChainConfigAccount burnmint_token_pool.ChainConfig
 	err = chain.GetAccountDataBorshInto(b.GetContext(), remoteChainConfigPDA, &remoteChainConfigAccount)
 	if err != nil {
+		// A missing chain config account means the pool was never configured for this remote
+		// chain, so there is nothing to remove (idempotent, like an absent pairing).
+		if errors.Is(err, rpc.ErrNotFound) {
+			b.Logger.Warnf("skipping removal of remote pools %x for remote chain %d from pool %s on chain %d: remote chain not configured on this pool", input.RemotePoolAddresses, input.RemoteSelector, input.TokenPool.String(), chain.Selector)
+			return sequences.OnChainOutput{}, nil
+		}
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to decode remote chain config at PDA %s on chain %d for remote %d: %w", remoteChainConfigPDA, chain.Selector, input.RemoteSelector, err)
 	}
 
-	existing := remoteChainConfigAccount.Base.Remote.PoolAddresses
-	target := input.RemotePoolAddress
-	remaining := make([]base_token_pool.RemoteAddress, 0, len(existing))
-	found := false
-	for _, addr := range existing {
-		if bytes.Equal(addr.Address, target) {
-			found = true
-			continue
+	existingPools := remoteChainConfigAccount.Base.Remote.PoolAddresses
+	poolsToRetain := make([]base_token_pool.RemoteAddress, 0, len(existingPools))
+	for _, addr := range existingPools {
+		if !slices.ContainsFunc(input.RemotePoolAddresses, func(target []byte) bool { return bytes.Equal(addr.Address, target) }) {
+			poolsToRetain = append(poolsToRetain, base_token_pool.RemoteAddress{Address: addr.Address})
 		}
-		remaining = append(remaining, base_token_pool.RemoteAddress{Address: addr.Address})
 	}
-	if !found {
-		b.Logger.Warnf("skipping removal of remote pool %x for remote chain %d from pool %s on chain %d: pairing already absent", target, input.RemoteSelector, input.TokenPool.String(), chain.Selector)
+	for _, target := range input.RemotePoolAddresses {
+		if !slices.ContainsFunc(existingPools, func(addr base_token_pool.RemoteAddress) bool { return bytes.Equal(addr.Address, target) }) {
+			b.Logger.Warnf("skipping removal of remote pool %x for remote chain %d from pool %s on chain %d: pairing already absent", target, input.RemoteSelector, input.TokenPool.String(), chain.Selector)
+		}
+	}
+	if len(poolsToRetain) == len(existingPools) {
 		return sequences.OnChainOutput{}, nil
 	}
 
 	remoteConfig := base_token_pool.RemoteConfig{
-		PoolAddresses: remaining,
+		PoolAddresses: poolsToRetain,
 		TokenAddress:  remoteChainConfigAccount.Base.Remote.TokenAddress,
 		Decimals:      remoteChainConfigAccount.Base.Remote.Decimals,
 	}
