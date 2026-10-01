@@ -619,7 +619,7 @@ func readV12Limits(
 
 	case utils.LockReleaseTokenPool:
 		// No official v1.2.0 LockRelease gobindings exist; the v1.0.0 binding's read selectors
-		// are identical, so it is reused here. See ticket NOTE for revisiting if that changes.
+		// are identical, so it is reused here. Revisit if official v1.2.0 bindings become available.
 		caller, err := v1_0_0_lock_release_token_pool.NewLockReleaseTokenPoolCaller(previous, chain.Client)
 		if err != nil {
 			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, err
