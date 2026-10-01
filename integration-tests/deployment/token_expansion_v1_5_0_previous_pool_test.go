@@ -40,12 +40,10 @@ var (
 
 // TestTokenExpansionMigration_V1_5_0_PreviousPool_V14 runs the real auto-migrate changeset
 // end-to-end for a v1.5.0 *AndProxy pool whose getPreviousPool() points at an enabled v1.4 pool.
-// It mirrors the live wxUSD scenario from the ticket, but goes one step further than
-// TestEffectiveMigrationRateLimits_V14Previous (which calls EffectiveMigrationRateLimits
-// directly): this exercises the TAR active-pool lookup, LegacyPoolAddress population, *AndProxy
-// detection, and the real v2 sequence call site, by setting the previous pool tighter on outbound
-// and looser on inbound than the proxy so each direction's "winner" differs, proving the
-// per-direction min is actually applied through the real migration path.
+// It exercises the TAR active-pool lookup, LegacyPoolAddress population, *AndProxy detection, and
+// the real v2 sequence call site, by setting the previous pool tighter on outbound and looser on
+// inbound than the proxy so each direction's "winner" differs, proving the per-direction min is
+// actually applied through the real migration path.
 func TestTokenExpansionMigration_V1_5_0_PreviousPool_V14(t *testing.T) {
 	s := setupLegacyConnectedBnMPair(t, cciputils.Version_1_5_0)
 	e, selA, selB := s.env, s.selA, s.selB
