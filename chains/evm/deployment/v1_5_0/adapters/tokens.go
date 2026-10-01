@@ -441,8 +441,7 @@ func (p *poolOpsV150) Version() *semver.Version {
 // its getPreviousPool() ("previous"), and BOTH apply their own limiter, so the
 // effective limit per direction is the tighter of the two.
 //
-// Exists only for the v1.5.0 *AndProxy migration path (see the ticket referenced from the
-// v2 sequence call site for removal criteria); do not copy this pattern elsewhere.
+// Exists only for the v1.5.0 *AndProxy migration path; do not copy this pattern elsewhere.
 func EffectiveMigrationRateLimits(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
@@ -496,18 +495,24 @@ func EffectiveMigrationRateLimits(
 		return tokensapi.OnchainRateLimits{}, err
 	}
 
-	// proxyIn is already rebased to local decimals upstream (only when remoteDecimals != 0).
-	// Mirror that exact guard so we compare like for like. v1.2/v1.4 EVM previous pools always
-	// use remote decimals, so the DoesPoolUseLocalDecimals check reduces to the remoteDecimals
-	// sentinel.
-	if remoteDecimals != 0 {
-		prevIn = tokensapi.RebaseRateLimiterConfig(prevIn, remoteDecimals, localDecimals)
-	}
+	prevIn = rebasePreviousInbound(prevIn, remoteDecimals, localDecimals)
 
 	return tokensapi.OnchainRateLimits{
 		Outbound: effectiveRateLimiter(proxyOut, prevOut),
 		Inbound:  effectiveRateLimiter(proxyIn, prevIn),
 	}, nil
+}
+
+// rebasePreviousInbound rebases a previous pool's inbound bucket to local decimals, mirroring the
+// exact guard LegacyRateLimitsForAutoMigrate already applied to proxyIn upstream (only when
+// remoteDecimals != 0) so the two are compared like for like. v1.2/v1.4 EVM previous pools always
+// use remote decimals, so the DoesPoolUseLocalDecimals check reduces to the remoteDecimals
+// sentinel.
+func rebasePreviousInbound(prevIn tokensapi.RateLimiterConfig, remoteDecimals, localDecimals uint8) tokensapi.RateLimiterConfig {
+	if remoteDecimals == 0 {
+		return prevIn
+	}
+	return tokensapi.RebaseRateLimiterConfig(prevIn, remoteDecimals, localDecimals)
 }
 
 // effectiveRateLimiter returns the constraint that actually binds: the enabled
@@ -579,6 +584,10 @@ func readV14Limits(
 		nil
 }
 
+// TODO: if v1.2 has a shared `TokenPool` base contract that BnM and LnR pools inherit
+// from, then this function should be refactored such that it re-uses the shared bindings
+// for both pool types similar to `readV14Limits`.
+//
 // readV12Limits reads the per-proxy-address outbound/inbound buckets from a v1.2 previous pool.
 // v1.2 pools key rate limiter state by onRamp (outbound)/offRamp (inbound) address, shared across
 // every lane the proxy pool serves (see the aggregate-bucket caveat logged by the caller). Bucket

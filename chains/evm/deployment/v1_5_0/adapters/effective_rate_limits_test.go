@@ -65,6 +65,32 @@ func TestEffectiveRateLimiter(t *testing.T) {
 	}
 }
 
+// TestRebasePreviousInbound asserts the rebase is applied when remoteDecimals != 0 and skipped
+// (left in the previous pool's native units) otherwise, mirroring the exact guard
+// LegacyRateLimitsForAutoMigrate already applied to the proxy's own inbound bucket upstream.
+func TestRebasePreviousInbound(t *testing.T) {
+	t.Parallel()
+
+	prevIn := tokensapi.RateLimiterConfig{IsEnabled: true, Capacity: big.NewInt(1_000_000), Rate: big.NewInt(1_000)}
+
+	t.Run("remoteDecimals != 0 rebases to local decimals", func(t *testing.T) {
+		t.Parallel()
+		got := rebasePreviousInbound(prevIn, 6, 18)
+		want := tokensapi.RebaseRateLimiterConfig(prevIn, 6, 18)
+		require.Equal(t, want.IsEnabled, got.IsEnabled)
+		require.Equal(t, 0, want.Capacity.Cmp(got.Capacity))
+		require.Equal(t, 0, want.Rate.Cmp(got.Rate))
+		require.NotEqual(t, 0, prevIn.Capacity.Cmp(got.Capacity), "sanity: rebasing should actually change the value for a 6->18 decimal shift")
+	})
+
+	t.Run("remoteDecimals == 0 is a no-op", func(t *testing.T) {
+		t.Parallel()
+		got := rebasePreviousInbound(prevIn, 0, 18)
+		require.Equal(t, 0, prevIn.Capacity.Cmp(got.Capacity))
+		require.Equal(t, 0, prevIn.Rate.Cmp(got.Rate))
+	})
+}
+
 func TestMinBigInt(t *testing.T) {
 	t.Parallel()
 

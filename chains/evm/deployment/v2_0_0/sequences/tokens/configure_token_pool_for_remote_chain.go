@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -126,7 +125,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			// the proxy pool. Remove this once legacy pools are migrated.
 			if imported.LegacyPoolVersion != nil &&
 				imported.LegacyPoolVersion.Equal(utils.Version_1_5_0) &&
-				strings.Contains(imported.LegacyPoolType, "AndProxy") {
+				(imported.LegacyPoolType == utils.BurnMintTokenPoolAndProxy.String() ||
+					imported.LegacyPoolType == utils.LockReleaseTokenPoolAndProxy.String()) {
 				if len(imported.LegacyPoolAddress) == 0 {
 					return sequences.OnChainOutput{}, fmt.Errorf(
 						"v1.5.0 *AndProxy pool detected for lane %d but LegacyPoolAddress is empty",
