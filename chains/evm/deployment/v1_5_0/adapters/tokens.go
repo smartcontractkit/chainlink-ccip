@@ -455,7 +455,9 @@ func EffectiveMigrationRateLimits(
 		return unchanged, nil
 	}
 
-	previous, err := previousPool(chain, proxy)
+	opts := &bind.CallOpts{Context: b.GetContext()}
+
+	previous, err := previousPool(chain, proxy, opts)
 	if err != nil {
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get previous pool for proxy pool %s: %w", proxy.Hex(), err)
 	}
@@ -468,7 +470,6 @@ func EffectiveMigrationRateLimits(
 		return tokensapi.OnchainRateLimits{}, err
 	}
 
-	opts := &bind.CallOpts{Context: b.GetContext()}
 	var prevOut, prevIn tokensapi.RateLimiterConfig
 	switch {
 	case prevVersion.GreaterThanEqual(utils.Version_1_4_0) && prevVersion.LessThan(utils.Version_1_5_0):
@@ -537,12 +538,12 @@ func effectiveRateLimiter(proxy, previous tokensapi.RateLimiterConfig) tokensapi
 
 // previousPool reads getPreviousPool() from the v1.5.0 *AndProxy pool at proxy. The value is
 // technically mutable, so this is a raw call rather than a cached operation.
-func previousPool(chain evm.Chain, proxy common.Address) (common.Address, error) {
+func previousPool(chain evm.Chain, proxy common.Address, opts *bind.CallOpts) (common.Address, error) {
 	contract, err := tpap.NewTokenPoolAndProxyContract(proxy, chain.Client)
 	if err != nil {
 		return common.Address{}, err
 	}
-	return contract.GetPreviousPool(&bind.CallOpts{})
+	return contract.GetPreviousPool(opts)
 }
 
 // previousTypeAndVersion resolves the type and version of the previous pool via the shared
