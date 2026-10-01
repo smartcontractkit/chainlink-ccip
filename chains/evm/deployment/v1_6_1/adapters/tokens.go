@@ -1,10 +1,8 @@
 package adapters
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -76,7 +74,7 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 	)
 }
 
-func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
+func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr, _ []byte) ([]uint64, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -95,7 +93,7 @@ func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelecto
 	return report.Output, nil
 }
 
-func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr, _ []byte, remoteSelector uint64) ([]byte, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -118,7 +116,7 @@ func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector ui
 	return report.Output, nil
 }
 
-func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error) {
+func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr, _ []byte, remoteSelector uint64) ([][]byte, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -280,11 +278,6 @@ func (p *poolOpsV161) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, 
 func (p *poolOpsV161) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error) {
 	var writes []evm_contract.WriteOutput
 	for _, remote := range remotes {
-		if !common.IsHexAddress(remote.Remote.Address) {
-			return nil, fmt.Errorf("invalid remote pool address for chain %d: %s", remote.Selector, remote.Remote.Address)
-		}
-		target := common.LeftPadBytes(common.HexToAddress(remote.Remote.Address).Bytes(), 32)
-
 		poolsReport, err := cldf_ops.ExecuteOperation(
 			b, tpOps.GetRemotePools, chain,
 			evm_contract.FunctionInput[uint64]{ChainSelector: chain.Selector, Address: poolAddr, Args: remote.Selector},
@@ -294,29 +287,33 @@ func (p *poolOpsV161) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, pool
 			return nil, fmt.Errorf("failed to get remote pools for remote chain %d from pool %s on chain %d: %w", remote.Selector, poolAddr.Hex(), chain.Selector, err)
 		}
 
-		if !slices.ContainsFunc(poolsReport.Output, func(p []byte) bool { return bytes.Equal(p, target) }) {
-			return nil, fmt.Errorf(
-				"remote pool %s is not configured for remote chain %d on pool %s (chain %d)",
-				remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector,
-			)
-		}
-
-		removeReport, err := cldf_ops.ExecuteOperation(
-			b, tpOps.RemoveRemotePool, chain,
-			evm_contract.FunctionInput[tpOps.RemoveRemotePoolArgs]{
-				ChainSelector: chain.Selector,
-				Address:       poolAddr,
-				Args: tpOps.RemoveRemotePoolArgs{
-					RemoteChainSelector: remote.Selector,
-					RemotePoolAddress:   target,
-				},
-			},
-		)
+		matches, err := evm1_0_0.MatchingRemotePools(poolsReport.Output, remote.Selector, remote.Remote.Address)
 		if err != nil {
-			return nil, fmt.Errorf("failed to remove remote pool %s for remote chain %d from pool %s on chain %d: %w", remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector, err)
+			return nil, err
+		}
+		if len(matches) == 0 {
+			b.Logger.Warnf("skipping removal of remote pool %s for remote chain %d from pool %s on chain %d: pairing already absent", remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector)
+			continue
 		}
 
-		writes = append(writes, removeReport.Output)
+		// Remove each stored encoding of the remote pool by its exact bytes.
+		for _, stored := range matches {
+			removeReport, err := cldf_ops.ExecuteOperation(
+				b, tpOps.RemoveRemotePool, chain,
+				evm_contract.FunctionInput[tpOps.RemoveRemotePoolArgs]{
+					ChainSelector: chain.Selector,
+					Address:       poolAddr,
+					Args: tpOps.RemoveRemotePoolArgs{
+						RemoteChainSelector: remote.Selector,
+						RemotePoolAddress:   stored,
+					},
+				},
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to remove remote pool %s for remote chain %d from pool %s on chain %d: %w", remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector, err)
+			}
+			writes = append(writes, removeReport.Output)
+		}
 	}
 
 	return writes, nil
