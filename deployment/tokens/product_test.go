@@ -112,3 +112,70 @@ func TestRegisterTokenAdapter(t *testing.T) {
 		})
 	}
 }
+
+// productTest_MockTARReader is a reader-only TokenAdminRegistry; productTest_MockTARManager can also
+// unregister.
+type productTest_MockTARReader struct{}
+
+func (m *productTest_MockTARReader) GetActivePool(deployment.Environment, uint64, datastore.AddressRef, ...datastore.AddressRef) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *productTest_MockTARReader) GetTokenAdminRegistryRef(deployment.Environment, uint64) (datastore.AddressRef, error) {
+	return datastore.AddressRef{}, nil
+}
+
+type productTest_MockTARManager struct{ productTest_MockTARReader }
+
+func (m *productTest_MockTARManager) UnregisterToken() *cldf_ops.Sequence[tokens.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return nil
+}
+
+func TestTokenAdminRegistryRegistration(t *testing.T) {
+	// The registry is global and registrations are first-write-wins, so each case uses its own family.
+	registry := tokens.GetTokenAdapterRegistry()
+
+	t.Run("a manager is also the family's reader", func(t *testing.T) {
+		family := "productTest-tar-manager-is-reader"
+		manager := &productTest_MockTARManager{}
+		registry.RegisterTokenAdminRegistryManager(family, manager)
+
+		reader, ok := registry.GetTokenAdminRegistryReader(family)
+		require.True(t, ok)
+		require.Same(t, manager, reader)
+	})
+
+	t.Run("a manager replaces an earlier reader-only registration", func(t *testing.T) {
+		family := "productTest-tar-manager-replaces-reader"
+		registry.RegisterTokenAdminRegistryReader(family, &productTest_MockTARReader{})
+		manager := &productTest_MockTARManager{}
+		registry.RegisterTokenAdminRegistryManager(family, manager)
+
+		reader, ok := registry.GetTokenAdminRegistryReader(family)
+		require.True(t, ok)
+		require.Same(t, manager, reader)
+	})
+
+	t.Run("a later reader-only registration does not replace a manager", func(t *testing.T) {
+		family := "productTest-tar-reader-keeps-manager"
+		manager := &productTest_MockTARManager{}
+		registry.RegisterTokenAdminRegistryManager(family, manager)
+		registry.RegisterTokenAdminRegistryReader(family, &productTest_MockTARReader{})
+
+		reader, ok := registry.GetTokenAdminRegistryReader(family)
+		require.True(t, ok)
+		require.Same(t, manager, reader)
+	})
+
+	t.Run("a reader-only family has no manager", func(t *testing.T) {
+		family := "productTest-tar-reader-only"
+		readerOnly := &productTest_MockTARReader{}
+		registry.RegisterTokenAdminRegistryReader(family, readerOnly)
+
+		reader, ok := registry.GetTokenAdminRegistryReader(family)
+		require.True(t, ok)
+		require.Same(t, readerOnly, reader)
+		_, ok = registry.GetTokenAdminRegistryManager(family)
+		require.False(t, ok)
+	})
+}
