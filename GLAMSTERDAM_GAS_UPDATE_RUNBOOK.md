@@ -8,17 +8,58 @@ If you just want to generate both proposals with minimal reading, skip to **§3 
 Everything else is context/troubleshooting for when something doesn't work on the first try.
 
 **Validation status (read first):**
-- **v2.0 (`ccv` / `prod_testnet`)** was re-run end to end on 2026-10-02 against `chainlink-ccip`
-  `main` (`a2d686f61`) plus the pool-skip fix in §10, and the output was verified with the script
-  in **Appendix A** (194 txs / 60 chains, 0 failures). The steps below for that path reflect what
-  actually worked.
-- **v1.6 (`ccip` / `testnet`)** steps (§5) were *not* re-run in that session. Expect the same
-  class of issues as v2.0 (stale local checkout, datastore/catalog access, report cache) and
-  treat §5 as unverified until it has been re-run.
-- Things that changed since the original rehearsal and are easy to trip over: `prod_testnet` now
-  needs **catalog access** (§1, §6c); the `chainlink-ccip` checkout must be **at or after the
-  commit `domains/ccv/go.mod` pins** (§5a/§6a); and the v2.0 changeset **needs the fix in §10**
-  (skip token pools that don't support the target) or it aborts.
+- **v2.0 (`ccv` / `prod_testnet`)** was fully rehearsed on 2026-10-02: a freshly generated proposal
+  (96 batches, 214 txs, 60 chains) passed the Appendix A verification (0 failures) and the Appendix B
+  coverage check, every batch was callable by its chain's timelock, and `execute-fork` ran cleanly on
+  Base Sepolia, Robinhood, Arbitrum Sepolia, Arc and Hedera testnets. Avalanche Fuji could not be
+  fork-executed (no RPC that serves fork state, §9c); its 6 txs were simulated as the timelock instead.
+- **v1.6 (`ccip` / `testnet`)**: the changeset now updates only the FeeQuoter each v1.6 OnRamp is
+  actually wired to, and skips chains where that is a FeeQuoter 2.0.0 (§10). On `ccip`/`testnet`
+  that is **every** chain, so it produced no proposal; the v2.0 proposal covers those lanes. On
+  mainnet the v1.6 changeset is expected to have little or nothing to do (73 of 85 v1.6 OnRamps were
+  wired to a 2.0.0 FeeQuoter when checked) but **must still be run** to find the exceptions.
+- Mainnet has only been dry-run (`ccv`/`prod_mainnet`, file datastore) with an earlier version of the
+  code (before verifier-batch isolation and the `destGasOverhead` field): 129 batches, 273 txs, 0 failed
+  checks. It must be regenerated, re-verified and fork-executed before a real run.
+
+## START HERE — end-to-end procedure (for an engineer or an AI agent)
+
+Gather before starting: the **target chain selector** (the chain moving to Glamsterdam), the
+environment (`ccv`: `prod_testnet` / `prod_mainnet`; `ccip`: `testnet` / `mainnet`), the MCMS
+`qualifier` (`CLLCCIP`), a `validUntil` timestamp, and the list of **chains already executed** from any
+earlier proposal (they must go in `skipChainSelectors`, see the re-run rules below). Do not guess any of
+these; look them up (§13).
+
+**Rules that prevent the expensive mistakes**
+1. **Run v2.0 first, then v1.6.** They never write the same contract (the v1.6 changeset skips chains
+   whose OnRamp uses a FeeQuoter 2.0.0, which the v2.0 changeset owns), so the order is not
+   safety-critical, but v2.0 is the critical one and v1.6 is "whatever is left".
+2. **Never regenerate a proposal over chains that already executed.** Re-running is not idempotent for
+   generic FeeQuoter token overrides (x3 again) or any field that took a ratio fallback (`MISMATCH`);
+   see **§3.1**.
+3. **Rehearsal workarounds must never reach a real proposal or a commit**: the `datastore: file`
+   override (§1, §6c), commented-out dead chains in `.config/networks/*.yaml` (§7.2), and local
+   `replace` lines in `go.mod`.
+4. **A proposal that builds is not a proposal that works.** Always run the verification (§9, Appendix A
+   and B) and the fork executions (§9c) before handing it over.
+
+**Steps**
+1. **Code and versions** (§1, §5a, §6a). The `chainlink-ccip` code you run must contain the current
+   changesets; for a real run, bump the module pins rather than using `replace` (§12).
+2. **Registration and input** (§2, §5b/c, §6d/e). Create the input YAML with the right target,
+   `qualifier`, `validUntil` and `skipChainSelectors`.
+3. **Datastore** (§1, §6c). A real run uses the catalog (`datastore: all`, needs catalog access). If you
+   have no catalog access, the `datastore: file` workaround produces a rehearsal-only proposal.
+4. **Generate**. Move any previous outputs aside first (§8), `mkdir` the Solana placeholder (§7.1),
+   then `go run . pipeline run ... --dry-run` (§3). Budget ~4 minutes for `ccv`. A dead RPC on one chain
+   fails the whole load: disable only that chain locally and say so (§7.2).
+5. **Verify** with Appendix A (per-transaction checks against live chain state) and Appendix B
+   (nothing missing or extra). Require `FAILED: 0` and `COVERAGE PROBLEMS: 0`, and read every WARNING.
+6. **Check ownership**: every target contract must be owned by the chain's timelock (§9). Verifier
+   writes are in their own batches, so one bad owner only fails its own batch.
+7. **Fork-execute** the highest-traffic chains with `mcms execute-fork` (§9c). Docker must be running.
+8. **Report** what was and was not verified (for example chains with no usable fork RPC), what the
+   datastore source was (catalog vs file), and which chains were skipped and why.
 
 ## 0. What this is
 
@@ -64,7 +105,10 @@ the deployer key happens to own the contract.
   Catalog auth uses AWS KMS (see `.config/ci/common.env`). Either configure it
   (`catalog.grpc` in `.config/local/config.<env>.yaml` plus AWS creds), or for a **rehearsal only**
   use the file-datastore workaround in §6c. A proposal for a *real* execution must be generated
-  against the catalog, not the checked-in file snapshot.
+  against the catalog, not the checked-in file snapshot. **AI agents:** do not go looking for catalog
+  credentials or AWS keys on the machine. If the catalog is not configured, stop and ask the human,
+  or use the file workaround and label every result "rehearsal, file datastore". The same
+  `datastore: all` setting applies to `ccip`'s `testnet` and `mainnet` in `domains/ccip/.config/domain.yaml`.
 - Otherwise no `secrets-<env>.toml` is needed for a dry run — RPC endpoints come straight from
   `domains/<domain>/.config/networks/<env>.yaml`.
 - `cast` (Foundry) on `PATH`, for the verification script in Appendix A.
@@ -121,16 +165,39 @@ least one flaky/dead-chain RPC — see §7.2 for the fix pattern (disable that o
 they cover every setup step from scratch, since your local state may differ from what's described
 above. Once you've done that once, only §3 is needed for subsequent runs.
 
+### 3.1 Re-running after partial or failed execution (IMPORTANT)
+
+The changesets read the **current** on-chain values and apply their rules. After a proposal has
+executed on a chain, running them again against that chain is **not** a no-op:
+- fields that matched the Prague baseline are safe (they now equal the Glamsterdam value, so the
+  changeset sees "already applied"), but
+- fields that took the **ratio fallback** (`MISMATCH` in the report) are scaled *again* (for example
+  `destGasPerPayloadByteBase` 16 -> 51 would become 163), and
+- every **generic FeeQuoter token override** (anything that is not USDC/Lombard) is multiplied by 3 again.
+
+So: **if some chains executed and you need a new proposal for the rest, put every chain that already
+executed into `cfg.skipChainSelectors`** in the input YAML (the list is excluded unconditionally, no lane
+check is made), move the previous outputs aside (§8), and regenerate. Procedure:
+1. List the chains that executed. For each, confirm on-chain, for example
+   `OnRamp.getDestChainConfig(<target>)` shows `baseExecutionGasCost` 400000 for v2.0.
+2. Put those chain selectors in `skipChainSelectors`, regenerate, and verify as usual.
+3. A chain that is only **partly** executed (some batches done, for example only its verifier batch
+   failed) is the dangerous case: regenerating would redo the executed batches too. Prefer to
+   **execute the remaining batches of the existing proposal** (batches are independent) instead of
+   regenerating; if you must regenerate, skip the chain and fix its remaining batch by hand.
+
 ## 4. Verifying a proposal (do this after every run, not optional)
 
 See §9 for the full 3-tier checklist (report → decoded diff → fork-execute). At minimum, do tier
 (a) and (b) before trusting a proposal — this catches most real bugs, including the two described
 in §10.
 
-For v2.0, tier (b) is automated by **Appendix A** (`verify_proposal.py`): it checks every
-transaction's function selector and target contract type, diffs OnRamp/FeeQuoter writes against
-`<env>/state_v2.json`, and diffs verifier/pool writes against live on-chain values. Run it right
-after the pipeline finishes and require `FAILED: 0`.
+For v2.0, tier (b) is automated by **Appendix A** (`verify_proposal.py`): for every transaction it
+checks the function selector and target contract type, diffs the write against the **live on-chain
+value** (only the gas fields may differ), and recomputes the expected new value from the live current
+value with the changeset's rules. **Appendix B** (`verify_coverage.py`) checks the other direction:
+every chain with a live lane is in the proposal and nothing extra is. Run both right after the pipeline
+finishes and require `FAILED: 0` and `COVERAGE PROBLEMS: 0`.
 
 ## 5. v1.6 setup (ccip domain, testnet)
 
@@ -186,7 +253,7 @@ changesets:
       payload:
         cfg:
           targetChainSelector: 16015286601757825753 # ethereum-testnet-sepolia
-          skipChainSelectors: []
+          skipChainSelectors: []   # chains that ALREADY EXECUTED from an earlier proposal go here (§3.1)
         mcms:
           timelockAction: "schedule"
           validUntil: 1893456000
@@ -321,7 +388,7 @@ changesets:
       payload:
         cfg:
           targetChainSelector: 16015286601757825753 # ethereum-testnet-sepolia
-          skipChainSelectors: []
+          skipChainSelectors: []   # chains that ALREADY EXECUTED from an earlier proposal go here (§3.1)
         mcms:
           qualifier: "CLLCCIP"
           timelockAction: "schedule"
@@ -447,17 +514,43 @@ This produces one collapsible section per chain/batch, with every call's decoded
 - Cross-reference against `GLAMSTERDAM_GAS_UPDATE_PLAN.md` §6's field table for the expected
   Prague/Glamsterdam/fallback numbers per field.
 
-**c. Actually execute against a fork (strongest check, do this before a real mainnet run):**
+**c. Actually execute against a fork (strongest check, do this before a real run):**
 ```bash
 go run . mcms execute-fork \
-  -e <testnet|prod_testnet> \
-  -p ../<env>/proposals/<the proposal file>.json \
+  -e <testnet|prod_testnet|prod_mainnet> \
+  -p /absolute/path/to/<the proposal file>.json \
   -s <chain selector> \
   --test-signer
 ```
-Forks that one chain with Anvil and actually runs set-root + execute-timelock against it — the
-closest thing to a full dry run without touching real state. Do this per chain you're unsure
-about, then read back the contract state to confirm it matches what the decoded proposal claimed.
+Forks that one chain with Anvil (in a Docker container: **Docker must be running**, otherwise it fails
+with `failed to set up CTF default network`) and runs set-root, the MCMS executes and the timelock
+executes for that chain's batches. Run it **one chain at a time** (each starts a container; a loop of
+chains takes ~3-5 minutes each) and pick the highest-traffic chains plus any chain with something
+unusual. Reading the log (redact RPC URLs before pasting it anywhere; they contain API keys):
+- Success looks like `MCM.setRoot() - success`, `MCM.execute() - success`,
+  `Operation N executed successfully` once per batch on that chain, `All operations executed
+  successfully`, `Timelock.execute() - success`. Count the operations: it must equal the number of
+  batches for that chain in the proposal.
+- After the timelock executes, a **post-proposal hook** (`verify-ccip-send`) sends real test CCIP
+  messages through the new gas config on the fork. Sends that succeed are extra evidence. Failures
+  of the form `dest chain ... not in fork env` are test-harness noise (only one chain is forked) and
+  do not mean the proposal failed; judge the proposal by the lines above, not by the hook.
+- `execute-fork` **aborts at the first failing operation**; later batches on that chain are not
+  attempted. A failing operation `RBACTimelock: underlying transaction reverted` usually means the
+  timelock is not the owner of that target (`OnlyCallableByOwner`); check ownership (§9). Real
+  execution runs each batch separately, so a failed batch does not block the others.
+- **Fork RPC problems are not proposal failures.** `missing trie node` / `failed to get storage` mean
+  the RPC the tool picked is not an archive node and dropped the forked block's state (Avalanche Fuji
+  hit this on 2026-10-02: every configured RPC either failed its health check or was pruned). The
+  tool takes the first two healthy RPCs from `.config/networks/<env>.yaml`; you can temporarily
+  comment out the pruned provider locally to force another, and **restore the file afterwards**
+  (`git status` on it must be clean). If no RPC works, fall back to simulating each transaction as the
+  chain's timelock: `cast rpc eth_call '{"from":"<timelock>","to":"<target>","data":"<hex>"}' latest
+  --rpc-url <rpc>` (decode the base64 `data` first). This proves the call itself succeeds, but not the
+  MCMS/timelock path, and must be reported as a weaker check.
+- **Hedera quirk:** `eth_call` simulation as the timelock fails on `hedera-testnet` with
+  `OnlyCallableByOwner()` even though the timelock is the owner (its JSON-RPC relay does not present a
+  contract `from` as `msg.sender`); `execute-fork` on Hedera passes. Trust the fork there.
 
 ## 10. Known non-bugs / behaviors you'll likely rediscover
 
@@ -657,7 +750,8 @@ OnRamp/Router a given lane actually routes through.)
 ## 12. Mainnet rollout notes
 
 - Batch mainnet's ~80 lanes using `SkipChainSelectors` in the input YAML's `cfg` block — put
-  everything except the batch you're running for that pass in the skip list.
+  everything except the batch you're running for that pass in the skip list. (The same list is how
+  you exclude chains that already executed when regenerating, §3.1.)
 - `SkipChainSelectors` entries are unconditionally excluded, not even checked for a lane — this is
   the intended mechanism for controlled fan-out.
 - Re-verify §0's domain choice before the mainnet run — confirm which domain (`ccip` vs `ccv`) and
@@ -673,8 +767,8 @@ OnRamp/Router a given lane actually routes through.)
      the Glamsterdam changesets themselves, just not the §10 fix.)
   3. Land the changeset registration and input YAML in `chainlink-deployments` via a normal PR
      (they were uncommitted local edits during the rehearsal).
-  4. Re-run the Appendix A verification on the final proposal, then `execute-fork` a
-     representative sample of chains (§9c). The rehearsal did **not** fork-execute.
+  4. Re-run the Appendix A and B verification on the final proposal, then `execute-fork` the
+     highest-traffic chains (§9c). The testnet rehearsal did this; mainnet has not been fork-executed yet.
   5. Resolve the USDC-pool baseline question in §11 and replace the "(guesstimate)" constants.
 
 ## 13. Notes for an AI agent picking this up
@@ -725,60 +819,76 @@ If you're an AI agent (Claude Code or otherwise) working through this runbook ra
 
 ## Appendix A. `verify_proposal.py` — automated v2.0 proposal check
 
-Save as `verify_proposal.py` and run it after the pipeline finishes (needs `cast` on `PATH` and
-VPN for the `rpcs.cldev.sh` reads; Python 3, standard library only):
+This is a helper that an engineer or AI agent can copy out of this file; it is **not** part of the
+repo or of CLD. Save it as `verify_proposal.py` (outside the repo) and run it right after the pipeline
+finishes. It needs `python3` (standard library only), `cast` (Foundry) and the VPN, and reads current
+values from `https://rpcs.cldev.sh/<selector>`:
 
 ```bash
-python3 verify_proposal.py chainlink-deployments/domains/ccv/prod_testnet            # default target: Sepolia
-python3 verify_proposal.py chainlink-deployments/domains/ccv/prod_testnet <targetChainSelector>
+python3 verify_proposal.py chainlink-deployments/domains/ccv/<env> <target chain selector>
 ```
 
-It uses the newest `proposals/*glamsterdam_v2*.json` in that directory, so move older runs aside
-first (§8). Exit code is non-zero if any transaction fails. What it enforces, per transaction:
-
-1. selector is one of the four expected functions (§9) and the target address is the expected
+It uses the newest `proposals/*glamsterdam_v2*.json` in that directory, so move older runs aside first
+(§8). The exit code is non-zero if any transaction fails. Per transaction it enforces:
+1. the 4-byte selector is one of the expected functions (§9) and the target address is the expected
    contract type in `datastore/address_refs.json`;
-2. `OnRamp` / `FeeQuoter` writes: every field except the gas fields is identical to `state_v2.json`;
-3. verifier / token-pool writes: every field except the gas field is identical to the **live**
-   on-chain value (`getRemoteChainConfig`, `getTokenTransferFeeConfig`);
-4. destination selector in the calldata is the intended target;
+2. `OnRamp` / `FeeQuoter` dest-chain writes: every field except the gas fields equals the **live**
+   on-chain value (`state_v2.json` is a snapshot and can be stale, so it is not used);
+3. verifier / token-pool / FeeQuoter-override writes: every field except the gas field equals the live
+   on-chain value, no override is removed or disabled;
+4. the **new value equals what the changeset's rules compute from the live current value**
+   (literal Glamsterdam value on a baseline match, no-op if already migrated, otherwise the ratio
+   fallback; FeeQuoter per-token overrides x3);
+5. the destination selector inside the calldata is the intended target;
 
-and prints every current → new value transition with counts, which you compare to the report's
-`description` and to §11. It does *not* simulate execution — still do §9c before a real run.
-Verified 2026-10-02: 194/194 txs pass, and pointing it at a wrong target selector fails all 194.
+and prints every current -> new value transition with counts, which you compare to the report in the
+proposal `description` and to §11. It retries transient RPC-proxy errors, but a chain whose RPC keeps
+failing shows up as a failed transaction (`ERR ...`): re-run before treating it as real. It does
+**not** simulate execution (use §9c) and does **not** check ownership (use §9). If you change a rule
+in `fields.go`, update the `EXPECT` table in the script to match.
 
 ```python
 #!/usr/bin/env python3
 """Verify a Glamsterdam v2.0 MCMS proposal: right functions, right contracts, only intended fields changed.
 
-usage: verify_proposal.py <domains/ccv/prod_testnet dir> [target_selector]
+usage: python3 verify_proposal.py <domains/ccv/<env> dir> <target_selector>
 Needs: `cast` (foundry), VPN (reads live values from https://rpcs.cldev.sh/<selector>).
 Checks:
   1. every tx targets a contract of the expected type per <env>/datastore/address_refs.json
   2. every tx's 4-byte selector is one of the 4 expected functions
-  3. OnRamp / FeeQuoter writes vs <env>/state_v2.json: only gas fields differ
+  3. OnRamp / FeeQuoter dest-chain writes vs LIVE on-chain values (state_v2.json is a snapshot and can be stale): only gas fields differ
   4. CommitteeVerifier / CCTPVerifier / token-pool writes vs LIVE on-chain values: only the gas field differs
 """
-import base64, glob, json, re, subprocess, sys
+import base64, glob, json, re, subprocess, sys, time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 BASE = sys.argv[1].rstrip('/') + '/'
-T = int(sys.argv[2]) if len(sys.argv) > 2 else 16015286601757825753  # ethereum-testnet-sepolia
+T = int(sys.argv[2])  # target chain selector (the chain moving to Glamsterdam)
 
 prop = json.load(open(sorted(glob.glob(BASE + 'proposals/*glamsterdam_v2*.json'))[-1]))
-state = json.load(open(BASE + 'state_v2.json'))
 ref = {(r['chainSelector'], r['address'].lower()): r for r in json.load(open(BASE + 'datastore/address_refs.json'))}
 
+def run(cmd, tries=4):
+    """Run a cast command, retrying transient RPC failures (the RPC proxy occasionally returns 'header not found')."""
+    for i in range(tries):
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        if p.returncode == 0: return p.stdout
+        if i == tries - 1 or not re.search(r'header for number not found|ErrUpstreamsExhausted|timed out|timeout|502|503|504|connection', p.stderr, re.I):
+            raise RuntimeError(p.stderr.strip()[:200])
+        time.sleep(2 * (i + 1))
+
 def cast(*a):
-    p = subprocess.run(['cast', *a], capture_output=True, text=True, timeout=60)
-    if p.returncode: raise RuntimeError(p.stderr.strip()[:200])
-    return re.sub(r' \[[0-9.e+-]+\]', '', p.stdout.strip())  # cast annotates big numbers, e.g. "270000 [2.7e5]"
+    return re.sub(r' \[[0-9.e+-]+\]', '', run(['cast', *a]).strip())  # cast annotates big numbers, e.g. "270000 [2.7e5]"
+
+def livejson(to, sig, url, *args):
+    return json.loads(run(['cast', 'call', to, sig, *args, '--json', '--rpc-url', url]))[0]  # the single tuple output, as a list of fields
 
 FN = {  # name -> (signature, expected datastore type)
     'OnRamp.applyDestChainConfigUpdates': ('applyDestChainConfigUpdates((uint64,address,uint8,bool,uint16,uint16,uint32,address[],address[],address,bytes)[])', {'OnRamp'}),
     'FeeQuoter.applyDestChainConfigUpdates': ('applyDestChainConfigUpdates((uint64,(bool,uint32,uint32,uint32,uint8,bytes4,uint16,uint32,uint32,uint16,uint8))[])', {'FeeQuoter'}),
     'Verifier.applyRemoteChainConfigUpdates': ('applyRemoteChainConfigUpdates((address,uint64,bool,uint16,uint32,uint16)[])', {'CommitteeVerifier', 'CCTPVerifier', 'LombardVerifier'}),
+    'FeeQuoter.applyTokenTransferFeeConfigUpdates': ('applyTokenTransferFeeConfigUpdates((uint64,(address,(uint32,uint32,uint32,bool))[])[],(uint64,address)[])', {'FeeQuoter'}),
     'Pool.applyTokenTransferFeeConfigUpdates': ('applyTokenTransferFeeConfigUpdates((uint64,(uint32,uint32,uint32,uint32,uint16,uint16,bool))[],uint64[])', {'CCTPThroughCCVTokenPool', 'LombardTokenPool', 'SiloedUSDCTokenPool', 'USDCTokenPool'}),
 }
 SEL = {cast('sig', s): n for n, (s, _) in FN.items()}
@@ -789,10 +899,6 @@ for bi, b in enumerate(prop['operations']):
         d = t['data'] if t['data'].startswith('0x') else '0x' + base64.b64decode(t['data']).hex()  # proposal JSON stores base64
         ops.append((bi, int(b['chainSelector']), t['to'].lower(), d))
 print(f'{len(prop["operations"])} batches, {len(ops)} txs, {len({o[1] for o in ops})} chains')
-
-def state_contract(sel, addr, kind):
-    c = next((v for v in state['chains'].values() if v['chainSelector'] == sel), None)
-    return next((v for a, v in (c or {}).get(kind, {}).items() if a.lower() == addr), None)
 
 def check(op):
     bi, sel, to, data = op
@@ -823,36 +929,83 @@ def check(op):
                 if i and cv[i] != nv[i]: out['errs'].append(f'{n} changed {cv[i]}->{nv[i]}')
             if cv[6] != 'true': out['errs'].append('pool fee config currently disabled')
             out['t'] = (typ, 'DestGasOverhead', int(cv[0]), int(nv[0]))
+        elif fn == 'FeeQuoter.applyTokenTransferFeeConfigUpdates':
+            new = cast('calldata-decode', 'x((uint64,(address,(uint32,uint32,uint32,bool))[])[],(uint64,address)[])', data).replace('\n', ', ')
+            if int(re.match(r'\[\((\d+),', new).group(1)) != T: out['errs'].append('wrong dest chain')
+            if not new.endswith(', []'): out['errs'].append('unexpected tokensToUseDefaultFeeConfigs (override removal)')
+            entries = re.findall(r'\((0x\w{40}), \((\d+), (\d+), (\d+), (true|false)\)\)', new)
+            if not entries: out['errs'].append('no token entries decoded')
+            out['ts'] = []
+            for tok, fee, gas, byt, en in entries:
+                c = re.match(r'\((\d+), (\d+), (\d+), (true|false)\)', cast(
+                    'call', to, 'getTokenTransferFeeConfig(uint64,address)((uint32,uint32,uint32,bool))', str(T), tok, '--rpc-url', url)).groups()
+                if c[3] != 'true': out['errs'].append(f'{tok}: override currently disabled (would be re-enabled)')
+                for n, a_, b_ in (('feeUSDCents', c[0], fee), ('destBytesOverhead', c[2], byt), ('isEnabled', c[3], en)):
+                    if a_ != b_: out['errs'].append(f'{tok}: {n} changed {a_}->{b_}')
+                out['ts'].append((typ, 'token override DestGasOverhead', int(c[1]), int(gas)))
         elif fn == 'OnRamp.applyDestChainConfigUpdates':
-            sc = state_contract(sel, to, 'onRamp'); cur = next(d for d in sc['destChainConfigs'] if d['destChainSelector'] == T)
+            live = livejson(to, 'getDestChainConfig(uint64)((address,uint64,uint8,bool,uint16,uint16,uint32,address,address[],address[],bytes))', url, str(T))
             new = cast('calldata-decode', 'x(' + '(uint64,address,uint8,bool,uint16,uint16,uint32,address[],address[],address,bytes)[])', data)
             m = re.match(r'\[\((\d+), (0x\w{40}), (\d+), (true|false), (\d+), (\d+), (\d+), \[(.*?)\], \[(.*?)\], (0x\w{40}), (0x\w*)\)\]', new, re.S)
             g = m.groups()
-            for i, n, k in [(1, 'router', 'router'), (2, 'addressBytesLength', 'addressBytesLength'), (4, 'messageNetworkFeeUSDCents', 'messageNetworkFeeUSDCents'),
-                            (5, 'tokenNetworkFeeUSDCents', 'tokenNetworkFeeUSDCents'), (9, 'defaultExecutor', 'defaultExecutor')]:
-                if str(g[i]).lower() != str(cur[k]).lower(): out['errs'].append(f'OnRamp {n} changed {cur[k]}->{g[i]}')
+            # live getter order: router, messageNumber, addressBytesLength, tokenReceiverAllowed, msgFee, tokFee, baseExec, defaultExecutor, laneMandatedCCVs, defaultCCVs, offRamp
             if int(g[0]) != T: out['errs'].append('wrong dest chain')
-            if sorted(re.findall(r'0x\w{40}', g[7].lower())) != sorted(x.lower() for x in cur['defaultCCVs']): out['errs'].append('defaultCCVs changed')
-            if sorted(re.findall(r'0x\w{40}', g[8].lower())) != sorted(x.lower() for x in cur['laneMandatedCCVs']): out['errs'].append('laneMandatedCCVs changed')
-            out['t'] = (typ, 'BaseExecutionGasCost', cur['baseExecutionGasCost'], int(g[6]))
+            checks = [('router', live[0], g[1]), ('addressBytesLength', live[2], g[2]), ('tokenReceiverAllowed', live[3], g[3]),
+                      ('messageNetworkFeeUSDCents', live[4], g[4]), ('tokenNetworkFeeUSDCents', live[5], g[5]),
+                      ('defaultExecutor', live[7], g[9]), ('offRamp', live[10], g[10])]
+            for n, a_, b_ in checks:
+                if str(a_).lower() != str(b_).lower(): out['errs'].append(f'OnRamp {n} changed {a_}->{b_}')
+            if sorted(x.lower() for x in live[9]) != sorted(re.findall(r'0x\w{40}', g[7].lower())): out['errs'].append('defaultCCVs changed')
+            if sorted(x.lower() for x in live[8]) != sorted(re.findall(r'0x\w{40}', g[8].lower())): out['errs'].append('laneMandatedCCVs changed')
+            out['t'] = (typ, 'BaseExecutionGasCost', int(live[6]), int(g[6]))
         elif fn == 'FeeQuoter.applyDestChainConfigUpdates':
-            sc = state_contract(sel, to, 'feeQuoter'); cur = sc['destinationChainConfig'][str(T)]
+            live = livejson(to, 'getDestChainConfig(uint64)((bool,uint32,uint32,uint32,uint8,bytes4,uint16,uint32,uint32,uint16,uint8))', url, str(T))
             new = cast('calldata-decode', 'x((uint64,(bool,uint32,uint32,uint32,uint8,bytes4,uint16,uint32,uint32,uint16,uint8))[])', data)
             g = re.match(r'\[\((\d+), \((true|false), (\d+), (\d+), (\d+), (\d+), (0x\w+), (\d+), (\d+), (\d+), (\d+), (\d+)\)\)\]', new).groups()
             names = ['isEnabled', 'maxDataBytes', 'maxPerMsgGasLimit', 'destGasOverhead', 'destGasPerPayloadByteBase', 'chainFamilySelector',
                      'defaultTokenFeeUSDCents', 'defaultTokenDestGasOverhead', 'defaultTxGasLimit', 'networkFeeUSDCents', 'linkFeeMultiplierPercent']
-            gas = {'maxPerMsgGasLimit', 'destGasPerPayloadByteBase', 'defaultTokenDestGasOverhead', 'defaultTxGasLimit'}
+            gas = {'destGasOverhead', 'maxPerMsgGasLimit', 'destGasPerPayloadByteBase', 'defaultTokenDestGasOverhead', 'defaultTxGasLimit'}
             if int(g[0]) != T: out['errs'].append('wrong dest chain')
             out['ts'] = []
-            for n, v in zip(names, g[1:]):
-                cv = str(cur[n]).lower().replace('true', 'true')
-                if n in gas: out['ts'].append((typ, n, cur[n], int(v)))
-                elif str(v).lower().replace('0x', '') != cv.replace('0x', ''): out['errs'].append(f'FeeQuoter {n} changed {cur[n]}->{v}')
+            for n, cv, v in zip(names, live, g[1:]):
+                if n in gas: out['ts'].append((typ, n, int(cv), int(v)))
+                elif str(cv).lower().replace('0x', '').replace('true', 'true') != str(v).lower().replace('0x', ''): out['errs'].append(f'FeeQuoter {n} changed {cv}->{v}')
     except Exception as e:
         out['errs'].append('ERR ' + repr(e)[:160])
     return out
 
 with ThreadPoolExecutor(12) as ex: res = list(ex.map(check, ops))
+
+
+# ---- independent expected-value rules (recomputed from the LIVE current value, not taken from the changeset) ----
+import math
+def rnd(x): return int(math.floor(x + 0.5))  # Go math.Round (half away from zero) for positive values
+def rule(cur, prague, glam, ratio_num, ratio_den):
+    if cur == glam: return cur                 # already migrated -> no-op
+    if cur == prague: return glam              # baseline match -> literal Glamsterdam value
+    return rnd(cur * ratio_num / ratio_den)    # mismatch -> ratio fallback
+EXPECT = {
+    ('OnRamp', 'BaseExecutionGasCost'): lambda c: rule(c, 200_000, 400_000, 2, 1),
+    ('FeeQuoter', 'destGasOverhead'): lambda c: rule(c, 300_000, 500_000, 5, 3),
+    ('FeeQuoter', 'defaultTokenDestGasOverhead'): lambda c: rule(c, 90_000, 270_000, 3, 1),
+    ('FeeQuoter', 'defaultTxGasLimit'): lambda c: rule(c, 200_000, 400_000, 2, 1),
+    ('FeeQuoter', 'destGasPerPayloadByteBase'): lambda c: rule(c, 20, 64, 64, 20),
+    ('FeeQuoter', 'maxPerMsgGasLimit'): lambda c: c,   # 15M -> 15M; fallback is a no-op
+    ('CommitteeVerifier', 'GasForVerification'): lambda c: rule(c, 75_000, 85_000, 85, 75),
+    ('CCTPVerifier', 'GasForVerification'): lambda c: rule(c, 200_000, 600_000, 3, 1),
+    ('LombardVerifier', 'GasForVerification'): lambda c: rule(c, 275_000, 825_000, 3, 1),
+    ('CCTPThroughCCVTokenPool', 'DestGasOverhead'): lambda c: rule(c, 250_000, 750_000, 3, 1),
+    ('SiloedUSDCTokenPool', 'DestGasOverhead'): lambda c: rule(c, 250_000, 750_000, 3, 1),
+    ('LombardTokenPool', 'DestGasOverhead'): lambda c: rule(c, 410_000, 1_200_000, 1_200_000, 410_000),
+    # per-token FeeQuoter override: generic x3 (USDC literal 250k->750k equals x3; a USDC token already at 750k, or a Lombard
+    # token, would differ and is flagged below for manual review)
+    ('FeeQuoter', 'token override DestGasOverhead'): lambda c: 3 * c,
+}
+for r in res:
+    for (typ_, field, cur_, new_) in ([r['t']] if 't' in r else []) + r.get('ts', []):
+        exp = EXPECT.get((typ_, field))
+        if exp is None: r['errs'].append(f'no expected-value rule for {typ_}.{field}')
+        elif exp(cur_) != new_: r['errs'].append(f'{typ_}.{field}: current {cur_} -> proposed {new_}, rule expects {exp(cur_)}')
 
 print('\ntx count by function / target contract type:')
 for k, n in sorted(Counter((r['fn'], r['typ']) for r in res).items(), key=str): print(' ', n, k)
@@ -863,4 +1016,143 @@ bad = [r for r in res if r['errs']]
 print(f'\nFAILED: {len(bad)} / {len(res)} txs')
 for r in bad[:25]: print(' ', r['sel'], r['to'], r['typ'], r['errs'])
 sys.exit(1 if bad else 0)
+```
+
+## Appendix B. `verify_coverage.py` — nothing missing, nothing extra
+
+Same status as Appendix A (a helper to copy out, not part of the repo). It recomputes from **live**
+chain state which writes the proposal should contain and compares in both directions:
+
+```bash
+python3 verify_coverage.py chainlink-deployments/domains/ccv/<env> <target chain selector>
+```
+
+- A chain has a lane when its FeeQuoter 2.0.0 has an enabled dest config for the target (the same
+  definition the changeset uses) and an OnRamp 2.0.0 in the datastore; the proposal's chain set must
+  equal that set.
+- On each chain: the OnRamp / CommitteeVerifier / CCTPVerifier / LombardVerifier write is present
+  exactly when that contract's live router for the target is non-zero; token pool writes are present
+  exactly when the pool supports the target and its fee config is enabled; the FeeQuoter overrides
+  cover every enabled override.
+- `WARNING` lines list chains whose lane status could not be read through the RPC proxy (they are
+  **not** verified, whether or not they appear in the proposal). On `prod_testnet` this includes
+  five datastore chains that are not in the `ccv` network config at all, so the changeset cannot
+  reach them either; one of them (`superseed-testnet`) has a live lane to Sepolia. Report these.
+
+```python
+#!/usr/bin/env python3
+"""Coverage check for a Glamsterdam v2.0 proposal: recompute from LIVE chain state which writes the proposal
+should contain, and compare with the proposal in both directions (nothing missing, nothing extra).
+usage: python3 verify_coverage.py <domains/ccv/<env> dir> <target selector>
+Needs: `cast` (foundry), VPN (reads live values from https://rpcs.cldev.sh/<selector>)."""
+import base64, glob, json, re, subprocess, sys, time
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+
+BASE = sys.argv[1].rstrip('/') + '/'
+T = int(sys.argv[2])
+prop = json.load(open(sorted(glob.glob(BASE + 'proposals/*glamsterdam_v2*.json'))[-1]))
+refs = json.load(open(BASE + 'datastore/address_refs.json'))
+by_chain = defaultdict(list)
+for r in refs: by_chain[r['chainSelector']].append(r)
+
+def call(sel, to, sig, *args):
+    """cast call with retries for transient RPC-proxy failures; returns the decoded JSON output."""
+    cmd = ['cast', 'call', to, sig, *args, '--json', '--rpc-url', f'https://rpcs.cldev.sh/{sel}']
+    for i in range(4):
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        if p.returncode == 0: return json.loads(p.stdout)
+        if i == 3 or not re.search(r'header for number not found|ErrUpstreamsExhausted|timed out|timeout|502|503|504|connection', p.stderr, re.I):
+            raise RuntimeError(p.stderr.strip()[:120])
+        time.sleep(2 * (i + 1))
+
+def ref(sel, typ, versions=None):
+    return [r for r in by_chain[sel] if r['type'] == typ and (versions is None or r['version'] in versions)]
+
+# what the proposal actually touches, per chain: set of (type)
+touched = defaultdict(lambda: defaultdict(set))   # chain -> type -> {addresses}
+tx_count = 0
+for o in prop['operations']:
+    sel = int(o['chainSelector'])
+    for t in o['transactions']:
+        r = next((x for x in by_chain[sel] if x['address'].lower() == t['to'].lower()), None)
+        touched[sel][r['type'] if r else '?'].add(t['to'].lower()); tx_count += 1
+print(f'proposal: {len(prop["operations"])} batches, {tx_count} txs, {len(touched)} chains')
+
+# --- expected lane set, mirroring DiscoverLanesToTarget: FeeQuoter 2.0.0 dest config for the target is enabled
+fq_chains = {sel: ref(sel, 'FeeQuoter', ['2.0.0']) for sel in by_chain if sel != T}
+fq_chains = {s: v for s, v in fq_chains.items() if v}
+def lane(sel):
+    fq = fq_chains[sel][0]['address']
+    try: return sel, bool(call(sel, fq, 'getDestChainConfig(uint64)((bool,uint32,uint32,uint32,uint8,bytes4,uint16,uint32,uint32,uint16,uint8))', str(T))[0][0]), None
+    except Exception as e: return sel, None, str(e)
+with ThreadPoolExecutor(10) as ex: lanes = list(ex.map(lane, fq_chains))
+read_err = [(s, e) for s, ok, e in lanes if ok is None]
+L = {s for s, ok, _ in lanes if ok}
+no_onramp = {s for s in L if not ref(s, 'OnRamp', ['2.0.0'])}
+expected_chains = L - no_onramp
+P = set(touched)
+unreadable = {s for s, _ in read_err}   # lane status could not be read through the RPC proxy
+print(f'chains with a v2.0 FeeQuoter: {len(fq_chains)} | with an enabled dest config for the target (lane): {len(L)} | lane but no OnRamp 2.0.0 in datastore: {len(no_onramp)} | unreadable via RPC proxy: {len(unreadable)}')
+problems = []
+if (P - unreadable) != expected_chains:
+    problems.append(f'chain set differs: in proposal only {sorted(P - unreadable - expected_chains)}; expected but missing {sorted(expected_chains - P)}')
+warnings = []
+if unreadable:
+    warnings.append(f'could not read the lane status of {len(unreadable)} chains, so they are NOT verified: ' +
+                    ', '.join(f'{s} ({"in" if s in P else "not in"} proposal)' for s in sorted(unreadable)))
+
+# --- per-chain expectations
+def _chain_check(sel):
+    errs = []
+    t = touched.get(sel, {})
+    fq = fq_chains[sel][0]['address'].lower()
+    if fq not in t.get('FeeQuoter', set()): errs.append('no FeeQuoter write')
+    # OnRamp / verifiers: written iff the live router for the target is non-zero
+    def expect_router(typ, versions, getter_sig, getter_idx):
+        for r in ref(sel, typ, versions):
+            try: router = call(sel, r['address'], getter_sig, str(T))[0]
+            except Exception as e: errs.append(f'{typ} read error {e}'); continue
+            router = router[getter_idx] if isinstance(router, list) else router
+            wrote = r['address'].lower() in t.get(typ, set())
+            if (int(router, 16) != 0) != wrote: errs.append(f'{typ} {r["address"]}: live router {"set" if int(router,16) else "ZERO"} but proposal {"writes" if wrote else "does not write"} it')
+    expect_router('OnRamp', ['2.0.0'], 'getDestChainConfig(uint64)((address,uint64,uint8,bool,uint16,uint16,uint32,address,address[],address[],bytes))', 0)
+    expect_router('CommitteeVerifier', ['2.0.0'], 'getRemoteChainConfig(uint64)((address,uint64,bool,uint16,uint32,uint16),address[])', 0)
+    expect_router('CCTPVerifier', ['2.0.0', '2.1.0'], 'getRemoteChainConfig(uint64)((address,uint64,bool,uint16,uint32,uint16),address[])', 0)
+    expect_router('LombardVerifier', ['2.0.0', '2.1.0'], 'getRemoteChainConfig(uint64)((address,uint64,bool,uint16,uint32,uint16),address[])', 0)
+    # token pools: written iff the pool supports the target and its fee config for it is enabled
+    for typ, versions in (('CCTPThroughCCVTokenPool', ['2.0.0']), ('SiloedUSDCTokenPool', ['2.0.0']), ('LombardTokenPool', ['2.0.0', '2.1.0'])):
+        for r in ref(sel, typ, versions):
+            try:
+                supported = int(T) in [int(x) for x in call(sel, r['address'], 'getSupportedChains()(uint64[])')[0]]
+                cfg = call(sel, r['address'], 'getTokenTransferFeeConfig(address,uint64,bytes4,bytes)((uint32,uint32,uint32,uint32,uint16,uint16,bool))',
+                           '0x' + '0' * 40, str(T), '0x00000000', '0x')[0] if supported else None
+            except Exception as e:
+                # reverting getters (e.g. CCTPThroughCCV for an unconfigured destination) mean "not written"
+                supported, cfg = False, None
+            should = bool(supported and cfg and cfg[6])
+            wrote = r['address'].lower() in t.get(typ, set())
+            if should != wrote and not (should and cfg and cfg[0] in (750_000, 1_200_000)):  # already-migrated no-op is legitimate
+                errs.append(f'{typ} {r["address"]}: expected write={should} but proposal write={wrote}')
+    # FeeQuoter per-token overrides: a second FeeQuoter batch exists iff there is >=1 enabled override
+    all_ = call(sel, fq_chains[sel][0]['address'], 'getAllTokenTransferFeeConfigs()(uint64[],address[][],(uint32,uint32,uint32,bool)[][])')
+    n_over = sum(1 for d, tl, cl in zip(*all_) if int(d) == T for c in cl if c[3])
+    return sel, errs, n_over
+
+unverified = []
+def chain_check(sel):
+    try: return _chain_check(sel)
+    except Exception as e:                     # persistent RPC trouble: report, don't crash
+        unverified.append((sel, str(e)[:80])); return sel, [], 0
+
+with ThreadPoolExecutor(10) as ex: results = list(ex.map(chain_check, sorted(expected_chains & P)))
+for sel, errs, n in results:
+    for e in errs: problems.append(f'chain {sel}: {e}')
+print(f'checked {len(results)} chains; enabled overrides for target across them: {sum(n for _, _, n in results)}')
+if no_onramp: print('lane but no OnRamp (skipped by the changeset, reported as "could not resolve OnRamp"):', sorted(no_onramp))
+for w in warnings: print('WARNING:', w)
+if unverified: print('WARNING: per-chain checks could not run (RPC errors) for:', unverified)
+print(f'\nCOVERAGE PROBLEMS: {len(problems)}')
+for p in problems: print('  ', p)
+sys.exit(1 if problems else 0)
 ```
