@@ -139,7 +139,7 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 	)
 }
 
-func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
+func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr, _ []byte) ([]uint64, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -158,7 +158,7 @@ func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelecto
 	return report.Output, nil
 }
 
-func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
+func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr, _ []byte, remoteSelector uint64) ([]byte, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -186,7 +186,7 @@ func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector ui
 // single-element slice. Callers that rely on multiple remote pools for zero-downtime cutover
 // (e.g. MigrationMetadata.LegacyRemotePools) therefore get a single entry here, and retargeting a
 // v1.5.0 pool is a hard cutover - see the note on ConfigureTokenPoolForRemoteChain.
-func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error) {
+func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr, _ []byte, remoteSelector uint64) ([][]byte, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -368,18 +368,58 @@ func (p *poolOpsV150) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, 
 	return writes, nil
 }
 
-// RemoveRemotePools is not supported on v1.5.0 pools. The contract has no removeRemotePool: the
-// only way to drop a remote pool entry is applyChainUpdates with allowed=false, which deletes the
-// ENTIRE remote chain config (remote token and both rate limiters), not just the pool entry.
-// Doing that silently under a "remove remote pools" pipeline would tear down more than the caller
-// asked for, so this errors instead. Use ConfigureTokenForTransfers to retarget the lane, or drop
-// the chain deliberately.
-func (p *poolOpsV150) RemoveRemotePools(_ cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, _ []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error) {
-	return nil, fmt.Errorf(
-		"removing individual remote pools is not supported on v1.5.0 token pools (pool %s on chain %d): "+
-			"the contract has no removeRemotePool, and applyChainUpdates(allowed=false) would remove the whole remote chain config",
-		poolAddr.Hex(), chain.Selector,
-	)
+// RemoveRemotePools removes remote pool entries from a v1.5.0 pool. v1.5.0 stores a single remote
+// pool per remote chain and has no removeRemotePool, so a removal clears that slot with
+// setRemotePool(remoteChainSelector, <empty bytes>) when it holds the requested pool. An empty slot
+// makes releaseOrMint reject every source pool from that chain (its configured-pool length check),
+// the same effect as removeRemotePool on later versions, while the remote chain config (remote
+// token, rate limits) is kept. Empty bytes is used rather than an encoded address(0) so the slot
+// reads back as "no remote pool" instead of a zero-address pool. A slot that holds a different
+// pool, or is already empty, is skipped with a warning so re-runs are idempotent.
+func (p *poolOpsV150) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error) {
+	var writes []evm_contract.WriteOutput
+	for _, remote := range remotes {
+		poolReport, err := cldf_ops.ExecuteOperation(
+			b, tpap.GetRemotePool, chain,
+			evm_contract.FunctionInput[uint64]{ChainSelector: chain.Selector, Address: poolAddr, Args: remote.Selector},
+			cldf_ops.WithForceExecute[evm_contract.FunctionInput[uint64], evm.Chain](),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get remote pool for remote chain %d from pool %s on chain %d: %w", remote.Selector, poolAddr.Hex(), chain.Selector, err)
+		}
+
+		// The single slot is cleared when it holds the remote pool in any of its encodings.
+		var matches [][]byte
+		if len(poolReport.Output) > 0 {
+			matches, err = evm1_0_0.MatchingRemotePools([][]byte{poolReport.Output}, remote.Selector, remote.Remote.Address)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if len(matches) == 0 {
+			b.Logger.Warnf("skipping removal of remote pool %s for remote chain %d from pool %s on chain %d: pairing already absent", remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector)
+			continue
+		}
+
+		clearReport, err := cldf_ops.ExecuteOperation(
+			b, tpap.SetRemotePool, chain,
+			evm_contract.FunctionInput[tpap.SetRemotePoolArgs]{
+				ChainSelector: chain.Selector,
+				Address:       poolAddr,
+				Args: tpap.SetRemotePoolArgs{
+					RemoteChainSelector: remote.Selector,
+					RemotePoolAddress:   []byte{},
+				},
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clear remote pool %s for remote chain %d on pool %s on chain %d: %w", remote.Remote.Address, remote.Selector, poolAddr.Hex(), chain.Selector, err)
+		}
+
+		writes = append(writes, clearReport.Output)
+	}
+
+	return writes, nil
 }
 
 func (p *poolOpsV150) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.OnchainRateLimits, error) {

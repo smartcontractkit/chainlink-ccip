@@ -988,13 +988,21 @@ func TestTokenExpansionMigration_LiquidityMigration(t *testing.T) {
 	require.Contains(t, authCallers, timelockAddr, "timelock should be an authorized caller after deposit")
 }
 
-// TestTokenExpansionMigration_IncrementalMigration reproduces an incremental migration of a
-// fully-connected BurnMint web (A, B, C): migrate A first (A1->A2), then B+C (B1->B2, C1->C2),
-// where each migration uses autoMigrateRemoteChains (remotes discovered from the active legacy
-// pool). This is the sequential-migration shape: reverse-propagation is expected to keep every
-// already-migrated active v2 pools' accept lists up to date (A2 should learn B2 and C2 as remote
-// pools).
-func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
+// incrementalMigrationWeb is a fully-connected BurnMint web (A, B, C) migrated incrementally:
+// A first (A1->A2), then B+C (B1->B2, C1->C2), where each migration uses autoMigrateRemoteChains
+// (remotes discovered from the active legacy pool).
+type incrementalMigrationWeb struct {
+	e          *deployment.Environment
+	tokenA     datastore.AddressRef
+	tokenB     datastore.AddressRef
+	tokenC     datastore.AddressRef
+	v1PoolRefs map[uint64]datastore.AddressRef // legacy pools A1, B1, C1 keyed by chain selector
+	v2PoolRefs []datastore.AddressRef          // migrated pools A2, B2, C2, in that order
+}
+
+// setupIncrementalMigrationWeb deploys the v1 web and migrates it incrementally (see
+// incrementalMigrationWeb).
+func setupIncrementalMigrationWeb(t *testing.T) incrementalMigrationWeb {
 	// Set up a new env with 3 chains
 	selA := chainsel.TEST_90000001.Selector
 	selB := chainsel.TEST_90000002.Selector
@@ -1124,11 +1132,43 @@ func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
 		return v2PoolRefs
 	}
 
+	// Capture the legacy v1 pools before migrating
+	v1PoolRefs := map[uint64]datastore.AddressRef{}
+	for _, sel := range []uint64{selA, selB, selC} {
+		ref, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			Type:      datastore.ContractType(cciputils.BurnMintTokenPool),
+			Version:   cciputils.Version_1_6_1,
+			Qualifier: legacyWeb[sel].DeployTokenPoolInput.TokenPoolQualifier,
+		}, sel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		v1PoolRefs[sel] = ref
+	}
+
 	// Migrate A (A1 -> A2), then migrate B+C (batched)
 	poolRefs := []datastore.AddressRef{}
 	poolRefs = append(poolRefs, migrate([]datastore.AddressRef{tokenRefA})...)
 	poolRefs = append(poolRefs, migrate([]datastore.AddressRef{tokenRefB, tokenRefC})...)
 	require.Len(t, poolRefs, 3, "should have 3 migrated pools")
+
+	return incrementalMigrationWeb{
+		e:          e,
+		tokenA:     tokenRefA,
+		tokenB:     tokenRefB,
+		tokenC:     tokenRefC,
+		v1PoolRefs: v1PoolRefs,
+		v2PoolRefs: poolRefs,
+	}
+}
+
+// TestTokenExpansionMigration_IncrementalMigration reproduces an incremental migration of a
+// fully-connected BurnMint web (see incrementalMigrationWeb). This is the sequential-migration
+// shape: reverse-propagation is expected to keep every already-migrated active v2 pools' accept
+// lists up to date (A2 should learn B2 and C2 as remote pools).
+func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
+	web := setupIncrementalMigrationWeb(t)
+	e := web.e
+	tokenRefA, tokenRefB, tokenRefC := web.tokenA, web.tokenB, web.tokenC
+	poolRefs := web.v2PoolRefs
 
 	// Get EVM adapter implementations
 	adp, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, cciputils.Version_2_0_0)
@@ -1145,9 +1185,11 @@ func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the remote pools for A2 on chains B and C. These should include the newly-migrated B2 and C2 pools, respectively, due to reverse propagation.
-	a2b, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenRefB.ChainSelector)
+	tokenA2, err := adp.AddressRefToBytes(tokenRefA)
 	require.NoError(t, err)
-	a2c, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenRefC.ChainSelector)
+	a2b, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenA2, tokenRefB.ChainSelector)
+	require.NoError(t, err)
+	a2c, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenA2, tokenRefC.ChainSelector)
 	require.NoError(t, err)
 
 	// Check that A2's remote pools for B and C include the newly-migrated B2 and C2 pools, respectively. This is the reverse propagation check.

@@ -1,7 +1,7 @@
 ---
 title: Changeset Style Guide
 sidebar_label: Changeset Style Guide
-sidebar_position: 8
+sidebar_position: 7
 ---
 # Changeset Style Guide
 
@@ -15,8 +15,8 @@ The examples in this guide may age as the codebase evolves. The principles shoul
 
 For implementation details, see:
 
-- [Cross-Family Deployment Architecture](./architecture.md)
-- [Implementing Adapters](./implementing-adapters.md)
+- [Architecture](./architecture.md)
+- [Implementing 1.6](./implementing-1.6.md) / [Implementing 2.0](./implementing-2.0.md)
 
 ## How to Use This Guide
 
