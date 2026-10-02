@@ -15,7 +15,6 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -253,11 +252,6 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 			// for the purpose of the FeeQuoter per-token override.
 			for _, legacyType := range legacyUSDCTokenPoolContractTypes {
 				fqLane.USDCPoolAddresses = append(fqLane.USDCPoolAddresses, resolveAddressRefsAnyVersion(addrs, legacyType)...)
-			}
-			if tarRef := datastore_utils.GetAddressRef(addrs, sel, token_admin_registry.ContractType, token_admin_registry.Version, ""); !datastore_utils.IsAddressRefEmpty(tarRef) {
-				fqLane.TokenAdminRegistryAddress = common.HexToAddress(tarRef.Address)
-			} else {
-				report.AddUnresolvedContract(sel, "TokenAdminRegistry (FeeQuoter per-token overrides only checked for USDC/Lombard pool tokens)")
 			}
 			fqTokenLanes = append(fqTokenLanes, fqLane)
 		}

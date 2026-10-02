@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	fqTokCfgGenericToken    = common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	fqTokCfgNoOverrideToken = common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	fqTokCfgGenericToken = common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 )
 
 func fqTokCfgOverride(token common.Address, destGasOverhead uint32) fqops.TokenTransferFeeConfigSingleTokenArgs {
@@ -93,8 +92,7 @@ func TestUpdateFeeQuoterTokenTransferFeeConfig(t *testing.T) {
 	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{tpGasCfgBaselineChain, tpGasCfgMismatchedChain}))
 	require.NoError(t, err)
 
-	// Baseline chain: USDC (250k), Lombard (410k), an unrelated token (150k) and a token with no
-	// override at all.
+	// Baseline chain: USDC (250k), Lombard (410k) and an unrelated token (150k).
 	usdcPool := deployTokenPoolFixture(t, e, tpGasCfgBaselineChain, "usdc", 250_000)
 	lombardPool := deployTokenPoolFixture(t, e, tpGasCfgBaselineChain, "lombard", 410_000)
 	usdcToken := poolToken(t, e, tpGasCfgBaselineChain, usdcPool)
@@ -118,7 +116,6 @@ func TestUpdateFeeQuoterTokenTransferFeeConfig(t *testing.T) {
 			{
 				ChainSelector:        tpGasCfgBaselineChain,
 				FeeQuoterAddress:     fqBaseline,
-				ExtraCandidateTokens: []common.Address{fqTokCfgGenericToken, fqTokCfgNoOverrideToken},
 				USDCPoolAddresses:    []common.Address{usdcPool},
 				LombardPoolAddresses: []common.Address{lombardPool},
 			},
@@ -138,7 +135,7 @@ func TestUpdateFeeQuoterTokenTransferFeeConfig(t *testing.T) {
 		require.Contains(t, reportStr, "chain 4949039107694359620: FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (USDC) matched expected Prague value 250000, applying Glamsterdam value 750000")
 		require.Contains(t, reportStr, "chain 4949039107694359620: FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (Lombard) matched expected Prague value 410000, applying Glamsterdam value 1200000")
 		require.Contains(t, reportStr, "(token "+fqTokCfgGenericToken.Hex()+") generic scaling 150000 -> 450000")
-		require.Contains(t, reportStr, "checked 4 candidate tokens, 3 with an enabled override for dst 3379446385462418246, 3 updated")
+		require.Contains(t, reportStr, "has 3 enabled token overrides for dst 3379446385462418246, 3 updated")
 
 		args := decodeApplyFQTokenTransferFeeConfigUpdates(t, report.Output.BatchOps[0].Transactions[0].Data)
 		require.Len(t, args, 1)
@@ -147,8 +144,7 @@ func TestUpdateFeeQuoterTokenTransferFeeConfig(t *testing.T) {
 		for _, c := range args[0].TokenTransferFeeConfigs {
 			got[c.Token] = c.TokenTransferFeeConfig
 		}
-		require.Len(t, got, 3, "the token with no override must not be written")
-		require.NotContains(t, got, fqTokCfgNoOverrideToken)
+		require.Len(t, got, 3)
 		require.Equal(t, uint32(750_000), got[usdcToken].DestGasOverhead)
 		require.Equal(t, uint32(1_200_000), got[lombardToken].DestGasOverhead)
 		require.Equal(t, uint32(450_000), got[fqTokCfgGenericToken].DestGasOverhead)
@@ -215,7 +211,6 @@ func TestUpdateFeeQuoterTokenTransferFeeConfig_UnreadablePoolIsNotFatal(t *testi
 		Lanes: []glamsterdamseq.FeeQuoterTokenConfigLane{{
 			ChainSelector:        tpGasCfgBaselineChain,
 			FeeQuoterAddress:     fq,
-			ExtraCandidateTokens: []common.Address{fqTokCfgGenericToken},
 			USDCPoolAddresses:    []common.Address{stalePool},
 			LombardPoolAddresses: []common.Address{stalePool},
 		}},

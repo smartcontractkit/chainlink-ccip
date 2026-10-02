@@ -14,15 +14,10 @@ import (
 
 	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/token_pool"
-	tokenadminregistrybindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
+	feequoterbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 )
-
-// tokenAdminRegistryPageSize is how many configured tokens are fetched per
-// TokenAdminRegistry.getAllConfiguredTokens call.
-const tokenAdminRegistryPageSize = uint64(100)
 
 // applyFeeQuoterTokenTransferFeeConfigUpdates mirrors fee_quoter.ApplyTokenTransferFeeConfigUpdates,
 // but always routes the write through MCMS regardless of who the deployer key is.
@@ -40,53 +35,27 @@ var applyFeeQuoterTokenTransferFeeConfigUpdates = contract.NewWrite(contract.Wri
 	},
 })
 
-// getAllConfiguredTokensArgs are the pagination args of TokenAdminRegistry.getAllConfiguredTokens.
-type getAllConfiguredTokensArgs struct {
-	StartIndex uint64
-	MaxCount   uint64
-}
-
-// getAllConfiguredTokens reads one page of TokenAdminRegistry.getAllConfiguredTokens.
-var getAllConfiguredTokens = contract.NewRead(contract.ReadParams[getAllConfiguredTokensArgs, []common.Address, *tokenadminregistrybindings.TokenAdminRegistry]{
-	Name:         "glamsterdam:token-admin-registry:get-all-configured-tokens",
-	Version:      token_admin_registry.Version,
-	Description:  "Calls getAllConfiguredTokens on the TokenAdminRegistry contract",
-	ContractType: token_admin_registry.ContractType,
-	NewContract:  tokenadminregistrybindings.NewTokenAdminRegistry,
-	CallContract: func(c *tokenadminregistrybindings.TokenAdminRegistry, opts *bind.CallOpts, args getAllConfiguredTokensArgs) ([]common.Address, error) {
-		return c.GetAllConfiguredTokens(opts, args.StartIndex, args.MaxCount)
+// getAllTokenTransferFeeConfigs reads every per-token override on a FeeQuoter, for every destination
+// chain, in a single call. (The generated ops package doesn't wrap this getter, so it is bound here.)
+var getAllTokenTransferFeeConfigs = contract.NewRead(contract.ReadParams[struct{}, feequoterbindings.GetAllTokenTransferFeeConfigs, *feequoterbindings.FeeQuoter]{
+	Name:         "glamsterdam:fee-quoter:get-all-token-transfer-fee-configs",
+	Version:      semver.MustParse("2.0.0"),
+	Description:  "Calls getAllTokenTransferFeeConfigs on the FeeQuoter contract",
+	ContractType: fee_quoter.ContractType,
+	NewContract:  feequoterbindings.NewFeeQuoter,
+	CallContract: func(c *feequoterbindings.FeeQuoter, opts *bind.CallOpts, _ struct{}) (feequoterbindings.GetAllTokenTransferFeeConfigs, error) {
+		return c.GetAllTokenTransferFeeConfigs(opts)
 	},
 })
-
-// collectPaged drains a paginated list: it calls fetch(start, pageSize) until a page comes back
-// shorter than pageSize.
-func collectPaged(pageSize uint64, fetch func(start, maxCount uint64) ([]common.Address, error)) ([]common.Address, error) {
-	var all []common.Address
-	for start := uint64(0); ; start += pageSize {
-		page, err := fetch(start, pageSize)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, page...)
-		if uint64(len(page)) < pageSize {
-			return all, nil
-		}
-	}
-}
 
 // FeeQuoterTokenConfigLane describes one source chain with a confirmed lane to the target whose
 // FeeQuoter per-token overrides must be migrated.
 type FeeQuoterTokenConfigLane struct {
 	ChainSelector    uint64
 	FeeQuoterAddress common.Address
-	// TokenAdminRegistryAddress, if set, is enumerated (getAllConfiguredTokens) to find every token
-	// that may carry a per-token override. The FeeQuoter has no on-chain enumeration of overrides,
-	// so every registered token is checked and only those with an enabled override are updated.
-	TokenAdminRegistryAddress common.Address
-	// ExtraCandidateTokens are additional tokens to check (in addition to the registry's).
-	ExtraCandidateTokens []common.Address
 	// USDCPoolAddresses / LombardPoolAddresses are pools whose underlying token (getToken) must use
-	// the USDC / Lombard spec instead of the generic scaling. Their tokens are also candidates.
+	// the USDC / Lombard spec instead of the generic scaling. A pool that can't be read is skipped
+	// with a warning (its token then gets the generic scaling).
 	USDCPoolAddresses    []common.Address
 	LombardPoolAddresses []common.Address
 }
@@ -112,6 +81,10 @@ type UpdateFeeQuoterTokenTransferFeeConfigOutput struct {
 // FeeQuoter override (or the default) otherwise — so both must be migrated, or the Glamsterdam
 // change is lost whenever the active source flips.
 //
+// Overrides are read with one getAllTokenTransferFeeConfigs call per FeeQuoter, so every token that
+// has an enabled override for the target is covered regardless of what kind of pool it uses (on
+// mainnet the large majority are ordinary BurnMint/LockRelease tokens, not USDC/Lombard):
+//
 //   - USDC tokens use FeeQuoterUSDCTokenDestGasOverhead and Lombard tokens
 //     FeeQuoterLombardTokenDestGasOverhead: the literal Glamsterdam value when the current override
 //     equals the expected Prague baseline, a no-op when it already equals the Glamsterdam value, and
@@ -133,128 +106,89 @@ var UpdateFeeQuoterTokenTransferFeeConfig = cldf_ops.NewSequence(
 				return UpdateFeeQuoterTokenTransferFeeConfigOutput{}, fmt.Errorf("chain with selector %d not found", lane.ChainSelector)
 			}
 
-			poolToken := func(pool common.Address) (common.Address, error) {
-				out, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, contract.FunctionInput[struct{}]{
-					ChainSelector: lane.ChainSelector,
-					Address:       pool,
-				})
-				if err != nil {
-					return common.Address{}, fmt.Errorf("failed to read underlying token of pool %s on src %d: %w", pool, lane.ChainSelector, err)
+			// Pools are only used to recognise their token as USDC/Lombard, so a pool that can't be read
+			// (e.g. a stale datastore entry with no code) must not block the batch: warn and carry on.
+			recognise := func(pools []common.Address, into map[common.Address]bool, kind string) {
+				for _, pool := range pools {
+					out, err := cldf_ops.ExecuteOperation(b, token_pool.GetToken, chain, contract.FunctionInput[struct{}]{
+						ChainSelector: lane.ChainSelector,
+						Address:       pool,
+					})
+					if err != nil {
+						output.Report.AddLine(fmt.Sprintf(
+							"chain %d: WARNING - failed to read underlying token of pool %s: %v; its token will not be recognised as %s",
+							lane.ChainSelector, pool, err, kind,
+						))
+						continue
+					}
+					into[out.Output] = true
 				}
-				return out.Output, nil
 			}
-
 			usdcTokens := map[common.Address]bool{}
 			lombardTokens := map[common.Address]bool{}
-			var candidates []common.Address
-			seen := map[common.Address]bool{}
-			addCandidate := func(t common.Address) {
-				if !seen[t] {
-					seen[t] = true
-					candidates = append(candidates, t)
-				}
-			}
+			recognise(lane.USDCPoolAddresses, usdcTokens, "USDC")
+			recognise(lane.LombardPoolAddresses, lombardTokens, "Lombard")
 
-			// A pool here is only used to recognise its token as USDC/Lombard, so a pool that can't be read
-			// (e.g. a stale datastore entry with no code) must not block the batch: warn and carry on. The
-			// token, if it has an override, is still found through the TokenAdminRegistry and then gets the
-			// generic scaling instead of the USDC/Lombard rule.
-			for _, pool := range lane.USDCPoolAddresses {
-				t, err := poolToken(pool)
-				if err != nil {
-					output.Report.AddLine(fmt.Sprintf("chain %d: WARNING - %v; its token will not be recognised as USDC", lane.ChainSelector, err))
-					continue
-				}
-				usdcTokens[t] = true
-				addCandidate(t)
-			}
-			for _, pool := range lane.LombardPoolAddresses {
-				t, err := poolToken(pool)
-				if err != nil {
-					output.Report.AddLine(fmt.Sprintf("chain %d: WARNING - %v; its token will not be recognised as Lombard", lane.ChainSelector, err))
-					continue
-				}
-				lombardTokens[t] = true
-				addCandidate(t)
-			}
-			for _, t := range lane.ExtraCandidateTokens {
-				addCandidate(t)
-			}
-			if lane.TokenAdminRegistryAddress != (common.Address{}) {
-				registryTokens, err := collectPaged(tokenAdminRegistryPageSize, func(start, maxCount uint64) ([]common.Address, error) {
-					out, err := cldf_ops.ExecuteOperation(b, getAllConfiguredTokens, chain, contract.FunctionInput[getAllConfiguredTokensArgs]{
-						ChainSelector: lane.ChainSelector,
-						Address:       lane.TokenAdminRegistryAddress,
-						Args:          getAllConfiguredTokensArgs{StartIndex: start, MaxCount: maxCount},
-					})
-					return out.Output, err
-				})
-				if err != nil {
-					return UpdateFeeQuoterTokenTransferFeeConfigOutput{}, fmt.Errorf(
-						"failed to list configured tokens of TokenAdminRegistry %s on src %d: %w",
-						lane.TokenAdminRegistryAddress, lane.ChainSelector, err,
-					)
-				}
-				for _, t := range registryTokens {
-					addCandidate(t)
-				}
+			all, err := cldf_ops.ExecuteOperation(b, getAllTokenTransferFeeConfigs, chain, contract.FunctionInput[struct{}]{
+				ChainSelector: lane.ChainSelector,
+				Address:       lane.FeeQuoterAddress,
+			})
+			if err != nil {
+				return UpdateFeeQuoterTokenTransferFeeConfigOutput{}, fmt.Errorf(
+					"failed to read FeeQuoter %s token transfer fee configs on src %d: %w", lane.FeeQuoterAddress, lane.ChainSelector, err,
+				)
 			}
 
 			var singleTokenArgs []fee_quoter.TokenTransferFeeConfigSingleTokenArgs
 			overrides := 0
-			for _, token := range candidates {
-				cur, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetTokenTransferFeeConfig, chain, contract.FunctionInput[fee_quoter.GetTokenTransferFeeConfigArgs]{
-					ChainSelector: lane.ChainSelector,
-					Address:       lane.FeeQuoterAddress,
-					Args: fee_quoter.GetTokenTransferFeeConfigArgs{
-						DestChainSelector: input.TargetChainSelector,
-						Token:             token,
-					},
-				})
-				if err != nil {
-					return UpdateFeeQuoterTokenTransferFeeConfigOutput{}, fmt.Errorf(
-						"failed to read FeeQuoter token transfer fee config for src %d, dst %d, token %s: %w",
-						lane.ChainSelector, input.TargetChainSelector, token, err,
-					)
-				}
-				if !cur.Output.IsEnabled {
+			for i, dest := range all.Output.DestChainSelectors {
+				if dest != input.TargetChainSelector {
 					continue
 				}
-				overrides++
+				for j, token := range all.Output.TransferTokens[i] {
+					cur := all.Output.TokenTransferFeeConfigs[i][j]
+					if !cur.IsEnabled {
+						continue
+					}
+					overrides++
 
-				var applied uint32
-				switch {
-				case usdcTokens[token]:
-					result := glamsterdamutils.Resolve(FeeQuoterUSDCTokenDestGasOverhead, cur.Output.DestGasOverhead)
-					glamsterdamutils.AddField(output.Report, lane.ChainSelector, result)
-					applied = result.AppliedValue
-				case lombardTokens[token]:
-					result := glamsterdamutils.Resolve(FeeQuoterLombardTokenDestGasOverhead, cur.Output.DestGasOverhead)
-					glamsterdamutils.AddField(output.Report, lane.ChainSelector, result)
-					applied = result.AppliedValue
-				default:
-					applied = FeeQuoterGenericTokenDestGasOverheadScale(cur.Output.DestGasOverhead)
-					output.Report.AddLine(fmt.Sprintf(
-						"chain %d: FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (token %s) generic scaling %d -> %d "+
-							"(no per-token Glamsterdam target)",
-						lane.ChainSelector, token, cur.Output.DestGasOverhead, applied,
-					))
-				}
+					var applied uint32
+					switch {
+					case usdcTokens[token]:
+						result := glamsterdamutils.Resolve(FeeQuoterUSDCTokenDestGasOverhead, cur.DestGasOverhead)
+						glamsterdamutils.AddField(output.Report, lane.ChainSelector, result)
+						applied = result.AppliedValue
+					case lombardTokens[token]:
+						result := glamsterdamutils.Resolve(FeeQuoterLombardTokenDestGasOverhead, cur.DestGasOverhead)
+						glamsterdamutils.AddField(output.Report, lane.ChainSelector, result)
+						applied = result.AppliedValue
+					default:
+						applied = FeeQuoterGenericTokenDestGasOverheadScale(cur.DestGasOverhead)
+						output.Report.AddLine(fmt.Sprintf(
+							"chain %d: FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (token %s) generic scaling %d -> %d "+
+								"(no per-token Glamsterdam target)",
+							lane.ChainSelector, token, cur.DestGasOverhead, applied,
+						))
+					}
 
-				if applied == cur.Output.DestGasOverhead {
-					continue // nothing to write (e.g. already at the Glamsterdam value)
+					if applied == cur.DestGasOverhead {
+						continue // nothing to write (e.g. already at the Glamsterdam value)
+					}
+					singleTokenArgs = append(singleTokenArgs, fee_quoter.TokenTransferFeeConfigSingleTokenArgs{
+						Token: token,
+						TokenTransferFeeConfig: fee_quoter.TokenTransferFeeConfig{
+							FeeUSDCents:       cur.FeeUSDCents,
+							DestGasOverhead:   applied,
+							DestBytesOverhead: cur.DestBytesOverhead,
+							IsEnabled:         cur.IsEnabled,
+						},
+					})
 				}
-				newConfig := cur.Output
-				newConfig.DestGasOverhead = applied
-				singleTokenArgs = append(singleTokenArgs, fee_quoter.TokenTransferFeeConfigSingleTokenArgs{
-					Token:                  token,
-					TokenTransferFeeConfig: newConfig,
-				})
 			}
 
 			output.Report.AddLine(fmt.Sprintf(
-				"chain %d: FeeQuoter(%s) checked %d candidate tokens, %d with an enabled override for dst %d, %d updated",
-				lane.ChainSelector, lane.FeeQuoterAddress, len(candidates), overrides, input.TargetChainSelector, len(singleTokenArgs),
+				"chain %d: FeeQuoter(%s) has %d enabled token overrides for dst %d, %d updated",
+				lane.ChainSelector, lane.FeeQuoterAddress, overrides, input.TargetChainSelector, len(singleTokenArgs),
 			))
 
 			if len(singleTokenArgs) == 0 {
