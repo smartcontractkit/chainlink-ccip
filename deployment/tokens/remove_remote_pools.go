@@ -76,7 +76,7 @@ type RemoveRemotePoolsInput struct {
 // family must still register an address normalizer, since the forward pass needs it to decode and
 // remove that family's remote entries. Requires bidirectional or deactivate.
 type RemoveRemotePoolsPerPool struct {
-	ChainSelector        uint64               `yaml:"selector" json:"selector,string"`
+	ChainSelector        uint64               `yaml:"selector" json:"selector"`
 	Pool                 datastore.AddressRef `yaml:"pool" json:"pool"`
 	RemotePoolsToRemove  []RemotePoolToRemove `yaml:"remotePoolsToRemove" json:"remotePoolsToRemove"`
 	Bidirectional        bool                 `yaml:"bidirectional" json:"bidirectional"`
