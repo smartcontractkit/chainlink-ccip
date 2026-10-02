@@ -1,7 +1,7 @@
 ---
 title: Maintaining the Changeset Style Guide
 sidebar_label: Style Guide Contributions
-sidebar_position: 9
+sidebar_position: 8
 ---
 
 # Maintaining the Changeset Style Guide
@@ -26,7 +26,7 @@ Good reasons to add or update a rule:
 Signals to pause, narrow the scope, or avoid adding a rule:
 
 - The issue is a one-off bug or a temporary API quirk that will disappear with the next refactor.
-- The proposed rule would duplicate [Cross-Family Deployment Architecture](./architecture.md) or [Implementing Adapters](./implementing-adapters.md); prefer linking to those for deep implementation detail.
+- The proposed rule would duplicate [Architecture](./architecture.md) or [Implementing 1.6](./implementing-1.6.md) / [Implementing 2.0](./implementing-2.0.md); prefer linking to those for deep implementation detail.
 - The change would read as a mandate to rewrite unrelated, already-safe code. The style guide explicitly says it is not a mandate to rewrite older code that is correct and operating safely.
 - The guidance is really a local implementation note, not a stable review principle.
 
@@ -110,7 +110,7 @@ Keep contributions aligned with the tone and goals of the [Changeset Style Guide
 - Prefer concrete BAD/BETTER examples when they make the rule faster to recognize.
 - Keep sections short, scannable, and linkable.
 - Split large topics into separate rules instead of growing one section indefinitely.
-- Avoid duplicating deep implementation guidance that belongs in [Cross-Family Deployment Architecture](./architecture.md) or [Implementing Adapters](./implementing-adapters.md).
+- Avoid duplicating deep implementation guidance that belongs in [Architecture](./architecture.md) or [Implementing 1.6](./implementing-1.6.md) / [Implementing 2.0](./implementing-2.0.md).
 - Write for both human reviewers and AI-assisted authoring: the rule should be easy to quote, apply, and review against.
 
 Match the main guide’s tone: direct, practical, and review-oriented. Prefer “what to do and why” over abstract documentation language.

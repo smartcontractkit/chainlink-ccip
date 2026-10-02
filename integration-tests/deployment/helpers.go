@@ -668,3 +668,43 @@ func SeedUltraFastCurseMCMS(t *testing.T, e *cldf_deployment.Environment) {
 	require.NoError(t, err, "failed to seed UltraFastCurse MCMS timelock refs")
 	e.DataStore = ds
 }
+
+// ReadRemotePools returns the remote pools (raw on-chain bytes) that the pool at poolRef on chain sel
+// lists for remoteSel. It reads through the pool's registered TokenPoolMigrator adapter, so it works
+// for any chain family and pool version. tokenRef identifies the pool's token for families whose pool
+// address does not (e.g. Solana, where a pool program is shared across mints); pass an empty ref when
+// the adapter can derive the token from the pool (e.g. EVM).
+func ReadRemotePools(t *testing.T, e *cldf_deployment.Environment, sel uint64, poolRef, tokenRef datastore.AddressRef, remoteSel uint64) [][]byte {
+	t.Helper()
+	adapter, _, fullPoolRef, fullTokenRef, err := tokensapi.ResolveAdapterAndRefs(*e, tokensapi.GetTokenAdapterRegistry(), sel, poolRef, tokenRef)
+	require.NoError(t, err)
+	migrator, ok := adapter.(tokensapi.TokenPoolMigrator)
+	require.True(t, ok, "adapter for pool %s on chain %d does not implement TokenPoolMigrator", datastore_utils.SprintRef(poolRef), sel)
+	poolBytes, err := adapter.AddressRefToBytes(fullPoolRef)
+	require.NoError(t, err)
+	tokenBytes, err := adapter.AddressRefToBytes(fullTokenRef)
+	require.NoError(t, err)
+	remotes, err := migrator.GetRemotePools(*e, sel, poolBytes, tokenBytes, remoteSel)
+	require.NoError(t, err)
+	return remotes
+}
+
+// BytesToAddressesEVM converts raw on-chain address bytes (e.g. from ReadRemotePools) to EVM
+// addresses. Values that are left-padded to 32 bytes are handled: the right-most 20 bytes are used.
+func BytesToAddressesEVM(raw [][]byte) []common.Address {
+	out := make([]common.Address, 0, len(raw))
+	for _, r := range raw {
+		out = append(out, common.BytesToAddress(r))
+	}
+	return out
+}
+
+// FindFullRef returns the single datastore ref on chain sel matching filter (its chain selector is set
+// to sel), failing the test if there is not exactly one match.
+func FindFullRef(t *testing.T, e *cldf_deployment.Environment, sel uint64, filter datastore.AddressRef) datastore.AddressRef {
+	t.Helper()
+	filter.ChainSelector = sel
+	ref, err := datastore_utils.FindAndFormatRef(e.DataStore, filter, sel, datastore_utils.FullRef)
+	require.NoError(t, err)
+	return ref
+}

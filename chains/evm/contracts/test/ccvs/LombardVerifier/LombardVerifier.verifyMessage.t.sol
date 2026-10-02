@@ -17,7 +17,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     bytes memory proof
   ) internal pure returns (bytes memory) {
     return bytes.concat(
-      VERSION_TAG_V2_2_0, bytes2(uint16(rawPayload.length)), rawPayload, bytes2(uint16(proof.length)), proof
+      VERSION_TAG_V2_0_0, bytes2(uint16(rawPayload.length)), rawPayload, bytes2(uint16(proof.length)), proof
     );
   }
 
@@ -37,116 +37,11 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // Proofs are not used. Using raw bytes format.
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
     s_lombardVerifier.verifyMessage(message, messageId, ccvData);
-  }
-
-  function test_verifyMessage_WithPaddedBridgeMessage() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), address(12));
-
-    bytes memory zeroPadding = new bytes(12);
-    bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress,
-      message.sender,
-      message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount,
-      messageId,
-      zeroPadding
-    );
-
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId, zeroPadding));
-
-    vm.startPrank(s_offRamp);
-    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
-  }
-
-  function testFuzz_verifyMessage_RevertWhen_InvalidMessagePadding_PaddedMsgBodyPaddingNonZero(
-    uint8 fuzzedPaddingIndex
-  ) public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), address(12));
-
-    uint256 paddingIndex = bound(fuzzedPaddingIndex, 0, 11);
-    bytes memory invalidPadding = new bytes(12);
-    invalidPadding[paddingIndex] = bytes1(uint8(1));
-    bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress,
-      message.sender,
-      message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount,
-      messageId,
-      invalidPadding
-    );
-
-    vm.startPrank(s_offRamp);
-    vm.expectRevert(LombardVerifier.InvalidMessagePadding.selector);
-    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
-  }
-
-  function testFuzz_verifyMessage_RevertWhen_InvalidMessagePadding_PaddedReturnedMessagePaddingNonZero(
-    uint8 fuzzedPaddingIndex
-  ) public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), address(12));
-
-    bytes memory zeroPadding = new bytes(12);
-    bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress,
-      message.sender,
-      message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount,
-      messageId,
-      zeroPadding
-    );
-
-    uint256 paddingIndex = bound(fuzzedPaddingIndex, 0, 11);
-    bytes memory invalidPadding = new bytes(12);
-    invalidPadding[paddingIndex] = bytes1(uint8(1));
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId, invalidPadding));
-
-    vm.startPrank(s_offRamp);
-    vm.expectRevert(LombardVerifier.InvalidMessagePadding.selector);
-    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
-  }
-
-  function test_verifyMessage_RevertWhen_InvalidBridgeMessageLength_UnsupportedMsgBodyLength() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), address(12));
-
-    bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress,
-      message.sender,
-      message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount,
-      messageId,
-      new bytes(1)
-    );
-
-    vm.startPrank(s_offRamp);
-    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidBridgeMessageLength.selector, 165, 177, 166));
-    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
-  }
-
-  function test_verifyMessage_RevertWhen_InvalidBridgeMessageLength_UnsupportedReturnedMessageLength() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), address(12));
-
-    bytes memory rawPayload = _generateValidRawPayload(
-      message.tokenTransfer[0].destTokenAddress,
-      message.sender,
-      message.tokenTransfer[0].tokenReceiver,
-      message.tokenTransfer[0].amount,
-      messageId
-    );
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId, bytes1(0)));
-
-    vm.startPrank(s_offRamp);
-    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 36, 48, 37));
-    s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
   function test_verifyMessage_RevertWhen_InvalidMessageId() public {
@@ -162,7 +57,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
       messageId
     );
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, wrongMessageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, wrongMessageId));
 
     vm.startPrank(s_offRamp);
 
@@ -190,9 +85,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     vm.startPrank(s_offRamp);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 36, 48, shortMessageId.length)
-    );
+    vm.expectRevert(abi.encodeWithSelector(LombardVerifier.InvalidMessageLength.selector, 36, shortMessageId.length));
     s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
 
@@ -259,20 +152,10 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.startPrank(s_offRamp);
 
     // ccvData with only 5 bytes (needs at least 6: 4 for version tag + 2 for rawPayloadLength).
-    bytes memory tooShortCcvData = bytes.concat(VERSION_TAG_V2_2_0, bytes1(0x00));
+    bytes memory tooShortCcvData = bytes.concat(VERSION_TAG_V2_0_0, bytes1(0x00));
 
     vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
     s_lombardVerifier.verifyMessage(message, messageId, tooShortCcvData);
-  }
-
-  function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForVersionTag() public {
-    (MessageV1Codec.MessageV1 memory message, bytes32 messageId) =
-      _createForwardMessage(address(s_testToken), address(12));
-
-    vm.startPrank(s_offRamp);
-
-    vm.expectRevert(LombardVerifier.InvalidVerifierResults.selector);
-    s_lombardVerifier.verifyMessage(message, messageId, abi.encodePacked(bytes3(VERSION_TAG_V2_2_0)));
   }
 
   function test_verifyMessage_RevertWhen_InvalidVerifierResults_CcvDataTooShortForProofLengthField() public {
@@ -285,7 +168,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // but only providing 5 bytes of raw payload and no proof length field.
     // Total: 4 + 2 + 5 = 11 bytes, but needs at least 4 + 2 + 10 + 2 = 18 bytes.
     bytes memory tooShortCcvData = bytes.concat(
-      VERSION_TAG_V2_2_0,
+      VERSION_TAG_V2_0_0,
       bytes2(uint16(10)), // rawPayloadLength = 10
       bytes5(0) // only 5 bytes instead of 10 + 2 for proof length
     );
@@ -315,7 +198,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     vm.startPrank(s_offRamp);
 
     vm.expectRevert(
-      abi.encodeWithSelector(LombardVerifier.InvalidBridgeMessageLength.selector, 165, 177, tooShortPayload.length)
+      abi.encodeWithSelector(LombardVerifier.InvalidBridgeMessageLength.selector, 165, tooShortPayload.length)
     );
     s_lombardVerifier.verifyMessage(message, messageId, _encodeCcvData(rawPayload, ""));
   }
@@ -337,7 +220,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
     // ccvData with version tag (4) + rawPayloadLength (2) + rawPayload (variable) + proofLength (2) claiming 10 bytes,
     // but only providing 5 bytes of proof.
     bytes memory tooShortCcvData = bytes.concat(
-      VERSION_TAG_V2_2_0,
+      VERSION_TAG_V2_0_0,
       bytes2(uint16(rawPayload.length)), // rawPayloadLength
       rawPayload,
       bytes2(uint16(10)), // proofLength = 10
@@ -360,7 +243,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -392,7 +275,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -423,7 +306,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -449,7 +332,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -475,7 +358,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -511,7 +394,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
@@ -534,7 +417,7 @@ contract LombardVerifier_verifyMessage is LombardVerifierSetup {
 
     bytes memory ccvData = _encodeCcvData(rawPayload, "");
 
-    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_2_0, messageId));
+    s_mockMailbox.setMessageId(abi.encodePacked(VERSION_TAG_V2_0_0, messageId));
 
     vm.startPrank(s_offRamp);
 
