@@ -7,10 +7,23 @@ generate an MCMS proposal, with no prior context on this feature. Companion doc:
 If you just want to generate both proposals with minimal reading, skip to **§3 (Quick path)**.
 Everything else is context/troubleshooting for when something doesn't work on the first try.
 
+**Validation status (read first):**
+- **v2.0 (`ccv` / `prod_testnet`)** was re-run end to end on 2026-10-02 against `chainlink-ccip`
+  `main` (`a2d686f61`) plus the pool-skip fix in §10, and the output was verified with the script
+  in **Appendix A** (194 txs / 60 chains, 0 failures). The steps below for that path reflect what
+  actually worked.
+- **v1.6 (`ccip` / `testnet`)** steps (§5) were *not* re-run in that session. Expect the same
+  class of issues as v2.0 (stale local checkout, datastore/catalog access, report cache) and
+  treat §5 as unverified until it has been re-run.
+- Things that changed since the original rehearsal and are easy to trip over: `prod_testnet` now
+  needs **catalog access** (§1, §6c); the `chainlink-ccip` checkout must be **at or after the
+  commit `domains/ccv/go.mod` pins** (§5a/§6a); and the v2.0 changeset **needs the fix in §10**
+  (skip token pools that don't support the target) or it aborts.
+
 ## 0. What this is
 
-Two `ChangeSetV2` implementations in `chainlink-ccip` (branch `glamsterdam-changeset` at time of
-writing) automate updating source-side gas config on every lane pointed at a chain that's moving
+Two `ChangeSetV2` implementations in `chainlink-ccip` (now on `main`; the pool-skip fix described
+in §10 is on branch `fix/glamsterdam-skip-unsupported-token-pools` until it is merged) automate updating source-side gas config on every lane pointed at a chain that's moving
 to the Glamsterdam hard fork:
 
 - `UpdateGasConfigForGlamsterdamV2` — `chains/evm/deployment/v2_0_0/changesets/glamsterdam_gas_update.go`
@@ -28,38 +41,56 @@ the deployer key happens to own the contract.
 
 ## 1. Prerequisites
 
-- Two sibling checkouts on disk: `chainlink-ccip` (your feature branch) and `chainlink-deployments`,
-  as siblings (i.e. `.../chainlink-ccip` and `.../chainlink-deployments` share a parent directory).
-  This matters because the local `replace` directives in step 2 use relative paths
-  (`../../../chainlink-ccip`).
-- A third sibling checkout, `chainlink-ccv` (yes, confusingly similar name to the `ccv` domain
-  above — it's a separate repo). Only needed for the v2.0 path; see §4b.
+- Two sibling checkouts on disk: `chainlink-ccip` and `chainlink-deployments`, as siblings (i.e.
+  `.../chainlink-ccip` and `.../chainlink-deployments` share a parent directory). This matters
+  because the local `replace` directives in §5a/§6a use relative paths (`../../../chainlink-ccip`).
+  **The `chainlink-ccip` checkout must be up to date with `origin/main` (plus the §10 fix if it
+  isn't merged yet).** An older feature branch makes `go build` fail in unrelated Solana packages
+  (`undefined: tokensapi.TokenAdminRegistryManager`, `...GetRemotePools` signature mismatch) because
+  the domain's pinned `chainlink-ccip` version is newer than your checkout. If you don't want to
+  move your working branch, use a separate worktree instead:
+  `git -C chainlink-ccip worktree add ../chainlink-ccip-glamsterdam-run origin/main` and point the
+  `replace` lines at it.
+- Only for the v2.0 path, and only if `go mod tidy` fails on `chainlink-ccv` (see §6b): a third
+  sibling checkout, `chainlink-ccv` (confusingly similar name to the `ccv` domain — it's a
+  separate repo). As of 2026-10-02 this was **not** needed.
 - VPN connected. Several RPC endpoints in `.config/networks/<env>.yaml` are internal proxies
   (`rpcs.cldev.sh`) that only resolve on VPN.
-- No `secrets-<env>.toml` is required for a dry run — RPC endpoints come straight from
-  `domains/<domain>/.config/networks/<env>.yaml`. You only need secrets for something that signs
-  and broadcasts for real.
+- **Catalog (datastore) access, or the local-file workaround.** `domains/ccv` sets
+  `prod_testnet` (and `staging_testnet`, `prod_mainnet`) to `datastore: all` in
+  `.config/domain.yaml`, which makes the pipeline load the datastore from the remote **catalog**
+  service. Without a catalog endpoint + auth the run dies immediately with
+  `failed to load datastore: catalog GRPC endpoint is required when datastore location is set to 'catalog'`.
+  Catalog auth uses AWS KMS (see `.config/ci/common.env`). Either configure it
+  (`catalog.grpc` in `.config/local/config.<env>.yaml` plus AWS creds), or for a **rehearsal only**
+  use the file-datastore workaround in §6c. A proposal for a *real* execution must be generated
+  against the catalog, not the checked-in file snapshot.
+- Otherwise no `secrets-<env>.toml` is needed for a dry run — RPC endpoints come straight from
+  `domains/<domain>/.config/networks/<env>.yaml`.
+- `cast` (Foundry) on `PATH`, for the verification script in Appendix A.
 - Go 1.26+ (matches `go.mod`; the `ccv` domain's `go.mod` may auto-bump to 1.26.5+ the first time
   you `go mod tidy` it — that's expected, not an error).
 
-## 2. Registration status (already done on this branch)
+## 2. Registration status (local, uncommitted edits in `chainlink-deployments`)
 
-Both changesets are already registered in `chainlink-deployments` as of this writing — this is
-tracked in `chainlink-deployments`, a separate repo from `chainlink-ccip`, so it doesn't show up
-in `chainlink-ccip`'s git history. **Check these are still present before running** — see the
-"keeps getting reset" note in §8; something in this environment periodically reverts uncommitted
-edits to these two files:
+The changesets must be registered in `chainlink-deployments`, a separate repo from
+`chainlink-ccip`. As of 2026-10-02 **neither registration, nor the input YAMLs, nor the `go.mod`
+`replace` lines were present** on a fresh `chainlink-deployments` checkout (`main` or a feature
+branch) — they were only ever local, uncommitted edits. Assume you have to add them (§5b/§5c for
+v1.6, §6a/§6d/§6e for v2.0). Check for:
 
-- `domains/ccip/testnet/durable_pipelines.go` — look for `registry.Add("update_gas_config_glamsterdam_v16", ...)`
-- `domains/ccv/pkg/pipelines/evm_pipelines.go` — look for `registry.Add("update_gas_config_glamsterdam_v2", ...)`
+- `domains/ccip/testnet/durable_pipelines.go` — `registry.Add("update_gas_config_glamsterdam_v16", ...)`
+- `domains/ccv/pkg/pipelines/evm_pipelines.go` — `registry.Add("update_gas_config_glamsterdam_v2", ...)`
 
-If either is missing, see §5 (v1.6 setup) or §6 (v2.0 setup) to re-add it — those sections have the
-exact code to paste back in.
+Also see the "keeps getting reset" note in §8: these local edits have been observed disappearing
+between sessions.
 
 ## 3. Quick path — generate both proposals
 
-If registration (§2), the `chainlink-ccip => ../../../chainlink-ccip` replace directives, and the
-`chainlink-ccv` patch (§6b) are all already in place, this is the whole workflow:
+If registration (§2), the `chainlink-ccip => ../../../chainlink-ccip` replace directives (§5a/§6a),
+the input YAMLs, and — for v2.0 — catalog access or the §6c file-datastore workaround are all in
+place, this is the whole workflow. **Before every rerun, move the previous run's outputs away**
+(§8: cached operation report + old proposal files), otherwise you may get stale results:
 
 ```bash
 # one-time per fresh shell session (see §7.1 for why)
@@ -74,9 +105,13 @@ cd ../../ccv/cmd
 go run . pipeline run --environment prod_testnet --input-file glamsterdam_gas_update_v2.yaml --dry-run
 ```
 
-Both input files already exist (checked into your working tree, not yet committed) at:
+The input files are not in the repo; create them from §5c / §6e at:
 - `domains/ccip/testnet/durable_pipelines/inputs/glamsterdam_gas_update_v16.yaml`
 - `domains/ccv/prod_testnet/durable_pipelines/inputs/glamsterdam_gas_update_v2.yaml`
+
+The v2.0 run makes many live RPC reads across ~70 chains, so budget several minutes (run it in the
+background / with a long timeout). It exits non-zero and prints the full CLI usage text on any error — the real message is the `Error:` line (grep for
+`^Error` in the log); the usage dump below it is noise.
 
 Expect each run to take several minutes (§7 has timing/troubleshooting notes) and expect to hit at
 least one flaky/dead-chain RPC — see §7.2 for the fix pattern (disable that one chain block in
@@ -91,6 +126,11 @@ above. Once you've done that once, only §3 is needed for subsequent runs.
 See §9 for the full 3-tier checklist (report → decoded diff → fork-execute). At minimum, do tier
 (a) and (b) before trusting a proposal — this catches most real bugs, including the two described
 in §10.
+
+For v2.0, tier (b) is automated by **Appendix A** (`verify_proposal.py`): it checks every
+transaction's function selector and target contract type, diffs OnRamp/FeeQuoter writes against
+`<env>/state_v2.json`, and diffs verifier/pool writes against live on-chain values. Run it right
+after the pipeline finishes and require `FAILED: 0`.
 
 ## 5. v1.6 setup (ccip domain, testnet)
 
@@ -159,10 +199,11 @@ Output lands at `domains/ccip/testnet/proposals/*update_gas_config_glamsterdam_v
 
 ## 6. v2.0 setup (ccv domain, prod_testnet)
 
-This path has two extra wrinkles v1.6 doesn't: a missing local-env config file, and a version
-mismatch in a third repo (`chainlink-ccv`). Both are one-time fixes.
+This path has extra wrinkles v1.6 doesn't: the catalog/datastore requirement (§6c), possible
+version skew in a third repo (`chainlink-ccv`, §6b — not needed as of 2026-10-02), and a possibly
+missing local-env config file (§6c).
 
-### 6a. Point `domains/ccv` at your local chainlink-ccip branch
+### 6a. Point `domains/ccv` at your local chainlink-ccip checkout
 
 ```bash
 cd chainlink-deployments/domains/ccv
@@ -174,6 +215,11 @@ github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
 github.com/smartcontractkit/chainlink-ccip/chains/evm => ../../../chainlink-ccip/chains/evm
 github.com/smartcontractkit/chainlink-ccip/deployment => ../../../chainlink-ccip/deployment
 ```
+Then `go mod tidy && go build ./pkg/... ./prod_testnet/...`. If the build fails inside
+`chainlink-ccip/chains/solana/deployment/...` (e.g. `undefined: tokensapi.TokenAdminRegistryManager`),
+your `chainlink-ccip` checkout is behind the commit pinned in `go.mod` — update it to
+`origin/main` (or use a separate worktree, §1). The checkout you point at must also contain the
+§10 pool-skip fix until it is merged to `main`.
 
 ### 6b. Patch the `chainlink-ccv` version mismatch
 
@@ -187,8 +233,9 @@ contain package .../v2_0_0/operations/cctp_verifier
 ```
 
 **Check first whether this is still broken** — try `go mod tidy` in `domains/ccv` (after 6a) and
-see if it succeeds. If `chainlink-ccv` has caught up upstream by the time you read this, skip
-straight to 6c. If not:
+see if it succeeds. **As of 2026-10-02 it succeeded without any patch, so this whole section was
+skipped.** If `chainlink-ccv` has caught up upstream by the time you read this, skip straight to
+6c. If not:
 
 1. Create a worktree of `chainlink-ccv` at `origin/main`, as a sibling of `chainlink-ccip` /
    `chainlink-deployments` (don't touch your real `chainlink-ccv` checkout):
@@ -217,10 +264,22 @@ straight to 6c. If not:
 **Remove this whole patch once `chainlink-ccv` catches up upstream** — it's a temporary
 workaround for a real, independent bug in another team's repo, not something to keep long-term.
 
-### 6c. Create the missing local-env config
+### 6c. Datastore access and local-env config
 
-`domains/ccv/.config/local/config.prod_testnet.yaml` doesn't exist by default (unlike
-`config.prod_mainnet.yaml`, `config.staging_testnet.yaml`, etc., which do). Without it, **zero
+**Datastore (new requirement).** `.config/domain.yaml` has `prod_testnet: datastore: all`, so the
+run needs the remote catalog (see §1). With no catalog access you get:
+```
+Error: failed to load datastore: catalog GRPC endpoint is required when datastore location is set to 'catalog'
+```
+*Rehearsal-only workaround* — read the checked-in snapshot (`prod_testnet/datastore/*.json`)
+instead, by changing `prod_testnet` to `datastore: file` in `domains/ccv/.config/domain.yaml`
+(the `staging_testnet_*` environments already use `file`). **Do not commit this change**, and do
+not use a proposal generated this way for a real execution: the snapshot may be stale relative to
+the catalog, so addresses/lanes can differ.
+
+**Local-env config.** On older checkouts `domains/ccv/.config/local/config.prod_testnet.yaml` didn't exist
+(unlike `config.prod_mainnet.yaml`, `config.staging_testnet.yaml`, etc., which do); as of
+2026-10-02 it exists, so this part can be skipped if the file is there. Without it, **zero
 chain loaders register for any chain family** — you'll see `"No chain loader available for chain
 family, skipping"` for every single chain and `"valid":0,"successful":0"`, with no other error.
 Create it (deployer key here is a shared placeholder already used by `prod_mainnet`/
@@ -307,7 +366,12 @@ These get wiped by reboots/`/tmp` cleanup and will resurface even after you've f
   If you change the changeset's Go code and rerun with the *same* input YAML, you may get the
   proposal from *before* your change, with no error or warning that anything was cached — the log
   will show `"Sequence already executed. Returning previous result"` if you look closely. **If a
-  code change doesn't seem to take effect, delete that report file and rerun.**
+  code change doesn't seem to take effect, move that report file (and the matching
+  `<env>/artifacts/durable_pipelines/<changeset_name>/` directory) aside and rerun.** The same
+  applies to anything that changes the result without changing the input YAML (e.g. editing the
+  `chainlink-ccip` code, or switching the datastore source). Also note each run writes a *new*
+  timestamp-prefixed file to `<env>/proposals/` and `<env>/decoded_proposals/` — old ones are not
+  overwritten — so move previous outputs aside before a rerun to make sure you verify the latest.
 - **`domains/ccip/testnet/durable_pipelines.go`, `domains/ccv/pkg/pipelines/evm_pipelines.go`, and
   both domains' `go.mod` files have been observed reverting between sessions** (registration lines
   and `replace` blocks disappearing without an explicit edit). Cause not identified — possibly a
@@ -318,7 +382,23 @@ These get wiped by reboots/`/tmp` cleanup and will resurface even after you've f
 ## 9. Verifying the proposal is doing what you expect
 
 Three checks, increasing in rigor. Do at least the first two before treating a proposal as
-trustworthy.
+trustworthy. For v2.0, **run the Appendix A script as part of (b)** — it automates the
+"only the intended fields changed" comparison for every transaction, including the ones
+`state_v2.json` has no baseline for.
+
+Things worth knowing about the output files (v2.0, `ccv`):
+- The proposal JSON stores each transaction's `data` as **base64**, not hex. Convert before
+  feeding it to `cast` (`base64 -d | xxd -p`, or `base64.b64decode(...).hex()` in Python).
+- The pipeline also writes a decoded version to `<env>/decoded_proposals/*_decoded.txt`
+  (function signature + named struct fields per transaction), so `analyze-proposal-v2` in (b) is
+  usually not needed to read it.
+- Expected tx functions for v2.0: `OnRamp.applyDestChainConfigUpdates`,
+  `FeeQuoter.applyDestChainConfigUpdates`, `<Committee|CCTP|Lombard>Verifier.applyRemoteChainConfigUpdates`,
+  and `<token pool>.applyTokenTransferFeeConfigUpdates`. Anything else is a bug.
+- `<env>/state_v2.json` (checked into the domain; refresh it before relying on it) holds current OnRamp/FeeQuoter
+  dest-chain config per chain, so those two can be diffed offline. It does **not** include
+  verifier remote-chain config or per-lane pool fee config — read those on-chain
+  (`getRemoteChainConfig(uint64)` / `getTokenTransferFeeConfig(address,uint64,bytes4,bytes)`).
 
 **a. Read the embedded report.** The proposal JSON's `description` field contains a full
 per-chain, per-field trace: which chains were skipped (`SkipChainSelectors`), which had no lane to
@@ -373,6 +453,32 @@ about, then read back the contract state to confirm it matches what the decoded 
   failing the entire run. Seen in practice: `sei-testnet-atlantic`'s FeeQuoter address in the
   testnet datastore has no contract code anymore (stale entry) — it's skipped, the other 16 chains
   still got processed.
+- **Token pools that don't support the target chain are skipped (required fix — see below).**
+  `CCTPThroughCCVTokenPool.getTokenTransferFeeConfig` reverts with `CCVNotSetOnResolver(address)`
+  (selector `0x4172d660`) when its CCTPVerifier resolver has no outbound implementation for the
+  destination — i.e. the USDC lane to the target isn't configured on that pool
+  (`isSupportedChain(target)` is false, `getSupportedChains()` is empty). Before the fix,
+  `UpdateTokenPoolGasConfig` (`sequences/glamsterdam/token_pool_gas_config.go`) read the fee config
+  unconditionally, so a single such pool aborted the **entire** changeset with:
+  ```
+  Error: failed to update token pool gas config for target chain <sel>: failed to read
+  TokenPool(0x...) transfer fee config for src <sel>, dst <sel>: execution reverted
+  ```
+  The fix reads `getSupportedChains()` first and, if the target isn't listed, skips the pool with a
+  report line `chain <sel>: TokenPool(0x...) does not support dst <sel>, skipping`. It lives on
+  branch `fix/glamsterdam-skip-unsupported-token-pools` (regression test:
+  `TestUpdateTokenPoolGasConfig_SkipsPoolNotSupportingTarget`); **make sure whatever
+  `chainlink-ccip` code you run against contains it.** On `prod_testnet` (2026-10-02) two pools
+  were skipped this way (a Hyperliquid-testnet `CCTPThroughCCVTokenPool` `0x17608A…C035`, and one
+  on chain `9763904284804119144`) — the same two chains where the `CCTPVerifier` also has
+  `router == address(0)` for the target, which is consistent. The same class of problem — a read that reverts for an
+  unconfigured destination aborting everything — is worth checking for in any new field added
+  to either sequence.
+- **Whole-struct rewrites of unchanged values are normal.** The changeset re-submits the full
+  FeeQuoter/OnRamp dest-chain struct with only the touched fields overridden, so you'll see writes
+  whose old and new values for a field are identical (e.g. `MaxPerMsgGasLimit` 15,000,000 →
+  15,000,000, or 3,000,000 → 3,000,000 where the fallback is a no-op). That's expected; what must
+  not happen is any *other* field changing (the Appendix A script checks this).
 - **`CommitteeVerifier` is optional for the v2.0 changeset**, same as `OffRamp` already was — a
   missing address just skips that chain's verifier-gas-for-verification write (row 8), it doesn't
   drop the whole lane's OnRamp/FeeQuoter writes.
@@ -421,6 +527,36 @@ about, then read back the contract state to confirm it matches what the decoded 
 measurement — it's a constant in `chains/evm/deployment/utils/glamsterdam/` / the version-specific
 `fields.go` files, no code logic changes needed.
 
+### Observed v2.0 result — `ccv` / `prod_testnet`, target Sepolia (2026-10-02)
+
+Run against `chainlink-ccip` `main` (`a2d686f61`) + the §10 fix, file datastore (§6c). 68 batches,
+194 txs, 60 chains; Appendix A script: 0 failures. Current → new, with tx counts:
+
+| Contract.field | Current → new | Count | Note |
+|---|---|---|---|
+| `OnRamp.BaseExecutionGasCost` | 200,000 → 400,000 | 59 | literal Glamsterdam |
+| `FeeQuoter.DefaultTokenDestGasOverhead` | 90,000 → 270,000 | 60 | literal |
+| `FeeQuoter.DefaultTxGasLimit` | 200,000 → 400,000 | 60 | literal |
+| `FeeQuoter.DestGasPerPayloadByteBase` | 20 → 64 | 58 | literal |
+| `FeeQuoter.DestGasPerPayloadByteBase` | 16 → 51 | 2 | `MISMATCH` → fallback (these chains are non-default) |
+| `FeeQuoter.MaxPerMsgGasLimit` | 15,000,000 → 15,000,000 | 58 | no-op |
+| `FeeQuoter.MaxPerMsgGasLimit` | 3,000,000 → 3,000,000 | 2 | `MISMATCH`, fallback is a no-op |
+| `CommitteeVerifier.GasForVerification` | 75,000 → 85,000 | 59 | literal |
+| `CCTPVerifier.GasForVerification` | 200,000 → 600,000 | 6 | literal (guesstimate value) |
+| `CCTPVerifier.GasForVerification` | 220,000 → 660,000 | 2 | `MISMATCH` → fallback |
+| `CCTPThroughCCVTokenPool` (USDC slot) `DestGasOverhead` | 90,000 → 270,000 | 8 | `MISMATCH` → fallback |
+
+Not written: 8 chains skipped for an unresolved contract address (5 `OnRamp`, 3 `FeeQuoter`);
+OnRamp/CommitteeVerifier/CCTPVerifier writes skipped on a few chains with `router == address(0)`;
+2 token pools skipped as unsupported for the target (§10).
+
+**Open question — USDC pool baseline.** All 8 `CCTPThroughCCVTokenPool`s on `prod_testnet` have a
+current `DestGasOverhead` of 90,000 (not the 250,000 "expected Prague" baseline in row 10), so
+every one takes the `MISMATCH` fallback (3× → 270,000) instead of the literal 750,000. The 90,000
+looks like it may just be the default token overhead rather than a deliberately tuned USDC value.
+Decide whether row 10's baseline/target should be different for `CCTPThroughCCVTokenPool`
+before a real run, rather than leaving it to the fallback.
+
 ## 12. Mainnet rollout notes
 
 - Batch mainnet's ~80 lanes using `SkipChainSelectors` in the input YAML's `cfg` block — put
@@ -430,6 +566,19 @@ measurement — it's a constant in `chains/evm/deployment/utils/glamsterdam/` / 
 - Re-verify §0's domain choice before the mainnet run — confirm which domain (`ccip` vs `ccv`) and
   environment (`mainnet` vs `prod_mainnet`) actually carries the mature v1.6/v2.0 contracts by then;
   this may have changed since this rehearsal.
+- **A real proposal must not be generated the way the rehearsal was.** Checklist:
+  1. Run with **catalog access** (§1), not the `datastore: file` workaround; make sure
+     `.config/domain.yaml` is back to `datastore: all`.
+  2. Do not use local `replace` directives. Merge the §10 fix (and any guesstimate-constant
+     updates) into `chainlink-ccip` `main`, then **bump the `chainlink-ccip` module pins** in
+     `chainlink-deployments/domains/<domain>/go.mod` to a commit that contains them, so the
+     proposal is reproducible from the pinned versions. (The pin on 2026-10-02 already contained
+     the Glamsterdam changesets themselves, just not the §10 fix.)
+  3. Land the changeset registration and input YAML in `chainlink-deployments` via a normal PR
+     (they were uncommitted local edits during the rehearsal).
+  4. Re-run the Appendix A verification on the final proposal, then `execute-fork` a
+     representative sample of chains (§9c). The rehearsal did **not** fork-execute.
+  5. Resolve the USDC-pool baseline question in §11 and replace the "(guesstimate)" constants.
 
 ## 13. Notes for an AI agent picking this up
 
@@ -461,5 +610,160 @@ If you're an AI agent (Claude Code or otherwise) working through this runbook ra
   expect) to confirm the prerequisite contracts actually exist there, and (2) whether the same
   changeset family has a similar archived input file under `durable_pipelines/archived/` you can
   diff your input against for a schema/qualifier mismatch.
+- **Sandboxed shells.** Inside Claude Code's default Bash sandbox, `go mod tidy` / `go build` can't
+  download modules (`proxy.golang.org` is blocked, then fails TLS verification) and the pipeline /
+  `cast` calls to `rpcs.cldev.sh` need network access too. Those commands have to run outside the
+  sandbox (with the user's approval); say so rather than looking for another route.
+- **Don't touch the user's working branch to fix version skew.** If their `chainlink-ccip`
+  checkout is behind the pinned version, use a separate `git worktree` at `origin/main` (§1) and
+  point the `replace` lines there; commit any fix on its own branch.
+- **Don't print config files to find their structure.** `.config/local/config.*.yaml` can hold
+  plaintext credentials (e.g. Job Distributor passwords in the `staging_testnet` config). Use `grep`
+  for key names, or read only the file you need.
+- **Verify, don't just generate.** "Exit code 0 + a proposal file" is not success: run the
+  Appendix A script and require `FAILED: 0`. Also be explicit in your report about what was *not*
+  checked (e.g. fork execution) and what the datastore source was (file vs catalog).
 - **Update this runbook if you discover a new gotcha.** It's meant to accumulate operational
   knowledge across runs, not just describe the original rehearsal.
+
+## Appendix A. `verify_proposal.py` — automated v2.0 proposal check
+
+Save as `verify_proposal.py` and run it after the pipeline finishes (needs `cast` on `PATH` and
+VPN for the `rpcs.cldev.sh` reads; Python 3, standard library only):
+
+```bash
+python3 verify_proposal.py chainlink-deployments/domains/ccv/prod_testnet            # default target: Sepolia
+python3 verify_proposal.py chainlink-deployments/domains/ccv/prod_testnet <targetChainSelector>
+```
+
+It uses the newest `proposals/*glamsterdam_v2*.json` in that directory, so move older runs aside
+first (§8). Exit code is non-zero if any transaction fails. What it enforces, per transaction:
+
+1. selector is one of the four expected functions (§9) and the target address is the expected
+   contract type in `datastore/address_refs.json`;
+2. `OnRamp` / `FeeQuoter` writes: every field except the gas fields is identical to `state_v2.json`;
+3. verifier / token-pool writes: every field except the gas field is identical to the **live**
+   on-chain value (`getRemoteChainConfig`, `getTokenTransferFeeConfig`);
+4. destination selector in the calldata is the intended target;
+
+and prints every current → new value transition with counts, which you compare to the report's
+`description` and to §11. It does *not* simulate execution — still do §9c before a real run.
+Verified 2026-10-02: 194/194 txs pass, and pointing it at a wrong target selector fails all 194.
+
+```python
+#!/usr/bin/env python3
+"""Verify a Glamsterdam v2.0 MCMS proposal: right functions, right contracts, only intended fields changed.
+
+usage: verify_proposal.py <domains/ccv/prod_testnet dir> [target_selector]
+Needs: `cast` (foundry), VPN (reads live values from https://rpcs.cldev.sh/<selector>).
+Checks:
+  1. every tx targets a contract of the expected type per <env>/datastore/address_refs.json
+  2. every tx's 4-byte selector is one of the 4 expected functions
+  3. OnRamp / FeeQuoter writes vs <env>/state_v2.json: only gas fields differ
+  4. CommitteeVerifier / CCTPVerifier / token-pool writes vs LIVE on-chain values: only the gas field differs
+"""
+import base64, glob, json, re, subprocess, sys
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+
+BASE = sys.argv[1].rstrip('/') + '/'
+T = int(sys.argv[2]) if len(sys.argv) > 2 else 16015286601757825753  # ethereum-testnet-sepolia
+
+prop = json.load(open(sorted(glob.glob(BASE + 'proposals/*glamsterdam_v2*.json'))[-1]))
+state = json.load(open(BASE + 'state_v2.json'))
+ref = {(r['chainSelector'], r['address'].lower()): r for r in json.load(open(BASE + 'datastore/address_refs.json'))}
+
+def cast(*a):
+    p = subprocess.run(['cast', *a], capture_output=True, text=True, timeout=60)
+    if p.returncode: raise RuntimeError(p.stderr.strip()[:200])
+    return re.sub(r' \[[0-9.e+-]+\]', '', p.stdout.strip())  # cast annotates big numbers, e.g. "270000 [2.7e5]"
+
+FN = {  # name -> (signature, expected datastore type)
+    'OnRamp.applyDestChainConfigUpdates': ('applyDestChainConfigUpdates((uint64,address,uint8,bool,uint16,uint16,uint32,address[],address[],address,bytes)[])', {'OnRamp'}),
+    'FeeQuoter.applyDestChainConfigUpdates': ('applyDestChainConfigUpdates((uint64,(bool,uint32,uint32,uint32,uint8,bytes4,uint16,uint32,uint32,uint16,uint8))[])', {'FeeQuoter'}),
+    'Verifier.applyRemoteChainConfigUpdates': ('applyRemoteChainConfigUpdates((address,uint64,bool,uint16,uint32,uint16)[])', {'CommitteeVerifier', 'CCTPVerifier', 'LombardVerifier'}),
+    'Pool.applyTokenTransferFeeConfigUpdates': ('applyTokenTransferFeeConfigUpdates((uint64,(uint32,uint32,uint32,uint32,uint16,uint16,bool))[],uint64[])', {'CCTPThroughCCVTokenPool', 'LombardTokenPool', 'SiloedUSDCTokenPool', 'USDCTokenPool'}),
+}
+SEL = {cast('sig', s): n for n, (s, _) in FN.items()}
+
+ops = []
+for bi, b in enumerate(prop['operations']):
+    for t in b['transactions']:
+        d = t['data'] if t['data'].startswith('0x') else '0x' + base64.b64decode(t['data']).hex()  # proposal JSON stores base64
+        ops.append((bi, int(b['chainSelector']), t['to'].lower(), d))
+print(f'{len(prop["operations"])} batches, {len(ops)} txs, {len({o[1] for o in ops})} chains')
+
+def state_contract(sel, addr, kind):
+    c = next((v for v in state['chains'].values() if v['chainSelector'] == sel), None)
+    return next((v for a, v in (c or {}).get(kind, {}).items() if a.lower() == addr), None)
+
+def check(op):
+    bi, sel, to, data = op
+    r = ref.get((sel, to)); typ = r['type'] if r else None
+    fn = SEL.get(data[:10])
+    out = dict(batch=bi, sel=sel, to=to, typ=typ, fn=fn, errs=[])
+    if fn is None: out['errs'].append('unexpected selector ' + data[:10]); return out
+    if typ not in FN[fn][1]: out['errs'].append(f'{fn} on unexpected contract type {typ}')
+    url = f'https://rpcs.cldev.sh/{sel}'
+    try:
+        if fn == 'Verifier.applyRemoteChainConfigUpdates':
+            m = re.match(r'\[\((0x\w{40}), (\d+), (true|false), (\d+), (\d+), (\d+)\)\]', cast('calldata-decode', 'x(' + '(address,uint64,bool,uint16,uint32,uint16)[])', data))
+            new = m.groups()
+            cur = re.match(r'\((0x\w{40}), (\d+), (true|false), (\d+), (\d+), (\d+)\)', cast('call', to, 'getRemoteChainConfig(uint64)((address,uint64,bool,uint16,uint32,uint16),address[])', str(T), '--rpc-url', url)).groups()
+            if int(new[1]) != T: out['errs'].append('wrong dest chain')
+            for i, n in [(0, 'router'), (2, 'allowlistEnabled'), (3, 'feeUSDCents'), (5, 'payloadSizeBytes')]:
+                if cur[i].lower() != new[i].lower(): out['errs'].append(f'{n} changed {cur[i]}->{new[i]}')
+            out['t'] = (typ, 'GasForVerification', int(cur[4]), int(new[4]))
+        elif fn == 'Pool.applyTokenTransferFeeConfigUpdates':
+            new = cast('calldata-decode', 'x((uint64,(uint32,uint32,uint32,uint32,uint16,uint16,bool))[],uint64[])', data).replace('\n', ', ')
+            m = re.match(r'\[\((\d+), \((\d+), (\d+), (\d+), (\d+), (\d+), (\d+), (true|false)\)\)\], \[\]', new)
+            if int(m.group(1)) != T: out['errs'].append('wrong dest chain')
+            nv = list(m.groups()[1:])
+            cv = list(re.match(r'\((\d+), (\d+), (\d+), (\d+), (\d+), (\d+), (true|false)\)', cast(
+                'call', to, 'getTokenTransferFeeConfig(address,uint64,bytes4,bytes)((uint32,uint32,uint32,uint32,uint16,uint16,bool))',
+                '0x' + '0' * 40, str(T), '0x00000000', '0x', '--rpc-url', url)).groups())
+            for i, n in enumerate(['destGasOverhead', 'destBytesOverhead', 'finalityFeeUSDCents', 'fastFinalityFeeUSDCents', 'finalityBps', 'fastFinalityBps', 'isEnabled']):
+                if i and cv[i] != nv[i]: out['errs'].append(f'{n} changed {cv[i]}->{nv[i]}')
+            if cv[6] != 'true': out['errs'].append('pool fee config currently disabled')
+            out['t'] = (typ, 'DestGasOverhead', int(cv[0]), int(nv[0]))
+        elif fn == 'OnRamp.applyDestChainConfigUpdates':
+            sc = state_contract(sel, to, 'onRamp'); cur = next(d for d in sc['destChainConfigs'] if d['destChainSelector'] == T)
+            new = cast('calldata-decode', 'x(' + '(uint64,address,uint8,bool,uint16,uint16,uint32,address[],address[],address,bytes)[])', data)
+            m = re.match(r'\[\((\d+), (0x\w{40}), (\d+), (true|false), (\d+), (\d+), (\d+), \[(.*?)\], \[(.*?)\], (0x\w{40}), (0x\w*)\)\]', new, re.S)
+            g = m.groups()
+            for i, n, k in [(1, 'router', 'router'), (2, 'addressBytesLength', 'addressBytesLength'), (4, 'messageNetworkFeeUSDCents', 'messageNetworkFeeUSDCents'),
+                            (5, 'tokenNetworkFeeUSDCents', 'tokenNetworkFeeUSDCents'), (9, 'defaultExecutor', 'defaultExecutor')]:
+                if str(g[i]).lower() != str(cur[k]).lower(): out['errs'].append(f'OnRamp {n} changed {cur[k]}->{g[i]}')
+            if int(g[0]) != T: out['errs'].append('wrong dest chain')
+            if sorted(re.findall(r'0x\w{40}', g[7].lower())) != sorted(x.lower() for x in cur['defaultCCVs']): out['errs'].append('defaultCCVs changed')
+            if sorted(re.findall(r'0x\w{40}', g[8].lower())) != sorted(x.lower() for x in cur['laneMandatedCCVs']): out['errs'].append('laneMandatedCCVs changed')
+            out['t'] = (typ, 'BaseExecutionGasCost', cur['baseExecutionGasCost'], int(g[6]))
+        elif fn == 'FeeQuoter.applyDestChainConfigUpdates':
+            sc = state_contract(sel, to, 'feeQuoter'); cur = sc['destinationChainConfig'][str(T)]
+            new = cast('calldata-decode', 'x((uint64,(bool,uint32,uint32,uint32,uint8,bytes4,uint16,uint32,uint32,uint16,uint8))[])', data)
+            g = re.match(r'\[\((\d+), \((true|false), (\d+), (\d+), (\d+), (\d+), (0x\w+), (\d+), (\d+), (\d+), (\d+), (\d+)\)\)\]', new).groups()
+            names = ['isEnabled', 'maxDataBytes', 'maxPerMsgGasLimit', 'destGasOverhead', 'destGasPerPayloadByteBase', 'chainFamilySelector',
+                     'defaultTokenFeeUSDCents', 'defaultTokenDestGasOverhead', 'defaultTxGasLimit', 'networkFeeUSDCents', 'linkFeeMultiplierPercent']
+            gas = {'maxPerMsgGasLimit', 'destGasPerPayloadByteBase', 'defaultTokenDestGasOverhead', 'defaultTxGasLimit'}
+            if int(g[0]) != T: out['errs'].append('wrong dest chain')
+            out['ts'] = []
+            for n, v in zip(names, g[1:]):
+                cv = str(cur[n]).lower().replace('true', 'true')
+                if n in gas: out['ts'].append((typ, n, cur[n], int(v)))
+                elif str(v).lower().replace('0x', '') != cv.replace('0x', ''): out['errs'].append(f'FeeQuoter {n} changed {cur[n]}->{v}')
+    except Exception as e:
+        out['errs'].append('ERR ' + repr(e)[:160])
+    return out
+
+with ThreadPoolExecutor(12) as ex: res = list(ex.map(check, ops))
+
+print('\ntx count by function / target contract type:')
+for k, n in sorted(Counter((r['fn'], r['typ']) for r in res).items(), key=str): print(' ', n, k)
+print('\nvalue transitions  (contract, field, current -> new): count')
+ts = [r['t'] for r in res if 't' in r] + [t for r in res for t in r.get('ts', [])]
+for k, n in sorted(Counter(ts).items(), key=str): print(f'  {k[0]}.{k[1]}: {k[2]} -> {k[3]}   x{n}')
+bad = [r for r in res if r['errs']]
+print(f'\nFAILED: {len(bad)} / {len(res)} txs')
+for r in bad[:25]: print(' ', r['sel'], r['to'], r['typ'], r['errs'])
+sys.exit(1 if bad else 0)
+```
