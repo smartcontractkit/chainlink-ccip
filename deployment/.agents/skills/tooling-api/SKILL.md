@@ -129,4 +129,5 @@ Non-obvious points:
 - [ ] v2 versions are not pre-release (`2.0.0`, not `2.0.0-dev`).
 - [ ] CCTP and Lombard adapters are registered in the `chainlink-deployments` durable pipelines (`New*Registry()`), not in `init()`. A new family adapter must be added there too.
 - [ ] `MCMSReader` is registered for the family. Without it, `OutputBuilder.Build` cannot create proposals for that family's chains.
+- [ ] If one pool program serves many tokens (as on Solana), `DeriveTokenPoolCounterpart` returns the per-token address, and `TokenFeeAdapter` accepts that address as its pool key. A changeset that calls `TokenFeeAdapter` gets the key from `tokens.TokenPoolCounterpartAddress`, not from `poolRef.Address`.
 - [ ] Docs updated: `interfaces.md` for new interfaces, `consuming.md` for new changesets.

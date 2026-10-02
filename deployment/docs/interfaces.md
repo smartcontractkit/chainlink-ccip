@@ -72,7 +72,7 @@ Registered once per **token pool version**, because pool versions configure diff
 | `AddressRefToBytes(ref)` | Family address encoding (hex on EVM, base58 on Solana) |
 | `DeriveTokenAddress(e, sel, poolRef)` | Read the token address stored on the pool |
 | `DeriveTokenDecimals(e, sel, poolRef, token)` | Read the token's decimals |
-| `DeriveTokenPoolCounterpart(e, sel, pool, token)` | Turn the deployed pool address into the address the remote side must store (Solana: pool config PDA). Return `pool` unchanged if not applicable |
+| `DeriveTokenPoolCounterpart(e, sel, pool, token)` | Turn the deployed pool address into the per-token pool address: the one the remote side must store, and the key of `TokenFeeAdapter` inputs (Solana: pool config PDA). Return `pool` unchanged if not applicable |
 | `ManualRegistration()` | Register a customer-deployed token whose mint authority the customer no longer holds |
 | `SetTokenPoolRateLimits()` | Set outbound/inbound rate limits for one remote |
 | `DeployToken()` / `DeployTokenVerify(e, in)` | Deploy a token, and validate the input first |
@@ -93,6 +93,14 @@ Registered once per **token pool version**, because pool versions configure diff
 | `RemotePoolRemover` | type assertion | `RemoveRemotePools` |
 | `RateLimitReaderAdapter` | type assertion | `SetTokenPoolRateLimits` (outbound-only path), auto-migrate |
 | `TokenPoolMigrator` | type assertion | `ConfigureTokensForTransfers` auto-migrate, `RemoveRemotePools` |
+
+**Which pool address each interface receives.** On EVM it is always the pool contract. On families where one pool program serves many tokens, it depends on the interface:
+
+- **`TokenFeeAdapter`**: the pool's counterpart address, from `tokens.TokenPoolCounterpartAddress`, which calls `DeriveTokenPoolCounterpart`. That's the pool address on EVM and the pool config PDA on Solana. The PDA identifies both the pool program (its owner) and the mint (in its state).
+- **`TokenPoolMigrator`**: the pool as the datastore or TokenAdminRegistry holds it (the program ID on Solana), plus the token address.
+- **Other optional interfaces**: the resolved `TokenPoolRef` and `TokenRef`.
+
+On Solana, allowed finality and token transfer fees are stored per lane, in the pool's `ChainConfigV2`. EVM stores finality per pool. The Solana `SetAllowedFinalityConfig` therefore writes the value to every lane the pool is configured for.
 
 `TokenRefResolver` and `DeriveTokenAddress` do different jobs. The resolver answers "what is the full `AddressRef` for this address?" `DeriveTokenAddress` answers "which token does this already resolved pool serve?" `ResolveAdapterAndRefs` in [tokens/token_expansion.go](../tokens/token_expansion.go) uses both, in this order:
 

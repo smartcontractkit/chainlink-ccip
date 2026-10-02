@@ -25,7 +25,7 @@ A 2.0 chain family still registers these shared adapters. They are the same inte
 |---|---|
 | `changesets.MCMSReader` | Required. Resolve the 2.0 MCMS refs (Solana 2.0 looks up MCM refs at version 2.0.0) |
 | `deploy.TransferOwnershipAdapter` | Register at `2.0.0`. `DeployChainContracts` uses it to hand contracts to the timelock |
-| `tokens.TokenAdapter` | Register under each **2.0 pool version** (EVM `2.0.0`; Solana `2.0.0` and `1.6.1`). Read CCVs from `RemoteChainConfig.OutboundCCVs`/`InboundCCVs`, and finality from `AllowedFinalityConfig` |
+| `tokens.TokenAdapter` | Register under each **2.0 pool version** (EVM `2.0.0`; Solana `2.0.0` and `1.6.1`). Read CCVs from `RemoteChainConfig.OutboundCCVs`/`InboundCCVs`, and finality from `AllowedFinalityConfig`. 2.0 pools carry their own token transfer fees and allowed finality, so also implement `tokens.TokenFeeAdapter`. Its pool keys are counterpart addresses (see [TokenAdapter](interfaces.md#tokenadapter)) |
 | `fastcurse` curse adapters | Register at the RMN version your chain uses (EVM registers RMN 2.1.0) |
 | `fees.FeeAdapter`, `fees.FeeAggregatorAdapter` | Register at `2.0.0` |
 | `authorizedcallers.AuthorizedCallersAdapter` | If your 2.0 contracts inherit `AuthorizedCallers` |
