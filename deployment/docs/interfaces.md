@@ -1,647 +1,281 @@
 ---
 title: "Adapter Interfaces Reference"
 sidebar_label: "Interfaces"
-sidebar_position: 3
+sidebar_position: 6
 ---
 
 # Adapter Interfaces Reference
 
-This document provides a complete API reference for all adapter interfaces that chain-specific implementations must or can provide. Each interface is accompanied by its registry, registration pattern, and method signatures.
+Every interface a chain family can implement, grouped by API generation. Each entry lists its registry, the key it is registered under, and what it does. The source file is the source of truth for exact signatures. Go to it when you need parameter types.
 
-For a step-by-step guide on implementing these interfaces for a new chain family, see [Implementing Adapters](implementing-adapters.md).
+- For how to implement these, see [Implementing 1.6](implementing-1.6.md) and [Implementing 2.0](implementing-2.0.md).
+- For how registries work, see [Architecture](architecture.md#registries).
 
-## Quick Reference
+**Key column:**
 
-### Required Interfaces
+- `family-version`: one adapter per chain family *and* contract version (`"evm-1.6.0"`).
+- `family`: one adapter per chain family.
+- *type assertion*: there is no registry. The changeset checks whether the already-registered adapter also implements the interface (`adapter.(X)`).
 
-Every chain family **must** implement these interfaces:
-
-| Interface | Registry | Key Format | Source |
-|-----------|----------|------------|--------|
-| [Deployer](#deployer) | `DeployerRegistry` | `chainFamily-version` | [deploy/product.go](../deploy/product.go) |
-| [LaneAdapter](#laneadapter) | `LaneAdapterRegistry` | `chainFamily-version` | [lanes/product.go](../lanes/product.go) |
-| [TokenAdapter](#tokenadapter) | `TokenAdapterRegistry` | `chainFamily-version` | [tokens/product.go](../tokens/product.go) |
-| [FeeAdapter](#feeadapter) | `FeeAdapterRegistry` | `chainFamily-version` | [fees/product.go](../fees/product.go) |
-| [FeeAggregatorAdapter](#feeaggregatoradapter) | `FeeAggregatorAdapterRegistry` | `chainFamily-version` | [fees/fee_aggregator.go](../fees/fee_aggregator.go) |
-| [MCMSReader](#mcmsreader) | `MCMSReaderRegistry` | `chainFamily` | [utils/changesets/output.go](../utils/changesets/output.go) |
-| [TransferOwnershipAdapter](#transferownershipadapter) | `TransferOwnershipAdapterRegistry` | `chainFamily-version` | [deploy/product.go](../deploy/product.go) |
-| [CurseAdapter](#curseadapter) | `CurseRegistry` | `chainFamily-version` | [fastcurse/product.go](../fastcurse/product.go) |
-| [CurseSubjectAdapter](#cursesubjectadapter) | `CurseRegistry` | `chainFamily` | [fastcurse/product.go](../fastcurse/product.go) |
-
-### Optional Interfaces
-
-These interfaces are optional depending on what the chain family supports:
-
-| Interface | Registry | Purpose | Source |
-|-----------|----------|---------|--------|
-| [TokenRefResolver](#tokenrefresolver) | `TokenAdapterRegistry` | Resolve token/pool refs from datastore or on-chain | [tokens/product.go](../tokens/product.go) |
-| [TokenPriceProvider](#tokenpriceprovider) | None (embedded) | Provide default fee token prices | [lanes/product.go](../lanes/product.go) |
-| [PingPongAdapter](#pingpongadapter) | `PingPongAdapterRegistry` | PingPong demo contract support | [lanes/pingpong.go](../lanes/pingpong.go) |
-| [ConfigImporter](#configimporter) | None | Import config from existing deployments | [deploy/product.go](../deploy/product.go) |
-| [RampUpdateInRouter](#rampupdateinrouter) | `LaneMigratorRegistry` | Lane migration: update router | [deploy/lanemigrator.go](../deploy/lanemigrator.go) |
-| [RouterUpdateInRamp](#routerupdateinramp) | `LaneMigratorRegistry` | Lane migration: update ramps | [deploy/lanemigrator.go](../deploy/lanemigrator.go) |
-| [TestAdapter](#testadapter) | `TestAdapterRegistry` | Cross-chain message testing | [testadapters/adapters.go](../testadapters/adapters.go) |
+All registries keep the **first** registration for a key and silently ignore later ones.
 
 ---
 
-## Required Interfaces
-
-### Deployer
-
-Handles deployment of CCIP core contracts and MCMS governance contracts on a chain.
-
-**Source:** [deploy/product.go](../deploy/product.go)
-**Registry:** `DeployerRegistry` via `deploy.GetRegistry()`
-**Key:** `chainFamily-version`
-
-```go
-type Deployer interface {
-    // DeployChainContracts deploys all CCIP contracts required for a chain
-    // (Router, OnRamp, OffRamp, FeeQuoter, RMNRemote, etc.)
-    DeployChainContracts() *Sequence[ContractDeploymentConfigPerChainWithAddress, OnChainOutput, BlockChains]
-
-    // DeployMCMS deploys Multi-Chain Multi-Sig governance contracts
-    // (AccessController, MCM, Timelock)
-    DeployMCMS() *Sequence[MCMSDeploymentConfigPerChainWithAddress, OnChainOutput, BlockChains]
-
-    // FinalizeDeployMCMS finalizes MCMS deployment (e.g., timelock initialization on Solana).
-    // Not all chains require this - can be a no-op sequence.
-    FinalizeDeployMCMS() *Sequence[MCMSDeploymentConfigPerChainWithAddress, OnChainOutput, BlockChains]
-
-    // SetOCR3Config sets OCR3 configuration on the chain's OffRamp
-    SetOCR3Config() *Sequence[SetOCR3ConfigInput, OnChainOutput, BlockChains]
-
-    // GrantAdminRoleToTimelock grants admin role from one timelock to another
-    GrantAdminRoleToTimelock() *Sequence[GrantAdminRoleToTimelockConfigPerChainWithSelector, OnChainOutput, BlockChains]
-}
-```
-
-**Registration:**
-```go
-deploy.GetRegistry().RegisterDeployer(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), &EVMAdapter{})
-```
-
----
-
-### LaneAdapter
-
-Handles lane configuration between chains -- configuring a chain as a message source or destination for a given lane.
-
-**Source:** [lanes/product.go](../lanes/product.go)
-**Registry:** `LaneAdapterRegistry` via `lanes.GetLaneAdapterRegistry()`
-**Key:** `chainFamily-version`
-
-```go
-type LaneAdapter interface {
-    // ConfigureLaneLegAsSource configures this chain as the source for a lane.
-    // Sets up OnRamp destination chain config, FeeQuoter destination config, and token prices.
-    ConfigureLaneLegAsSource() *Sequence[UpdateLanesInput, OnChainOutput, BlockChains]
-
-    // ConfigureLaneLegAsDest configures this chain as the destination for a lane.
-    // Sets up OffRamp source chain config and Router integration.
-    ConfigureLaneLegAsDest() *Sequence[UpdateLanesInput, OnChainOutput, BlockChains]
-
-    // GetOnRampAddress returns the OnRamp contract address (as bytes) for the given chain.
-    // On Solana, this returns the Router address since Solana has a unified contract.
-    GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-
-    // GetOffRampAddress returns the OffRamp contract address (as bytes) for the given chain.
-    GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-
-    // GetRouterAddress returns the Router contract address (as bytes) for the given chain.
-    GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-
-    // GetFQAddress returns the FeeQuoter contract address (as bytes) for the given chain.
-    GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
-}
-```
-
-**Registration:**
-```go
-lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), &SolanaAdapter{})
-```
-
-**Note:** The `Get*Address` methods are used by the `ConnectChains` changeset to programmatically populate `ChainDefinition` fields. Address bytes must be chain-family encoded (e.g., 20-byte EVM address, 32-byte Solana public key).
-
----
-
-### TokenAdapter
-
-Handles token pool configuration, deployment, and cross-chain token transfer setup.
-
-**Source:** [tokens/product.go](../tokens/product.go)
-**Registry:** `TokenAdapterRegistry` via `tokens.GetTokenAdapterRegistry()`
-**Key:** `chainFamily-version`
-
-Each chain-family-version combination registers separately, because configuration differs by token pool version (e.g., 2.0.0 pools require CCV config, 1.5.0 pools require remote pool addresses).
-
-```go
-type TokenAdapter interface {
-    // ConfigureTokenForTransfersSequence configures a token pool for cross-chain transfers.
-    // Assumes the token and pool are already deployed and registered.
-    ConfigureTokenForTransfersSequence() *Sequence[ConfigureTokenForTransfersInput, OnChainOutput, BlockChains]
-
-    // AddressRefToBytes converts an AddressRef to a byte slice.
-    // Each chain family serializes addresses differently (hex for EVM, base58 for Solana).
-    AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
-
-    // DeriveTokenAddress derives the token address from a token pool reference.
-    // Used when the token address is stored on the pool contract.
-    DeriveTokenAddress(e Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error)
-
-    // DeriveTokenDecimals derives the token's decimal count from a pool reference.
-    DeriveTokenDecimals(e Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error)
-
-    // DeriveTokenPoolCounterpart derives the effective pool address for chains where
-    // the deployed address differs from the operational address (e.g., Solana PDAs).
-    DeriveTokenPoolCounterpart(e Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error)
-
-    // ManualRegistration registers a customer token with the token admin registry.
-    // Used when the customer has already deployed and no longer has mint authority.
-    ManualRegistration() *Sequence[ManualRegistrationSequenceInput, OnChainOutput, BlockChains]
-
-    // SetTokenPoolRateLimits sets rate limits on a token pool.
-    SetTokenPoolRateLimits() *Sequence[TPRLRemotes, OnChainOutput, BlockChains]
-
-    // DeployToken deploys a new token on the chain.
-    DeployToken() *Sequence[DeployTokenInput, OnChainOutput, BlockChains]
-
-    // DeployTokenVerify validates the DeployToken input before execution.
-    DeployTokenVerify(e Environment, in DeployTokenInput) error
-
-    // DeployTokenPoolForToken deploys a token pool for an existing token.
-    DeployTokenPoolForToken() *Sequence[DeployTokenPoolInput, OnChainOutput, BlockChains]
-
-    // UpdateAuthorities transfers token and pool ownership to the timelock signer.
-    UpdateAuthorities() *Sequence[UpdateAuthoritiesInput, OnChainOutput, *Environment]
-}
-```
-
-**Registration:**
-```go
-tokens.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), &EVMAdapter{})
-```
-
----
-
-### FeeAdapter
-
-Handles token transfer fee configuration and retrieval, plus FeeQuoter destination chain config reads/writes.
-
-**Source:** [fees/product.go](../fees/product.go), [fees/defaults.go](../fees/defaults.go)
-**Registry:** `FeeAdapterRegistry` via `fees.GetRegistry()`
-**Key:** `chainFamily-version` (adapters); `chainFamily` (resolvers)
-
-Adapters take explicit dependencies instead of `Environment`: `Bundle` (logger + context), `BlockChains`, and `DataStore`. Changesets decompose `Environment` at the call site; private helpers may still accept `Environment` and decompose internally.
-
-#### FeeResolver
-
-Infers the on-ramp for a lane from on-chain state (via the router). Registered per chain family in `chains/<family>/deployment/v1_0_0/adapters/fees.go`.
-
-```go
-type FeeResolver interface {
-    GetOnRampRef(b Bundle, chains BlockChains, ds DataStore, src uint64, dst uint64) (datastore.AddressRef, error)
-}
-```
-
-**Registration:**
-```go
-fees.GetRegistry().RegisterFeeResolver(chain_selectors.FamilyEVM, &EVMFeeResolver{})
-```
-
-#### FeeAdapter
-
-```go
-type FeeAdapter interface {
-    // GetFeeContractRef resolves the fee contract (OnRamp for v1.5, FeeQuoter for v1.6+/v2) from an on-ramp ref.
-    GetFeeContractRef(b Bundle, chains BlockChains, ds DataStore, onRamp datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error)
-
-    // SetTokenTransferFee returns a sequence that sets per-token transfer fees for each destination chain.
-    SetTokenTransferFee(ds DataStore, fq datastore.AddressRef) *Sequence[SetTokenTransferFeeSequenceInput, OnChainOutput, BlockChains]
-
-    // GetOnchainTokenTransferFeeConfig reads the current on-chain fee configuration for a token on a lane.
-    GetOnchainTokenTransferFeeConfig(b Bundle, chains BlockChains, fq datastore.AddressRef, src uint64, dst uint64, token string) (TokenTransferFeeArgs, error)
-
-    // GetDefaultTokenTransferFeeConfig returns default fee configuration for a token on a lane.
-    GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) TokenTransferFeeArgs
-
-    // ApplyDestChainConfigUpdates returns a sequence that updates FeeQuoter destination chain configs.
-    ApplyDestChainConfigUpdates(ds DataStore, fq datastore.AddressRef) *Sequence[ApplyDestChainConfigSequenceInput, OnChainOutput, BlockChains]
-
-    // GetOnchainDestChainConfig reads the current FeeQuoter destination chain config for a lane.
-    GetOnchainDestChainConfig(b Bundle, chains BlockChains, fq datastore.AddressRef, src uint64, dst uint64) (FeeQuoterDestChainConfig, error)
-
-    // GetDefaultDestChainConfig returns default destination chain config for a lane.
-    GetDefaultDestChainConfig(src, dst uint64) FeeQuoterDestChainConfig
-}
-```
-
-#### ResolveFeeAdapter
-
-Shared helper in [fees/defaults.go](../fees/defaults.go) that performs the full lane lookup: router → on-ramp → fee contract → adapter (using the **fee contract version**, not the on-ramp version).
-
-```go
-func ResolveFeeAdapter(b Bundle, chains BlockChains, ds DataStore, src, dst uint64) (FeeAdapter, datastore.AddressRef, error)
-```
-
-**Registration:**
-```go
-fees.GetRegistry().RegisterFeeAdapter(chain_selectors.FamilySolana, semver.MustParse("1.6.0"), &FeesAdapter{})
-```
-
----
-
-### FeeAggregatorAdapter
-
-Handles setting and reading the fee aggregator address on a chain. The fee aggregator is the address that receives accumulated fees. The specific on-chain mechanism varies by chain family and version:
-
-- **EVM 1.6:** Fee aggregator is stored in the OnRamp's DynamicConfig.
-- **EVM 2.0:** Fee aggregator exists on multiple contracts (OnRamp, Proxy, Executor, USDCTokenPoolProxy). The adapter dispatches to the correct on-chain operation based on contract type.
-- **Solana 1.6:** Fee aggregator is stored on the Router.
-
-The `SetFeeAggregatorSequenceInput.Contracts` field allows callers to specify exactly which contracts to update using fully-qualified `datastore.AddressRef` values. This avoids ambiguity when the datastore contains multiple versions of the same contract type. When `Contracts` is empty, the adapter falls back to its default contract (Proxy for EVM 2.0, OnRamp for EVM 1.6, Router for Solana 1.6).
-
-**Source:** [fees/fee_aggregator.go](../fees/fee_aggregator.go)
-**Registry:** `FeeAggregatorAdapterRegistry` via `fees.GetFeeAggregatorRegistry()`
-**Key:** `chainFamily-version`
-
-```go
-type FeeAggregatorAdapter interface {
-    // SetFeeAggregator returns a sequence that sets the fee aggregator address on a chain.
-    SetFeeAggregator(e Environment) *Sequence[SetFeeAggregatorSequenceInput, OnChainOutput, BlockChains]
-
-    // GetFeeAggregator reads the current fee aggregator address from on-chain state.
-    GetFeeAggregator(e Environment, chainSelector uint64) (string, error)
-}
-```
-
-**Registration:**
-```go
-fees.GetFeeAggregatorRegistry().RegisterFeeAggregatorAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), &FeeAggregatorAdapter{})
-```
-
----
+## Shared by v1 and v2
+
+Both API generations use these. A v2 chain family still needs them.
+
+| Interface | Registry accessor → register method | Key | Source |
+|---|---|---|---|
+| `MCMSReader` | `changesets.GetRegistry().RegisterMCMSReader` | family | [utils/changesets/output.go](../utils/changesets/output.go) |
+| `TransferOwnershipAdapter` | `deploy.GetTransferOwnershipRegistry().RegisterAdapter` | family-version | [deploy/product.go](../deploy/product.go) |
+| `AddressNormalizer` | `deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer` | family | [deploy/product.go](../deploy/product.go) |
+| `TokenAdapter` (+ optional token interfaces below) | `tokens.GetTokenAdapterRegistry().RegisterTokenAdapter` | family-version (pool version) | [tokens/product.go](../tokens/product.go) |
+| `CurseAdapter` + `CurseSubjectAdapter` | `fastcurse.GetCurseRegistry().RegisterNewCurse` | family-version / family | [fastcurse/product.go](../fastcurse/product.go) |
+| `FeeAggregatorAdapter` | `fees.GetFeeAggregatorRegistry().RegisterFeeAggregatorAdapter` | family-version | [fees/fee_aggregator.go](../fees/fee_aggregator.go) |
+| `AuthorizedCallersAdapter` | `authorizedcallers.GetAuthorizedCallersRegistry().RegisterAdapter` | family + contract type + version | [authorizedcallers/product.go](../authorizedcallers/product.go) |
+| `TestAdapter` (factory) | `testadapters.GetTestAdapterRegistry().RegisterTestAdapter` | family-version | [testadapters/adapters.go](../testadapters/adapters.go) |
+| Hook providers | `hooks.Get*Registry().Register` | family | [hooks/](../hooks/) |
 
 ### MCMSReader
 
-Resolves MCMS governance metadata for a chain -- timelock addresses, MCMS contract references, and chain metadata needed to build proposals.
+Resolves the MCMS and timelock contracts and the chain metadata (MCM address, starting op count) that `OutputBuilder` needs to build a proposal. Every chain family needs one, or no proposal can be built for it.
 
-**Source:** [utils/changesets/output.go](../utils/changesets/output.go)
-**Registry:** `MCMSReaderRegistry` via `changesets.GetRegistry()`
-**Key:** `chainFamily` (version-agnostic -- one reader per chain family)
-
-```go
-type MCMSReader interface {
-    // GetChainMetadata returns MCMS chain metadata (e.g., starting op count, MCM address).
-    GetChainMetadata(e Environment, chainSelector uint64, input mcms.Input) (mcms_types.ChainMetadata, error)
-
-    // GetTimelockRef returns the timelock contract AddressRef for a given MCMS input.
-    GetTimelockRef(e Environment, chainSelector uint64, input mcms.Input) (datastore.AddressRef, error)
-
-    // GetMCMSRef returns the MCMS contract AddressRef for a given MCMS input.
-    GetMCMSRef(e Environment, chainSelector uint64, input mcms.Input) (datastore.AddressRef, error)
-}
-```
-
-**Registration:**
-```go
-changesets.GetRegistry().RegisterMCMSReader(chain_selectors.FamilySolana, &SolanaAdapter{})
-```
-
-**Note:** Unlike other registries, this one is keyed by chain family only (no version), since MCMS metadata resolution is typically family-wide.
-
----
+| Method | Purpose |
+|---|---|
+| `GetChainMetadata(e, sel, mcms.Input)` | MCM address + starting op count for the proposal |
+| `GetTimelockRef(e, sel, mcms.Input)` | Timelock `AddressRef` selected by `mcms.Input.Qualifier` |
+| `GetMCMSRef(e, sel, mcms.Input)` | MCM `AddressRef` selected by `mcms.Input.Qualifier` |
 
 ### TransferOwnershipAdapter
 
-Handles transferring contract ownership via MCMS governance proposals.
+| Method | Purpose |
+|---|---|
+| `InitializeTimelockAddress(e, mcms.Input)` | Resolve and cache the timelock that becomes the new owner |
+| `SequenceTransferOwnershipViaMCMS()` | Propose an ownership transfer for the given refs |
+| `SequenceAcceptOwnership()` | Accept a pending transfer |
+| `ShouldAcceptOwnershipWithTransferOwnership(e, in)` | `true` if accept must run in the same changeset (e.g. Solana) |
 
-**Source:** [deploy/product.go](../deploy/product.go)
-**Registry:** `TransferOwnershipAdapterRegistry` via `deploy.GetTransferOwnershipRegistry()`
-**Key:** `chainFamily-version`
+### AddressNormalizer
 
-```go
-type TransferOwnershipAdapter interface {
-    // InitializeTimelockAddress resolves and caches the timelock address for use in ownership sequences.
-    InitializeTimelockAddress(e Environment, input mcms.Input) error
+Converts between the family's address strings and bytes. Token changesets use it before datastore lookups so that two spellings of the same address match.
 
-    // SequenceTransferOwnershipViaMCMS proposes ownership transfer of contracts through MCMS.
-    SequenceTransferOwnershipViaMCMS() *Sequence[TransferOwnershipPerChainInput, OnChainOutput, BlockChains]
+`NormalizeAddress(string)`, `BytesToString([]byte)`, `StringToBytes(string)`.
 
-    // SequenceAcceptOwnership accepts previously proposed ownership transfers.
-    SequenceAcceptOwnership() *Sequence[TransferOwnershipPerChainInput, OnChainOutput, BlockChains]
+### TokenAdapter
 
-    // ShouldAcceptOwnershipWithTransferOwnership returns true if accept-ownership should be
-    // called automatically as part of the transfer-ownership flow (chain-specific behavior).
-    ShouldAcceptOwnershipWithTransferOwnership(e Environment, in TransferOwnershipPerChainInput) (bool, error)
-}
-```
+Registered once per **token pool version**, because pool versions configure differently. The big difference is v1 vs v2: v2 pools take CCVs, finality config, and pool-level fees. All pool versions must be able to connect to each other.
 
-**Registration:**
-```go
-deploy.GetTransferOwnershipRegistry().RegisterAdapter(chain_selectors.FamilyEVM, semver.MustParse("1.6.0"), &EVMAdapter{})
-```
+| Method | Purpose |
+|---|---|
+| `ConfigureTokenForTransfersSequence()` | Register the token in the TokenAdminRegistry and configure remote chains on the pool |
+| `AddressRefToBytes(ref)` | Family address encoding (hex on EVM, base58 on Solana) |
+| `DeriveTokenAddress(e, sel, poolRef)` | Read the token address stored on the pool |
+| `DeriveTokenDecimals(e, sel, poolRef, token)` | Read the token's decimals |
+| `DeriveTokenPoolCounterpart(e, sel, pool, token)` | Turn the deployed pool address into the address the remote side must store (Solana: pool config PDA). Return `pool` unchanged if not applicable |
+| `ManualRegistration()` | Register a customer-deployed token whose mint authority the customer no longer holds |
+| `SetTokenPoolRateLimits()` | Set outbound/inbound rate limits for one remote |
+| `DeployToken()` / `DeployTokenVerify(e, in)` | Deploy a token, and validate the input first |
+| `DeployTokenPoolForToken()` | Deploy or initialize a pool for an existing token |
+| `UpdateAuthorities()` | Hand token/pool ownership to the timelock |
+| `MigrateLockReleasePoolLiquiditySequence()` | Move liquidity from a legacy lock-release pool to a 2.0 lockbox pool. Return `nil` if unsupported |
 
----
+**Optional token interfaces.** The changeset discovers these by type assertion on your `TokenAdapter`, or registers them separately where noted:
 
-### CurseAdapter
+| Interface | Discovered by | Used by changeset |
+|---|---|---|
+| `TokenRefResolver` | `RegisterTokenRefResolver` (family) | Every token changeset that accepts address-only refs |
+| `TokenAdminRegistryReader` | `RegisterTokenAdminRegistryReader` (family) | Upgrade-safety checks (`GetActivePool`) |
+| `TokenAdminRegistryManager` (reader + `UnregisterToken`) | `RegisterTokenAdminRegistryManager` (family) | `RemoveRemotePools` |
+| `TokenFeeAdapter` | type assertion | `ConfigureTokenPool`, `ConfigureTokensForTransfers` (pool-level fees, finality) |
+| `TokenPoolDynamicConfigAdapter` | type assertion | `ConfigureTokenPool` (router, rate-limit admin, fee admin) |
+| `TokenAdminRoleAdapter` | type assertion | `GrantTokenAdminRole`, `RevokeTokenAdminRole` |
+| `RemotePoolRemover` | type assertion | `RemoveRemotePools` |
+| `RateLimitReaderAdapter` | type assertion | `SetTokenPoolRateLimits` (outbound-only path), auto-migrate |
+| `TokenPoolMigrator` | type assertion | `ConfigureTokensForTransfers` auto-migrate, `RemoveRemotePools` |
 
-Handles RMN (Risk Management Network) curse and uncurse operations on a chain.
+`TokenRefResolver` and `DeriveTokenAddress` do different jobs. The resolver answers "what is the full `AddressRef` for this address?" `DeriveTokenAddress` answers "which token does this already resolved pool serve?" `ResolveAdapterAndRefs` in [tokens/token_expansion.go](../tokens/token_expansion.go) uses both, in this order:
 
-**Source:** [fastcurse/product.go](../fastcurse/product.go)
-**Registry:** `CurseRegistry` via `fastcurse.GetCurseRegistry()`
-**Key:** `chainFamily-version`
+1. It resolves the pool ref from the datastore, then falls back to `ResolveTokenPoolRef`.
+2. It picks the `TokenAdapter` by the pool's version.
+3. It calls `DeriveTokenAddress` on the resolved pool.
+4. If that fails, it calls `ResolveTokenRef` on the user's token ref.
 
-```go
-type CurseAdapter interface {
-    // Initialize sets up the adapter state for a given chain (e.g., loads RMN contract addresses).
-    Initialize(e Environment, selector uint64) error
+A resolver may tag reconstructed refs with the label `tokens.ArtificialAddressRefLabel` ("ArtificialAddressRef"). Solana does this when the user passes a pool config PDA instead of the program ID.
 
-    // IsSubjectCursedOnChain returns true if the given subject is cursed on the chain.
-    // Does NOT follow EVM RMN behavior of returning true for global curse.
-    // Use GlobalCurseSubject() to check global curse state.
-    IsSubjectCursedOnChain(e Environment, selector uint64, subject Subject) (bool, error)
+### CurseAdapter / CurseSubjectAdapter
 
-    // IsChainConnectedToTargetChain returns true if the chain is connected to the target chain.
-    // E.g., on EVM, checks if router.isChainSupported(targetSel) returns true.
-    IsChainConnectedToTargetChain(e Environment, selector uint64, targetSel uint64) (bool, error)
+Both are registered together with `RegisterNewCurse(fastcurse.CurseRegistryInput{CursingFamily, CursingVersion, CurseAdapter, CurseSubjectAdapter})`. The curse adapter is keyed by family-version, and the subject adapter by family.
 
-    // IsCurseEnabledForChain returns true if the chain supports cursing
-    // (e.g., RMNRemote contract is deployed).
-    IsCurseEnabledForChain(e Environment, selector uint64) (bool, error)
+- `CurseAdapter`: `Initialize`, `IsSubjectCursedOnChain`, `IsChainConnectedToTargetChain`, `IsCurseEnabledForChain`, `SubjectToSelector`, `Curse()`, `Uncurse()`, `ListConnectedChains`.
+  - `IsSubjectCursedOnChain` returns `true` only when that exact subject is cursed. Unlike EVM RMN, it does not return `true` because of a global curse. To check for a global curse, query `GlobalCurseSubject()`.
+- `CurseSubjectAdapter`: `SelectorToSubject`, and `DeriveCurseAdapterVersion` (picks which `CurseAdapter` version to use on a chain).
 
-    // SubjectToSelector converts a Subject to a chain selector.
-    SubjectToSelector(subject Subject) (uint64, error)
+### FeeAggregatorAdapter
 
-    // Curse returns a sequence that curses the given subjects on a chain.
-    Curse() *Sequence[CurseInput, OnChainOutput, BlockChains]
+`SetFeeAggregator(e)`, `GetFeeAggregator(e, sel)`, `WithdrawFeeTokens(e)`. Where the aggregator lives differs by family and version:
 
-    // Uncurse returns a sequence that lifts curses on the given subjects.
-    Uncurse() *Sequence[CurseInput, OnChainOutput, BlockChains]
+| Family and version | Where the aggregator is stored |
+|---|---|
+| EVM 1.6 | OnRamp dynamic config |
+| EVM 2.0 | Proxy (the default), OnRamp, Executor, and USDC proxy |
+| Solana 1.6 | Router |
 
-    // ListConnectedChains returns all chain selectors connected to this chain.
-    // Used to determine which chains need to curse subjects derived from a given selector.
-    ListConnectedChains(e Environment, selector uint64) ([]uint64, error)
-}
-```
+### AuthorizedCallersAdapter
 
----
+Manages callers on any contract that inherits `AuthorizedCallers.sol`. It is keyed by `(family, ContractType, version)`.
 
-### CurseSubjectAdapter
+`Initialize`, `GetAllAuthorizedCallers`, `ApplyAuthorizedCallerUpdates()`, `NormalizeCaller`.
 
-Maps between chain selectors and curse subjects, and derives the correct curse adapter version for a chain.
+### Test and hook providers
 
-**Source:** [fastcurse/product.go](../fastcurse/product.go)
-**Registry:** `CurseRegistry` via `fastcurse.GetCurseRegistry()`
-**Key:** `chainFamily` (version-agnostic for subject mapping)
-
-```go
-type CurseSubjectAdapter interface {
-    // SelectorToSubject converts a chain selector to a curse Subject.
-    SelectorToSubject(selector uint64) Subject
-
-    // DeriveCurseAdapterVersion derives which version of the curse adapter to use for a chain.
-    // E.g., for EVM, this could check which RMN version is deployed on the chain.
-    DeriveCurseAdapterVersion(e Environment, selector uint64) (*semver.Version, error)
-}
-```
-
-**Registration (both adapters together):**
-```go
-fastcurse.GetCurseRegistry().RegisterNewCurse(fastcurse.CurseRegistryInput{
-    CursingFamily:       chain_selectors.FamilyEVM,
-    CursingVersion:      semver.MustParse("1.6.0"),
-    CurseAdapter:        NewCurseAdapter(),
-    CurseSubjectAdapter: NewCurseAdapter(),
-})
-```
+| Interface | Registry | Purpose |
+|---|---|---|
+| `TestAdapter` | `testadapters.GetTestAdapterRegistry().RegisterTestAdapter(family, version, factory)` | Send and validate CCIP messages in integration tests. Registered as `func(*cldf.Environment, uint64) TestAdapter` |
+| `TestAdapterForFamily` / `ForkCCIPSendTestAdapter` | `RegisterTestAdapterForFamily` / `RegisterForkCCIPSendTestAdapter` | Narrow subsets of `TestAdapter` for fork smoke tests that don't need a live client |
+| `MessageExecutor` | `testadapters.GetMessageExecutorRegistry().Register` | Execute a sent message manually on dest (optional post-send step) |
+| `ContractVerification` | `hooks.GetContractVerificationRegistry().Register` | Block-explorer verification pre/post hooks |
+| `ContractOwnership` | `hooks.GetContractOwnershipRegistry().Register` | "Contracts must be owned by the timelock" pre-hook |
+| `PostProposalCCIPSend` | `hooks.GetPostProposalCCIPSendRegistry().Register` | Smoke-test a CCIP send after a proposal executes |
+| `PostProposalLaneSanity` | `hooks.GetPostProposalLaneSanityRegistry().Register` | CLI lane sanity checks (extends `PostProposalCCIPSend`) |
 
 ---
 
-## Optional Interfaces
+## v1 (1.6) lane and chain API
 
-### TokenRefResolver
+These drive the v1 changesets (`DeployContracts`, `ConnectChains`, `SetOCR3Config`, `DisableLane`, `UpdateFeeQuoterDests`, …). They are keyed by `family-version`, and 1.6.0 is the version a new family should register.
 
-Reconstructs `datastore.AddressRef` values for tokens and token pools when a changeset input only provides a partial ref (for example, an address string) or when the ref is not yet present in the environment datastore. Used by `ResolveTokenPoolRef`, `ResolveTokenRef`, and `ResolveAdapterAndRefs` in [tokens/token_expansion.go](../tokens/token_expansion.go).
+| Interface | Registry accessor → register method | Key | Source |
+|---|---|---|---|
+| `Deployer` | `deploy.GetRegistry().RegisterDeployer` | family-version | [deploy/product.go](../deploy/product.go) |
+| `LaneAdapter` (+ optional lane interfaces) | `lanes.GetLaneAdapterRegistry().RegisterLaneAdapter` | family-version | [lanes/product.go](../lanes/product.go) |
+| `FeeAdapter` | `fees.GetRegistry().RegisterFeeAdapter` | family-version (fee contract version) | [fees/product.go](../fees/product.go) |
+| `FeeResolver` | `fees.GetRegistry().RegisterFeeResolver` | family | [fees/product.go](../fees/product.go) |
+| `PingPongAdapter` | `lanes.GetPingPongAdapterRegistry().RegisterPingPongAdapter` | family-version | [lanes/pingpong.go](../lanes/pingpong.go) |
+| `RampUpdateInRouter` / `RouterUpdateInRamp` | `deploy.GetLaneMigratorRegistry().RegisterRouterUpdater` / `RegisterRampUpdater` | family-version | [deploy/lanemigrator.go](../deploy/lanemigrator.go) |
+| `FeeQuoterUpdater`, `RampUpdater`, `ConfigImporter`, `LaneVersionResolver` | `deploy.GetFQAndRampUpdaterRegistry().Register*` | family-version (resolver: family) | [deploy/feequoterupdater.go](../deploy/feequoterupdater.go) |
 
-**Source:** [tokens/product.go](../tokens/product.go)
-**Registry:** `TokenAdapterRegistry` via `tokens.GetTokenAdapterRegistry()`
-**Key:** `chainFamily` only (version-agnostic — one resolver per chain family)
+### Deployer
 
-```go
-type TokenRefResolver interface {
-    // ResolveTokenPoolRef reconstructs a token pool AddressRef from an on-chain address.
-    // Implementations typically read type/version (and related metadata) from chain state.
-    ResolveTokenPoolRef(b Bundle, chains BlockChains, ds DataStore, chainSelector uint64, address string) (AddressRef, error)
+| Method | Purpose |
+|---|---|
+| `DeployChainContracts()` | Deploy Router, OnRamp, OffRamp, FeeQuoter, RMNRemote, etc. on one chain |
+| `DeployMCMS()` | Deploy MCM (proposer/canceller/bypasser), timelock, call proxy |
+| `FinalizeDeployMCMS()` | Second MCMS phase (Solana timelock init). Return a no-op sequence if not needed |
+| `SetOCR3Config()` | Write OCR3 config (read from CCIPHome) to the OffRamp |
+| `GrantAdminRoleToTimelock()` | Make one timelock admin of another |
+| `UpdateMCMSConfig()` | Change signers and quorums on an existing MCM |
 
-    // ResolveTokenRef reconstructs a token AddressRef from an on-chain address (for example, a mint or ERC20).
-    ResolveTokenRef(b Bundle, chains BlockChains, ds DataStore, chainSelector uint64, address string) (AddressRef, error)
-}
-```
+### LaneAdapter
 
-**Registration** (alongside `RegisterTokenAdapter` in the same `init()`):
+| Method | Purpose |
+|---|---|
+| `ConfigureLaneLegAsSource()` | This chain sends to the remote: OnRamp dest config, FeeQuoter dest config, prices |
+| `ConfigureLaneLegAsDest()` | This chain receives from the remote: OffRamp source config, Router offramp |
+| `DisableRemoteChain()` | Disable the remote on this chain (used by `DisableLane`) |
+| `GetOnRampAddress` / `GetOffRampAddress` / `GetRouterAddress` / `GetFQAddress` | Addresses as **bytes in this family's encoding**. `ConnectChains` uses them to fill `ChainDefinition` |
+| `GetFeeQuoterDestChainConfig()` | Default FeeQuoter config **for this chain as a destination**, applied on the remote source |
+| `GetDefaultGasPrice()` | Default USD price (18 decimals) per gas unit for this chain as a destination |
 
-```go
-tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilyEVM, &EVMTokenBase{})
-tokensapi.GetTokenAdapterRegistry().RegisterTokenRefResolver(chain_selectors.FamilySolana, &SolanaAdapter{})
-```
+**Optional lane interfaces.** The changeset discovers these by type assertion on your `LaneAdapter`:
 
-First registration wins; a second `RegisterTokenRefResolver` for the same family is ignored.
+| Interface | Effect |
+|---|---|
+| `ChainMetadataProvider` | `GetChainFamilySelector() [4]byte`. Registers your 4-byte family selector so `utils.GetSelectorHex` works without a hardcoded case |
+| `TestRouterProvider` | `GetTestRouter`. Used when a lane sets `TestRouter: true` |
+| `TokenPriceProvider` | `GetDefaultTokenPrices`. Default fee-token prices (EVM: LINK, WETH) |
+| `DynamicFeeQuoter` | `GetFQAddressDynamic`. Resolve the FeeQuoter from chain state instead of the datastore |
+| `FeeQuoterVersionProvider` | `GetFQVersion`. Report the FeeQuoter version (1.6 or 2.0) so `ConnectChains` picks the right ops |
 
-**Resolution order** (package helpers, not part of the interface):
+### FeeAdapter and FeeResolver
 
-1. `TryNormalizeAddressRef` canonicalizes `ref.Address` when set (via `deploy.AddressNormalizer` for the chain family).
-2. Datastore lookup with `AddressRefToFilters` — exactly one match returns that row; zero matches fall through to the resolver; more than one match is an error.
-3. If no datastore row and `address` is set, `TokenRefResolver.ResolveTokenPoolRef` / `ResolveTokenRef` rebuild the ref from chain state.
+`fees.ResolveFeeAdapter` ([fees/defaults.go](../fees/defaults.go)) looks up the adapter for a lane in this order:
 
-**`ResolveAdapterAndRefs`** (used by token expansion, configure-for-transfers, rate limits):
+1. `FeeResolver.GetOnRampRef` finds the lane's OnRamp from the router.
+2. `FeeAdapter.GetFeeContractRef` finds the fee contract. This is the OnRamp for 1.5 and the FeeQuoter for 1.6 and later.
+3. The adapter is picked by the **fee contract's version**, not the OnRamp's version.
 
-1. `ResolveTokenPoolRef` → pick `TokenAdapter` from the resolved pool’s version.
-2. `DeriveTokenAddress` on the resolved pool ref when the token address is stored on the pool (preferred).
-3. If derivation fails, `ResolveTokenRef` on the input token ref (datastore, then resolver).
+FeeAdapter methods: `GetFeeContractRef`, `SetTokenTransferFee`, `GetOnchainTokenTransferFeeConfig`, `GetDefaultTokenTransferFeeConfig`, `ApplyDestChainConfigUpdates`, `GetOnchainDestChainConfig`, `GetDefaultDestChainConfig`. Adapters take a `Bundle`, `BlockChains`, and `DataStore` instead of a full `Environment`.
 
-**Semantics by chain family:**
+### Lane migration and FeeQuoter upgrade
 
-- **EVM:** Resolver reads pool `typeAndVersion` and token `symbol` via RPC. Reconstructed pool refs use the token address as `Qualifier` when `getToken()` succeeds.
-- **Solana:** `ResolveTokenPoolRef` accepts either the **pool program ID** or the **pool config PDA**. For a PDA, the adapter loads the program ID from chain state, looks up the program in the datastore, and may attach an [`ArtificialAddressRefLabel`](../tokens/product.go) label so `DeriveTokenAddress` can read the mint from that PDA. `ResolveTokenRef` reads the mint’s token program and symbol (or a `{mint}-{programType}` placeholder qualifier).
-- **`ArtificialAddressRefLabel`:** Optional label format `ArtificialAddressRef:<poolPDA>` on pool refs. Not required for all adapters; Solana uses it when resolving from a config PDA.
-
-Implement `TokenRefResolver` on the same struct as `TokenAdapter` when the family should support address-only inputs (EVM and Solana in this repo register both on one adapter type).
-
----
-
-### TokenPriceProvider
-
-An optional interface that `LaneAdapter` implementations can also satisfy to provide default fee token prices. Primarily used by EVM chains.
-
-**Source:** [lanes/product.go](../lanes/product.go)
-**Registry:** None -- checked via Go type assertion on the `LaneAdapter` instance.
-
-```go
-type TokenPriceProvider interface {
-    // GetDefaultTokenPrices returns default fee token prices for a chain.
-    // Returns a map of contract type (e.g., "WETH", "LINK") to USD price (18 decimals).
-    GetDefaultTokenPrices() map[datastore.ContractType]*big.Int
-}
-```
+- `RampUpdateInRouter.UpdateRouter()` points the Router at new ramps.
+- `RouterUpdateInRamp.VerifyPreconditions` and `UpdateVersionWithRouter()` point the new ramps at the Router. These are used by `LaneMigrateToNewVersionChangeset`.
+- `FeeQuoterUpdater`, `RampUpdater`, and `ConfigImporter` back `UpdateFeeQuoterChangeset`. That changeset rebuilds FeeQuoter config by importing existing 1.5 and 1.6 lane config from chain.
 
 ---
 
-### PingPongAdapter
+## v2 (2.0) chain API
 
-Supports the PingPong demo contract for testing lane connectivity. Chains that do not support PingPong (e.g., Solana) should not implement this.
+These live in [`v2_0_0/adapters`](../v2_0_0/adapters/) and drive the 2.0 changesets in [`v2_0_0/changesets`](../v2_0_0/changesets/). Most of them are keyed by **family only**: 2.0 contract versions are chosen inside the adapter (via `GetDefaultDeployContractParams`), not by the registry key.
 
-**Source:** [lanes/pingpong.go](../lanes/pingpong.go)
-**Registry:** `PingPongAdapterRegistry` via `lanes.GetPingPongAdapterRegistry()`
-**Key:** `chainFamily-version`
+| Interface | Registry accessor → register method | Key | Required? | Source |
+|---|---|---|---|---|
+| `DeployChainContractsAdapter` | `adapters.GetDeployChainContractsRegistry().Register` | family | yes | [deploy_chain_contracts.go](../v2_0_0/adapters/deploy_chain_contracts.go) |
+| `ChainFamily` | `adapters.GetChainFamilyRegistry().RegisterChainFamily` | family | yes | [chain_family.go](../v2_0_0/adapters/chain_family.go) |
+| `CommitteeVerifierContractAdapter` | `adapters.GetCommitteeVerifierContractRegistry().Register` | family | yes | [committee_verifier_contract.go](../v2_0_0/adapters/committee_verifier_contract.go) |
+| `LaneVersionResolver` | `adapters.GetDeployChainContractsRegistry().RegisterLaneVersionResolver` | family | recommended (blocks 2.0→1.6 lane downgrades) | [deploy/product.go](../deploy/product.go) |
+| `ConfigImporter` | `adapters.GetDeployChainContractsRegistry().RegisterConfigImporter` | family-version | for migrations | [deploy/product.go](../deploy/product.go) |
+| `OnRampUpgrader` | `adapters.GetOnRampUpgraderRegistry().Register` | family | to support OnRamp upgrades | [upgrade_onramp.go](../v2_0_0/adapters/upgrade_onramp.go) |
+| `OffRampSourceOnRampSetter` / `Reader` | type assertion on `ChainFamily` | — | for OnRamp upgrades / `OffRampSetSourceOnRamps` | [offramp_source_onramps.go](../v2_0_0/adapters/offramp_source_onramps.go) |
+| `GasPriceValidator` | type assertion on `ChainFamily` | — | optional preflight | [chain_family.go](../v2_0_0/adapters/chain_family.go) |
+| `CCTPChain` | `adapters.NewCCTPChainRegistry().RegisterCCTPChain` | family + USDC type | for USDC/CCTP | [cctp.go](../v2_0_0/adapters/cctp.go) |
+| `LombardChain` | `adapters.NewLombardChainRegistry().RegisterLombardChain` | family | for Lombard | [lombard.go](../v2_0_0/adapters/lombard.go) |
+| `TestVerifierChainAdapter` | `adapters.GetTestVerifierChainRegistry().Register` | family | test envs | [test_verifier_chain.go](../v2_0_0/adapters/test_verifier_chain.go) |
 
-```go
-type PingPongAdapter interface {
-    // GetPingPongDemoAddress returns the PingPongDemo contract address for the given chain.
-    GetPingPongDemoAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error)
+The CCTP and Lombard registries have no global singleton, by design. The durable pipeline in `chainlink-deployments` builds one with `New*Registry()`, registers each family's adapter, and passes it to `DeployCCTPChains` or `DeployLombardChains`.
 
-    // ConfigurePingPong configures PingPong for a lane between source and dest.
-    ConfigurePingPong() *Sequence[PingPongInput, PingPongOutput, BlockChains]
-}
-```
+### DeployChainContractsAdapter
 
----
+The `DeployChainContracts` (2.0) changeset calls these methods in this order, once per chain:
 
-### ConfigImporter
+| # | Method | Purpose |
+|---|---|---|
+| 1 | `GetDefaultDeployContractParams(sel)` | Family defaults: contract versions, FeeQuoter static config, executors |
+| 2 | `ResolveDeployAddresses(e, sel)` | Find or deploy prerequisites, at minimum the `DeployerContract` (EVM: CREATE2 factory). Returns `NewAddressRefs` to persist |
+| 3 | `BuildDeployContractParams(input)` | Merge defaults + topology-derived `CommitteeVerifiers` + user `Overrides`. Call `adapters.ApplyDeployContractParamsOverrides` at the end |
+| 4 | `DeployChainContracts()` | Sequence that deploys the contracts. Returns `DeployChainContractsOutput` with `RefsToTransferOwnership` (CLL timelock) and `RefsToTransferOwnershipRMN` |
 
-Imports configuration from existing deployments to bootstrap the DataStore.
+### ChainFamily
 
-**Source:** [deploy/product.go](../deploy/product.go)
-**Registry:** None currently.
+The 2.0 replacement for `LaneAdapter`. Lanes are configured **per chain** (`ConfigureChainForLanes`) for all of that chain's remotes at once, not leg by leg.
 
-```go
-type ConfigImporter interface {
-    // InitializeAdapter sets up the importer for the given chain selectors.
-    InitializeAdapter(e Environment, selectors []uint64) error
+| Method | Purpose |
+|---|---|
+| `ConfigureChainForLanes()` | Sequence. Configures OnRamp, OffRamp, FeeQuoter, CommitteeVerifiers, Executor, and Router (router **last**) for every remote in `ConfigureChainForLanesInput.RemoteChains`. Must be idempotent |
+| `AddressRefToBytes(ref)` | Family address encoding |
+| `GetOnRampAddress(ds, sel)` | OnRamp bytes **as this chain writes them into messages**. The remote OffRamp hashes these bytes. EVM: 20-byte address abi-encoded to 32 bytes |
+| `GetOffRampAddress` / `GetFQAddress` / `GetRouterAddress` / `GetTestRouter` | Native-encoding bytes (destination-side addresses are never padded) |
+| `ResolveExecutor(ds, sel, qualifier)` | Executor address for a qualifier |
+| `GetAddressBytesLength()` | Address length on this family (EVM 20, Solana 32) |
+| `GetChainFamilySelector()` | 4-byte family selector |
+| `GetDefaultFeeQuoterDestChainConfig(sel, remote, familySel)` | FeeQuoter dest config defaults for `remote` as seen from `sel` |
+| `GetDefaultRemoteChainConfig(src, remote)` | Executor fee, base execution gas, network fees, `SkipExecutorConfig`, … |
+| `GetDefaultCommitteeVerifierRemoteChainConfig()` | Verifier fee, gas, and payload size defaults |
+| `GetDefaultFinalityConfig()` | Default allowed finality |
+| `ValidateNOPsTopology(sel, nopCount)` | Reject topologies the family can't support |
 
-    // ConnectedChains returns the chain selectors connected to a given chain.
-    ConnectedChains(e Environment, chainsel uint64) ([]uint64, error)
+### CommitteeVerifierContractAdapter
 
-    // SupportedTokensPerRemoteChain returns supported tokens per remote chain.
-    SupportedTokensPerRemoteChain(e Environment, chainSelector uint64) (map[uint64][]common.Address, error)
+`ResolveCommitteeVerifierContracts(ds, sel, qualifier)` returns the verifier contracts for a committee qualifier. `GetCommitteeVerifierResolver(ds, sel, qualifier)` returns the resolver contracts that are used as CCV addresses on lanes.
 
-    // SequenceImportConfig returns a sequence to import lane config from on-chain state.
-    SequenceImportConfig() *Sequence[ImportConfigPerChainInput, OnChainOutput, BlockChains]
-}
-```
+### OnRampUpgrader
 
----
+Backs the five-phase OnRamp upgrade (`UpgradeOnrampPhase1/2/3`, `UpgradeOnrampPhase3Rollback`, `UpgradeOnrampCleanup`):
 
-### RampUpdateInRouter
+1. Deploy the new OnRamp.
+2. Stage it behind the TestRouter.
+3. Promote it to the production Router.
+4. Roll back if needed.
+5. Remove the legacy OnRamp from the remote OffRamp whitelists.
 
-Updates router configuration for lane migration scenarios (pointing routers to new ramps).
+The remote `ChainFamily` must also implement `OffRampSourceOnRampSetter` and `OffRampSourceOnRampReader`.
 
-**Source:** [deploy/lanemigrator.go](../deploy/lanemigrator.go)
-**Registry:** `LaneMigratorRegistry` via `deploy.GetLaneMigratorRegistry()` (as RouterUpdater)
-**Key:** `chainFamily-version`
+### CCTPChain / LombardChain / TestVerifierChainAdapter
 
-```go
-type RampUpdateInRouter interface {
-    // UpdateRouter updates the router to point to new OnRamp/OffRamp contracts for remote chains.
-    UpdateRouter() *Sequence[RouterUpdaterConfig, OnChainOutput, BlockChains]
-}
-```
+These follow the same pattern. Each is split into a *remote* interface and a *local* one:
 
----
+- The **remote** interface (`RemoteCCTPChain`, `RemoteLombardChain`, `RemoteTestVerifierChain`) returns this chain's addresses for **other** chains to store.
+- The **local** interface adds `Deploy…Chain()` and `Configure…ChainForLanes()` sequences.
 
-### RouterUpdateInRamp
-
-Updates ramp configuration with new router addresses for lane migration scenarios.
-
-**Source:** [deploy/lanemigrator.go](../deploy/lanemigrator.go)
-**Registry:** `LaneMigratorRegistry` via `deploy.GetLaneMigratorRegistry()` (as RampUpdater)
-**Key:** `chainFamily-version`
-
-```go
-type RouterUpdateInRamp interface {
-    // UpdateVersionWithRouter updates OnRamp/OffRamp contracts with a new router address.
-    UpdateVersionWithRouter() *Sequence[RampUpdaterConfig, OnChainOutput, BlockChains]
-}
-```
-
----
-
-### TestAdapter
-
-Interface for integration testing of cross-chain message passing. Each adapter instance represents a concrete chain.
-
-**Source:** [testadapters/adapters.go](../testadapters/adapters.go)
-**Registry:** `TestAdapterRegistry` via `testadapters.GetTestAdapterRegistry()`
-**Key:** `chainFamily-version`
-
-```go
-type TestAdapter interface {
-    // ChainSelector returns the selector of the chain for this adapter.
-    ChainSelector() uint64
-
-    // Family returns the chain family string (e.g., "evm", "solana").
-    Family() string
-
-    // BuildMessage builds a chain-family-specific message from generic components.
-    // E.g., EVM produces router.ClientEVM2AnyMessage, Solana produces ccip_router.SVM2AnyMessage.
-    BuildMessage(components MessageComponents) (any, error)
-
-    // SendMessage sends a CCIP message and returns the sequence number.
-    SendMessage(ctx context.Context, destChainSelector uint64, msg any) (uint64, error)
-
-    // CCIPReceiver returns the address of a CCIP receiver contract on this chain.
-    CCIPReceiver() []byte
-
-    // NativeFeeToken returns the native fee token identifier for this chain.
-    NativeFeeToken() string
-
-    // GetExtraArgs returns encoded extra args for sending to this chain from a given source family.
-    // Extra args are source-family encoded (abi.encode for EVM, borsh for Solana).
-    GetExtraArgs(receiver []byte, sourceFamily string, opts ...ExtraArgOpt) ([]byte, error)
-
-    // GetInboundNonce returns the inbound nonce for a sender from a source chain.
-    // Returns 0 for chains without nonce concepts.
-    GetInboundNonce(ctx context.Context, sender []byte, srcSel uint64) (uint64, error)
-
-    // ValidateCommit validates that a message was committed on this chain.
-    ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange)
-
-    // ValidateExec validates that a message was executed on this chain and returns execution states.
-    ValidateExec(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNrs []uint64) (execStates map[uint64]int)
-
-    // AllowRouterToWithdrawTokens approves the router to spend tokens from the deployer.
-    AllowRouterToWithdrawTokens(ctx context.Context, tokenAddress string, amount *big.Int) error
-
-    // GetTokenBalance returns the token balance for a given owner address.
-    GetTokenBalance(ctx context.Context, tokenAddress string, ownerAddress []byte) (*big.Int, error)
-
-    // GetTokenExpansionConfig returns default token expansion config for testing.
-    GetTokenExpansionConfig() TokenExpansionInputPerChain
-
-    // GetRegistryAddress returns the address of the token admin registry contract.
-    GetRegistryAddress() (string, error)
-}
-```
-
-**Note:** `TestAdapter` is instantiated via a factory function:
-```go
-type TestAdapterFactory = func(env *Environment, selector uint64) TestAdapter
-```
-
----
-
-## Registry Accessor Summary
-
-| Registry | Accessor | Key Format |
-|----------|----------|------------|
-| `DeployerRegistry` | `deploy.GetRegistry()` | `chainFamily-version` |
-| `TransferOwnershipAdapterRegistry` | `deploy.GetTransferOwnershipRegistry()` | `chainFamily-version` |
-| `LaneAdapterRegistry` | `lanes.GetLaneAdapterRegistry()` | `chainFamily-version` |
-| `PingPongAdapterRegistry` | `lanes.GetPingPongAdapterRegistry()` | `chainFamily-version` |
-| `TokenAdapterRegistry` | `tokens.GetTokenAdapterRegistry()` | `chainFamily-version` (adapters); `chainFamily` (`TokenRefResolver`) |
-| `FeeAdapterRegistry` | `fees.GetRegistry()` | `chainFamily-version` |
-| `FeeAggregatorAdapterRegistry` | `fees.GetFeeAggregatorRegistry()` | `chainFamily-version` |
-| `MCMSReaderRegistry` | `changesets.GetRegistry()` | `chainFamily` |
-| `CurseRegistry` | `fastcurse.GetCurseRegistry()` | `chainFamily-version` / `chainFamily` |
-| `LaneMigratorRegistry` | `deploy.GetLaneMigratorRegistry()` | `chainFamily-version` |
-| `TestAdapterRegistry` | `testadapters.GetTestAdapterRegistry()` | `chainFamily-version` |
+Their dependency structs (`*Deps`) receive `RemoteChains map[uint64]Remote…Chain`, so a sequence on one family can ask another family for its addresses without importing that family's code.

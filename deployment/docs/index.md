@@ -6,125 +6,56 @@ sidebar_position: 1
 
 # CCIP Deployment Tooling API
 
-The CCIP Deployment Tooling API provides a unified, strongly-typed Go-based operational layer for deploying, configuring, and managing CCIP across all chain families (EVM, Solana, Aptos, TON, Sui, etc.).
+The tooling API is a Go library for deploying and operating CCIP on any chain family: EVM, Solana, Aptos, TON, Sui, and others.
 
-This shared library (`chainlink-ccip/deployment`) contains all generic, chain-agnostic types, registries, and utilities. Each chain family implements its own adapter alongside its contracts, either in `chainlink-ccip/chains/<chain>/deployment` or in a dedicated repository.
+- **`chainlink-ccip/deployment`** (this module) holds the chain-agnostic **changesets** you run, and the **interfaces** each chain family implements.
+- **Chain families** implement those interfaces next to their contracts:
+  - EVM: `chains/evm/deployment`
+  - Solana v1: `chains/solana/deployment`
+  - Solana v2: the `chainlink-ccip-solana` repo
+  - Other families: their own repos
+- Families register their implementations in global registries at `init()`. A changeset looks up the right implementation from the chain selector.
 
-## Architecture Overview
+## v1 vs v2
 
-```mermaid
-flowchart LR
-    subgraph chainlink-deployments
-        dp[Durable Pipelines]
-        ds[DataStore]
-    end
+There are two API generations. They share MCMS, ownership, tokens, fees, curse, and test plumbing, but deploy contracts and configure lanes differently.
 
-    subgraph Chain Family Repo
-        cfmr[MCMSReader]
-        subgraph Sequences
-            subgraph v1.6.0
-                clls1_6[ConfigureLaneLegAsSource]
-                clld1_6[ConfigureLaneLegAsDest]
-                cllb1_6[ConfigureLaneLegBidirectionally]
-                ctft1_6[ConfigureTokenForTransfers]
-            end
-            subgraph v2.0.0
-                clls1_7[ConfigureChainForLanes]
-                ctft1_7[ConfigureTokenForTransfers]
-            end
-            subgraph v1.5.0
-                ctft1_5[ConfigureTokenForTransfers]
-            end
-        end
-        subgraph Helpers
-            artb[AddressRefToBytes]
-            dtfp[DeriveTokenFromPool]
-        end
-    end
+| | **v1 (CCIP 1.6)** | **v2 (CCIP 2.0)** |
+|---|---|---|
+| Verification | OCR3 DONs | Committee verifiers (CCVs) + executors |
+| Input | Per-chain / per-lane config | Environment **topology** (NOPs, committees, executor pools) + lane pairs |
+| Lane setup | `lanes.ConnectChains` → `LaneAdapter` (source leg + dest leg) | `ConfigureChainsForLanesFromTopology` → `ChainFamily` (one call per chain, all remotes) |
+| Deploy | `deploy.DeployContracts` → `Deployer` | `v2_0_0/changesets.DeployChainContracts` → `DeployChainContractsAdapter` |
+| Code | `deploy/`, `lanes/`, `fees/`, … | `v2_0_0/` |
 
-    subgraph chainlink-ccip/deployment
-        subgraph changesets
-            ctft[ConfigureTokensForTransfers]
-            cc1_6[v1_6.ConnectChains]
-            cc1_7[v1_7.ConnectChains]
-        end
-        subgraph interfaces
-            mr[MCMSReader]
-            ta[TokensAdapter]
-            ca1_6[v1_6.ChainAdapter]
-            ca1_7[v1_7.ChainAdapter]
-        end
-        subgraph registries
-            tar[TokenAdapterRegistry]
-            car1_6[v1_6.ChainAdapterRegistry]
-            car1_7[v1_7.ChainAdapterRegistry]
-            mrr[MCMSReaderRegistry]
-        end
-    end
+## Docs
 
-    ctft --> tar
-    ctft --> mrr
+| Page | Read it when you want to… |
+|---|---|
+| [Architecture](architecture.md) | Understand operations / sequences / changesets, registries, DataStore, MCMS proposals |
+| [Consuming](consuming.md) | Run changesets: wiring, v1 and v2 examples, v1-vs-v2 per flow, full changeset catalog |
+| [Implementing 1.6](implementing-1.6.md) | Add a chain family to the v1 API |
+| [Implementing 2.0](implementing-2.0.md) | Add a chain family to the v2 API |
+| [Interfaces](interfaces.md) | Look up an interface, its registry, and its key |
+| [Changeset Style Guide](style-guide.md) | Write or review a changeset |
 
-    tar --> ta
-    mrr --> mr
+## Package map
 
-    ta --> artb
-    ta --> dtfp
-    ta --> ctft1_5
-    ta --> ctft1_6
-    ta --> ctft1_7
-    mr ------> cfmr
+| Package | Contents |
+|---|---|
+| `deploy/` | v1 deployer, MCMS deploy, OCR3, ownership, lane migration, FeeQuoter upgrade, address normalizer |
+| `lanes/` | v1 `LaneAdapter`, `ConnectChains`, `DisableLane`, PingPong |
+| `tokens/` | `TokenAdapter` + optional token interfaces, all token changesets (v1 and v2 pools) |
+| `fees/` | Fee adapters, fee aggregator, token transfer fee, FeeQuoter dest changesets |
+| `fastcurse/` | RMN curse adapters and changesets |
+| `authorizedcallers/` | Authorized-callers adapter and changeset |
+| `hooks/` | Pre/post/post-proposal hooks (verification, ownership, CCIP send, lane sanity) |
+| `testadapters/` | Cross-chain message test adapters |
+| `v2_0_0/adapters` | v2 interfaces: `ChainFamily`, `DeployChainContractsAdapter`, `CommitteeVerifierContractAdapter`, CCTP, Lombard, OnRamp upgrade, test verifier |
+| `v2_0_0/changesets` | v2 changesets |
+| `v2_0_0/offchain` | `EnvironmentTopology` and JD helpers |
+| `utils/` | Versions, contract types, qualifiers, `OutputBuilder`, `OnChainOutput`, `mcms.Input`, datastore helpers |
 
-    dp ---init---> registries
-    dp ---run---> changesets
+## Agent skill
 
-    cc1_6 --> mrr & car1_6
-    car1_6 --> ca1_6
-    ca1_6 ------> cllb1_6
-    ca1_6 ------> clls1_6
-    ca1_6 ------> clld1_6
-```
-
-## Three-Level Hierarchy
-
-The API is structured in three levels of granularity:
-
-| Level | Description | Use When |
-|-------|-------------|----------|
-| **Changesets** | Environment-aware entry points that read from DataStore, invoke sequences, and produce MCMS proposals | Executing operations via Durable Pipelines or full deployment environments |
-| **Sequences** | Ordered collections of operations. Accept serializable input and minimal dependencies | Completing an operational workflow without a full deployment environment |
-| **Operations** | Single side-effect actions (deploy, read, write). Produce reports for stateful retries | Making a single contract call or deployment |
-
-## Package Layout
-
-| Package | Purpose |
-|---------|---------|
-| `deploy/` | Contract deployment, MCMS deployment, OCR3 config, ownership transfer changesets and interfaces |
-| `lanes/` | Lane configuration and inter-chain connection changesets and interfaces |
-| `tokens/` | Token pool configuration, expansion, manual registration, rate limits |
-| `fees/` | Fee configuration and token transfer fee management |
-| `fastcurse/` | RMN curse/uncurse operations |
-| `utils/changesets/` | `MCMSReader` interface, `OutputBuilder`, changeset utilities |
-| `utils/sequences/` | `OnChainOutput` type, sequence execution utilities |
-| `utils/mcms/` | MCMS input types |
-| `utils/` | Common types, version constants, contract type constants |
-| `testadapters/` | Test adapter framework for cross-chain message testing |
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Architecture](architecture.md) | Design principles, adapter-registry pattern, dispatch flow, DataStore and MCMS integration |
-| [Interfaces](interfaces.md) | Complete API reference for all adapter interfaces and their registries |
-| [Types](types.md) | All input/output types, config structs, and constants |
-| [Changesets](changesets.md) | Reference for all changesets (entry points) with config types and usage |
-| [Implementing Adapters](implementing-adapters.md) | Step-by-step guide for adding a new chain family |
-| [2.0 Integration Guide](https://docs.google.com/document/d/1R_6LUfFlfJGayosR3Tf-Iql4iCsQ0XCPGJj80pOUpec/edit?tab=t.n5zfx7ozrtxa#heading=h.m1tfywbyiedh) | CCIP 2.0-specific interfaces, deployment flow, and integration checklist |
-| [MCMS and Utilities](mcms-and-utilities.md) | MCMS integration, `OutputBuilder`, DataStore and sequence utilities |
-
-## Chain-Specific Documentation
-
-| Chain Family | Documentation |
-|-------------|---------------|
-| EVM | [EVM Deployment Docs](../../chains/evm/deployment/docs/index.md) |
-| Solana | [Solana Deployment Docs](../../chains/solana/deployment/docs/index.md) |
+The [`tooling-api` skill](../.agents/skills/tooling-api/SKILL.md) walks an AI agent through implementing these interfaces for a chain family, adding a new interface, or adding a new changeset.
