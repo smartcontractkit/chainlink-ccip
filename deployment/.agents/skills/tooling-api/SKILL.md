@@ -9,7 +9,7 @@ The tooling API is the chain-agnostic changesets plus the adapter interfaces in 
 
 ## 0. Orient first (always)
 
-1. Read `deployment/docs/index.md` and `deployment/docs/architecture.md`. They are short.
+1. Read `deployment/docs/README.md` and `deployment/docs/architecture.md`. They are short.
 2. Decide which API generation the task targets. It is either **v1 (1.6)** or **v2 (2.0)**; ignore 1.x minor versions unless the task is specifically about them.
 
    | Task touches… | Generation | Guide |

@@ -9,7 +9,7 @@ The API has two generations:
 
 Tokens, MCMS, ownership, curse, and fees are shared between them.
 
-Documentation lives in [`docs/`](docs/index.md):
+Documentation lives in [`docs/`](docs/README.md):
 
 - [Architecture](docs/architecture.md)
 - [Consuming the API](docs/consuming.md)

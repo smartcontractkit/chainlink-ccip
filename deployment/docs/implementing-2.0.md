@@ -29,6 +29,7 @@ A 2.0 chain family still registers these shared adapters. They are the same inte
 | `fastcurse` curse adapters | Register at the RMN version your chain uses (EVM registers RMN 2.1.0) |
 | `fees.FeeAdapter`, `fees.FeeAggregatorAdapter` | Register at `2.0.0` |
 | `authorizedcallers.AuthorizedCallersAdapter` | If your 2.0 contracts inherit `AuthorizedCallers` |
+| `fees.FeeResolver`, `deploy.AddressNormalizer`, `tokens.TokenRefResolver`, `tokens.TokenAdminRegistryReader`/`Manager` | Keyed by family only, but **still required**: `SetTokenTransferFee`/`UpdateFeeQuoterDests` fail without a `FeeResolver`, and the token changesets need the resolver, normalizer and TAR reader. If your 1.6 package registers them, a pipeline that imports only your 2.0 package won't have them. Register them from the 2.0 package too, or make sure the version-agnostic package is imported |
 
 You do **not** register a `lanes.LaneAdapter` or a `deploy.Deployer` for 2.0. `ChainFamily` and `DeployChainContractsAdapter` replace them. EVM still registers its 1.6 `Deployer` struct at `2.0.0`, so `DeployMCMS` and the other `deploy.*` MCMS changesets keep working when they are called with version 2.0.0.
 
