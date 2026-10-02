@@ -2020,7 +2020,7 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 		require.True(t, bytes.Equal(oldRemoteToken, gotRemoteToken), "remote Solana token should be carried forward onto evm1_new")
 		gotRemotePools, err := newPool1.GetRemotePools(&bind.CallOpts{Context: t.Context()}, solChainSel)
 		require.NoError(t, err)
-		require.Contains(t, gotRemotePools, oldRemotePools[0], "remote Solana pool should be carried forward onto evm1_new")
+		require.ElementsMatch(t, oldRemotePools, gotRemotePools, "remote Solana pools on evm1_new should match evm1_old exactly")
 		evm2RemotePools, err := newPool1.GetRemotePools(&bind.CallOpts{Context: t.Context()}, evm2ChainSel)
 		require.NoError(t, err)
 		require.Contains(t, evm2RemotePools, common.LeftPadBytes(newPool2Addr.Bytes(), 32), "evm1_new should know evm2_new")

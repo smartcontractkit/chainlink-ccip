@@ -354,6 +354,13 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for remote chain selector %d: %w", remoteSelector, err)
 				}
+				// remotePoolBytes is the pool's datastore address (e.g. the Solana pool program), which is needed to resolve
+				// the refs above. The local pool must instead store the pool's counterpart form (e.g. the Solana pool config
+				// PDA), so we derive it here to mirror convertRemoteChainConfig.
+				remotePoolBytes, err = remoteAdapter.DeriveTokenPoolCounterpart(e, remoteSelector, remotePoolBytes, remoteTokenBytes)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to derive remote pool counterpart for remote chain selector %d: %w", remoteSelector, err)
+				}
 				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, localTokenBytes, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
@@ -494,10 +501,17 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
 
-			migratedPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
+			// Counterparts must store the new pool in its counterpart form (e.g. the Solana pool config PDA as
+			// opposed to the pool program), mirroring convertRemoteChainConfig.
+			newPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
+			migratedPoolBytes, err := adapter.DeriveTokenPoolCounterpart(e, selector, newPoolBytes, migratedTokenBytes)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to derive new pool counterpart for reverse propagation on chain selector %d: %w", selector, err)
+			}
+
 			for _, ru := range discoveredRemotes {
 				// After a pool is migrated, we need to tell every connected chain about the new pool so that the
 				// web stays reachable in both directions. One edge case to consider - suppose we have a web with
