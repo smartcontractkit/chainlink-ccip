@@ -2,7 +2,6 @@ package adapters
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
@@ -137,7 +135,7 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 	)
 }
 
-func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error) {
+func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr, _ []byte) ([]uint64, error) {
 	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -161,8 +159,8 @@ func (t *TokenAdapter) GetSupportedChains(e deployment.Environment, chainSelecto
 // A v1.4.0 pool stores no remote token. The proxy in front of it is a v1.5.0
 // pool that does, and it is the contract actually serving the lane, so it is
 // the authoritative source.
-func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error) {
-	chain, proxy, err := t.frontingProxy(e, chainSelector, common.BytesToAddress(poolAddr))
+func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([]byte, error) {
+	chain, proxy, err := t.frontingProxy(e, chainSelector, common.BytesToAddress(poolAddr), tokenAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -190,8 +188,8 @@ func (t *TokenAdapter) GetRemoteToken(e deployment.Environment, chainSelector ui
 // multiple remote pools for zero-downtime cutover (e.g.
 // MigrationMetadata.LegacyRemotePools) therefore get a single entry here, and
 // retargeting is a hard cutover.
-func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error) {
-	chain, proxy, err := t.frontingProxy(e, chainSelector, common.BytesToAddress(poolAddr))
+func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([][]byte, error) {
+	chain, proxy, err := t.frontingProxy(e, chainSelector, common.BytesToAddress(poolAddr), tokenAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -221,19 +219,23 @@ func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector ui
 // getPreviousPool is required to point back at the legacy pool. The round trip
 // is what makes this safe. It rejects a registered pool that merely shares a
 // token with the legacy pool but does not actually front it.
-func (t *TokenAdapter) frontingProxy(e deployment.Environment, chainSelector uint64, poolAddr common.Address) (evm.Chain, common.Address, error) {
+func (t *TokenAdapter) frontingProxy(e deployment.Environment, chainSelector uint64, poolAddr common.Address, tokenAddr []byte) (evm.Chain, common.Address, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return evm.Chain{}, common.Address{}, fmt.Errorf("chain with selector %d not found", chainSelector)
 	}
 
-	pool, err := tpbindings.NewTokenPool(poolAddr, chain.Client)
-	if err != nil {
-		return evm.Chain{}, common.Address{}, fmt.Errorf("failed to instantiate v1.4.0 token pool at %s: %w", poolAddr.Hex(), err)
-	}
-	token, err := pool.GetToken(&bind.CallOpts{Context: e.GetContext()})
-	if err != nil {
-		return evm.Chain{}, common.Address{}, fmt.Errorf("failed to get local token from pool %s on chain %d: %w", poolAddr.Hex(), chainSelector, err)
+	// Callers that know the token pass it in; otherwise fall back to the pool.
+	token := common.BytesToAddress(tokenAddr)
+	if token == (common.Address{}) {
+		pool, err := tpbindings.NewTokenPool(poolAddr, chain.Client)
+		if err != nil {
+			return evm.Chain{}, common.Address{}, fmt.Errorf("failed to instantiate v1.4.0 token pool at %s: %w", poolAddr.Hex(), err)
+		}
+		token, err = pool.GetToken(&bind.CallOpts{Context: e.GetContext()})
+		if err != nil {
+			return evm.Chain{}, common.Address{}, fmt.Errorf("failed to get local token from pool %s on chain %d: %w", poolAddr.Hex(), chainSelector, err)
+		}
 	}
 
 	tarAddr, err := t.EVMTokenBase.GetTokenAdminRegistryAddress(e.DataStore, chainSelector)
@@ -339,33 +341,35 @@ func (p *poolOpsV140) GetPoolAdmins(ctx context.Context, chain *evm.Chain, poolA
 		return common.Address{}, common.Address{}, fmt.Errorf("failed to get owner of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 	}
 
-	// Only LockReleaseTokenPool exposes getRateLimitAdmin. On BurnMintTokenPool
-	// the selector is absent, so the call reverts and the owner is the sole
-	// authorized caller. Only that case may fall back, a transport-level
-	// failure must surface, or a flaky RPC would silently report the owner as
-	// the rate limit admin and feed a wrong answer to permission checks.
+	// Only LockReleaseTokenPool exposes getRateLimitAdmin; on BurnMintTokenPool
+	// the selector does not exist. Dispatch on typeAndVersion rather than
+	// calling and interpreting the failure, so a transport error can never be
+	// mistaken for "no such method" and silently report the owner as the rate
+	// limit admin.
+	//
+	// typeAndVersion is absent from the shared TokenPool base ABI but present
+	// on both concrete pool types with an identical selector, so the
+	// lock-release bindings read it for either.
 	lrPool, err := lrBindings.NewLockReleaseTokenPool(poolAddr, chain.Client)
 	if err != nil {
 		return common.Address{}, common.Address{}, fmt.Errorf("failed to instantiate v1.4.0 lock release token pool contract at %s: %w", poolAddr.Hex(), err)
 	}
+	tv, err := lrPool.TypeAndVersion(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("failed to get typeAndVersion of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
+	}
+	if !strings.HasPrefix(tv, string(lrp.ContractType)) {
+		// Not a lock-release pool, so the owner is the sole authorized caller.
+		// Returning the owner rather than the zero address keeps the
+		// SkipIfMissingPermissions guard in SetTokenPoolRateLimits correct.
+		return owner, owner, nil
+	}
+
 	rlAdmin, err = lrPool.GetRateLimitAdmin(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		if isContractRevert(err) {
-			return owner, owner, nil
-		}
 		return common.Address{}, common.Address{}, fmt.Errorf("failed to get rate limit admin of token pool at %s on chain %d: %w", poolAddr.Hex(), chain.Selector, err)
 	}
 	return owner, rlAdmin, nil
-}
-
-// isContractRevert reports whether err is the contract rejecting the call
-// (a revert, or no data returned because the selector does not exist) rather
-// than a transport or RPC failure.
-func isContractRevert(err error) bool {
-	if _, ok := errors.AsType[rpc.DataError](err); ok {
-		return true
-	}
-	return errors.Is(err, bind.ErrNoCode) || strings.Contains(err.Error(), "abi: attempting to unmarshall an empty string")
 }
 
 func (p *poolOpsV140) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, input tokensapi.TPRLRemotes) ([]evm_contract.WriteOutput, error) {
@@ -391,12 +395,12 @@ func (p *poolOpsV140) SetRateLimiterConfig(b cldf_ops.Bundle, chain evm.Chain, p
 			ChainSelector: chain.Selector,
 			Address:       poolAddr,
 			Args: tp.SetChainRateLimiterConfigArgs{
-				OutboundConfig: tp.RateLimiterConfig{
+				OutboundConfig: tp.Config{
 					IsEnabled: outbound.IsEnabled,
 					Capacity:  outbound.Capacity,
 					Rate:      outbound.Rate,
 				},
-				InboundConfig: tp.RateLimiterConfig{
+				InboundConfig: tp.Config{
 					IsEnabled: inbound.IsEnabled,
 					Capacity:  inbound.Capacity,
 					Rate:      inbound.Rate,
@@ -448,10 +452,10 @@ func (p *poolOpsV140) SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, 
 		} else {
 			report, err := cldf_ops.ExecuteOperation(b,
 				lrp.SetRateLimitAdmin, chain,
-				evm_contract.FunctionInput[lrp.SetRateLimitAdminArgs]{
+				evm_contract.FunctionInput[common.Address]{
 					ChainSelector: chain.Selector,
 					Address:       poolAddr,
-					Args:          lrp.SetRateLimitAdminArgs{RateLimitAdmin: *rlAdmin},
+					Args:          *rlAdmin,
 				})
 			if err != nil {
 				return nil, fmt.Errorf("SetRateLimitAdmin v1.4.0: %w", err)

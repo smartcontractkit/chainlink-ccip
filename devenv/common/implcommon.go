@@ -35,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	evmdeploy "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/deploy"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_4_0/adapters" // register v1.4.0 token pool adapter
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters" // register v1.5.1 token pool adapter
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters" // register v1.6.0/v1.6.1 token pool adapter
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters" // register FeeQuoter 2.0 updater for UpdateFeeQuoterChangeset

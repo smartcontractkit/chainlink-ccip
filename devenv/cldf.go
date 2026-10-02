@@ -47,7 +47,6 @@ import (
 	_ "github.com/smartcontractkit/chainlink-ton/deployment/testadapter"
 
 	// Register per-version token pool adapters
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_4_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
 )

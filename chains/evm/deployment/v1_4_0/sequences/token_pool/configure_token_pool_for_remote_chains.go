@@ -247,8 +247,8 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				Address:       input.TokenPoolAddress,
 				Args: tp.SetChainRateLimiterConfigArgs{
 					RemoteChainSelector: input.RemoteChainSelector,
-					OutboundConfig:      tp.RateLimiterConfig{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
-					InboundConfig:       tp.RateLimiterConfig{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
+					OutboundConfig:      tp.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
+					InboundConfig:       tp.Config{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
 				},
 			})
 			if err != nil {
@@ -256,17 +256,15 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			}
 			reportWrites = append(reportWrites, report.Output)
 		} else {
-			report, err := cldf_ops.ExecuteOperation(b, tp.ApplyChainUpdates, chain, contract.FunctionInput[tp.ApplyChainUpdatesArgs]{
+			report, err := cldf_ops.ExecuteOperation(b, tp.ApplyChainUpdates, chain, contract.FunctionInput[[]tp.ChainUpdate]{
 				ChainSelector: chain.Selector,
 				Address:       input.TokenPoolAddress,
-				Args: tp.ApplyChainUpdatesArgs{
-					Chains: []tp.ChainUpdate{{
-						RemoteChainSelector:       input.RemoteChainSelector,
-						Allowed:                   true,
-						OutboundRateLimiterConfig: tp.RateLimiterConfig{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
-						InboundRateLimiterConfig:  tp.RateLimiterConfig{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
-					}},
-				},
+				Args: []tp.ChainUpdate{{
+					RemoteChainSelector:       input.RemoteChainSelector,
+					Allowed:                   true,
+					OutboundRateLimiterConfig: tp.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
+					InboundRateLimiterConfig:  tp.Config{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
+				}},
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply chain updates: %w", err)
