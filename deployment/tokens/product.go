@@ -435,6 +435,11 @@ type MigrationMetadata struct {
 	// EVM uses this with LegacyPoolVersion for inbound rate limit decimal normalization.
 	LegacyPoolType string
 
+	// LegacyPoolAddress is the address of the active (TAR-registered) pool being
+	// upgraded from, as raw on-chain bytes. EVM uses it to consult a v1.5.0
+	// *AndProxy pool's getPreviousPool() when resolving the effective rate limits.
+	LegacyPoolAddress []byte
+
 	// LegacyRemotePools is the full set of remote pool addresses registered on the legacy active pool
 	// for this lane. EVM v2 uses this for upgrade cutover (inflight message protection).
 	// RemotePool on RemoteChainConfig remains the primary/target pool; this is the extra legacy set.
