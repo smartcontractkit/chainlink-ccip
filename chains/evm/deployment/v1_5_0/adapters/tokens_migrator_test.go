@@ -17,7 +17,9 @@ import (
 	rmnproxyops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
+	bmtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool"
 	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool"
 	lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -93,13 +95,20 @@ func TestTokenAdapter_DeriveTokenDecimals_ReadsFromToken(t *testing.T) {
 	})
 }
 
-// forEachPoolType runs fn against both v1.5.0 pool types. The adapter reads and writes only the
-// shared TokenPoolAndProxy surface, so nothing in it should behave differently between the two -
-// these subtests are what holds that claim honest.
+// forEachPoolType runs fn against every v1.5.0 pool type the adapter supports: the two *AndProxy
+// pools and their plain siblings. The adapter reads and writes only the shared TokenPoolAndProxy
+// surface, so nothing in it should behave differently between them - these subtests are what
+// holds that claim honest, and the plain-pool cases are what give an existing plain v1.5.0 pool
+// its auto-migrate (upgrade) path.
 func forEachPoolType(t *testing.T, fn func(t *testing.T, poolType string)) {
 	t.Helper()
 
-	for _, poolType := range []string{string(bmtpap.ContractType), string(lrtpap.ContractType)} {
+	for _, poolType := range []string{
+		string(bmtpap.ContractType),
+		string(lrtpap.ContractType),
+		string(bmtp.ContractType),
+		string(lrtp.ContractType),
+	} {
 		t.Run(poolType, func(t *testing.T) {
 			t.Parallel()
 			fn(t, poolType)

@@ -73,8 +73,8 @@ func disabledRateLimit() tpap.Config {
 //     removals as allowed=false entries, rather than v1.5.1's (selectorsToRemove, chainsToAdd)
 //
 // Pool-type agnostic: every call below is on the TokenPoolAndProxy base surface, which
-// BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy share with byte-identical
-// signatures. Type-specific state (lock-release liquidity and rebalancer) is not touched here.
+// BurnMintTokenPoolAndProxy, LockReleaseTokenPoolAndProxy, and the plain BurnMintTokenPool and
+// LockReleaseTokenPool share with byte-identical signatures. Type-specific state (lock-release liquidity and rebalancer) is not touched here.
 var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 	"token-pool:configure-token-pool-for-remote-chains",
 	tpap.Version,

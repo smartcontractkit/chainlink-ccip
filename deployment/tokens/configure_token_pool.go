@@ -172,9 +172,13 @@ func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (
 							selector, family, fullPoolRef.Version,
 						)
 					}
+					poolAddress, err := TokenPoolCounterpartAddress(e, selector, fullPoolRef, fullTokenRef)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to derive address of pool %s: %w", fullPoolRef.Address, err)
+					}
 					report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, feeAdapter.SetAllowedFinalityConfig(&e), e.BlockChains, SetAllowedFinalityConfigSequenceInput{
 						Selector: selector,
-						Settings: map[string]finality.Config{fullPoolRef.Address: *pool.FinalityConfig},
+						Settings: map[string]finality.Config{poolAddress: *pool.FinalityConfig},
 					})
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to set finality config on pool %s: %w", fullPoolRef.Address, err)

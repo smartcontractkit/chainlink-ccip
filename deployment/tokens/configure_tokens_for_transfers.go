@@ -658,7 +658,7 @@ func applyTokenTransferFeeConfig(
 	}
 
 	if fullSrcPoolRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
-		if poolBatches, poolReports, err := applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, srcToDstFeeCfg); err != nil {
+		if poolBatches, poolReports, err := applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, fullSrcTokenRef, srcToDstFeeCfg); err != nil {
 			return nil, nil, fmt.Errorf("failed to apply token transfer fee config on token pool for chain selector %d and remote chain selector %d: %w", src, dst, err)
 		} else {
 			batches = append(batches, poolBatches...)
@@ -673,15 +673,19 @@ func applyTokenTransferFeeConfigOnTokenPool(
 	e cldf.Environment,
 	src, dst uint64,
 	fullSrcPoolRef datastore.AddressRef,
+	fullSrcTokenRef datastore.AddressRef,
 	partial PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	feeAdapter, err := ResolveTokenFeeAdapter(e, src, fullSrcPoolRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve token fee adapter for chain selector %d and token pool address %s: %w", src, fullSrcPoolRef.Address, err)
 	}
-	poolAddress := fullSrcPoolRef.Address
-	if poolAddress == "" {
+	if fullSrcPoolRef.Address == "" {
 		return nil, nil, fmt.Errorf("token pool address is required to apply token transfer fee config for chain selector %d and remote chain selector %d", src, dst)
+	}
+	poolAddress, err := TokenPoolCounterpartAddress(e, src, fullSrcPoolRef, fullSrcTokenRef)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to derive token pool address for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
 
 	onChainConfig, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e, poolAddress, src, dst)
@@ -1088,6 +1092,33 @@ func LegacyRateLimitsForAutoMigrate[R any, CCV any](
 		Outbound: legacy.Outbound,
 		Inbound:  inboundLegacy,
 	}, nil
+}
+
+// TokenPoolCounterpartAddress returns the address that identifies the pool for this token in the
+// pool's own family, as TokenFeeAdapter expects it. That is the pool address itself on EVM, and the
+// pool config PDA on Solana, where one pool program serves many mints. When the counterpart is the
+// pool itself, poolRef.Address is returned unchanged.
+func TokenPoolCounterpartAddress(e cldf.Environment, sel uint64, poolRef, tokenRef datastore.AddressRef) (string, error) {
+	adapter, _, err := ResolveAdapter(GetTokenAdapterRegistry(), sel, poolRef.Version)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve token adapter: %w", err)
+	}
+	poolBytes, err := adapter.AddressRefToBytes(poolRef)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert token pool ref to bytes: %w", err)
+	}
+	tokenBytes, err := adapter.AddressRefToBytes(tokenRef)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert token ref to bytes: %w", err)
+	}
+	counterpart, err := adapter.DeriveTokenPoolCounterpart(e, sel, poolBytes, tokenBytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive token pool counterpart: %w", err)
+	}
+	if bytes.Equal(counterpart, poolBytes) {
+		return poolRef.Address, nil
+	}
+	return deploy.BytesToString(sel, counterpart)
 }
 
 func ResolveTokenFeeAdapter(e cldf.Environment, sel uint64, poolRef datastore.AddressRef) (TokenFeeAdapter, error) {
