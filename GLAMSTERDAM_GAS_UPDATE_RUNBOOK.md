@@ -550,12 +550,52 @@ Not written: 8 chains skipped for an unresolved contract address (5 `OnRamp`, 3 
 OnRamp/CommitteeVerifier/CCTPVerifier writes skipped on a few chains with `router == address(0)`;
 2 token pools skipped as unsupported for the target (§10).
 
-**Open question — USDC pool baseline.** All 8 `CCTPThroughCCVTokenPool`s on `prod_testnet` have a
-current `DestGasOverhead` of 90,000 (not the 250,000 "expected Prague" baseline in row 10), so
-every one takes the `MISMATCH` fallback (3× → 270,000) instead of the literal 750,000. The 90,000
-looks like it may just be the default token overhead rather than a deliberately tuned USDC value.
-Decide whether row 10's baseline/target should be different for `CCTPThroughCCVTokenPool`
-before a real run, rather than leaving it to the fallback.
+### Where the USDC token gas actually comes from (OnRamp fee path) — row 10 is incomplete
+
+All 8 `CCTPThroughCCVTokenPool`s on `prod_testnet` have a current pool-level `DestGasOverhead` of
+90,000 (not the 250,000 "expected Prague" baseline in row 10), so every one takes the `MISMATCH`
+fallback (3× → 270,000) instead of the literal 750,000. The reason is that **the 250,000 is not a
+pool value at all.** Traced in `chains/evm/contracts/onRamp/OnRamp.sol` (`_getReceipts`):
+
+1. For a token transfer the `OnRamp` calls `pool.getFee(...)` if the pool supports `IPoolV2`.
+   `USDCTokenPoolProxy.getFee` forwards to the underlying pool selected for that lane's mechanism
+   (and reverts for a legacy mechanism); `CCTPThroughCCVTokenPool` inherits `TokenPool.getFee`,
+   which returns the pool's own `s_tokenTransferFeeConfig[dest]` **only if that config is
+   enabled**, otherwise `(0, 0, 0, 0, isEnabled=false)`.
+2. If the pool is not `IPoolV2`, or returned `isEnabled=false`, the `OnRamp` falls back to
+   `FeeQuoter.getTokenTransferFee(dest, token)`, i.e. the FeeQuoter's **per-token override**
+   `getTokenTransferFeeConfig(dest, token)` (or `defaultTokenDestGasOverhead`, 90,000, if there is
+   none).
+3. Exactly one of the two supplies the token's `destGasLimit`; the other is ignored.
+
+Evidence from Base mainnet (FeeQuoter 2.0.0 `0x0352…3Cb62`, event history for dest = Ethereum
+`5009297550715157269`): native USDC (`0x8335…2913`) got a per-token override of
+`destGasOverhead = 180,000` on 2026-05-19 and was raised to **250,000** on 2026-06-11 (block
+47175441); it is still 250,000 on-chain. The FeeQuoter 1.6.3 on Base still has 180,000 for USDC (the
+v1.6 row-5 baseline). `DestChainConfig` was never 250k (`defaultTokenDestGasOverhead` stayed 90,000).
+Dozens of other tokens have overrides in the 100k–410k range. So the "250,000" in row 10 is the
+**FeeQuoter 2.0.0 per-token override for USDC**, not `CCTPThroughCCVTokenPool`'s own config.
+
+**Consequence — a likely gap in the v2.0 changeset.** The v2.0 sequence only updates pool-level
+config (`UpdateTokenPoolGasConfig`) and discovers only `SiloedUSDCTokenPool` and
+`CCTPThroughCCVTokenPool` v2.0.0 pools. That is correct for lanes whose pool config is enabled, but:
+- mainnet (`prod_mainnet/state_v2.json` on 2026-10-02) has **no** `CCTPThroughCCVTokenPool` /
+  `USDCTokenPoolProxy` at all — its USDC pools are legacy `USDCTokenPool` 1.5.1 / 1.6.2, which are
+  not `IPoolV2` (checked on-chain 2026-10-02: `getFee` and `getTokenTransferFeeConfig` both revert
+  on Base's `USDCTokenPool` 1.5.1 `0x5931…a8C9` and 1.6.2 `0x6378…ecda`), so the `OnRamp` charges
+  the **FeeQuoter override (250,000)**, which the changeset never touches;
+- on any lane where the pool's fee config is disabled, the FeeQuoter override applies too.
+
+Proposed change (not yet implemented): add a v2.0 analogue of the v1.6
+`UpdateTokenTransferFeeConfig` sequence (`v1_6_1/sequences/glamsterdam/token_transfer_fee_config.go`)
+that, per FeeQuoter 2.0.0, reads `getTokenTransferFeeConfig(target, usdcToken)` for each candidate
+USDC token, skips it if not enabled, resolves `destGasOverhead` against the 250,000 → 750,000 rule
+(`ApplyTokenTransferFeeConfigUpdates` already exists in `v2_0_0/operations/fee_quoter`), and emits an
+MCMS batch. Open questions to settle first: (a) which tokens are in scope (USDC only, or the other
+overrides too — Lombard etc.); (b) whether to update **both** the pool config and the FeeQuoter
+override when both exist (only the active one matters, but they can flip if the pool config is
+later enabled/disabled); (c) the Glamsterdam target for USDC (750,000 is still a "guesstimate").
+Until that is decided, treat row 10 as covering `IPoolV2` pools with an enabled config only.
 
 ## 12. Mainnet rollout notes
 

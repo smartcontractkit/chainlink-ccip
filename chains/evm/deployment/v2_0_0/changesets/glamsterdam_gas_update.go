@@ -15,6 +15,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/cctp_through_ccv_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/committee_verifier"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
@@ -101,6 +102,35 @@ var usdcTokenPoolContractTypes = []struct {
 	{cctp_through_ccv_token_pool.ContractType, cctp_through_ccv_token_pool.Version},
 }
 
+// legacyUSDCTokenPoolContractTypes are USDC pool contract types, of any version, that are not
+// updated as token pools by this changeset (they are legacy / not IPoolV2, or are proxies) but whose
+// underlying token must still be recognised as USDC when migrating the FeeQuoter per-token
+// overrides: on mainnet the canonical USDC lanes use the legacy USDCTokenPool 1.5.x / 1.6.x, whose
+// token gas the OnRamp takes from the FeeQuoter override.
+var legacyUSDCTokenPoolContractTypes = []datastore.ContractType{
+	"USDCTokenPool",
+	"USDCTokenPoolCCTPV2",
+	"USDCTokenPoolProxy",
+}
+
+// resolveAddressRefsAnyVersion returns every distinct address of the given contract type on the
+// chain, regardless of version or qualifier.
+func resolveAddressRefsAnyVersion(addrs []datastore.AddressRef, contractType datastore.ContractType) []common.Address {
+	seen := make(map[common.Address]bool)
+	var out []common.Address
+	for _, ref := range addrs {
+		if ref.Type != contractType {
+			continue
+		}
+		addr := common.HexToAddress(ref.Address)
+		if !seen[addr] {
+			seen[addr] = true
+			out = append(out, addr)
+		}
+	}
+	return out
+}
+
 // GlamsterdamGasUpdateCfg is configuration for the UpdateGasConfigForGlamsterdamV2 changeset.
 type GlamsterdamGasUpdateCfg struct {
 	// TargetChainSelector is the chain selector of the chain moving to Glamsterdam.
@@ -171,6 +201,7 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 			lanes        []glamsterdamseq.LaneAddresses
 			lombardPools []glamsterdamseq.TokenPoolLane
 			usdcPools    []glamsterdamseq.TokenPoolLane
+			fqTokenLanes []glamsterdamseq.FeeQuoterTokenConfigLane
 		)
 
 		for _, sel := range discoveryReport.Output.LanesToUpdate {
@@ -198,11 +229,16 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 			}
 			lanes = append(lanes, lane)
 
+			fqLane := glamsterdamseq.FeeQuoterTokenConfigLane{
+				ChainSelector:    sel,
+				FeeQuoterAddress: feeQuoterAddrByChain[sel],
+			}
 			for _, lombardAddr := range resolveAddressRefsAllQualifiers(addrs, lombard_token_pool.ContractType, lombard_token_pool.Version) {
 				lombardPools = append(lombardPools, glamsterdamseq.TokenPoolLane{
 					ChainSelector: sel,
 					PoolAddress:   lombardAddr,
 				})
+				fqLane.LombardPoolAddresses = append(fqLane.LombardPoolAddresses, lombardAddr)
 			}
 			for _, usdcType := range usdcTokenPoolContractTypes {
 				for _, usdcAddr := range resolveAddressRefsAllQualifiers(addrs, usdcType.ContractType, usdcType.Version) {
@@ -210,8 +246,20 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 						ChainSelector: sel,
 						PoolAddress:   usdcAddr,
 					})
+					fqLane.USDCPoolAddresses = append(fqLane.USDCPoolAddresses, usdcAddr)
 				}
 			}
+			// Legacy / proxy USDC pools are not updated as token pools, but their token is still USDC
+			// for the purpose of the FeeQuoter per-token override.
+			for _, legacyType := range legacyUSDCTokenPoolContractTypes {
+				fqLane.USDCPoolAddresses = append(fqLane.USDCPoolAddresses, resolveAddressRefsAnyVersion(addrs, legacyType)...)
+			}
+			if tarRef := datastore_utils.GetAddressRef(addrs, sel, token_admin_registry.ContractType, token_admin_registry.Version, ""); !datastore_utils.IsAddressRefEmpty(tarRef) {
+				fqLane.TokenAdminRegistryAddress = common.HexToAddress(tarRef.Address)
+			} else {
+				report.AddUnresolvedContract(sel, "TokenAdminRegistry (FeeQuoter per-token overrides only checked for USDC/Lombard pool tokens)")
+			}
+			fqTokenLanes = append(fqTokenLanes, fqLane)
 		}
 
 		var batchOps []mcms_types.BatchOperation
@@ -239,6 +287,21 @@ func UpdateGasConfigForGlamsterdamV2(mcmsRegistry *cs_core.MCMSReaderRegistry) c
 			}
 			batchOps = append(batchOps, tokenPoolReport.Output.BatchOps...)
 			report.Lines = append(report.Lines, tokenPoolReport.Output.Report.Lines...)
+		}
+
+		// The OnRamp takes a token's destination gas from the pool's own fee config when the pool is
+		// IPoolV2 and that config is enabled, and from the FeeQuoter per-token override otherwise, so
+		// both are migrated.
+		if len(fqTokenLanes) > 0 {
+			fqTokenReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, glamsterdamseq.UpdateFeeQuoterTokenTransferFeeConfig, e.BlockChains, glamsterdamseq.UpdateFeeQuoterTokenTransferFeeConfigInput{
+				TargetChainSelector: target,
+				Lanes:               fqTokenLanes,
+			})
+			if err != nil {
+				return cldf_deployment.ChangesetOutput{}, fmt.Errorf("failed to update FeeQuoter token transfer fee config for target chain %d: %w", target, err)
+			}
+			batchOps = append(batchOps, fqTokenReport.Output.BatchOps...)
+			report.Lines = append(report.Lines, fqTokenReport.Output.Report.Lines...)
 		}
 
 		mcmsInput := cfg.MCMS
