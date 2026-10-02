@@ -393,8 +393,22 @@ Things worth knowing about the output files (v2.0, `ccv`):
   (function signature + named struct fields per transaction), so `analyze-proposal-v2` in (b) is
   usually not needed to read it.
 - Expected tx functions for v2.0: `OnRamp.applyDestChainConfigUpdates`,
-  `FeeQuoter.applyDestChainConfigUpdates`, `<Committee|CCTP|Lombard>Verifier.applyRemoteChainConfigUpdates`,
-  and `<token pool>.applyTokenTransferFeeConfigUpdates`. Anything else is a bug.
+  `FeeQuoter.applyDestChainConfigUpdates`, `FeeQuoter.applyTokenTransferFeeConfigUpdates` (per-token
+  overrides), `<Committee|CCTP|Lombard>Verifier.applyRemoteChainConfigUpdates`, and
+  `<token pool>.applyTokenTransferFeeConfigUpdates`. Anything else is a bug.
+- **Batch layout (v2.0).** Per chain: one *core* batch (OnRamp + FeeQuoter dest config +
+  CommitteeVerifier), then **one batch per Lombard/CCTP verifier write**, then one batch per token-pool
+  write, then one batch for the FeeQuoter per-token overrides. A timelock batch executes atomically, so
+  this isolation means a verifier the timelock doesn't own can only fail its own batch.
+- **Check contract ownership before signing.** Every target contract must be owned by the proposal's
+  timelock for that chain (a token pool's fee admin also works), otherwise its batch reverts at
+  execution time even though the proposal builds and signs fine. Spot-check with
+  `cast call <target> 'owner()(address)' --rpc-url <chain rpc>` and compare to the chain's `CLLCCIP`
+  timelock (`timelockAddresses` in the proposal JSON). Known case on `prod_testnet` (2026-10-02): 6 of 8
+  `CCTPVerifier`s are owned by an EOA (`0x14ea…25f3`, no code, not in the datastore) instead of the
+  timelock. Because verifier writes are in their own batches (above), those batches can fail without
+  affecting the rest of the chain's update, so the remaining batches can still be signed and executed.
+  On `prod_mainnet` all 11 `CCTPVerifier`s are owned by their chain's `CLLCCIP` timelock.
 - `<env>/state_v2.json` (checked into the domain; refresh it before relying on it) holds current OnRamp/FeeQuoter
   dest-chain config per chain, so those two can be diffed offline. It does **not** include
   verifier remote-chain config or per-lane pool fee config — read those on-chain
@@ -474,6 +488,23 @@ about, then read back the contract state to confirm it matches what the decoded 
   `router == address(0)` for the target, which is consistent. The same class of problem — a read that reverts for an
   unconfigured destination aborting everything — is worth checking for in any new field added
   to either sequence.
+- **FeeQuoter per-token overrides are migrated for every token, in one read.** The v2.0 OnRamp takes a
+  token's destination gas from the pool's own fee config when the pool is `IPoolV2` *and* that config
+  is enabled, and from the FeeQuoter per-token override (or `defaultTokenDestGasOverhead`) otherwise,
+  so both are updated (`UpdateFeeQuoterTokenTransferFeeConfig`). Overrides are read with one
+  `getAllTokenTransferFeeConfigs()` call per FeeQuoter (not by enumerating the `TokenAdminRegistry`
+  and reading token by token — that took 20+ minutes on testnet vs ~4 minutes). They are not limited
+  to USDC/Lombard: on mainnet there are 440 enabled overrides for Ethereum across 50 chains (SolvBTC,
+  LINK, syrupUSDC, WETH, ...), mostly 120k–180k. USDC and Lombard tokens use their own spec (literal
+  target on a baseline match, no-op if already migrated, ratio fallback otherwise); **every other
+  token with an enabled override is scaled x3 and this is not idempotent** — re-running the changeset
+  after its proposal executed would scale them again. USDC/Lombard targets live in one place
+  (`fields.go`: `usdc*/lombardDestGasOverhead*` constants) and feed both the pool-level and the
+  FeeQuoter-override specs.
+- **A pool that can't be read does not block the batch.** USDC/Lombard pools are only used to
+  recognise their token; one with no contract code (a stale datastore entry, e.g. `0xFD47…F910` on
+  `prod_testnet` chain `945045181441419236`) logs `WARNING - failed to read underlying token of pool
+  ...` and its token falls back to the generic x3 rule.
 - **Whole-struct rewrites of unchanged values are normal.** The changeset re-submits the full
   FeeQuoter/OnRamp dest-chain struct with only the touched fields overridden, so you'll see writes
   whose old and new values for a field are identical (e.g. `MaxPerMsgGasLimit` 15,000,000 →
@@ -529,26 +560,31 @@ measurement — it's a constant in `chains/evm/deployment/utils/glamsterdam/` / 
 
 ### Observed v2.0 result — `ccv` / `prod_testnet`, target Sepolia (2026-10-02)
 
-Run against `chainlink-ccip` `main` (`a2d686f61`) + the §10 fix, file datastore (§6c). 68 batches,
-194 txs, 60 chains; Appendix A script: 0 failures. Current → new, with tx counts:
+Run against `chainlink-ccip` `main` (`a2d686f61`) plus the §10 fixes (pool-skip, FeeQuoter per-token
+overrides), file datastore (§6c). 88 batches, 214 txs, 60 chains; Appendix A script: 0 failed txs,
+and the 88 enabled FeeQuoter overrides for Sepolia on-chain were exactly the 88 in the proposal. Run
+time ~4 minutes. Current -> new, with tx counts:
 
-| Contract.field | Current → new | Count | Note |
+| Contract.field | Current -> new | Count | Note |
 |---|---|---|---|
-| `OnRamp.BaseExecutionGasCost` | 200,000 → 400,000 | 59 | literal Glamsterdam |
-| `FeeQuoter.DefaultTokenDestGasOverhead` | 90,000 → 270,000 | 60 | literal |
-| `FeeQuoter.DefaultTxGasLimit` | 200,000 → 400,000 | 60 | literal |
-| `FeeQuoter.DestGasPerPayloadByteBase` | 20 → 64 | 58 | literal |
-| `FeeQuoter.DestGasPerPayloadByteBase` | 16 → 51 | 2 | `MISMATCH` → fallback (these chains are non-default) |
-| `FeeQuoter.MaxPerMsgGasLimit` | 15,000,000 → 15,000,000 | 58 | no-op |
-| `FeeQuoter.MaxPerMsgGasLimit` | 3,000,000 → 3,000,000 | 2 | `MISMATCH`, fallback is a no-op |
-| `CommitteeVerifier.GasForVerification` | 75,000 → 85,000 | 59 | literal |
-| `CCTPVerifier.GasForVerification` | 200,000 → 600,000 | 6 | literal (guesstimate value) |
-| `CCTPVerifier.GasForVerification` | 220,000 → 660,000 | 2 | `MISMATCH` → fallback |
-| `CCTPThroughCCVTokenPool` (USDC slot) `DestGasOverhead` | 90,000 → 270,000 | 8 | `MISMATCH` → fallback |
+| `OnRamp.BaseExecutionGasCost` | 200,000 -> 400,000 | 59 | literal Glamsterdam |
+| `FeeQuoter.DefaultTokenDestGasOverhead` | 90,000 -> 270,000 | 60 | literal |
+| `FeeQuoter.DefaultTxGasLimit` | 200,000 -> 400,000 | 60 | literal |
+| `FeeQuoter.DestGasPerPayloadByteBase` | 20 -> 64 | 58 | literal |
+| `FeeQuoter.DestGasPerPayloadByteBase` | 16 -> 51 | 2 | `MISMATCH` -> fallback (these chains are non-default) |
+| `FeeQuoter.MaxPerMsgGasLimit` | 15,000,000 -> 15,000,000 | 58 | no-op |
+| `FeeQuoter.MaxPerMsgGasLimit` | 3,000,000 -> 3,000,000 | 2 | `MISMATCH`, fallback is a no-op |
+| `CommitteeVerifier.GasForVerification` | 75,000 -> 85,000 | 59 | literal |
+| `CCTPVerifier.GasForVerification` | 200,000 -> 600,000 | 6 | literal (guesstimate value) |
+| `CCTPVerifier.GasForVerification` | 220,000 -> 660,000 | 2 | `MISMATCH` -> fallback |
+| `CCTPThroughCCVTokenPool` (USDC slot) `DestGasOverhead` | 90,000 -> 270,000 | 8 | `MISMATCH` -> fallback |
+| FeeQuoter per-token override, USDC | 90k / 180k / 200k -> 270k / 540k / 600k | 7 | all `MISMATCH` -> x3 (none at the 250k baseline on testnet) |
+| FeeQuoter per-token override, other tokens | e.g. 120k -> 360k (x41), 140k -> 420k (x7); largest 750k -> 2.25M | 81 | generic x3 |
 
 Not written: 8 chains skipped for an unresolved contract address (5 `OnRamp`, 3 `FeeQuoter`);
 OnRamp/CommitteeVerifier/CCTPVerifier writes skipped on a few chains with `router == address(0)`;
-2 token pools skipped as unsupported for the target (§10).
+2 token pools skipped as unsupported for the target (§10); 1 USDC pool with no contract code (warning,
+§10). Ownership (§9): 6 `CCTPVerifier`s are EOA-owned, so those isolated verifier batches would revert at execution; nothing else is affected.
 
 ### Where the USDC token gas actually comes from (OnRamp fee path) — row 10 is incomplete
 
@@ -576,26 +612,24 @@ v1.6 row-5 baseline). `DestChainConfig` was never 250k (`defaultTokenDestGasOver
 Dozens of other tokens have overrides in the 100k–410k range. So the "250,000" in row 10 is the
 **FeeQuoter 2.0.0 per-token override for USDC**, not `CCTPThroughCCVTokenPool`'s own config.
 
-**Consequence — a likely gap in the v2.0 changeset.** The v2.0 sequence only updates pool-level
-config (`UpdateTokenPoolGasConfig`) and discovers only `SiloedUSDCTokenPool` and
-`CCTPThroughCCVTokenPool` v2.0.0 pools. That is correct for lanes whose pool config is enabled, but:
-- mainnet (`prod_mainnet/state_v2.json` on 2026-10-02) has **no** `CCTPThroughCCVTokenPool` /
-  `USDCTokenPoolProxy` at all — its USDC pools are legacy `USDCTokenPool` 1.5.1 / 1.6.2, which are
-  not `IPoolV2` (checked on-chain 2026-10-02: `getFee` and `getTokenTransferFeeConfig` both revert
-  on Base's `USDCTokenPool` 1.5.1 `0x5931…a8C9` and 1.6.2 `0x6378…ecda`), so the `OnRamp` charges
-  the **FeeQuoter override (250,000)**, which the changeset never touches;
-- on any lane where the pool's fee config is disabled, the FeeQuoter override applies too.
+**Both sources are now migrated (implemented).** The v2.0 changeset updates the pool-level fee config
+(`UpdateTokenPoolGasConfig`: Lombard / Siloed USDC / `CCTPThroughCCVTokenPool` v2.0.0 pools) **and**
+every FeeQuoter 2.0.0 per-token override for the target (`UpdateFeeQuoterTokenTransferFeeConfig`,
+§10), so the Glamsterdam change is not lost if the active source flips (e.g. a pool's fee config is
+later disabled and the OnRamp falls back to the override).
 
-Proposed change (not yet implemented): add a v2.0 analogue of the v1.6
-`UpdateTokenTransferFeeConfig` sequence (`v1_6_1/sequences/glamsterdam/token_transfer_fee_config.go`)
-that, per FeeQuoter 2.0.0, reads `getTokenTransferFeeConfig(target, usdcToken)` for each candidate
-USDC token, skips it if not enabled, resolves `destGasOverhead` against the 250,000 → 750,000 rule
-(`ApplyTokenTransferFeeConfigUpdates` already exists in `v2_0_0/operations/fee_quoter`), and emits an
-MCMS batch. Open questions to settle first: (a) which tokens are in scope (USDC only, or the other
-overrides too — Lombard etc.); (b) whether to update **both** the pool config and the FeeQuoter
-override when both exist (only the active one matters, but they can flip if the pool config is
-later enabled/disabled); (c) the Glamsterdam target for USDC (750,000 is still a "guesstimate").
-Until that is decided, treat row 10 as covering `IPoolV2` pools with an enabled config only.
+**Which source is actually charged depends on the lane — and `state_v2.json` is not a reliable guide.**
+`prod_mainnet/state_v2.json` only lists the legacy `USDCTokenPool` 1.5.1/1.6.2, but the **datastore**
+(`datastore/address_refs.json`) also has 11 `CCTPThroughCCVTokenPool` 2.0.0 and 11 `USDCTokenPoolProxy`
+2.0.0 on mainnet. Checked on Base mainnet (2026-10-02): the USDC token is registered in the
+`TokenAdminRegistry` to the `USDCTokenPoolProxy` `0xfe38…6170`, and its `getFee(USDC -> Ethereum)`
+returns `destGasOverhead = 90,000, isEnabled = true`, so (if the v2.0 OnRamp is the one in use for the
+lane) the **pool-level 90,000 is what is charged**, and the FeeQuoter override (250,000) is currently
+shadowed. That is why the pool-level `MISMATCH` fallback (90,000 -> 270,000) is the value that matters
+on those lanes, and why the 250,000 baseline of row 10 never matches them. Whether 90,000 at the pool
+was intended (vs carrying over the 250,000 the lane used to be charged via the FeeQuoter override)
+is worth confirming with whoever configured the proxy pools before a real run. (Not checked: which
+OnRamp/Router a given lane actually routes through.)
 
 ## 12. Mainnet rollout notes
 
