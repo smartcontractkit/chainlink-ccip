@@ -84,6 +84,11 @@ var CCTPChainDefaultsBySelector = map[uint64]CCTPChainDefaults{
 		TokenMessengerV2: "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
 		USDCToken:        "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
 	},
+	chain_selectors.ARC_MAINNET.Selector: {
+		DomainIdentifier: 26,
+		TokenMessengerV2: "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+		USDCToken:        "0x3600000000000000000000000000000000000000",
+	},
 	chain_selectors.ETHEREUM_MAINNET_OPTIMISM_1.Selector: {
 		DomainIdentifier: 2,
 		TokenMessengerV1: "0x2B4069517957735bE00ceE0fadAE88a26365528f",
