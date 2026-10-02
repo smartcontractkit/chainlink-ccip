@@ -242,7 +242,7 @@ type TokenAdapter interface {
 	// On EVM the old pool is driven through the v1.6.1 lock-release bindings and dispatched on
 	// its typeAndVersion TYPE (siloed vs not), never its version - so any legacy pool sharing the
 	// getRebalancer/setRebalancer/withdrawLiquidity signatures is migratable. Verified sources:
-	// LockReleaseTokenPool v1.5.1 and v1.6.1, SiloedLockReleaseTokenPool v1.6.1, and
+	// LockReleaseTokenPool v1.5.0, v1.5.1 and v1.6.1, SiloedLockReleaseTokenPool v1.6.1, and
 	// LockReleaseTokenPoolAndProxy v1.5.0.
 	//
 	// NOTE: the adapter is resolved from the NEW pool's version, not the old one, so a legacy

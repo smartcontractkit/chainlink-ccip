@@ -44,9 +44,13 @@ var (
 // overrides only ConfigureTokenForTransfersSequence which inlines
 // the v1.5.0-specific configure + register flow.
 //
-// Scope: BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy. Both are driven through
-// the shared TokenPoolAndProxy base ops, whose surface they share with byte-identical
-// signatures, so nothing here branches on pool type. The remaining v1.5.0 pool contracts
+// Scope: BurnMintTokenPoolAndProxy, LockReleaseTokenPoolAndProxy, and the plain (non-proxy)
+// BurnMintTokenPool and LockReleaseTokenPool. All four are driven through the shared
+// TokenPoolAndProxy base ops, whose surface they share with byte-identical signatures, so
+// nothing here branches on pool type. (The plain pools lack only getPreviousPool, which nothing
+// here calls.) Because the adapter is registered by version alone, an existing plain v1.5.0 pool
+// resolves here during auto-migrate discovery just like an *AndProxy one does, which is what
+// gives both an upgrade path to v2.0.0. The remaining v1.5.0 pool contracts
 // (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool) have generated
 // bindings but no deployed footprint, and the deploy sequence rejects them.
 //
@@ -216,7 +220,7 @@ func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector ui
 }
 
 // poolOpsV150 implements PoolOps against the shared v1.5.0 TokenPoolAndProxy base surface,
-// so it serves both BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy.
+// so it serves every v1.5.0 pool type the adapter supports, proxy and non-proxy alike.
 type poolOpsV150 struct{}
 
 func (p *poolOpsV150) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
