@@ -242,7 +242,7 @@ type TokenAdapter interface {
 	// On EVM the old pool is driven through the v1.6.1 lock-release bindings and dispatched on
 	// its typeAndVersion TYPE (siloed vs not), never its version - so any legacy pool sharing the
 	// getRebalancer/setRebalancer/withdrawLiquidity signatures is migratable. Verified sources:
-	// LockReleaseTokenPool v1.5.1 and v1.6.1, SiloedLockReleaseTokenPool v1.6.1, and
+	// LockReleaseTokenPool v1.5.0, v1.5.1 and v1.6.1, SiloedLockReleaseTokenPool v1.6.1, and
 	// LockReleaseTokenPoolAndProxy v1.5.0.
 	//
 	// NOTE: the adapter is resolved from the NEW pool's version, not the old one, so a legacy
@@ -434,6 +434,11 @@ type MigrationMetadata struct {
 	// LegacyPoolType is the contract type of the active pool being upgraded from.
 	// EVM uses this with LegacyPoolVersion for inbound rate limit decimal normalization.
 	LegacyPoolType string
+
+	// LegacyPoolAddress is the address of the active (TAR-registered) pool being
+	// upgraded from, as raw on-chain bytes. EVM uses it to consult a v1.5.0
+	// *AndProxy pool's getPreviousPool() when resolving the effective rate limits.
+	LegacyPoolAddress []byte
 
 	// LegacyRemotePools is the full set of remote pool addresses registered on the legacy active pool
 	// for this lane. EVM v2 uses this for upgrade cutover (inflight message protection).

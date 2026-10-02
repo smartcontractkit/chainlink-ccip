@@ -13,7 +13,9 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	adaptersV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
+	bmtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool"
 	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool"
 	lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -29,11 +31,12 @@ import (
 // the adapters package from v1_5_0/sequences would close that cycle. (v1.5.1 has no such
 // constraint: nothing upstream imports v1_5_1/sequences.)
 //
-// Unlike the v1.5.1 sequence, only BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy
-// are supported — the two v1.5.0 pool types the TokenAdapter claims to configure. The remaining
-// v1.5.0 pool contracts (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool)
-// have bindings but no adapter support, so deploying one here would produce a pool no changeset
-// could then wire up.
+// Unlike the v1.5.1 sequence, only the four v1.5.0 pool types the TokenAdapter claims to
+// configure are supported: BurnMintTokenPoolAndProxy, LockReleaseTokenPoolAndProxy, and their
+// plain (non-proxy) siblings BurnMintTokenPool and LockReleaseTokenPool. The remaining v1.5.0
+// pool contracts (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool) have
+// bindings but no adapter support, so deploying one here would produce a pool no changeset could
+// then wire up.
 var DeployTokenPool = cldf_ops.NewSequence(
 	"deploy-token-pool",
 	utils.Version_1_5_0,
@@ -127,6 +130,22 @@ var DeployTokenPool = cldf_ops.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintTokenPoolAndProxy v1.5.0: %w", err)
 			}
 
+		case bmtp.TypeAndVersion.String():
+			poolRef, err = contract.MaybeDeployContract(b, bmtp.Deploy, chain, contract.DeployInput[bmtp.ConstructorArgs]{
+				TypeAndVersion: bmtp.TypeAndVersion,
+				ChainSelector:  chain.Selector,
+				Args: bmtp.ConstructorArgs{
+					Token:     tokenAddress,
+					Allowlist: allowlist,
+					RmnProxy:  rmnProxyAddr,
+					Router:    routerAddr,
+				},
+				Qualifier: &poolQualifier,
+			}, nil)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy BurnMintTokenPool v1.5.0: %w", err)
+			}
+
 		case lrtpap.TypeAndVersion.String():
 			// AcceptLiquidity is immutable on a v1.5.0 lock-release pool, so there is no
 			// recovering from a wrong value after deployment. Require it explicitly rather than
@@ -148,6 +167,27 @@ var DeployTokenPool = cldf_ops.NewSequence(
 			}, nil)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LockReleaseTokenPoolAndProxy v1.5.0: %w", err)
+			}
+
+		case lrtp.TypeAndVersion.String():
+			// Same immutability as LockReleaseTokenPoolAndProxy above.
+			if input.AcceptLiquidity == nil {
+				return sequences.OnChainOutput{}, errors.New("AcceptLiquidity is required when deploying LockReleaseTokenPool v1.5.0")
+			}
+			poolRef, err = contract.MaybeDeployContract(b, lrtp.Deploy, chain, contract.DeployInput[lrtp.ConstructorArgs]{
+				TypeAndVersion: lrtp.TypeAndVersion,
+				ChainSelector:  chain.Selector,
+				Args: lrtp.ConstructorArgs{
+					Token:           tokenAddress,
+					Allowlist:       allowlist,
+					RmnProxy:        rmnProxyAddr,
+					AcceptLiquidity: *input.AcceptLiquidity,
+					Router:          routerAddr,
+				},
+				Qualifier: &poolQualifier,
+			}, nil)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy LockReleaseTokenPool v1.5.0: %w", err)
 			}
 
 		default:

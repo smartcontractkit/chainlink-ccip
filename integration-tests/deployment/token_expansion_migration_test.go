@@ -114,6 +114,9 @@ type autoMigrateUpgradeOpts struct {
 	feeOverrideCfg    *tokensapi.PartialTokenTransferFeeConfig
 	explicitRemote    bool
 	skipLegacyFeeSeed bool
+	// legacyPoolType overrides the legacy pool type legacyPairSpecFor picks for the version. Used
+	// to start a v1.5.0 upgrade from the plain BurnMintTokenPool instead of the *AndProxy pool.
+	legacyPoolType deployment.ContractType
 }
 
 // TestTokenExpansionMigration_AutoMigrate exercises AutoMigrateRemoteChains upgrades from legacy BnM
@@ -122,7 +125,8 @@ type autoMigrateUpgradeOpts struct {
 // v1.5.0, v1.5.1 and v1.6.1 are covered. v1.5.1 vs v1.6.1 contrast inbound RL decimal rebasing
 // against native local decimals; v1.5.0 additionally covers the BurnMintTokenPoolAndProxy ABI,
 // whose single-remote-pool-per-lane storage makes reverse propagation a replace rather than an
-// append.
+// append. The v1_5_0_plain cases start from the plain (non-proxy) BurnMintTokenPool 1.5.0, which
+// shares that ABI but is a distinct contract - they are what pin its upgrade path.
 func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -153,6 +157,16 @@ func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
 				},
 			},
+		},
+		{
+			name:           "v1_5_0_plain_to_v2_0_0/full_discovery",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{legacyPoolType: cciputils.BurnMintTokenPool},
+		},
+		{
+			name:           "v1_5_0_plain_to_v2_0_0/explicit_remote_refs",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{legacyPoolType: cciputils.BurnMintTokenPool, explicitRemote: true},
 		},
 		{
 			name:           "v1_5_1_to_v2_0_0/full_discovery",
@@ -449,7 +463,11 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	const newPoolQualA = "MIG_NEW_POOL_A"
 
 	skipLegacyFeeSeed := opts != nil && opts.skipLegacyFeeSeed
-	s := setupLegacyConnectedBnMPair(t, oldPoolVersion)
+	spec := legacyPairSpecFor(oldPoolVersion)
+	if opts != nil && opts.legacyPoolType != "" {
+		spec.poolType = opts.legacyPoolType
+	}
+	s := setupLegacyConnectedPair(t, oldPoolVersion, spec)
 	e, selA, selB := s.env, s.selA, s.selB
 	chainA := e.BlockChains.EVMChains()[selA]
 
@@ -827,9 +845,9 @@ func TestTokenExpansionMigration_LiquidityMigration(t *testing.T) {
 				SkipOwnershipTransfer: true,
 				TokenPoolVersion:      cciputils.Version_2_0_0,
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
-					TokenPoolQualifier:            newPoolQual,
-					PoolType:                      cciputils.LockReleaseTokenPool.String(),
-					TokenRef:                      &datastore.AddressRef{Address: tokenAddr.Hex()},
+					TokenPoolQualifier: newPoolQual,
+					PoolType:           cciputils.LockReleaseTokenPool.String(),
+					TokenRef:           &datastore.AddressRef{Address: tokenAddr.Hex()},
 					LiquidityMigrationAmount: &tokensapi.LockReleasePoolLiquidityMigrationAmount{
 						Format: tokensapi.LiquidityMigrationAmountFormatBPS,
 						Value:  fmt.Sprintf("%d", migrateHalf),

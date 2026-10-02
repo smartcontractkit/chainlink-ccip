@@ -9,12 +9,18 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	v1_4_0_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_4_0/token_pool"
+	v1_2_0_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/burn_mint_token_pool"
+	v1_0_0_lock_release_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/lock_release_token_pool"
+
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	tpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
 	tpSeq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences/token_pool"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -38,9 +44,13 @@ var (
 // overrides only ConfigureTokenForTransfersSequence which inlines
 // the v1.5.0-specific configure + register flow.
 //
-// Scope: BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy. Both are driven through
-// the shared TokenPoolAndProxy base ops, whose surface they share with byte-identical
-// signatures, so nothing here branches on pool type. The remaining v1.5.0 pool contracts
+// Scope: BurnMintTokenPoolAndProxy, LockReleaseTokenPoolAndProxy, and the plain (non-proxy)
+// BurnMintTokenPool and LockReleaseTokenPool. All four are driven through the shared
+// TokenPoolAndProxy base ops, whose surface they share with byte-identical signatures, so
+// nothing here branches on pool type. (The plain pools lack only getPreviousPool, which nothing
+// here calls.) Because the adapter is registered by version alone, an existing plain v1.5.0 pool
+// resolves here during auto-migrate discovery just like an *AndProxy one does, which is what
+// gives both an upgrade path to v2.0.0. The remaining v1.5.0 pool contracts
 // (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool) have generated
 // bindings but no deployed footprint, and the deploy sequence rejects them.
 //
@@ -210,7 +220,7 @@ func (t *TokenAdapter) GetRemotePools(e deployment.Environment, chainSelector ui
 }
 
 // poolOpsV150 implements PoolOps against the shared v1.5.0 TokenPoolAndProxy base surface,
-// so it serves both BurnMintTokenPoolAndProxy and LockReleaseTokenPoolAndProxy.
+// so it serves every v1.5.0 pool type the adapter supports, proxy and non-proxy alike.
 type poolOpsV150 struct{}
 
 func (p *poolOpsV150) GetToken(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address) (common.Address, error) {
@@ -468,4 +478,230 @@ func (p *poolOpsV150) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, p
 
 func (p *poolOpsV150) Version() *semver.Version {
 	return tpap.Version
+}
+
+// EffectiveMigrationRateLimits resolves the rate limits that were actually in
+// force for a lane. A v1.5.0 *AndProxy pool ("proxy") forwards every transfer to
+// its getPreviousPool() ("previous"), and BOTH apply their own limiter, so the
+// effective limit per direction is the tighter of the two.
+//
+// Exists only for the v1.5.0 *AndProxy migration path; do not copy this pattern elsewhere.
+func EffectiveMigrationRateLimits(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	proxy common.Address,
+	remoteSelector uint64,
+	proxyOut, proxyIn tokensapi.RateLimiterConfig,
+	remoteDecimals, localDecimals uint8,
+) (tokensapi.OnchainRateLimits, error) {
+	unchanged := tokensapi.OnchainRateLimits{Outbound: proxyOut, Inbound: proxyIn}
+	if proxy == (common.Address{}) {
+		return unchanged, nil
+	}
+
+	opts := &bind.CallOpts{Context: b.GetContext()}
+
+	previous, err := previousPool(chain, proxy, opts)
+	if err != nil {
+		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to get previous pool for proxy pool %s: %w", proxy.Hex(), err)
+	}
+	if previous == (common.Address{}) {
+		return unchanged, nil
+	}
+
+	prevVersion, prevType, err := previousTypeAndVersion(b, chain, previous)
+	if err != nil {
+		return tokensapi.OnchainRateLimits{}, err
+	}
+
+	var prevOut, prevIn tokensapi.RateLimiterConfig
+	switch {
+	case prevVersion.GreaterThanEqual(utils.Version_1_4_0) && prevVersion.LessThan(utils.Version_1_5_0):
+		prevOut, prevIn, err = readV14Limits(chain, previous, remoteSelector, opts)
+	case prevVersion.GreaterThanEqual(utils.Version_1_2_0) && prevVersion.LessThan(utils.Version_1_4_0):
+		prevOut, prevIn, err = readV12Limits(chain, previous, proxy, prevType, opts)
+		if err == nil && (prevOut.IsEnabled || prevIn.IsEnabled) {
+			b.Logger.Warnf(
+				"v1.5.0 *AndProxy pool %s lane %d: previous v1.2 pool %s applies an enabled, "+
+					"per-proxy (shared) rate limit; the aggregate limit across lanes cannot be "+
+					"preserved and may increase after migration",
+				proxy.Hex(), remoteSelector, previous.Hex(),
+			)
+		}
+	default:
+		// NOTE: a v1.5.0 *AndProxy pool can also point at another v1.5.0 pool (e.g. a
+		// v1.5.0 BnM pool). That is out of scope for now; extend here if it comes up.
+		return tokensapi.OnchainRateLimits{}, fmt.Errorf(
+			"unsupported previous pool %s version %s for v1.5.0 *AndProxy pool %s",
+			prevType, prevVersion.String(), proxy.Hex(),
+		)
+	}
+	if err != nil {
+		return tokensapi.OnchainRateLimits{}, err
+	}
+
+	prevIn = rebasePreviousInbound(prevIn, remoteDecimals, localDecimals)
+
+	return tokensapi.OnchainRateLimits{
+		Outbound: effectiveRateLimiter(proxyOut, prevOut),
+		Inbound:  effectiveRateLimiter(proxyIn, prevIn),
+	}, nil
+}
+
+// rebasePreviousInbound rebases a previous pool's inbound bucket to local decimals, mirroring the
+// exact guard LegacyRateLimitsForAutoMigrate already applied to proxyIn upstream (only when
+// remoteDecimals != 0) so the two are compared like for like. v1.2/v1.4 EVM previous pools always
+// use remote decimals, so the DoesPoolUseLocalDecimals check reduces to the remoteDecimals
+// sentinel.
+func rebasePreviousInbound(prevIn tokensapi.RateLimiterConfig, remoteDecimals, localDecimals uint8) tokensapi.RateLimiterConfig {
+	if remoteDecimals == 0 {
+		return prevIn
+	}
+	return tokensapi.RebaseRateLimiterConfig(prevIn, remoteDecimals, localDecimals)
+}
+
+// effectiveRateLimiter returns the constraint that actually binds: the enabled
+// side wins; when both are enabled the smaller capacity/rate wins. A disabled
+// limiter imposes no constraint (it is NOT equivalent to numeric zero).
+func effectiveRateLimiter(proxy, previous tokensapi.RateLimiterConfig) tokensapi.RateLimiterConfig {
+	switch {
+	case !proxy.IsEnabled && !previous.IsEnabled:
+		return tokensapi.RateLimiterConfig{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
+	case !previous.IsEnabled:
+		return proxy
+	case !proxy.IsEnabled:
+		return previous
+	default:
+		return tokensapi.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  minBigInt(proxy.Capacity, previous.Capacity),
+			Rate:      minBigInt(proxy.Rate, previous.Rate),
+		}
+	}
+}
+
+// previousPool reads getPreviousPool() from the v1.5.0 *AndProxy pool at proxy. The value is
+// technically mutable, so this is a raw call rather than a cached operation.
+func previousPool(chain evm.Chain, proxy common.Address, opts *bind.CallOpts) (common.Address, error) {
+	contract, err := tpap.NewTokenPoolAndProxyContract(proxy, chain.Client)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return contract.GetPreviousPool(opts)
+}
+
+// previousTypeAndVersion resolves the type and version of the previous pool via the shared
+// typeAndVersion operation. The result is immutable per pool address, so it is safe to cache.
+func previousTypeAndVersion(b cldf_ops.Bundle, chain evm.Chain, previous common.Address) (*semver.Version, string, error) {
+	report, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chain.Selector,
+		Address:       previous,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get type and version of previous pool %s: %w", previous.Hex(), err)
+	}
+	return report.Output.Version, report.Output.Type.String(), nil
+}
+
+// readV14Limits reads the per-remote-chain outbound/inbound buckets from a v1.4 previous pool.
+// Bucket state is mutable, so this is a raw call rather than a cached operation.
+func readV14Limits(
+	chain evm.Chain, previous common.Address, remoteSelector uint64, opts *bind.CallOpts,
+) (outbound, inbound tokensapi.RateLimiterConfig, err error) {
+	caller, err := v1_4_0_token_pool.NewTokenPoolCaller(previous, chain.Client)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, err
+	}
+	out, err := caller.GetCurrentOutboundRateLimiterState(opts, remoteSelector)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+			"failed to get outbound rate limiter state for v1.4 previous pool %s: %w", previous.Hex(), err,
+		)
+	}
+	in, err := caller.GetCurrentInboundRateLimiterState(opts, remoteSelector)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+			"failed to get inbound rate limiter state for v1.4 previous pool %s: %w", previous.Hex(), err,
+		)
+	}
+	return tokensapi.RateLimiterConfig{IsEnabled: out.IsEnabled, Capacity: out.Capacity, Rate: out.Rate},
+		tokensapi.RateLimiterConfig{IsEnabled: in.IsEnabled, Capacity: in.Capacity, Rate: in.Rate},
+		nil
+}
+
+// TODO: if v1.2 has a shared `TokenPool` base contract that BnM and LnR pools inherit
+// from, then this function should be refactored such that it re-uses the shared bindings
+// for both pool types similar to `readV14Limits`.
+//
+// readV12Limits reads the per-proxy-address outbound/inbound buckets from a v1.2 previous pool.
+// v1.2 pools key rate limiter state by onRamp (outbound)/offRamp (inbound) address, shared across
+// every lane the proxy pool serves (see the aggregate-bucket caveat logged by the caller). Bucket
+// state is mutable, so this is a raw call rather than a cached operation.
+func readV12Limits(
+	chain evm.Chain, previous, proxy common.Address, prevType string, opts *bind.CallOpts,
+) (outbound, inbound tokensapi.RateLimiterConfig, err error) {
+	switch deployment.ContractType(prevType) {
+	case utils.BurnMintTokenPool:
+		caller, err := v1_2_0_burn_mint_token_pool.NewBurnMintTokenPoolCaller(previous, chain.Client)
+		if err != nil {
+			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, err
+		}
+		out, err := caller.CurrentOnRampRateLimiterState(opts, proxy)
+		if err != nil {
+			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+				"failed to get onRamp rate limiter state for v1.2 BurnMintTokenPool %s: %w", previous.Hex(), err,
+			)
+		}
+		in, err := caller.CurrentOffRampRateLimiterState(opts, proxy)
+		if err != nil {
+			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+				"failed to get offRamp rate limiter state for v1.2 BurnMintTokenPool %s: %w", previous.Hex(), err,
+			)
+		}
+		return tokensapi.RateLimiterConfig{IsEnabled: out.IsEnabled, Capacity: out.Capacity, Rate: out.Rate},
+			tokensapi.RateLimiterConfig{IsEnabled: in.IsEnabled, Capacity: in.Capacity, Rate: in.Rate},
+			nil
+
+	case utils.LockReleaseTokenPool:
+		// No official v1.2.0 LockRelease gobindings exist; the v1.0.0 binding's read selectors
+		// are identical, so it is reused here. Revisit if official v1.2.0 bindings become available.
+		caller, err := v1_0_0_lock_release_token_pool.NewLockReleaseTokenPoolCaller(previous, chain.Client)
+		if err != nil {
+			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, err
+		}
+		out, err := caller.CurrentOnRampRateLimiterState(opts, proxy)
+		if err != nil {
+			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+				"failed to get onRamp rate limiter state for v1.2 LockReleaseTokenPool %s: %w", previous.Hex(), err,
+			)
+		}
+		in, err := caller.CurrentOffRampRateLimiterState(opts, proxy)
+		if err != nil {
+			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+				"failed to get offRamp rate limiter state for v1.2 LockReleaseTokenPool %s: %w", previous.Hex(), err,
+			)
+		}
+		return tokensapi.RateLimiterConfig{IsEnabled: out.IsEnabled, Capacity: out.Capacity, Rate: out.Rate},
+			tokensapi.RateLimiterConfig{IsEnabled: in.IsEnabled, Capacity: in.Capacity, Rate: in.Rate},
+			nil
+
+	default:
+		return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+			"unsupported v1.2 previous pool type %q for pool %s", prevType, previous.Hex(),
+		)
+	}
+}
+
+// minBigInt returns the smaller of a and b, treating nil as zero.
+func minBigInt(a, b *big.Int) *big.Int {
+	if a == nil {
+		a = big.NewInt(0)
+	}
+	if b == nil {
+		b = big.NewInt(0)
+	}
+	if a.Cmp(b) <= 0 {
+		return a
+	}
+	return b
 }
