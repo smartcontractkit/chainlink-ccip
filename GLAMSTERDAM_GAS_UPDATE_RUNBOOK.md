@@ -136,6 +136,14 @@ after the pipeline finishes and require `FAILED: 0`.
 
 ### 5a. Point `domains/ccip` at your local chainlink-ccip branch
 
+> **Known blocker (2026-10-02):** `domains/ccip` currently cannot be built against a current `chainlink-ccip`.
+> The local/new `chainlink-ccip` requires `chainlink-evm/gethwrappers` >= 2026-09-15, which removed
+> `link_token.ZkBytecode` that `cld-changesets` (even at its latest `main`) still uses; downgrading
+> `gethwrappers` instead breaks `chainlink/deployment`. Until `cld-changesets` is fixed upstream, bumping
+> `chainlink-ccip` in `domains/ccip` fails with `undefined: link_token.ZkBytecode`. To test v1.6 changes
+> meanwhile, apply them onto a worktree of the **pinned** commit (`git worktree add --detach <path> <commit in domains/ccip/go.mod>`)
+> and `replace` only `chainlink-ccip/chains/evm` to it.
+
 ```bash
 cd chainlink-deployments/domains/ccip
 ```
@@ -501,6 +509,17 @@ about, then read back the contract state to confirm it matches what the decoded 
   after its proposal executed would scale them again. USDC/Lombard targets live in one place
   (`fields.go`: `usdc*/lombardDestGasOverhead*` constants) and feed both the pool-level and the
   FeeQuoter-override specs.
+- **The v1.6 changeset updates the FeeQuoter the v1.6 OnRamp is actually wired to, and skips 2.0.0 ones.**
+  It reads each chain's v1.6 OnRamp `getDynamicConfig().feeQuoter` and only writes it if the datastore
+  says it is a 1.6.x FeeQuoter (the v1.6 ABI/selectors cannot talk to a 2.0.0 FeeQuoter). On
+  `ccip`/`testnet` (2026-10-02) **every** v1.6 OnRamp is wired to the chain's FeeQuoter **2.0.0** (upgraded
+  in place), so the v1.6 changeset produces **no proposal at all** (exit 0, "0 batch operations"): those
+  lanes are priced by the 2.0.0 FeeQuoter, which the v2.0 changeset updates, including the legacy
+  `destGasOverhead` (row 1b). The skip reasons are logged (`Glamsterdam v1.6 gas config report`) because
+  they are otherwise only in the proposal description. Updating the datastore's old FeeQuoter 1.6.0 on
+  those chains (what the changeset used to do) changed a contract nothing prices with. Two proposals
+  must never write the same FeeQuoter: each rewrites the whole `DestChainConfig` struct from a read taken
+  at generation time, so the later one to execute would silently restore the earlier one's fields.
 - **A pool that can't be read does not block the batch.** USDC/Lombard pools are only used to
   recognise their token; one with no contract code (a stale datastore entry, e.g. `0xFD47…F910` on
   `prod_testnet` chain `945045181441419236`) logs `WARNING - failed to read underlying token of pool
@@ -543,6 +562,7 @@ about, then read back the contract state to confirm it matches what the decoded 
 | # | Field | Expected Prague | Glamsterdam | Fallback |
 |---|---|---|---|---|
 | 1 | `OnRamp.DestChainConfig.BaseExecutionGasCost` | 200,000 | 400,000 | `applyRatio` (2x) |
+| 1b | `FeeQuoter.DestChainConfig.DestGasOverhead` (legacy; only read by `getValidatedFee`, i.e. by v1.6 OnRamps wired to a 2.0.0 FeeQuoter — no effect on pure-v2.0 lanes) | 300,000 | 500,000 | `applyRatio` (~1.667x) |
 | 2 | `FeeQuoter.DestChainConfig.DefaultTokenDestGasOverhead` | 90,000 | 270,000 | `applyRatio` (3x) |
 | 3 | `FeeQuoter.DestChainConfig.MaxPerMsgGasLimit` | 15,000,000 | 15,000,000 | no-op |
 | 4 | `FeeQuoter.DestChainConfig.DestGasPerPayloadByteBase` | 20 | 64 | `applyRatio` (3.2x) |
@@ -561,13 +581,16 @@ measurement — it's a constant in `chains/evm/deployment/utils/glamsterdam/` / 
 ### Observed v2.0 result — `ccv` / `prod_testnet`, target Sepolia (2026-10-02)
 
 Run against `chainlink-ccip` `main` (`a2d686f61`) plus the §10 fixes (pool-skip, FeeQuoter per-token
-overrides), file datastore (§6c). 88 batches, 214 txs, 60 chains; Appendix A script: 0 failed txs,
+overrides, verifier batch isolation, `destGasOverhead`), file datastore (§6c). 96 batches, 214 txs, 60 chains; Appendix A script: 0 failed txs,
 and the 88 enabled FeeQuoter overrides for Sepolia on-chain were exactly the 88 in the proposal. Run
 time ~4 minutes. Current -> new, with tx counts:
 
 | Contract.field | Current -> new | Count | Note |
 |---|---|---|---|
 | `OnRamp.BaseExecutionGasCost` | 200,000 -> 400,000 | 59 | literal Glamsterdam |
+| `FeeQuoter.DestGasOverhead` | 300,000 -> 500,000 | 57 | literal |
+| `FeeQuoter.DestGasOverhead` | 548,000 -> 913,333 | 2 | `MISMATCH` -> ratio fallback |
+| `FeeQuoter.DestGasOverhead` | 0 -> 0 | 1 | fallback of 0 |
 | `FeeQuoter.DefaultTokenDestGasOverhead` | 90,000 -> 270,000 | 60 | literal |
 | `FeeQuoter.DefaultTxGasLimit` | 200,000 -> 400,000 | 60 | literal |
 | `FeeQuoter.DestGasPerPayloadByteBase` | 20 -> 64 | 58 | literal |

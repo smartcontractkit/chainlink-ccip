@@ -222,8 +222,8 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 				writes = append(writes, onRampWrite.Output)
 			}
 
-			// --- FeeQuoter: DefaultTokenDestGasOverhead, MaxPerMsgGasLimit,
-			// DestGasPerPayloadByteBase, DefaultTxGasLimit (rows 2-5) ---
+			// --- FeeQuoter: DestGasOverhead (legacy, see FeeQuoterDestGasOverhead), DefaultTokenDestGasOverhead,
+			// MaxPerMsgGasLimit, DestGasPerPayloadByteBase, DefaultTxGasLimit (rows 2-5) ---
 			fqCur, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: lane.ChainSelector,
 				Address:       lane.FeeQuoterAddress,
@@ -234,6 +234,9 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					"failed to read FeeQuoter dest chain config for src %d, dst %d: %w", lane.ChainSelector, input.TargetChainSelector, err,
 				)
 			}
+
+			destGasOverheadResult := glamsterdamutils.Resolve(FeeQuoterDestGasOverhead, fqCur.Output.DestGasOverhead)
+			glamsterdamutils.AddField(output.Report, lane.ChainSelector, destGasOverheadResult)
 
 			defaultTokenDestGasOverheadResult := glamsterdamutils.Resolve(FeeQuoterDefaultTokenDestGasOverhead, fqCur.Output.DefaultTokenDestGasOverhead)
 			glamsterdamutils.AddField(output.Report, lane.ChainSelector, defaultTokenDestGasOverheadResult)
@@ -248,6 +251,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			glamsterdamutils.AddField(output.Report, lane.ChainSelector, defaultTxGasLimitResult)
 
 			newFQConfig := fqCur.Output
+			newFQConfig.DestGasOverhead = destGasOverheadResult.AppliedValue
 			newFQConfig.DefaultTokenDestGasOverhead = defaultTokenDestGasOverheadResult.AppliedValue
 			newFQConfig.MaxPerMsgGasLimit = maxPerMsgGasLimitResult.AppliedValue
 			newFQConfig.DestGasPerPayloadByteBase = destGasPerPayloadByteBaseResult.AppliedValue

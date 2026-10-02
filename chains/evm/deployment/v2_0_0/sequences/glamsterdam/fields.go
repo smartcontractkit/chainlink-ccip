@@ -15,6 +15,19 @@ var (
 		Fallback:         glamsterdamutils.ApplyRatio[uint32](200_000, 400_000),
 	}
 
+	// FeeQuoterDestGasOverhead is the LEGACY FeeQuoter.DestChainConfig.DestGasOverhead ("gas charged on top
+	// of the gasLimit"). FeeQuoter 2.0.0 only reads it in getValidatedFee, the pricing path used by v1.6
+	// OnRamps that are wired to a 2.0.0 FeeQuoter, so it has no effect on pure-v2.0 lanes. It mirrors the
+	// v1.6 table (row 1: 300,000 -> 500,000) and lives here, in the single FeeQuoter write the v2.0
+	// changeset already makes, so that the 2.0.0 FeeQuoter has exactly one writer (two proposals each
+	// writing the whole DestChainConfig struct would overwrite each other's fields).
+	FeeQuoterDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.DestChainConfig.DestGasOverhead",
+		ExpectedPrague:   300_000,
+		GlamsterdamValue: 500_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](300_000, 500_000),
+	}
+
 	// FeeQuoterDefaultTokenDestGasOverhead is table row 2.
 	FeeQuoterDefaultTokenDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
 		Name:             "FeeQuoter.DestChainConfig.DefaultTokenDestGasOverhead",
