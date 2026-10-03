@@ -89,7 +89,7 @@ func CreateLookupTable(ctx context.Context, client *rpc.Client, admin solana.Pri
 		return solana.PublicKey{}, ierr
 	}
 
-	_, err := SendAndConfirmWithLookupTablesAndRetries(ctx, client, []solana.Instruction{instruction}, admin, rpc.CommitmentConfirmed, map[solana.PublicKey]solana.PublicKeySlice{})
+	_, err := SendAndConfirmWithLookupTablesAndRetries(ctx, client, []solana.Instruction{instruction}, admin, rpc.CommitmentFinalized, map[solana.PublicKey]solana.PublicKeySlice{})
 	return table, err
 }
 
@@ -101,18 +101,18 @@ func ExtendLookupTable(ctx context.Context, client *rpc.Client, table solana.Pub
 			admin.PublicKey(),
 			entries,
 		),
-	}, admin, rpc.CommitmentConfirmed, map[solana.PublicKey]solana.PublicKeySlice{})
+	}, admin, rpc.CommitmentFinalized, map[solana.PublicKey]solana.PublicKeySlice{})
 	return err
 }
 
 func AwaitSlotChange(ctx context.Context, client *rpc.Client) error {
-	originalSlot, err := client.GetSlot(ctx, rpc.CommitmentConfirmed)
+	originalSlot, err := client.GetSlot(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return err
 	}
 	newSlot := originalSlot
 	for newSlot == originalSlot {
-		newSlot, err = client.GetSlot(ctx, rpc.CommitmentConfirmed)
+		newSlot, err = client.GetSlot(ctx, rpc.CommitmentFinalized)
 		if err != nil {
 			return err
 		}
@@ -145,7 +145,7 @@ func SetupLookupTable(ctx context.Context, client *rpc.Client, admin solana.Priv
 
 func GetAddressLookupTableState(ctx context.Context, client *rpc.Client, lookupTablePublicKey solana.PublicKey) (*addresslookuptable.AddressLookupTableState, error) {
 	lookupTableState, err := addresslookuptable.GetAddressLookupTableStateWithOpts(ctx, client, lookupTablePublicKey, &rpc.GetAccountInfoOpts{
-		Commitment: rpc.CommitmentConfirmed,
+		Commitment: rpc.CommitmentFinalized,
 	})
 	if err != nil {
 		return nil, err

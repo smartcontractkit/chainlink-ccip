@@ -197,7 +197,7 @@ var CreateTokenMultisig = operations.NewOperation(
 
 		// --- Instructions ---
 		// get stake amount for init
-		lamports, err := chain.Client.GetMinimumBalanceForRentExemption(ctx, tokens.MultisigSize, rpc.CommitmentConfirmed)
+		lamports, err := chain.Client.GetMinimumBalanceForRentExemption(ctx, tokens.MultisigSize, rpc.CommitmentFinalized)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
