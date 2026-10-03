@@ -1,4 +1,4 @@
-package glamsterdam
+package adapters
 
 import (
 	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
