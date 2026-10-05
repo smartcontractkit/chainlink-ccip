@@ -1,0 +1,207 @@
+package solana
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"github.com/gagliardetto/solana-go"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/solutils"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+
+	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+)
+
+type FeeQuoterView struct {
+	PDA                    string                                             `json:"pda,omitempty"`
+	Version                uint8                                              `json:"version,omitempty"`
+	UpgradeAuthority       string                                             `json:"upgradeAuthority,omitempty"`
+	Owner                  string                                             `json:"owner,omitempty"`
+	ProposedOwner          string                                             `json:"proposedOwner,omitempty"`
+	MaxFeeJuelsPerMsg      string                                             `json:"maxFeeJuelsPerMsg,omitempty"`
+	LinkTokenMint          string                                             `json:"linkTokenMint,omitempty"`
+	LinkTokenLocalDecimals uint8                                              `json:"linkTokenLocalDecimals,omitempty"`
+	Onramp                 string                                             `json:"onRamp,omitempty"`
+	DefaultCodeVersion     string                                             `json:"defaultCodeVersion,omitempty"`
+	DestinationChainConfig map[uint64]FeeQuoterDestChainConfig                `json:"destinationChainConfig,omitempty"`
+	BillingTokenConfig     map[string]FeeQuoterBillingTokenConfig             `json:"billingTokenConfig,omitempty"`
+	TokenTransferConfig    map[uint64]map[string]FeeQuoterTokenTransferConfig `json:"tokenTransferConfig,omitempty"`
+}
+
+type FeeQuoterDestChainConfig struct {
+	PDA                               string `json:"pda,omitempty"`
+	IsEnabled                         bool   `json:"isEnabled,omitempty"`
+	LaneCodeVersion                   string `json:"laneCodeVersion,omitempty"`
+	MaxNumberOfTokensPerMsg           uint16 `json:"maxNumberOfTokensPerMsg,omitempty"`
+	MaxDataBytes                      uint32 `json:"maxDataBytes,omitempty"`
+	MaxPerMsgGasLimit                 uint32 `json:"maxPerMsgGasLimit,omitempty"`
+	DestGasOverhead                   uint32 `json:"destGasOverhead,omitempty"`
+	DestGasPerPayloadByteBase         uint32 `json:"destGasPerPayloadByteBase,omitempty"`
+	DestGasPerPayloadByteHigh         uint32 `json:"destGasPerPayloadByteHigh,omitempty"`
+	DestGasPerPayloadByteThreshold    uint32 `json:"destGasPerPayloadByteThreshold,omitempty"`
+	DestDataAvailabilityOverheadGas   uint32 `json:"destDataAvailabilityOverheadGas,omitempty"`
+	DestGasPerDataAvailabilityByte    uint16 `json:"destGasPerDataAvailabilityByte,omitempty"`
+	DestDataAvailabilityMultiplierBps uint16 `json:"destDataAvailabilityMultiplierBps,omitempty"`
+	DefaultTokenFeeUSDCents           uint16 `json:"defaultTokenFeeUSDCents,omitempty"`
+	DefaultTokenDestGasOverhead       uint32 `json:"defaultTokenDestGasOverhead,omitempty"`
+	DefaultTxGasLimit                 uint32 `json:"defaultTxGasLimit,omitempty"`
+	GasMultiplierWeiPerEth            uint64 `json:"gasMultiplierWeiPerEth,omitempty"`
+	NetworkFeeUSDCents                uint32 `json:"networkFeeUSDCents,omitempty"`
+	GasPriceStalenessThreshold        uint32 `json:"gasPriceStalenessThreshold,omitempty"`
+	EnforceOutOfOrder                 bool   `json:"enforceOutOfOrder,omitempty"`
+	ChainFamilySelector               string `json:"chainFamilySelector,omitempty"`
+}
+
+type FeeQuoterBillingTokenConfig struct {
+	PDA                        string `json:"pda,omitempty"`
+	Enabled                    bool   `json:"enabled,omitempty"`
+	PremiumMultiplierWeiPerEth uint64 `json:"premiumMultiplierWeiPerEth,omitempty"`
+}
+
+type FeeQuoterTokenTransferConfig struct {
+	PDA               string `json:"pda,omitempty"`
+	MinFeeUsdcents    uint32 `json:"minFeeUsdcents,omitempty"`
+	MaxFeeUsdcents    uint32 `json:"maxFeeUsdcents,omitempty"`
+	DeciBps           uint16 `json:"deciBps,omitempty"`
+	DestGasOverhead   uint32 `json:"destGasOverhead,omitempty"`
+	DestBytesOverhead uint32 `json:"destBytesOverhead,omitempty"`
+	IsEnabled         bool   `json:"isEnabled,omitempty"`
+}
+
+func GenerateFeeQuoterView(chain cldf_solana.Chain, program solana.PublicKey, remoteChains []uint64, tokens []solana.PublicKey) (FeeQuoterView, error) {
+	fq := FeeQuoterView{}
+	progDataAddr, err := solutils.GetProgramDataAddress(chain.Client, program)
+	if err != nil {
+		return fq, fmt.Errorf("failed to get program data address for program %s: %w", program.String(), err)
+	}
+	authority, _, err := solutils.GetUpgradeAuthority(chain.Client, progDataAddr)
+	if err != nil {
+		return fq, fmt.Errorf("failed to get upgrade authority for program data %s: %w", progDataAddr.String(), err)
+	}
+	fq.UpgradeAuthority = authority.String()
+	var fqConfig solFeeQuoter.Config
+	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(program)
+	err = chain.GetAccountDataBorshInto(context.Background(), feeQuoterConfigPDA, &fqConfig)
+	if err != nil {
+		return fq, fmt.Errorf("fee quoter config not found in existing state, initialize the fee quoter first %d", chain.Selector)
+	}
+	fq.PDA = feeQuoterConfigPDA.String()
+	fq.Version = fqConfig.Version
+	fq.Owner = fqConfig.Owner.String()
+	fq.ProposedOwner = fqConfig.ProposedOwner.String()
+	fq.MaxFeeJuelsPerMsg = fqConfig.MaxFeeJuelsPerMsg.String()
+	fq.LinkTokenMint = fqConfig.LinkTokenMint.String()
+	fq.LinkTokenLocalDecimals = fqConfig.LinkTokenLocalDecimals
+	fq.Onramp = fqConfig.Onramp.String()
+	fq.DefaultCodeVersion = fqConfig.DefaultCodeVersion.String()
+	fq.BillingTokenConfig = make(map[string]FeeQuoterBillingTokenConfig)
+	fq.TokenTransferConfig = make(map[uint64]map[string]FeeQuoterTokenTransferConfig)
+	fq.DestinationChainConfig = make(map[uint64]FeeQuoterDestChainConfig)
+
+	var mu sync.Mutex
+	eg, _ := errgroup.WithContext(context.Background())
+	eg.SetLimit(16)
+	// TODO: save the configured chains/tokens to the AB so we can reconstruct state without the loop
+	// fetch billing token configs in parallel
+	for _, token := range tokens {
+		eg.Go(func() error {
+			billingConfigPDA, _, err := solState.FindFqBillingTokenConfigPDA(token, program)
+			if err != nil {
+				return fmt.Errorf("failed to find billing token config pda (mint: %s, feeQuoter: %s): %w", token.String(), program.String(), err)
+			}
+			var tokenConfigAccount solFeeQuoter.BillingTokenConfigWrapper
+			if err := chain.GetAccountDataBorshInto(context.Background(), billingConfigPDA, &tokenConfigAccount); err != nil {
+				return nil // skip if not configured
+			}
+			mu.Lock()
+			fq.BillingTokenConfig[token.String()] = FeeQuoterBillingTokenConfig{
+				PDA:                        billingConfigPDA.String(),
+				Enabled:                    tokenConfigAccount.Config.Enabled,
+				PremiumMultiplierWeiPerEth: tokenConfigAccount.Config.PremiumMultiplierWeiPerEth,
+			}
+			mu.Unlock()
+
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return fq, err
+	}
+
+	// fetch destination chain configs
+	for _, remote := range remoteChains {
+		fqRemoteChainPDA, _, err := solState.FindFqDestChainPDA(remote, program)
+		if err != nil {
+			return fq, fmt.Errorf("failed to find dest chain state pda for remote chain %d: %w", remote, err)
+		}
+		var destChainStateAccount solFeeQuoter.DestChain
+		if err = chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount); err != nil {
+			return fq, fmt.Errorf("remote %d is not configured on solana chain feequoter %d", remote, chain.Selector)
+		}
+		fq.TokenTransferConfig[remote] = make(map[string]FeeQuoterTokenTransferConfig)
+		fq.DestinationChainConfig[remote] = FeeQuoterDestChainConfig{
+			PDA:                               fqRemoteChainPDA.String(),
+			IsEnabled:                         destChainStateAccount.Config.IsEnabled,
+			LaneCodeVersion:                   destChainStateAccount.Config.LaneCodeVersion.String(),
+			MaxNumberOfTokensPerMsg:           destChainStateAccount.Config.MaxNumberOfTokensPerMsg,
+			MaxDataBytes:                      destChainStateAccount.Config.MaxDataBytes,
+			MaxPerMsgGasLimit:                 destChainStateAccount.Config.MaxPerMsgGasLimit,
+			DestGasOverhead:                   destChainStateAccount.Config.DestGasOverhead,
+			DestGasPerPayloadByteBase:         destChainStateAccount.Config.DestGasPerPayloadByteBase,
+			DestGasPerPayloadByteHigh:         destChainStateAccount.Config.DestGasPerPayloadByteHigh,
+			DestGasPerPayloadByteThreshold:    destChainStateAccount.Config.DestGasPerPayloadByteThreshold,
+			DestDataAvailabilityOverheadGas:   destChainStateAccount.Config.DestDataAvailabilityOverheadGas,
+			DestGasPerDataAvailabilityByte:    destChainStateAccount.Config.DestGasPerDataAvailabilityByte,
+			DestDataAvailabilityMultiplierBps: destChainStateAccount.Config.DestDataAvailabilityMultiplierBps,
+			DefaultTokenFeeUSDCents:           destChainStateAccount.Config.DefaultTokenFeeUsdcents,
+			DefaultTokenDestGasOverhead:       destChainStateAccount.Config.DefaultTokenDestGasOverhead,
+			DefaultTxGasLimit:                 destChainStateAccount.Config.DefaultTxGasLimit,
+			GasMultiplierWeiPerEth:            destChainStateAccount.Config.GasMultiplierWeiPerEth,
+			NetworkFeeUSDCents:                destChainStateAccount.Config.NetworkFeeUsdcents,
+			GasPriceStalenessThreshold:        destChainStateAccount.Config.GasPriceStalenessThreshold,
+			EnforceOutOfOrder:                 destChainStateAccount.Config.EnforceOutOfOrder,
+			ChainFamilySelector:               fmt.Sprintf("%x", destChainStateAccount.Config.ChainFamilySelector),
+		}
+	}
+
+	// fetch token transfer configs in parallel for all tokens
+	eg2, _ := errgroup.WithContext(context.Background())
+	eg2.SetLimit(16)
+
+	for _, remote := range remoteChains {
+		for _, token := range tokens {
+			remote, token := remote, token
+			eg2.Go(func() error {
+				remoteBillingPDA, _, err := solState.FindFqPerChainPerTokenConfigPDA(remote, token, program)
+				if err != nil {
+					return fmt.Errorf("failed to find remote billing token config pda for (remoteSelector: %d, mint: %s, feeQuoter: %s): %w", remote, token, program, err)
+				}
+				var remoteBillingAccount solFeeQuoter.PerChainPerTokenConfig
+				if err := chain.GetAccountDataBorshInto(context.Background(), remoteBillingPDA, &remoteBillingAccount); err != nil {
+					return nil // skip if not configured
+				}
+				mu.Lock()
+				fq.TokenTransferConfig[remote][token.String()] = FeeQuoterTokenTransferConfig{
+					PDA:               remoteBillingPDA.String(),
+					MinFeeUsdcents:    remoteBillingAccount.TokenTransferConfig.MinFeeUsdcents,
+					MaxFeeUsdcents:    remoteBillingAccount.TokenTransferConfig.MaxFeeUsdcents,
+					DeciBps:           remoteBillingAccount.TokenTransferConfig.DeciBps,
+					DestGasOverhead:   remoteBillingAccount.TokenTransferConfig.DestGasOverhead,
+					DestBytesOverhead: remoteBillingAccount.TokenTransferConfig.DestBytesOverhead,
+					IsEnabled:         remoteBillingAccount.TokenTransferConfig.IsEnabled,
+				}
+				mu.Unlock()
+
+				return nil
+			})
+		}
+	}
+	if err := eg2.Wait(); err != nil {
+		return fq, err
+	}
+
+	return fq, nil
+}
