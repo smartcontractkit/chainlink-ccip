@@ -11,6 +11,72 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
+  # 1.4.0
+  #
+  # Legacy pools that survive only behind a v1.5.0 *TokenPoolAndProxy. TokenPool is the shared
+  # base surface of both v1.4.0 pool types; its ABI is read from token_pool.json. BurnMintTokenPool
+  # and LockReleaseTokenPool are supersets of it and every shared function is signature-identical,
+  # so both are driven through the TokenPool package and the per-pool entries below carry only what
+  # is type-specific.
+  #
+  # No deployment: a new v1.4.0 pool is never correct, so no bytecode is read and no Deploy op is
+  # generated.
+  - contract_name: TokenPool
+    version: "1.4.0"
+    abi_file: "token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getToken
+        access: public
+      - name: getRouter
+        access: public
+      - name: getArmProxy
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: isSupportedChain
+        access: public
+      - name: getCurrentInboundRateLimiterState
+        access: public
+      - name: getCurrentOutboundRateLimiterState
+        access: public
+      - name: applyChainUpdates
+        access: owner
+      - name: setChainRateLimiterConfig
+        access: owner
+      - name: setRouter
+        access: owner
+
+  - contract_name: BurnMintTokenPool
+    version: "1.4.0"
+    abi_file: "burn_mint_token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getAllowList
+        access: public
+      - name: getAllowListEnabled
+        access: public
+
+  - contract_name: LockReleaseTokenPool
+    version: "1.4.0"
+    abi_file: "lock_release_token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getRebalancer
+        access: public
+      - name: getRateLimitAdmin
+        access: public
+      - name: canAcceptLiquidity
+        access: public
+      - name: setRebalancer
+        access: owner
+      - name: setRateLimitAdmin
+        access: owner
+      - name: provideLiquidity
+        access: public
+      - name: withdrawLiquidity
+        access: public
+
   # 1.5.0
   #
   # TokenPoolAndProxy is the shared base surface of every v1.5.0 pool. Its ABI is read from
