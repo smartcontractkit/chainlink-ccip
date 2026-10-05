@@ -23,7 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
@@ -38,7 +38,7 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solanaseqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/rmn_remote"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"

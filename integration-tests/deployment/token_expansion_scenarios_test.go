@@ -32,9 +32,9 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/lockrelease_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -1325,11 +1325,12 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			require.Equal(t, solTokenMint, solPoolState.Config.Mint,
 				fmt.Sprintf("Solana pool mint should match token %s", solTokenRef.Address))
 
-			timelockSigner := solanautils.GetTimelockSignerPDA(
+			timelockSigner, err := solanautils.GetTimelockSignerPDA(
 				env.DataStore.Addresses().Filter(),
 				solChainSel,
 				cciputils.CLLQualifier,
 			)
+			require.NoError(t, err)
 			require.Equal(t, timelockSigner, solPoolState.Config.RateLimitAdmin,
 				"empty DeployTokenPoolInput.RateLimitAdmin should set RL admin to MCMS timelock signer PDA on Solana")
 
@@ -2695,9 +2696,10 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 	tarState = fetchTAR(true)
 
 	// Assert final expected Solana TAR state
-	timelockSigner := solanautils.GetTimelockSignerPDA(
+	timelockSigner, err := solanautils.GetTimelockSignerPDA(
 		env.DataStore.Addresses().Filter(), solChainSel, cciputils.CLLQualifier,
 	)
+	require.NoError(t, err)
 	require.Equal(
 		t, solMintPK, tarState.Mint,
 		"TAR mint must stay bound to the SPL mint deployed in the first token expansion",

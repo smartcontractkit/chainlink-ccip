@@ -97,18 +97,20 @@ func DeployMCMS(t *testing.T, e *cldf_deployment.Environment, selector uint64, q
 
 func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selector uint64) {
 	chain := e.BlockChains.SolanaChains()[selector]
-	timelockSigner := utils.GetTimelockSignerPDA(
+	timelockSigner, err := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
 		common_utils.CLLQualifier,
 	)
-	mcmSigner := utils.GetMCMSignerPDA(
+	require.NoError(t, err)
+	mcmSigner, err := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
 		common_utils.ProposerManyChainMultisig,
 		common_utils.CLLQualifier,
 	)
-	err := utils.FundSolanaAccounts(
+	require.NoError(t, err)
+	err = utils.FundSolanaAccounts(
 		t.Context(),
 		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
 		100,
@@ -224,18 +226,20 @@ func SolanaTransferOwnership(t *testing.T, e *cldf_deployment.Environment, selec
 
 func SolanaTransferMCMSContracts(t *testing.T, e *cldf_deployment.Environment, selector uint64, qualifier string, testTransferBack bool) {
 	chain := e.BlockChains.SolanaChains()[selector]
-	timelockSigner := utils.GetTimelockSignerPDA(
+	timelockSigner, err := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
 		qualifier,
 	)
-	mcmSigner := utils.GetMCMSignerPDA(
+	require.NoError(t, err)
+	mcmSigner, err := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
 		common_utils.ProposerManyChainMultisig,
 		qualifier,
 	)
-	err := utils.FundSolanaAccounts(
+	require.NoError(t, err)
+	err = utils.FundSolanaAccounts(
 		t.Context(),
 		[]solana.PublicKey{chain.DeployerKey.PublicKey()},
 		100,

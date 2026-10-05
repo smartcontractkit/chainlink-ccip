@@ -6,7 +6,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/base_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	token_deployments "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"

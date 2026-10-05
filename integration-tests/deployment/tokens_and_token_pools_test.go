@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -26,8 +26,8 @@ import (
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	bnmpool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_token_pool"
 	solanautils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	solchangesets "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/changesets"
+	solseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -1233,11 +1233,12 @@ func TestTokensAndTokenPools(t *testing.T) {
 			MergeAddresses(t, env, output.DataStore)
 			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
-			timelockSigner := solanautils.GetTimelockSignerPDA(
+			timelockSigner, err := solanautils.GetTimelockSignerPDA(
 				env.DataStore.Addresses().Filter(),
 				chain.Selector,
 				cciputils.CLLQualifier,
 			)
+			require.NoError(t, err)
 			// After token expansion, the token's mint authority should be the pool-signer PDA
 			poolProgramID := solana.MustPublicKeyFromBase58(tokenPool.Address)
 			poolSigner, err := tokens.TokenPoolSignerAddress(tokenMint, poolProgramID)

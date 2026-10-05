@@ -14,8 +14,7 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
-	rmn163 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_3/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -270,11 +269,11 @@ var SetEventAuthorities = operations.NewOperation(
 	Version,
 	"Sets the event authorities list on the RMNRemote contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input EventAuthoritiesInput) (sequences.OnChainOutput, error) {
-		rmn163.SetProgramID(input.RMNRemote)
+		rmn_remote.SetProgramID(input.RMNRemote)
 
 		authority := GetAuthority(chain, input.RMNRemote)
 
-		ixn, err := rmn163.NewSetEventAuthoritiesInstruction(
+		ixn, err := rmn_remote.NewSetEventAuthoritiesInstruction(
 			input.EventAuthorities,
 			input.RMNRemoteConfigPDA,
 			authority,
@@ -316,7 +315,7 @@ var SetCurser = operations.NewOperation(
 	Version,
 	"Sets the curser on the RMNRemote contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input SetCurserInput) (sequences.OnChainOutput, error) {
-		rmn163.SetProgramID(input.RMNRemote)
+		rmn_remote.SetProgramID(input.RMNRemote)
 
 		authority := GetAuthority(chain, input.RMNRemote)
 
@@ -329,7 +328,7 @@ var SetCurser = operations.NewOperation(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find RMNRemoteCurses PDA: %w", err)
 		}
 
-		ixn, err := rmn163.NewSetCurserInstruction(
+		ixn, err := rmn_remote.NewSetCurserInstruction(
 			input.Curser,
 			configPDA,
 			cursesPDA,
