@@ -143,7 +143,11 @@ type UpdateGasConfigInput struct {
 
 // UpdateGasConfigOutput is the output of UpdateGasConfig.
 type UpdateGasConfigOutput struct {
-	// BatchOps contains one MCMS batch operation per chain in Lanes.
+	// BatchOps contains, per chain in Lanes, one "core" MCMS batch operation (OnRamp, FeeQuoter and
+	// CommitteeVerifier writes) followed by one additional batch operation per Lombard/CCTP verifier
+	// write. The verifier writes are isolated on purpose: a timelock batch executes atomically, so if
+	// a verifier is not owned by the timelock (or otherwise reverts) only its own batch fails instead
+	// of taking the chain's core OnRamp/FeeQuoter/CommitteeVerifier update down with it.
 	BatchOps []mcms_types.BatchOperation
 	// Report is a human-readable summary of every field resolved on every lane, for inclusion in
 	// the changeset's MCMS proposal description.
@@ -153,7 +157,7 @@ type UpdateGasConfigOutput struct {
 // UpdateGasConfig reads the current on-chain gas config for every confirmed lane, resolves each
 // field in the v2.0 Glamsterdam mapping table against its expected Prague baseline (applying the
 // literal Glamsterdam value on a match, or the field's fallback rule on a mismatch), and packages
-// the resulting writes into one MCMS batch operation per chain. Every write is routed through
+// the resulting writes into one core MCMS batch operation per chain plus one isolated batch per verifier write. Every write is routed through
 // MCMS regardless of who the deployer key is.
 var UpdateGasConfig = cldf_ops.NewSequence(
 	"UpdateGasConfigV2",
@@ -169,6 +173,8 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			}
 
 			var writes []contract.WriteOutput
+			// isolatedWrites are verifier writes that each get their own batch (see UpdateGasConfigOutput).
+			var isolatedWrites []contract.WriteOutput
 
 			// --- OnRamp: BaseExecutionGasCost (row 1) ---
 			// Router == address(0) is OnRamp's own convention for "this destination isn't
@@ -216,8 +222,8 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 				writes = append(writes, onRampWrite.Output)
 			}
 
-			// --- FeeQuoter: DefaultTokenDestGasOverhead, MaxPerMsgGasLimit,
-			// DestGasPerPayloadByteBase, DefaultTxGasLimit (rows 2-5) ---
+			// --- FeeQuoter: DestGasOverhead (legacy, see FeeQuoterDestGasOverhead), DefaultTokenDestGasOverhead,
+			// MaxPerMsgGasLimit, DestGasPerPayloadByteBase, DefaultTxGasLimit (rows 2-5) ---
 			fqCur, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 				ChainSelector: lane.ChainSelector,
 				Address:       lane.FeeQuoterAddress,
@@ -228,6 +234,9 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					"failed to read FeeQuoter dest chain config for src %d, dst %d: %w", lane.ChainSelector, input.TargetChainSelector, err,
 				)
 			}
+
+			destGasOverheadResult := glamsterdamutils.Resolve(FeeQuoterDestGasOverhead, fqCur.Output.DestGasOverhead)
+			glamsterdamutils.AddField(output.Report, lane.ChainSelector, destGasOverheadResult)
 
 			defaultTokenDestGasOverheadResult := glamsterdamutils.Resolve(FeeQuoterDefaultTokenDestGasOverhead, fqCur.Output.DefaultTokenDestGasOverhead)
 			glamsterdamutils.AddField(output.Report, lane.ChainSelector, defaultTokenDestGasOverheadResult)
@@ -242,6 +251,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 			glamsterdamutils.AddField(output.Report, lane.ChainSelector, defaultTxGasLimitResult)
 
 			newFQConfig := fqCur.Output
+			newFQConfig.DestGasOverhead = destGasOverheadResult.AppliedValue
 			newFQConfig.DefaultTokenDestGasOverhead = defaultTokenDestGasOverheadResult.AppliedValue
 			newFQConfig.MaxPerMsgGasLimit = maxPerMsgGasLimitResult.AppliedValue
 			newFQConfig.DestGasPerPayloadByteBase = destGasPerPayloadByteBaseResult.AppliedValue
@@ -323,7 +333,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					if err != nil {
 						output.Report.AddReadError(lane.ChainSelector, "apply LombardVerifier remote chain config update", err)
 					} else {
-						writes = append(writes, lvWrite.Output)
+						isolatedWrites = append(isolatedWrites, lvWrite.Output)
 					}
 				}
 			}
@@ -357,7 +367,7 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 					if err != nil {
 						output.Report.AddReadError(lane.ChainSelector, "apply CCTPVerifier remote chain config update", err)
 					} else {
-						writes = append(writes, cctpWrite.Output)
+						isolatedWrites = append(isolatedWrites, cctpWrite.Output)
 					}
 				}
 			}
@@ -394,13 +404,34 @@ var UpdateGasConfig = cldf_ops.NewSequence(
 				}
 			}
 
-			batchOp, err := contract.NewBatchOperationFromWrites(writes)
+			laneBatchOps, err := buildLaneBatchOps(writes, isolatedWrites)
 			if err != nil {
-				return UpdateGasConfigOutput{}, fmt.Errorf("failed to build batch operation for src %d: %w", lane.ChainSelector, err)
+				return UpdateGasConfigOutput{}, fmt.Errorf("failed to build batch operations for src %d: %w", lane.ChainSelector, err)
 			}
-			output.BatchOps = append(output.BatchOps, batchOp)
+			output.BatchOps = append(output.BatchOps, laneBatchOps...)
 		}
 
 		return output, nil
 	},
 )
+
+// buildLaneBatchOps turns one lane's writes into MCMS batch operations: the core writes (OnRamp,
+// FeeQuoter, CommitteeVerifier) in a single batch, followed by one batch per isolated write. A
+// timelock batch executes atomically, so isolating the verifier writes means a verifier that the
+// timelock doesn't own (or that otherwise reverts) fails only its own batch, not the chain's core
+// update.
+func buildLaneBatchOps(core, isolated []contract.WriteOutput) ([]mcms_types.BatchOperation, error) {
+	coreBatch, err := contract.NewBatchOperationFromWrites(core)
+	if err != nil {
+		return nil, err
+	}
+	ops := []mcms_types.BatchOperation{coreBatch}
+	for _, w := range isolated {
+		isolatedBatch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{w})
+		if err != nil {
+			return nil, err
+		}
+		ops = append(ops, isolatedBatch)
+	}
+	return ops, nil
+}
