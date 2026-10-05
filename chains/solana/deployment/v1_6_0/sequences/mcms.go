@@ -8,7 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	mcmsops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/mcms"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"

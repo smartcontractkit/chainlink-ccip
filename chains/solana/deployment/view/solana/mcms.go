@@ -12,8 +12,8 @@ import (
 
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/mcm"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/mcm"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/timelock"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/solutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/view/shared"
