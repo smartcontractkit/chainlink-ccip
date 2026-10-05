@@ -156,7 +156,7 @@ require (
 	github.com/mr-tron/base58 v1.3.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/run v1.2.0 // indirect
-	github.com/pelletier/go-toml v1.9.5 // indirect
+	github.com/pelletier/go-toml v1.9.5
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.24.1 // indirect
