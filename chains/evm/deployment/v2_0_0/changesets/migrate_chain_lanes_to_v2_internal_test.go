@@ -490,6 +490,62 @@ func TestDiscoverLanesToMigrate_ExcludesNonEVMRemotes(t *testing.T) {
 	}
 }
 
+func TestDiscoverLanesToMigrate_IncludesListedNonEVMChains(t *testing.T) {
+	chainA := chainsel.TEST_90000001.Selector
+	remoteEVM := chainsel.TEST_90000002.Selector
+	remoteSolana := chainsel.SOLANA_DEVNET.Selector
+
+	resolver := &fakeLaneVersionResolver{
+		supported: map[uint64]bool{chainA: true},
+		lanes: map[uint64]map[uint64]*semver.Version{
+			chainA: {
+				remoteEVM:    semver.MustParse("1.6.0"),
+				remoteSolana: semver.MustParse("1.6.0"),
+			},
+		},
+	}
+
+	discover := func(input MigrateChainLanesToV2Input) []v2changesets.CrossFamilyLanePair {
+		lanes, err := discoverLanesToMigrate(cldf.Environment{}, registryWithResolver(t, resolver), supportedFQRegistry(t), nil,
+			MigrateChainLanesToV2Config{MigrateChainLanesToV2Input: input})
+		require.NoError(t, err)
+		return lanes
+	}
+
+	// Listed in RemoteChains: only the Solana lane, found from its EVM end.
+	lanes := discover(MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA}, RemoteChains: []uint64{remoteSolana}})
+	require.Len(t, lanes, 1)
+	assert.Equal(t, remoteSolana, lanes[0].ChainB)
+	assert.False(t, hasEVMOnlyLane(lanes), "a Solana-only batch gets no TESTTR test token")
+
+	// Listed in ChainSelectors: the EVM chain's EVM lanes plus its lane to Solana.
+	lanes = discover(MigrateChainLanesToV2Input{ChainSelectors: []uint64{chainA, remoteSolana}})
+	remotes := make([]uint64, 0, len(lanes))
+	for _, lane := range lanes {
+		remotes = append(remotes, lane.ChainB)
+	}
+	assert.ElementsMatch(t, []uint64{remoteEVM, remoteSolana}, remotes)
+}
+
+func TestValidateNonEVMChainsDiscoverable(t *testing.T) {
+	evm := chainsel.TEST_90000001.Selector
+	solana := chainsel.SOLANA_DEVNET.Selector
+
+	require.NoError(t, validateNonEVMChainsDiscoverable([]uint64{evm}))
+	require.NoError(t, validateNonEVMChainsDiscoverable([]uint64{solana, evm}))
+	require.ErrorContains(t, validateNonEVMChainsDiscoverable([]uint64{solana}), "need at least one EVM chain")
+}
+
+func TestHasEVMOnlyLane(t *testing.T) {
+	evmA := chainsel.TEST_90000001.Selector
+	evmB := chainsel.TEST_90000002.Selector
+	solana := chainsel.SOLANA_DEVNET.Selector
+
+	assert.False(t, hasEVMOnlyLane(nil))
+	assert.False(t, hasEVMOnlyLane([]v2changesets.CrossFamilyLanePair{{ChainA: evmA, ChainB: solana}}))
+	assert.True(t, hasEVMOnlyLane([]v2changesets.CrossFamilyLanePair{{ChainA: evmA, ChainB: solana}, {ChainA: evmA, ChainB: evmB}}))
+}
+
 func TestDiscoverLanesToMigrate_SkipsNonEVMLocalChain(t *testing.T) {
 	solana := chainsel.SOLANA_DEVNET.Selector
 
@@ -833,4 +889,68 @@ func TestDiscoverLanesToMigrate_SkipsVersionWithoutConfigImporter(t *testing.T) 
 	)
 	require.NoError(t, err)
 	require.Empty(t, lanes)
+}
+
+func TestMigrateChainLanesToV2_ValidateTestSendersAreUnderSolana(t *testing.T) {
+	evm := chainsel.TEST_90000001.Selector
+	solana := chainsel.SOLANA_DEVNET.Selector
+	cs := MigrateChainLanesToV2(
+		adapters.NewCommitteeVerifierContractRegistry(),
+		adapters.NewChainFamilyRegistry(),
+		changesetscore.GetRegistry(),
+		adapters.NewDeployChainContractsRegistry(),
+		newFQRegistry(),
+	)
+	validate := func(chain uint64) error {
+		return cs.VerifyPreconditions(cldf.Environment{}, MigrateChainLanesToV2Config{
+			Topology: &offchain.EnvironmentTopology{},
+			MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+				ChainSelectors: []uint64{evm},
+				RemoteChains:   []uint64{solana},
+				ChainOverrides: map[uint64]*v2changesets.ChainOverrides{chain: {
+					RemoteChainCfg: v2changesets.PartialRemoteChainConfig{TestSenders: []string{"wallet"}},
+				}},
+			},
+		})
+	}
+
+	// No resolver is registered for evm, so passing the overrides checks surfaces as the next
+	// validation error.
+	require.ErrorContains(t, validate(solana), "no lane version resolver")
+	require.ErrorContains(t, validate(evm), "only Solana chains are staged through them")
+}
+
+func TestWithChainOverrides(t *testing.T) {
+	evmA := chainsel.TEST_90000001.Selector
+	evmB := chainsel.TEST_90000002.Selector
+	solana := chainsel.SOLANA_DEVNET.Selector
+	lanes := []v2changesets.CrossFamilyLanePair{{ChainA: evmA, ChainB: solana}, {ChainA: evmA, ChainB: evmB}}
+
+	assert.Equal(t, lanes, withChainOverrides(lanes, nil))
+
+	staged := &v2changesets.ChainOverrides{RemoteChainCfg: v2changesets.PartialRemoteChainConfig{TestSenders: []string{"wallet"}}}
+	out := withChainOverrides(lanes, map[uint64]*v2changesets.ChainOverrides{solana: staged})
+	assert.Same(t, staged, out[0].ChainBOverrides, "the Solana end of the lane gets the Solana overrides")
+	assert.Nil(t, out[0].ChainAOverrides, "the EVM end has none")
+	assert.Nil(t, out[1].ChainAOverrides)
+	assert.Nil(t, out[1].ChainBOverrides, "lanes without Solana are untouched")
+	assert.Nil(t, lanes[0].ChainBOverrides, "the discovered lanes are not modified")
+}
+
+func TestMigrateChainLanesToV2_ValidateRejectsOverridesForUnlistedChain(t *testing.T) {
+	cs := MigrateChainLanesToV2(
+		adapters.NewCommitteeVerifierContractRegistry(),
+		adapters.NewChainFamilyRegistry(),
+		changesetscore.GetRegistry(),
+		adapters.NewDeployChainContractsRegistry(),
+		newFQRegistry(),
+	)
+	err := cs.VerifyPreconditions(cldf.Environment{}, MigrateChainLanesToV2Config{
+		Topology: &offchain.EnvironmentTopology{},
+		MigrateChainLanesToV2Input: MigrateChainLanesToV2Input{
+			ChainSelectors: []uint64{chainsel.TEST_90000001.Selector},
+			ChainOverrides: map[uint64]*v2changesets.ChainOverrides{chainsel.SOLANA_DEVNET.Selector: {}},
+		},
+	})
+	require.ErrorContains(t, err, "in neither chainSelectors nor remoteChains")
 }

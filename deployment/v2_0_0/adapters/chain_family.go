@@ -81,22 +81,27 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	// OffRamp is the remote chain's OffRamp address in that chain's native
 	// encoding: destination-side addresses travel unpadded, so this is the
 	// 20-byte address for an EVM remote. GetOffRampAddress returns it directly.
-	OffRamp                   RemoteContract
-	DefaultInboundCCVs        []LocalContract
-	LaneMandatedInboundCCVs   []LocalContract
-	DefaultOutboundCCVs       []LocalContract
-	LaneMandatedOutboundCCVs  []LocalContract
-	DefaultExecutor           LocalContract
-	FeeQuoterDestChainConfig  FeeQuoterDestChainConfigOverrides
-	ExecutorDestChainConfig   ExecutorDestChainConfig
+	OffRamp                  RemoteContract
+	DefaultInboundCCVs       []LocalContract
+	LaneMandatedInboundCCVs  []LocalContract
+	DefaultOutboundCCVs      []LocalContract
+	LaneMandatedOutboundCCVs []LocalContract
+	DefaultExecutor          LocalContract
+	FeeQuoterDestChainConfig FeeQuoterDestChainConfigOverrides
+	ExecutorDestChainConfig  ExecutorDestChainConfig
 	// SkipExecutorConfig mirrors RemoteChainDefaults.SkipExecutorConfig: when set, the
 	// local chain's sequence must not read or write an Executor contract for this lane.
-	SkipExecutorConfig bool
+	SkipExecutorConfig        bool
 	AddressBytesLength        uint8
 	BaseExecutionGasCost      uint32
 	TokenReceiverAllowed      *bool
 	MessageNetworkFeeUSDCents uint16
 	TokenNetworkFeeUSDCents   uint16
+	// TestSenders stages the lane on a family without a test router (e.g. Solana): when set, the
+	// lane only accepts these senders, in the local family's address encoding, until it is
+	// promoted. Families with a test router (EVM) stage lanes through it instead and never get
+	// test senders.
+	TestSenders []string
 }
 
 // ConfigureChainForLanesInput is the input for the chain-centric lane configuration sequence.
