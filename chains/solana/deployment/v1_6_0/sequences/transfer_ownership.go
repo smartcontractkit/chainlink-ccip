@@ -24,6 +24,31 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
+// mcmsQualifier returns the qualifier used to resolve the MCMS accounts, defaulting to CLLCCIP.
+// Every MCMS account (MCM, timelock, access controllers) must come from the same qualifier: mixing
+// them yields proposals the timelock rejects with InvalidAccessController.
+func mcmsQualifier(input mcms_utils.Input) string {
+	if input.Qualifier == "" {
+		return common_utils.CLLQualifier
+	}
+	return input.Qualifier
+}
+
+// getMCMSAccountRef resolves a 1.6.0 MCMS account ref, failing if it is not in the datastore.
+func getMCMSAccountRef(e deployment.Environment, chainSelector uint64, contractType deployment.ContractType, qualifier string) (cldf_datastore.AddressRef, error) {
+	ref := datastore.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		contractType,
+		common_utils.Version_1_6_0,
+		qualifier,
+	)
+	if ref.Address == "" {
+		return cldf_datastore.AddressRef{}, fmt.Errorf("%s with qualifier %q not found in datastore for chain %d", contractType, qualifier, chainSelector)
+	}
+	return ref, nil
+}
+
 func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (mcms_types.ChainMetadata, error) {
 	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
@@ -31,49 +56,26 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	}
 
 	inspector := mcms_solana.NewInspector(chain.Client)
+	qualifier := mcmsQualifier(input)
 
-	var id solana.PublicKey
-	var seed mcms_solana.PDASeed
-	var err error
+	var mcmType deployment.ContractType
 	switch input.TimelockAction {
 	case mcms_types.TimelockActionSchedule:
-		addr := datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			common_utils.ProposerManyChainMultisig,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
-		if err != nil {
-			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse proposer address %s for chain %d: %w", addr.Address, chainSelector, err)
-		}
+		mcmType = common_utils.ProposerManyChainMultisig
 	case mcms_types.TimelockActionCancel:
-		addr := datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			common_utils.CancellerManyChainMultisig,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
-		if err != nil {
-			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", addr.Address, chainSelector, err)
-		}
+		mcmType = common_utils.CancellerManyChainMultisig
 	case mcms_types.TimelockActionBypass:
-		addr := datastore.GetAddressRef(
-			e.DataStore.Addresses().Filter(),
-			chainSelector,
-			common_utils.BypasserManyChainMultisig,
-			common_utils.Version_1_6_0,
-			input.Qualifier,
-		)
-		id, seed, err = mcms_solana.ParseContractAddress(addr.Address)
-		if err != nil {
-			return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse address %s for chain %d: %w", addr.Address, chainSelector, err)
-		}
+		mcmType = common_utils.BypasserManyChainMultisig
 	default:
 		return mcms_types.ChainMetadata{}, fmt.Errorf("unsupported timelock action %s for chain %d", input.TimelockAction, chainSelector)
+	}
+	mcmRef, err := getMCMSAccountRef(e, chainSelector, mcmType, qualifier)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, err
+	}
+	id, seed, err := mcms_solana.ParseContractAddress(mcmRef.Address)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to parse %s address %s for chain %d: %w", mcmType, mcmRef.Address, chainSelector, err)
 	}
 	executor := mcms_solana.ContractAddress(
 		id,
@@ -83,27 +85,18 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	if err != nil {
 		return mcms_types.ChainMetadata{}, fmt.Errorf("failed to get op count for chain %d: %w", chainSelector, err)
 	}
-	proposerAccount := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		utils.ProposerAccessControllerAccount,
-		common_utils.Version_1_6_0,
-		input.Qualifier,
-	)
-	cancellerAccount := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		utils.CancellerAccessControllerAccount,
-		common_utils.Version_1_6_0,
-		input.Qualifier,
-	)
-	bypasserAccount := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		utils.BypasserAccessControllerAccount,
-		common_utils.Version_1_6_0,
-		input.Qualifier,
-	)
+	proposerAccount, err := getMCMSAccountRef(e, chainSelector, utils.ProposerAccessControllerAccount, qualifier)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, err
+	}
+	cancellerAccount, err := getMCMSAccountRef(e, chainSelector, utils.CancellerAccessControllerAccount, qualifier)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, err
+	}
+	bypasserAccount, err := getMCMSAccountRef(e, chainSelector, utils.BypasserAccessControllerAccount, qualifier)
+	if err != nil {
+		return mcms_types.ChainMetadata{}, err
+	}
 	metadata, err := mcms_solana.NewChainMetadata(
 		opcount,
 		id,
@@ -118,25 +111,13 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 }
 
 func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
-	ref := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		common_utils.RBACTimelock,
-		common_utils.Version_1_6_0,
-		input.Qualifier,
-	)
-	return ref, nil
+	return getMCMSAccountRef(e, chainSelector, common_utils.RBACTimelock, mcmsQualifier(input))
 }
 
-func (a *SolanaAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
-	mcmAddress := datastore.GetAddressRef(
-		e.DataStore.Addresses().Filter(),
-		chainSelector,
-		utils.McmProgramType,
-		common_utils.Version_1_6_0,
-		input.Qualifier,
-	)
-	return mcmAddress, nil
+// GetMCMSRef returns the MCM program ref. The program is shared by every MCMS instance on the chain,
+// so it is stored without a qualifier and the input qualifier does not apply.
+func (a *SolanaAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint64, _ mcms_utils.Input) (cldf_datastore.AddressRef, error) {
+	return getMCMSAccountRef(e, chainSelector, utils.McmProgramType, "")
 }
 
 func (a *SolanaAdapter) InitializeTimelockAddress(e deployment.Environment, input mcms.Input) error {
