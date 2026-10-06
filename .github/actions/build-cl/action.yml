@@ -48,23 +48,27 @@ runs:
     - name: Upgrade relayer dependencies to specified commit
       working-directory: ${{ github.workspace }}/chainlink-repo
       shell: bash
+      env:
+        TON_REF: ${{ inputs.ton_ref }}
+        SOLANA_REF: ${{ inputs.solana_ref }}
+        CCIP_REF: ${{ inputs.ccip_ref }}
       run: |
         export GOPRIVATE=github.com/smartcontractkit/*
         # Drop any stale shallow-clone VCS cache that the Go module cache restore may have
         # left behind.
         rm -rf "$(go env GOMODCACHE)/cache/vcs" || true
-        if [ -n "${{ inputs.ton_ref }}" ]; then
+        if [ -n "$TON_REF" ]; then
           for i in 1 2 3; do
-            go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }} && break
+            go get "github.com/smartcontractkit/chainlink-ton@${TON_REF}" && break
             echo "retry $i - unshallow race on chainlink-ton, sleeping 5s"
             sleep 5
           done
         fi
-        if [ -n "${{ inputs.solana_ref }}" ]; then
-          go get github.com/smartcontractkit/chainlink-solana@${{ inputs.solana_ref }}
+        if [ -n "$SOLANA_REF" ]; then
+          go get "github.com/smartcontractkit/chainlink-solana@${SOLANA_REF}"
         fi
-        if [ -n "${{ inputs.ccip_ref }}" ]; then
-          go get github.com/smartcontractkit/chainlink-ccip@${{ inputs.ccip_ref }}
-          go get github.com/smartcontractkit/chainlink-ccip/chains/evm@${{ inputs.ccip_ref }}
+        if [ -n "$CCIP_REF" ]; then
+          go get "github.com/smartcontractkit/chainlink-ccip@${CCIP_REF}"
+          go get "github.com/smartcontractkit/chainlink-ccip/chains/evm@${CCIP_REF}"
         fi
         make gomodtidy
