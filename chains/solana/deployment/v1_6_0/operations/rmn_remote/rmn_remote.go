@@ -1,12 +1,14 @@
 package rmn_remote
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -14,8 +16,7 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
-	rmn163 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_3/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	api "github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -270,11 +271,11 @@ var SetEventAuthorities = operations.NewOperation(
 	Version,
 	"Sets the event authorities list on the RMNRemote contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input EventAuthoritiesInput) (sequences.OnChainOutput, error) {
-		rmn163.SetProgramID(input.RMNRemote)
+		rmn_remote.SetProgramID(input.RMNRemote)
 
 		authority := GetAuthority(chain, input.RMNRemote)
 
-		ixn, err := rmn163.NewSetEventAuthoritiesInstruction(
+		ixn, err := rmn_remote.NewSetEventAuthoritiesInstruction(
 			input.EventAuthorities,
 			input.RMNRemoteConfigPDA,
 			authority,
@@ -316,7 +317,7 @@ var SetCurser = operations.NewOperation(
 	Version,
 	"Sets the curser on the RMNRemote contract",
 	func(b operations.Bundle, chain cldf_solana.Chain, input SetCurserInput) (sequences.OnChainOutput, error) {
-		rmn163.SetProgramID(input.RMNRemote)
+		rmn_remote.SetProgramID(input.RMNRemote)
 
 		authority := GetAuthority(chain, input.RMNRemote)
 
@@ -329,7 +330,7 @@ var SetCurser = operations.NewOperation(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find RMNRemoteCurses PDA: %w", err)
 		}
 
-		ixn, err := rmn163.NewSetCurserInstruction(
+		ixn, err := rmn_remote.NewSetCurserInstruction(
 			input.Curser,
 			configPDA,
 			cursesPDA,
@@ -361,14 +362,24 @@ var SetCurser = operations.NewOperation(
 	},
 )
 
+// GetAuthority returns the RMN Remote owner. It reads only the owner, which directly follows the
+// discriminator and version in every config layout: later versions append fields (curser, bump,
+// event authorities) that v1.6.0 programs lack, so a full decode with the current bindings fails
+// on them.
 func GetAuthority(chain cldf_solana.Chain, program solana.PublicKey) solana.PublicKey {
-	programData := rmn_remote.Config{}
+	const ownerOffset = 8 + 1 // discriminator, version
 	rmnRemoteConfigPDA, _, _ := state.FindRMNRemoteConfigPDA(program)
-	err := chain.GetAccountDataBorshInto(context.Background(), rmnRemoteConfigPDA, &programData)
-	if err != nil {
+	info, err := chain.Client.GetAccountInfoWithOpts(context.Background(), rmnRemoteConfigPDA, &rpc.GetAccountInfoOpts{
+		Commitment: cldf_solana.SolDefaultCommitment,
+	})
+	if err != nil || info.Value == nil {
 		return chain.DeployerKey.PublicKey()
 	}
-	return programData.Owner
+	data := info.Value.Data.GetBinary()
+	if len(data) < ownerOffset+solana.PublicKeyLength || !bytes.Equal(data[:8], rmn_remote.ConfigDiscriminator[:]) {
+		return chain.DeployerKey.PublicKey()
+	}
+	return solana.PublicKeyFromBytes(data[ownerOffset : ownerOffset+solana.PublicKeyLength])
 }
 
 func IsSubjectCursed(chain cldf_solana.Chain, program solana.PublicKey, subject rmn_remote.CurseSubject) (bool, error) {

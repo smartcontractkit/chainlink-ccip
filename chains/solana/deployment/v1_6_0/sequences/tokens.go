@@ -16,7 +16,7 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -76,7 +76,12 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
 			pendingSigner := rtarOut.Output.PendingSigner
 
-			timelockSigner := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+			// a chain without MCMS has no timelock signer, so nothing can match it
+			timelockSigner, err := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+			hasTimelock := err == nil
+			if err != nil && !errors.Is(err, utils.ErrMCMSInstanceNotFound) {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer: %w", err)
+			}
 			tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			deployerPK := chain.DeployerKey.PublicKey()
 			routerPK := solana.PublicKeyFromBytes(routerAddr)
@@ -88,7 +93,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			// to bugs since it is operating on an incomplete snapshot. The switch statement below should
 			// account for this case and cover the non-batch case as well.
 			hasMCMSProposal := len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0
-			isTimelockPendingAdmin := pendingSigner == timelockSigner
+			isTimelockPendingAdmin := hasTimelock && pendingSigner == timelockSigner
 			isDeployerPendingAdmin := pendingSigner == deployerPK
 			switch {
 			// Case 1: the RegisterTokenAdminRegistry changes are already confirmed on-chain and require
@@ -1180,13 +1185,13 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 					return sequences.OnChainOutput{}, errors.New("rate limit admin cannot be the zero pubkey")
 				}
 			} else {
-				rlAdmin = utils.GetTimelockSignerPDA(
+				rlAdmin, err = utils.GetTimelockSignerPDA(
 					input.ExistingDataStore.Addresses().Filter(),
 					chain.Selector,
 					common_utils.CLLQualifier,
 				)
-				if rlAdmin.IsZero() {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer PDA as rate limit admin for chain %d: ensure MCMS RBACTimelock is in the datastore", chain.Selector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer PDA as rate limit admin for chain %d: %w", chain.Selector, err)
 				}
 			}
 
@@ -1276,11 +1281,14 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
 			}
 
-			timelockSigner := utils.GetTimelockSignerPDA(
+			timelockSigner, err := utils.GetTimelockSignerPDA(
 				ds.Addresses().Filter(),
 				chain.Selector,
 				common_utils.CLLQualifier,
 			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer: %w", err)
+			}
 
 			tokenPoolRef, err := datastore_utils.FindAndFormatRef(ds, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
 			if err != nil {

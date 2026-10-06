@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/mcms/types"
 
 	sol_utils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/cctp_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/cctp_token_pool"
 	sol_token_utils "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
