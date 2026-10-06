@@ -82,11 +82,22 @@ func TestMCMSQualifierResolution(t *testing.T) {
 
 func TestMCMSQualifierResolution_UnknownQualifierFails(t *testing.T) {
 	e := newMultiMCMSEnv(t)
+
+	_, err := getMCMSAccountRef(e, testSelector, utils.ProposerAccessControllerAccount, "DoesNotExist")
+	require.ErrorContains(t, err, `qualifier "DoesNotExist" not found`)
+}
+
+// Callers (e.g. token expansion) rely on GetTimelockRef/GetMCMSRef returning an empty ref, not an error,
+// on chains where MCMS is not deployed.
+func TestMCMSRefs_NoMCMSReturnsEmptyRef(t *testing.T) {
+	e := deployment.Environment{DataStore: cldf_datastore.NewMemoryDataStore().Seal()}
 	a := &SolanaAdapter{}
 
-	_, err := a.GetTimelockRef(e, testSelector, mcms_utils.Input{Qualifier: "DoesNotExist"})
-	require.ErrorContains(t, err, `qualifier "DoesNotExist" not found`)
+	timelock, err := a.GetTimelockRef(e, testSelector, mcms_utils.Input{})
+	require.NoError(t, err)
+	require.Empty(t, timelock.Address)
 
-	_, err = getMCMSAccountRef(e, testSelector, utils.ProposerAccessControllerAccount, "DoesNotExist")
-	require.ErrorContains(t, err, `qualifier "DoesNotExist" not found`)
+	mcm, err := a.GetMCMSRef(e, testSelector, mcms_utils.Input{})
+	require.NoError(t, err)
+	require.Empty(t, mcm.Address)
 }

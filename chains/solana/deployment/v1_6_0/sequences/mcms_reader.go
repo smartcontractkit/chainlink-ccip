@@ -24,7 +24,8 @@ func mcmsQualifier(input mcms_utils.Input) string {
 	return input.Qualifier
 }
 
-// getMCMSAccountRef resolves a 1.6.0 MCMS account ref, failing if it is not in the datastore.
+// getMCMSAccountRef resolves a 1.6.0 MCMS account ref, failing if it is not in the datastore. Used when
+// building a proposal, where a missing account would otherwise surface as an unusable proposal.
 func getMCMSAccountRef(e deployment.Environment, chainSelector uint64, contractType deployment.ContractType, qualifier string) (cldf_datastore.AddressRef, error) {
 	ref := datastore.GetAddressRef(
 		e.DataStore.Addresses().Filter(),
@@ -100,12 +101,27 @@ func (a *SolanaAdapter) GetChainMetadata(e deployment.Environment, chainSelector
 	return metadata, nil
 }
 
+// GetTimelockRef returns an empty ref (and no error) when the timelock is not in the datastore: callers
+// such as token expansion use that to detect chains without MCMS and fall back to non-timelock admins.
 func (a *SolanaAdapter) GetTimelockRef(e deployment.Environment, chainSelector uint64, input mcms_utils.Input) (cldf_datastore.AddressRef, error) {
-	return getMCMSAccountRef(e, chainSelector, common_utils.RBACTimelock, mcmsQualifier(input))
+	return datastore.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		common_utils.RBACTimelock,
+		common_utils.Version_1_6_0,
+		mcmsQualifier(input),
+	), nil
 }
 
-// GetMCMSRef returns the MCM program ref. The program is shared by every MCMS instance on the chain,
-// so it is stored without a qualifier and the input qualifier does not apply.
+// GetMCMSRef returns the MCM program ref, or an empty ref when it is not in the datastore. The program is
+// shared by every MCMS instance on the chain, so it is stored without a qualifier and the input qualifier
+// does not apply.
 func (a *SolanaAdapter) GetMCMSRef(e deployment.Environment, chainSelector uint64, _ mcms_utils.Input) (cldf_datastore.AddressRef, error) {
-	return getMCMSAccountRef(e, chainSelector, utils.McmProgramType, "")
+	return datastore.GetAddressRef(
+		e.DataStore.Addresses().Filter(),
+		chainSelector,
+		utils.McmProgramType,
+		common_utils.Version_1_6_0,
+		"",
+	), nil
 }
