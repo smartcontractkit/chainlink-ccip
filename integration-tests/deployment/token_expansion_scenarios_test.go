@@ -50,7 +50,9 @@ import (
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/mcms/timelockdelay"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/onchain"
 
 	bnmERC20gen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	bnmPausableFreezableTransparentGen "github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/latest/burn_mint_erc20_pausable_freezable_transparent"
@@ -81,9 +83,11 @@ func setupEVMOnlyEnv(t *testing.T) (*deployment.Environment, uint64, uint64) {
 	selA := chainsel.TEST_90000001.Selector
 	selB := chainsel.TEST_90000002.Selector
 
+	// One additional funded account per chain serves as a foreign (non-CLL) EOA in scenarios
+	// that need a third-party pool owner.
 	env, err := environment.New(
 		t.Context(),
-		environment.WithEVMSimulated(t, []uint64{selA, selB}),
+		environment.WithEVMSimulatedWithConfig(t, []uint64{selA, selB}, onchain.EVMSimLoaderConfig{NumAdditionalAccounts: 1}),
 	)
 	require.NoError(t, err)
 
@@ -1157,6 +1161,161 @@ func TestTokenExpansionScenariosEVM(t *testing.T) {
 		hasBurnerRole, err := token.HasRole(&bind.CallOpts{Context: t.Context()}, burnerRole, poolAddr)
 		require.NoError(t, err)
 		require.True(t, hasBurnerRole, "pool should hold BURNER_ROLE")
+	})
+
+	// -----------------------------------------------------------------------
+	// Scenario 8: SkipIfMissingPermissions produces a one-sided config when the
+	// counterpart pool is owned by a third party (a foreign EOA)
+	// -----------------------------------------------------------------------
+	t.Run("Scenario8_SkipIfMissingPermissions", func(t *testing.T) {
+		tokenSymbolA := "S8_TOK_A"
+		tokenSymbolB := "S8_TOK_B"
+		poolQualA := "S8_POOL_A"
+		poolQualB := "S8_POOL_B"
+
+		// Deploy token+pool on both chains without connecting. SkipOwnershipTransfer keeps the
+		// deployer as pool owner so we can hand pool B to a foreign EOA below.
+		output, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+			ChainAdapterVersion: v1_6_0_scenarios,
+			MCMS:                NewDefaultInputForMCMS("Scenario 8 deploy"),
+			TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+				selA: {
+					SkipOwnershipTransfer: true,
+					TokenPoolVersion:      v1_5_1_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name: "Scenario8 Token A", Symbol: tokenSymbolA, Decimals: 18,
+						Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: poolQualA,
+						PoolType:           bmPoolType.String(),
+					},
+				},
+				selB: {
+					SkipOwnershipTransfer: true,
+					TokenPoolVersion:      v1_5_1_scenarios,
+					DeployTokenInput: &tokensapi.DeployTokenInput{
+						Name: "Scenario8 Token B", Symbol: tokenSymbolB, Decimals: 18,
+						Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply,
+					},
+					DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+						TokenPoolQualifier: poolQualB,
+						PoolType:           bmPoolType.String(),
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		MergeAddresses(t, env, output.DataStore)
+
+		chainA := env.BlockChains.EVMChains()[selA]
+		chainB := env.BlockChains.EVMChains()[selB]
+		poolAddrA, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: selA, Qualifier: poolQualA, Type: datastore.ContractType(bmPoolType)})
+		require.NoError(t, err)
+		poolAddrB, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{ChainSelector: selB, Qualifier: poolQualB, Type: datastore.ContractType(bmPoolType)})
+		require.NoError(t, err)
+		poolA, err := bnmpool.NewBurnMintTokenPool(poolAddrA, chainA.Client)
+		require.NoError(t, err)
+		poolB, err := bnmpool.NewBurnMintTokenPool(poolAddrB, chainB.Client)
+		require.NoError(t, err)
+		tokAddrB := assertTokenExists(t, env, selB, tokenSymbolB, "Scenario8 Token B", 18)
+
+		// Hand pool B to a foreign EOA (2-step ownership: deployer proposes, EOA accepts)
+		require.NotEmpty(t, chainB.Users, "simulated chain B should expose funded user accounts")
+		foreignEOA := chainB.Users[0]
+		tx, err := poolB.TransferOwnership(chainB.DeployerKey, foreignEOA.From)
+		require.NoError(t, err)
+		_, err = chainB.Confirm(tx)
+		require.NoError(t, err)
+		tx, err = poolB.AcceptOwnership(foreignEOA)
+		require.NoError(t, err)
+		_, err = chainB.Confirm(tx)
+		require.NoError(t, err)
+		ownerB, err := poolB.Owner(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		require.Equal(t, foreignEOA.From, ownerB)
+
+		connectInput := func(skipIfMissingPermissions bool, desc string) tokensapi.TokenExpansionInput {
+			transferCfg := func(sel, remoteSel uint64, poolQual, tokenSymbol, remotePoolQual, remoteTokenSymbol string) *tokensapi.TokenTransferConfig {
+				return &tokensapi.TokenTransferConfig{
+					SkipIfMissingPermissions: skipIfMissingPermissions,
+					TokenPoolRef: datastore.AddressRef{
+						ChainSelector: sel,
+						Qualifier:     poolQual,
+						Type:          datastore.ContractType(bmPoolType),
+						Version:       v1_5_1_scenarios,
+					},
+					TokenRef: datastore.AddressRef{
+						Qualifier: tokenSymbol,
+						Type:      datastore.ContractType(bnmERC20ops.ContractType),
+					},
+					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+						remoteSel: {
+							OutboundRateLimiterConfig: &defaultRL,
+							RemoteToken: &datastore.AddressRef{
+								ChainSelector: remoteSel,
+								Qualifier:     remoteTokenSymbol,
+								Type:          datastore.ContractType(bnmERC20ops.ContractType),
+							},
+							RemotePool: &datastore.AddressRef{
+								ChainSelector: remoteSel,
+								Qualifier:     remotePoolQual,
+								Type:          datastore.ContractType(bmPoolType),
+								Version:       v1_5_1_scenarios,
+							},
+						},
+					},
+				}
+			}
+			return tokensapi.TokenExpansionInput{
+				ChainAdapterVersion: v1_6_0_scenarios,
+				MCMS:                NewDefaultInputForMCMS(desc),
+				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+					selA: {
+						SkipOwnershipTransfer: true,
+						TokenPoolVersion:      v1_5_1_scenarios,
+						TokenTransferConfig:   transferCfg(selA, selB, poolQualA, tokenSymbolA, poolQualB, tokenSymbolB),
+					},
+					selB: {
+						SkipOwnershipTransfer: true,
+						TokenPoolVersion:      v1_5_1_scenarios,
+						TokenTransferConfig:   transferCfg(selB, selA, poolQualB, tokenSymbolB, poolQualA, tokenSymbolA),
+					},
+				},
+			}
+		}
+
+		// Flag on: pool A (deployer-owned) is configured, pool B (EOA-owned) is skipped
+		output, err = tokensapi.TokenExpansion().Apply(*env, connectInput(true, "Scenario 8 connect one-sided"))
+		require.NoError(t, err)
+		MergeAddresses(t, env, output.DataStore)
+		for _, prop := range output.MCMSTimelockProposals {
+			for _, op := range prop.Operations {
+				require.NotEqual(t, selB, uint64(op.ChainSelector), "no ops should target chain B whose pool is externally owned")
+			}
+		}
+		testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
+
+		assertPoolConnected(t, poolA, selA, selB, poolAddrB, tokAddrB)
+		assertPoolNotConnected(t, poolB)
+
+		// Flag off (control): pool B's writes are emitted eagerly and revert on execution since
+		// the timelock is not the owner of pool B
+		output, err = tokensapi.TokenExpansion().Apply(*env, connectInput(false, "Scenario 8 connect eager"))
+		require.NoError(t, err)
+		require.NotEmpty(t, output.MCMSTimelockProposals)
+		err = timelockdelay.CorrectTimelockDelays(env.GetContext(), env.Logger, env.BlockChains, output.MCMSTimelockProposals)
+		require.NoError(t, err)
+		var execErr error
+		for _, prop := range output.MCMSTimelockProposals {
+			p := testhelpers.SignMCMSTimelockProposal(t, *env, &prop, false)
+			require.NoError(t, testhelpers.ExecuteMCMSProposal(t, *env, p))
+			if err := testhelpers.ExecuteMCMSTimelockProposal(t, *env, &prop); err != nil {
+				execErr = err
+			}
+		}
+		require.Error(t, execErr, "configuring the externally owned pool B without skipIfMissingPermissions should fail")
+		assertPoolNotConnected(t, poolB)
 	})
 }
 
