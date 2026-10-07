@@ -44,6 +44,17 @@ type TokenPoolDynamicConfigAdapter interface {
 	SetTokenPoolDynamicConfig() *cldf_ops.Sequence[SetTokenPoolDynamicConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
+// TokenPoolOwnershipChecker is an optional interface for adapters that can report whether a
+// token pool is owned by a third party. It is used by ConfigureTokensForTransfers to skip
+// owner-gated writes on pools we do not control when SkipIfMissingPermissions is enabled.
+type TokenPoolOwnershipChecker interface {
+	// IsPoolExternallyOwned reports whether neither the MCMS timelock nor the chain deployer owns the
+	// pool referenced by poolRef on chainSelector. Implementations read the owner on-chain and compare
+	// against the timelock (from the datastore) and the chain deployer (from env). A failure to read
+	// the owner is returned as an error and must be treated as fatal (never treated as a skip).
+	IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (bool, error)
+}
+
 // SetTokenPoolDynamicConfigSequenceInput defines the input for updating a token pool's router
 // and admin roles. Nil fields are left unchanged on-chain.
 type SetTokenPoolDynamicConfigSequenceInput struct {
