@@ -35,6 +35,10 @@ type LombardChainConfig struct {
 	RateLimitAdmin string
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]adapters.RemoteLombardChainConfig
+	// SkipOwnershipTransfer leaves the Lombard contracts deployed by this changeset on the
+	// deployer key instead of transferring ownership to the MCMS timelock. Ownership is only
+	// transferred on chains whose adapter implements adapters.LombardAuthoritiesUpdater.
+	SkipOwnershipTransfer bool
 }
 
 type DeployLombardChainsConfig struct {
@@ -125,6 +129,9 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 
 		// Deploy across all chains.
 		newDS := datastore.NewMemoryDataStore()
+		// chainContractRefs tracks the contracts deployed or configured per chain so ownership
+		// can be transferred to the MCMS timelock at the end.
+		chainContractRefs := make(map[uint64][]datastore.AddressRef, len(cfg.Chains))
 		for chainSel, chainCfg := range cfg.Chains {
 			dep := adapters.DeployLombardChainDeps{
 				BlockChains: e.BlockChains,
@@ -150,6 +157,7 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 
 			batchOps = append(batchOps, deployLombardChainReport.Output.BatchOps...)
 			reports = append(reports, deployLombardChainReport.ExecutionReports...)
+			chainContractRefs[chainSel] = append(chainContractRefs[chainSel], deployLombardChainReport.Output.Addresses...)
 			for _, r := range deployLombardChainReport.Output.Addresses {
 				if err := newDS.Addresses().Add(r); err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s %s with address %s on chain with selector %d to datastore: %w", r.Type, r.Version, r.Address, r.ChainSelector, err)
@@ -202,6 +210,33 @@ func makeApplyDeployLombardChains(lombardChainRegistry *adapters.LombardChainReg
 			}
 			batchOps = append(batchOps, configureChainForLanesReport.Output.BatchOps...)
 			reports = append(reports, configureChainForLanesReport.ExecutionReports...)
+			chainContractRefs[chainSel] = append(chainContractRefs[chainSel], configureChainForLanesReport.Output.Addresses...)
+		}
+
+		// Transfer ownership of the Lombard contracts to the MCMS timelock, on chains whose adapter
+		// supports it. The adapter filters the refs to those that actually require a transfer.
+		for chainSel, chainCfg := range cfg.Chains {
+			// Ownership is transferred via an MCMS proposal, so there is nothing to do without MCMS.
+			if chainCfg.SkipOwnershipTransfer || cfg.MCMS == nil {
+				continue
+			}
+			updater, ok := adaptersByChain[chainSel].(adapters.LombardAuthoritiesUpdater)
+			if !ok {
+				continue
+			}
+			refs := chainContractRefs[chainSel]
+			if len(refs) == 0 {
+				continue
+			}
+			ownershipReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, updater.UpdateAuthorities(), &e, adapters.UpdateAuthoritiesInput{
+				ChainSelector: chainSel,
+				ContractRefs:  refs,
+			})
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer Lombard contract ownership on chain with selector %d: %w", chainSel, err)
+			}
+			batchOps = append(batchOps, ownershipReport.Output.BatchOps...)
+			reports = append(reports, ownershipReport.ExecutionReports...)
 		}
 
 		var mcmsInput mcms.Input

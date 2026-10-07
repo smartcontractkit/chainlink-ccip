@@ -230,8 +230,8 @@ Those interfaces belong to `chainlink-ccv`. Use the Solana adapters in `chainlin
 | Feature | Implement | Changesets |
 |---|---|---|
 | OnRamp upgrade | `OnRampUpgrader`, and on the remote `ChainFamily`: `OffRampSourceOnRampSetter` + `Reader` | `UpgradeOnrampPhase1/2/3`, `UpgradeOnrampPhase3Rollback`, `UpgradeOnrampCleanup`, `OffRampSetSourceOnRamps` |
-| USDC via CCTP | `CCTPChain` (one per USDC type) | `DeployCCTPChains` |
-| Lombard (LBTC) | `LombardChain` | `DeployLombardChains` |
+| USDC via CCTP | `CCTPChain` (one per USDC type). Optional: `tokens.RemotePoolRemover`, `tokens.TokenPoolRateLimitSetter`, `tokens.TokenPoolDynamicConfigAdapter` | `DeployCCTPChains`, `RemoveCCTPRemotePools`, `SetCCTPTokenPoolRateLimits`, `SetCCTPTokenPoolDynamicConfig` |
+| Lombard (LBTC) | `LombardChain`. Optional: the same three, plus `LombardAuthoritiesUpdater` | `DeployLombardChains`, `RemoveLombardRemotePools`, `SetLombardTokenPoolRateLimits`, `SetLombardTokenPoolDynamicConfig` |
 | Test verifier token (TESTVTR) | `TestVerifierChainAdapter` | `DeployTestVerifierChains` |
 
 Each optional interface has a *remote* half (`Remote…Chain`) that only returns addresses. A sequence on chain A gets `RemoteChains map[uint64]Remote…Chain` in its deps, so it can ask chain B's family for its pool, token, or caller addresses without importing chain B's code.

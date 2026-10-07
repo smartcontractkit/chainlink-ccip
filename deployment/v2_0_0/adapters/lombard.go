@@ -5,6 +5,7 @@ import (
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -83,6 +84,14 @@ type ConfigureLombardChainForLanesDeps struct {
 }
 
 // LombardChain is a configurable Lombard chain.
+//
+// Lombard pools are not managed by the common token pool changesets. To support the Lombard token
+// pool changesets, an implementation can also implement these optional interfaces:
+//   - LombardAuthoritiesUpdater, to transfer ownership in DeployLombardChains.
+//   - tokens.RemotePoolRemover, for RemoveLombardRemotePools.
+//   - tokens.TokenPoolRateLimitSetter, for SetLombardTokenPoolRateLimits.
+//   - tokens.TokenPoolDynamicConfigAdapter, for SetLombardTokenPoolDynamicConfig.
+//   - tokens.RateLimitReaderAdapter, to expose the pool's on-chain rate limits.
 type LombardChain interface {
 	RemoteLombardChain
 	// DeployLombardChain deploys the Lombard contracts on the chain.
@@ -91,6 +100,14 @@ type LombardChain interface {
 	// AddressRefToBytes converts an AddressRef to a byte slice representing the address.
 	// Each chain family has their own way of serializing addresses from strings and needs to specify this logic.
 	AddressRefToBytes(ref datastore.AddressRef) ([]byte, error)
+}
+
+// LombardAuthoritiesUpdater is an optional interface for Lombard chains that transfer ownership of
+// their Lombard contracts to the MCMS timelock. It mirrors CCTPChain.UpdateAuthorities.
+type LombardAuthoritiesUpdater interface {
+	// UpdateAuthorities transfers ownership of the Lombard contracts on the chain to the MCMS
+	// timelock. Implementations filter the input refs to the ones that require a transfer.
+	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *cldf.Environment]
 }
 
 // RemoteLombardChain is a connectable remote Lombard chain.

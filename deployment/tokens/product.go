@@ -130,6 +130,13 @@ type RateLimitReaderAdapter interface {
 	) (OnchainRateLimits, error)
 }
 
+// TokenPoolRateLimitSetter is an optional interface for adapters outside TokenAdapter that set token
+// pool rate limits, such as the CCTP and Lombard chain adapters. It has the same shape as
+// TokenAdapter.SetTokenPoolRateLimits.
+type TokenPoolRateLimitSetter interface {
+	SetTokenPoolRateLimits() *cldf_ops.Sequence[TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
 // TokenAdminRegistryReader is a versionless interface for reading the active pool from a chain's
 // TokenAdminRegistry (or equivalent). Implementations are registered per chain family via
 // TokenAdapterRegistry.RegisterTokenAdminRegistryReader, or implicitly by registering a

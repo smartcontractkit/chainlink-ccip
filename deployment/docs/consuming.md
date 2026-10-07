@@ -182,7 +182,7 @@ Each leg is verified by every committee that has **both** chains in its `chain_c
 | FeeQuoter dest config | `fees.UpdateFeeQuoterDests` | Set during lane configuration (`ChainOverrides.RemoteChainCfg.FeeQuoterDestChainConfig`). `UpdateFeeQuoterDests` also works with a 2.0 FeeQuoter |
 | Migrate a chain from v1 to v2 | — | `deploy.UpdateFeeQuoterChangeset` (deploys a 2.0 FeeQuoter from imported v1 lane config), `deploy.LaneMigrateToNewVersionChangeset` (repoints Router and ramps) |
 | Replace a v2 OnRamp | — | `UpgradeOnrampPhase1/2/3`, `UpgradeOnrampPhase3Rollback`, `UpgradeOnrampCleanup` |
-| USDC / Lombard | — | `DeployCCTPChains`, `DeployLombardChains` |
+| USDC / Lombard | — | `DeployCCTPChains`, `DeployLombardChains`. Pool updates: `RemoveCCTPRemotePools`, `SetCCTPTokenPoolRateLimits`, `SetCCTPTokenPoolDynamicConfig` and the Lombard equivalents |
 | MCMS proposals | `OutputBuilder` | Same. Batch ops from any version combine into one proposal |
 
 ## 6. Changeset catalog
@@ -226,6 +226,7 @@ Constructors and inputs. Follow the source link for the config type. Each config
 | Configure lanes | `ConfigureChainsForLanesFromTopology(cvReg, chainFamilyReg, mcmsReg)` | Bidirectional lane pairs, from topology |
 | CCTP | `DeployCCTPChains(cctpReg, mcmsReg)` | Deploy and configure USDC/CCTP pools and verifiers |
 | Lombard | `DeployLombardChains(lombardReg, mcmsReg)` | Deploy and configure Lombard |
+| CCTP / Lombard pools | `RemoveCCTPRemotePools`, `SetCCTPTokenPoolRateLimits`, `SetCCTPTokenPoolDynamicConfig` (`cctpReg, mcmsReg`); `RemoveLombardRemotePools`, `SetLombardTokenPoolRateLimits`, `SetLombardTokenPoolDynamicConfig` (`lombardReg, mcmsReg`) | Remove remote pools, set rate limits, set router and admins on CCTP or Lombard pools, which the `tokens` changesets do not manage ([cctp_lombard_token_pools.go](../v2_0_0/changesets/cctp_lombard_token_pools.go)) |
 | Test verifier | `DeployTestVerifierChains(tvReg, mcmsReg)` | TESTVTR token, pool, and verifier for test envs |
 | OnRamp upgrade | `UpgradeOnrampPhase1(upgraderReg, chainFamilyReg, mcmsReg, toReg)`, `Phase2(upgraderReg, mcmsReg)`, `Phase3`/`Phase3Rollback`/`Cleanup(upgraderReg, chainFamilyReg, mcmsReg)` | Staged OnRamp replacement |
 | OffRamp source OnRamps | `OffRampSetSourceOnRamps(chainFamilyReg, mcmsReg)` | Set the source-OnRamp whitelist on an OffRamp |

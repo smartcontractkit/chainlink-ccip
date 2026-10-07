@@ -94,6 +94,8 @@ Registered once per **token pool version**, because pool versions configure diff
 | `RateLimitReaderAdapter` | type assertion | `SetTokenPoolRateLimits` (outbound-only path), auto-migrate |
 | `TokenPoolMigrator` | type assertion | `ConfigureTokensForTransfers` auto-migrate, `RemoveRemotePools` |
 
+CCTP and Lombard pools are not managed by these changesets. Their adapters can implement `RemotePoolRemover`, `TokenPoolDynamicConfigAdapter`, `RateLimitReaderAdapter` and `TokenPoolRateLimitSetter` (same shape as `TokenAdapter.SetTokenPoolRateLimits`) instead. See [CCTPChain / LombardChain](#cctpchain--lombardchain--testverifierchainadapter).
+
 **Which pool address each interface receives.** On EVM it is always the pool contract. On families where one pool program serves many tokens, it depends on the interface:
 
 - **`TokenFeeAdapter`**: the pool's counterpart address, from `tokens.TokenPoolCounterpartAddress`, which calls `DeriveTokenPoolCounterpart`. That's the pool address on EVM and the pool config PDA on Solana. The PDA identifies both the pool program (its owner) and the mint (in its state).
@@ -287,3 +289,13 @@ These follow the same pattern. Each is split into a *remote* interface and a *lo
 - The **local** interface adds `Deploy…Chain()` and `Configure…ChainForLanes()` sequences.
 
 Their dependency structs (`*Deps`) receive `RemoteChains map[uint64]Remote…Chain`, so a sequence on one family can ask another family for its addresses without importing that family's code.
+
+CCTP and Lombard adapters can also implement optional token pool interfaces, found by type assertion. Each one enables a changeset in [cctp_lombard_token_pools.go](../v2_0_0/changesets/cctp_lombard_token_pools.go). The changeset takes resolved sequence inputs and fails for a family whose adapter does not implement the interface.
+
+| Interface | CCTP changeset | Lombard changeset |
+|---|---|---|
+| `tokens.RemotePoolRemover` | `RemoveCCTPRemotePools` | `RemoveLombardRemotePools` |
+| `tokens.TokenPoolRateLimitSetter` | `SetCCTPTokenPoolRateLimits` | `SetLombardTokenPoolRateLimits` |
+| `tokens.TokenPoolDynamicConfigAdapter` | `SetCCTPTokenPoolDynamicConfig` | `SetLombardTokenPoolDynamicConfig` |
+| `tokens.RateLimitReaderAdapter` | — (exposes on-chain rate limits) | — |
+| `adapters.LombardAuthoritiesUpdater` | — (`CCTPChain.UpdateAuthorities` is required) | `DeployLombardChains` (ownership transfer) |

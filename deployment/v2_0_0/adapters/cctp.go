@@ -170,6 +170,13 @@ type UpdateAuthoritiesInput struct {
 }
 
 // CCTPChain is a configurable CCTP chain.
+//
+// CCTP pools are not managed by the common token pool changesets. To support the CCTP token pool
+// changesets, an implementation can also implement these optional interfaces:
+//   - tokens.RemotePoolRemover, for RemoveCCTPRemotePools.
+//   - tokens.TokenPoolRateLimitSetter, for SetCCTPTokenPoolRateLimits.
+//   - tokens.TokenPoolDynamicConfigAdapter, for SetCCTPTokenPoolDynamicConfig.
+//   - tokens.RateLimitReaderAdapter, to expose the pool's on-chain rate limits.
 type CCTPChain interface {
 	RemoteCCTPChain
 	// DeployCCTPChain deploys the CCTP contracts on the chain.
