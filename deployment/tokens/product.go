@@ -50,9 +50,11 @@ type TokenPoolDynamicConfigAdapter interface {
 type TokenPoolOwnershipChecker interface {
 	// IsPoolExternallyOwned reports whether neither the MCMS timelock nor the chain deployer owns the
 	// pool referenced by poolRef on chainSelector. Implementations read the owner on-chain and compare
-	// against the timelock (from the datastore) and the chain deployer (from env). A failure to read
-	// the owner is returned as an error and must be treated as fatal (never treated as a skip).
-	IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (bool, error)
+	// against the timelock (from the datastore) and the chain deployer (from env). tokenRef is needed by
+	// families whose ownership is per token (e.g. Solana, where one pool program serves many mints) and
+	// may be ignored by others. A failure to read the owner is returned as an error and must be treated
+	// as fatal (never treated as a skip).
+	IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, tokenRef datastore.AddressRef) (bool, error)
 }
 
 // SetTokenPoolDynamicConfigSequenceInput defines the input for updating a token pool's router

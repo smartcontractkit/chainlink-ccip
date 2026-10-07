@@ -153,7 +153,7 @@ func (a *EVMPoolAdapter) GetOnchainRateLimits(b cldf_ops.Bundle, chains cldf_cha
 // IsPoolExternallyOwned reports whether the pool's owner is neither the CLL MCMS timelock nor
 // the chain deployer. An error reading the timelock or the pool owner is returned as-is; callers
 // must treat it as fatal rather than as a reason to skip.
-func (a *EVMPoolAdapter) IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (bool, error) {
+func (a *EVMPoolAdapter) IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, _ datastore.AddressRef) (bool, error) {
 	chain, ok := e.BlockChains.EVMChains()[chainSelector]
 	if !ok {
 		return false, fmt.Errorf("chain with selector %d not defined", chainSelector)
