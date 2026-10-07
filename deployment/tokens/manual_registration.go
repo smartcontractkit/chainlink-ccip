@@ -1,17 +1,20 @@
 package tokens
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 type ManualRegistrationInput struct {
@@ -74,7 +77,42 @@ func ManualRegistration() cldf.ChangeSetV2[ManualRegistrationInput] {
 
 func manualRegistrationVerify() func(cldf.Environment, ManualRegistrationInput) error {
 	return func(e cldf.Environment, cfg ManualRegistrationInput) error {
-		// TODO: implement
+		if len(cfg.Registrations) == 0 {
+			return errors.New("at least one registration is required")
+		}
+
+		seen := make(map[uint64]struct{}, len(cfg.Registrations))
+		for i, registration := range cfg.Registrations {
+			if _, err := chain_selectors.GetSelectorFamily(registration.ChainSelector); err != nil {
+				return fmt.Errorf("registration[%d]: invalid chain selector %d: %w", i, registration.ChainSelector, err)
+			}
+			if _, dup := seen[registration.ChainSelector]; dup {
+				return fmt.Errorf("registration[%d]: duplicate entry for chain selector %d", i, registration.ChainSelector)
+			}
+			seen[registration.ChainSelector] = struct{}{}
+
+			if registration.ProposedOwner == "" {
+				return fmt.Errorf("registration[%d]: ProposedOwner is required", i)
+			}
+			if datastore_utils.IsAddressRefEmpty(registration.TokenPoolRef) &&
+				datastore_utils.IsAddressRefEmpty(registration.TokenRef) {
+				return fmt.Errorf("registration[%d]: at least one of TokenPoolRef or TokenRef is required", i)
+			}
+			for _, ref := range []struct {
+				name string
+				ref  datastore.AddressRef
+			}{
+				{"TokenPoolRef", registration.TokenPoolRef},
+				{"TokenRef", registration.TokenRef},
+			} {
+				if ref.ref.ChainSelector != 0 && ref.ref.ChainSelector != registration.ChainSelector {
+					return fmt.Errorf(
+						"registration[%d]: %s.ChainSelector %d does not match the registration's ChainSelector %d",
+						i, ref.name, ref.ref.ChainSelector, registration.ChainSelector,
+					)
+				}
+			}
+		}
 		return nil
 	}
 }

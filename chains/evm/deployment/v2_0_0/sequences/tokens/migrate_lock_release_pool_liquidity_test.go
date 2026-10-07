@@ -22,6 +22,7 @@ import (
 	tar "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
 	old_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	old_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
+	burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -250,13 +251,15 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 }
 
 type migrationTestSetup struct {
-	env         *deployment.Environment
-	chainSel    uint64
-	deployer    common.Address
-	tokenAddr   common.Address
-	oldPoolAddr common.Address
-	newPoolAddr common.Address
-	lockBoxAddr common.Address
+	env          *deployment.Environment
+	chainSel     uint64
+	deployer     common.Address
+	tokenAddr    common.Address
+	oldPoolAddr  common.Address
+	newPoolAddr  common.Address
+	lockBoxAddr  common.Address
+	rmnProxyAddr common.Address
+	routerAddr   common.Address
 }
 
 // oldPoolKind selects which legacy lock-release pool the migration test starts from.
@@ -470,13 +473,15 @@ func setupMigrationTestWithOldPool(t *testing.T, chainSel uint64, liquidityAmoun
 	require.Equal(t, 0, liquidityAmount.Cmp(balReport.Output), "Old pool should hold the minted tokens")
 
 	return migrationTestSetup{
-		env:         e,
-		chainSel:    chainSel,
-		deployer:    deployer,
-		tokenAddr:   tokenAddr,
-		oldPoolAddr: oldPoolAddr,
-		newPoolAddr: newPoolAddr,
-		lockBoxAddr: lockBoxAddr,
+		env:          e,
+		chainSel:     chainSel,
+		deployer:     deployer,
+		tokenAddr:    tokenAddr,
+		oldPoolAddr:  oldPoolAddr,
+		newPoolAddr:  newPoolAddr,
+		lockBoxAddr:  lockBoxAddr,
+		rmnProxyAddr: rmnProxyAddr,
+		routerAddr:   routerAddr,
 	}
 }
 
@@ -2317,4 +2322,146 @@ func TestMigrateSiloedPool_ExactAmounts_SiloRebalancerRestore(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Equal(t, originalRebalancer, rebalancerReport.Output, "Silo rebalancer should be restored to the custom address set before migration")
+}
+
+// deployBurnMintPool deploys a burn-mint token pool of the given version, used to stand up a
+// migration source that is not a lock-release pool.
+func deployBurnMintPool(t *testing.T, s migrationTestSetup, version *semver.Version) common.Address {
+	t.Helper()
+
+	chain := s.env.BlockChains.EVMChains()[s.chainSel]
+	report, err := operations.ExecuteOperation(
+		s.env.OperationsBundle,
+		burn_mint_token_pool.Deploy,
+		chain,
+		evm_contract.DeployInput[burn_mint_token_pool.ConstructorArgs]{
+			ChainSelector:  s.chainSel,
+			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_token_pool.ContractType, *version),
+			Args: burn_mint_token_pool.ConstructorArgs{
+				Token:              s.tokenAddr,
+				LocalTokenDecimals: 18,
+				AdvancedPoolHooks:  common.Address{},
+				RmnProxy:           s.rmnProxyAddr,
+				Router:             s.routerAddr,
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	return common.HexToAddress(report.Output.Address)
+}
+
+// deploySecondToken deploys an independent ERC20 so a pool can be stood up against a token that
+// differs from the one the migration's other pool manages.
+func deploySecondToken(t *testing.T, s migrationTestSetup) common.Address {
+	t.Helper()
+
+	chain := s.env.BlockChains.EVMChains()[s.chainSel]
+	report, err := operations.ExecuteOperation(
+		s.env.OperationsBundle,
+		burn_mint_erc20_with_drip.Deploy,
+		chain,
+		evm_contract.DeployInput[burn_mint_erc20_with_drip.ConstructorArgs]{
+			ChainSelector:  s.chainSel,
+			TypeAndVersion: deployment.NewTypeAndVersion(burn_mint_erc20_with_drip.ContractType, *burn_mint_erc20_with_drip.Version),
+			Args:           burn_mint_erc20_with_drip.ConstructorArgs{Name: "Other Token", Symbol: "OTHER"},
+		},
+	)
+	require.NoError(t, err)
+
+	return common.HexToAddress(report.Output.Address)
+}
+
+// deployV2LockReleasePool deploys a v2.0.0 LockReleaseTokenPool (with its lockbox) against the
+// given token, used to stand up a migration destination that manages a different token.
+func deployV2LockReleasePool(t *testing.T, s migrationTestSetup, token common.Address) common.Address {
+	t.Helper()
+
+	chain := s.env.BlockChains.EVMChains()[s.chainSel]
+	report, err := operations.ExecuteSequence(
+		s.env.OperationsBundle,
+		tokens.DeployLockReleaseTokenPool,
+		chain,
+		tokens.DeployTokenPoolInput{
+			ChainSel:         s.chainSel,
+			TokenPoolType:    datastore.ContractType(new_lrtp.ContractType),
+			TokenPoolVersion: new_lrtp.Version,
+			TokenSymbol:      "OTHER",
+			ConstructorArgs: tokens.ConstructorArgs{
+				Token:    token,
+				Decimals: 18,
+				RMNProxy: s.rmnProxyAddr,
+				Router:   s.routerAddr,
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	return common.HexToAddress(report.Output.Addresses[0].Address)
+}
+
+func TestMigrateLockReleasePoolLiquidity_PoolPairValidation(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	s := setupMigrationTest(t, chainSel, big.NewInt(1000))
+
+	// A v1.6.1 lock-release pool that manages a different token than the migration's new pool.
+	otherToken := deploySecondToken(t, s)
+	otherTokenPool := deployV2LockReleasePool(t, s, otherToken)
+
+	// A burn-mint pool, which is not a lock-release pool and so cannot be a migration source.
+	burnMintPool := deployBurnMintPool(t, s, burn_mint_token_pool.Version)
+
+	// A second v2.0.0 lock-release pool, used as a same-version "old" pool.
+	secondV2Pool := deployV2LockReleasePool(t, s, s.tokenAddr)
+
+	tests := []struct {
+		name        string
+		oldPool     common.Address
+		newPool     common.Address
+		expectedErr string
+	}{
+		{
+			name:        "Failure - old pool manages a different token than the new pool",
+			oldPool:     s.oldPoolAddr,
+			newPool:     otherTokenPool,
+			expectedErr: "both pools must manage the same token",
+		},
+		{
+			name:        "Failure - old pool is not a lock-release pool",
+			oldPool:     burnMintPool,
+			newPool:     s.newPoolAddr,
+			expectedErr: "not a lock-release pool",
+		},
+		{
+			name:        "Failure - old and new pools are the same version",
+			oldPool:     secondV2Pool,
+			newPool:     s.newPoolAddr,
+			expectedErr: "must be strictly older than the new pool",
+		},
+		{
+			name:        "Failure - old and new pools are reversed",
+			oldPool:     s.newPoolAddr,
+			newPool:     s.oldPoolAddr,
+			expectedErr: "must be strictly older than the new pool",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := operations.ExecuteSequence(
+				testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+				tokens.MigrateLockReleasePoolLiquidity,
+				s.env.BlockChains,
+				tokens_core.MigrateLockReleasePoolLiquidityInput{
+					ChainSelector:   chainSel,
+					OldPoolAddress:  tc.oldPool.Hex(),
+					NewPoolAddress:  tc.newPool.Hex(),
+					TimelockAddress: s.deployer.Hex(),
+					BasisPoints:     new(uint16(10000)),
+				},
+			)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
 }

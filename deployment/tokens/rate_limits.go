@@ -1,19 +1,21 @@
 package tokens
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 type TPRLInput struct {
@@ -172,66 +174,82 @@ func SetTokenPoolRateLimits() cldf.ChangeSetV2[TPRLInput] {
 
 func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 	return func(e cldf.Environment, cfg TPRLInput) error {
+		if len(cfg.Configs) == 0 {
+			return errors.New("input must contain at least one chain config")
+		}
 		for localSelector, config := range cfg.Configs {
-			for remoteSelector, localOutbound := range config.RemoteOutbounds {
-				if err := localOutbound.Validate(); err != nil {
-					return fmt.Errorf("outbound rate limiter config for remote chain %d: %w", remoteSelector, err)
-				}
-
-				// Counterpart config must always exist: when OutboundOnly is set we still need the
-				// counterpart's TokenPoolRef/TokenRef to resolve its pool address and decimals for
-				// the on-chain inbound validation.
-				remote, ok := cfg.Configs[remoteSelector]
-				if !ok {
-					return fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
-				}
-
-				if localOutbound.OutboundOnly {
-					// In OutboundOnly mode the counterpart's RemoteOutbounds[localSelector] is not
-					// required and symmetry checks do not apply: chain B is read-only for the
-					// changeset and its rate limit will be validated against on-chain state at
-					// apply time, not user input.
-					if _, ok := localOutbound.DefaultBucket(); !ok {
-						if _, ffOK := localOutbound.FastFinalityBucket(); !ffOK {
-							return fmt.Errorf("outbound-only lane from chain %d to %d has no outbound buckets", localSelector, remoteSelector)
-						}
-					}
-					continue
-				}
-
-				remoteOutbound, ok := remote.RemoteOutbounds[localSelector]
-				if !ok {
-					return fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", remoteSelector, localSelector)
-				}
-
-				// Rate limit must be valid on both sides
-				if err := remoteOutbound.Validate(); err != nil {
-					return fmt.Errorf("outbound rate limiter config from chain %d toward %d: %w", remoteSelector, localSelector, err)
-				}
-
-				// Fast-finality rate limit must either be absent on both sides or present on both sides; it cannot be asymmetric
-				_, remoteFastFinalityRateLimitExists := remoteOutbound.FastFinalityBucket()
-				_, localFastFinalityRateLimitExists := localOutbound.FastFinalityBucket()
-				if localFastFinalityRateLimitExists != remoteFastFinalityRateLimitExists {
-					return fmt.Errorf(
-						"both local and remote buckets must be provided for fastFinality=true or neither can be provided for chain selector %d and remote selector %d",
-						localSelector, remoteSelector,
-					)
-				}
-
-				// Default rate limit must either be absent on both sides or present on both sides; it cannot be asymmetric
-				_, remoteDefaultRateLimitExists := remoteOutbound.DefaultBucket()
-				_, localDefaultRateLimitExists := localOutbound.DefaultBucket()
-				if localDefaultRateLimitExists != remoteDefaultRateLimitExists {
-					return fmt.Errorf(
-						"both local and remote buckets must be provided for fastFinality=false or neither can be provided for chain selector %d and remote selector %d",
-						localSelector, remoteSelector,
-					)
-				}
+			if len(config.RemoteOutbounds) == 0 {
+				return fmt.Errorf("no remote outbounds provided for chain with selector %d", localSelector)
+			}
+			if err := verifyRemoteOutbounds(cfg, localSelector, config); err != nil {
+				return err
 			}
 		}
 		return nil
 	}
+}
+
+// verifyRemoteOutbounds checks the outbound rate limit configuration for one chain against its
+// counterpart chains: every outbound must be valid, its counterpart config must exist, and the
+// default and fast-finality buckets must be symmetric across the lane.
+func verifyRemoteOutbounds(cfg TPRLInput, localSelector uint64, config TPRLConfig) error {
+	for remoteSelector, localOutbound := range config.RemoteOutbounds {
+		if err := localOutbound.Validate(); err != nil {
+			return fmt.Errorf("outbound rate limiter config for remote chain %d: %w", remoteSelector, err)
+		}
+
+		// Counterpart config must always exist: when OutboundOnly is set we still need the
+		// counterpart's TokenPoolRef/TokenRef to resolve its pool address and decimals for
+		// the on-chain inbound validation.
+		remote, ok := cfg.Configs[remoteSelector]
+		if !ok {
+			return fmt.Errorf("no config provided for remote chain with selector %d", remoteSelector)
+		}
+
+		if localOutbound.OutboundOnly {
+			// In OutboundOnly mode the counterpart's RemoteOutbounds[localSelector] is not
+			// required and symmetry checks do not apply: chain B is read-only for the
+			// changeset and its rate limit will be validated against on-chain state at
+			// apply time, not user input.
+			if _, ok := localOutbound.DefaultBucket(); !ok {
+				if _, ffOK := localOutbound.FastFinalityBucket(); !ffOK {
+					return fmt.Errorf("outbound-only lane from chain %d to %d has no outbound buckets", localSelector, remoteSelector)
+				}
+			}
+			continue
+		}
+
+		remoteOutbound, ok := remote.RemoteOutbounds[localSelector]
+		if !ok {
+			return fmt.Errorf("no inputs provided for remote chain with selector %d to chain with selector %d", remoteSelector, localSelector)
+		}
+
+		// Rate limit must be valid on both sides
+		if err := remoteOutbound.Validate(); err != nil {
+			return fmt.Errorf("outbound rate limiter config from chain %d toward %d: %w", remoteSelector, localSelector, err)
+		}
+
+		// Fast-finality rate limit must either be absent on both sides or present on both sides; it cannot be asymmetric
+		_, remoteFastFinalityRateLimitExists := remoteOutbound.FastFinalityBucket()
+		_, localFastFinalityRateLimitExists := localOutbound.FastFinalityBucket()
+		if localFastFinalityRateLimitExists != remoteFastFinalityRateLimitExists {
+			return fmt.Errorf(
+				"both local and remote buckets must be provided for fastFinality=true or neither can be provided for chain selector %d and remote selector %d",
+				localSelector, remoteSelector,
+			)
+		}
+
+		// Default rate limit must either be absent on both sides or present on both sides; it cannot be asymmetric
+		_, remoteDefaultRateLimitExists := remoteOutbound.DefaultBucket()
+		_, localDefaultRateLimitExists := localOutbound.DefaultBucket()
+		if localDefaultRateLimitExists != remoteDefaultRateLimitExists {
+			return fmt.Errorf(
+				"both local and remote buckets must be provided for fastFinality=false or neither can be provided for chain selector %d and remote selector %d",
+				localSelector, remoteSelector,
+			)
+		}
+	}
+	return nil
 }
 
 func setTokenPoolRateLimitsApply() func(cldf.Environment, TPRLInput) (cldf.ChangesetOutput, error) {

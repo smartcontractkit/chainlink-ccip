@@ -113,6 +113,9 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 						return fmt.Errorf("finality config for pool %s on chain selector %d: %w", datastore_utils.SprintRef(pool.TokenPoolRef), chainCfg.ChainSelector, err)
 					}
 				}
+				if err := verifyNonEmptyAddressFields(pool, chainCfg.ChainSelector); err != nil {
+					return err
+				}
 				seenRemotes := make(map[uint64]struct{})
 				for _, remote := range pool.Remotes {
 					if remote.RemoteChainSelector == chainCfg.ChainSelector {
@@ -147,6 +150,25 @@ func configureTokenPoolVerify() func(cldf.Environment, ConfigureTokenPoolInput) 
 		}
 		return nil
 	}
+}
+
+func verifyNonEmptyAddressFields(pool PoolConfigUpdate, chainSelector uint64) error {
+	for _, field := range []struct {
+		name  string
+		value *string
+	}{
+		{"rateLimitAdmin", pool.RateLimitAdmin},
+		{"feeAdmin", pool.FeeAdmin},
+		{"router", pool.Router},
+	} {
+		if field.value != nil && *field.value == "" {
+			return fmt.Errorf(
+				"pool entry %s on chain selector %d has an empty %s",
+				datastore_utils.SprintRef(pool.TokenPoolRef), chainSelector, field.name,
+			)
+		}
+	}
+	return nil
 }
 
 func configureTokenPoolApply() func(cldf.Environment, ConfigureTokenPoolInput) (cldf.ChangesetOutput, error) {

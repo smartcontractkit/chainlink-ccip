@@ -14,17 +14,18 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type MockReader struct{}
@@ -1324,4 +1325,168 @@ func TestAutoMigrate_V2TargetRequired(t *testing.T) {
 	// Even though this adapter implements TokenPoolMigrator, forward discovery must NOT run: the target is
 	// pre-V2, so auto-migration is a no-op (there is no V2 pool to migrate to).
 	require.Zero(t, mockAdapter.getSupportedChainsCalls, "discovery should not run without a v2.0.0+ migration target")
+}
+
+func TestConfigureTokensForTransfers_VerifyPreconditions(t *testing.T) {
+	const (
+		chainA = uint64(5009297550715157269)
+		chainB = uint64(15971525489660198786)
+	)
+
+	baseToken := func() tokens.TokenTransferConfig {
+		return tokens.TokenTransferConfig{
+			ChainSelector: chainA,
+			TokenPoolRef: datastore.AddressRef{
+				Type:          "TokenPool",
+				Version:       semver.MustParse("1.0.0"),
+				ChainSelector: chainA,
+				Qualifier:     "default",
+			},
+			RegistryRef: datastore.AddressRef{
+				Type:          "Registry",
+				Version:       semver.MustParse("1.0.0"),
+				ChainSelector: chainA,
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		cfg         tokens.ConfigureTokensForTransfersConfig
+		expectedErr string
+	}{
+		{
+			name:        "Failure - no token entries",
+			cfg:         tokens.ConfigureTokensForTransfersConfig{},
+			expectedErr: "at least one token entry",
+		},
+		{
+			name: "Success - valid single token",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{baseToken()},
+			},
+		},
+		{
+			name: "Failure - invalid chain selector",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					func() tokens.TokenTransferConfig {
+						token := baseToken()
+						token.ChainSelector = 0
+						return token
+					}(),
+				},
+			},
+			expectedErr: "invalid chain selector 0",
+		},
+		{
+			name: "Failure - duplicate chain selector",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{baseToken(), baseToken()},
+			},
+			expectedErr: "duplicate entry for chain selector",
+		},
+		{
+			name: "Failure - empty TokenPoolRef",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					func() tokens.TokenTransferConfig {
+						token := baseToken()
+						token.TokenPoolRef = datastore.AddressRef{}
+						return token
+					}(),
+				},
+			},
+			expectedErr: "TokenPoolRef is required",
+		},
+		{
+			name: "Failure - TokenPoolRef chain selector mismatch",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					func() tokens.TokenTransferConfig {
+						token := baseToken()
+						token.TokenPoolRef.ChainSelector = chainB
+						return token
+					}(),
+				},
+			},
+			expectedErr: "TokenPoolRef.ChainSelector",
+		},
+		{
+			name: "Failure - RegistryRef chain selector mismatch",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					func() tokens.TokenTransferConfig {
+						token := baseToken()
+						token.RegistryRef.ChainSelector = chainB
+						return token
+					}(),
+				},
+			},
+			expectedErr: "RegistryRef.ChainSelector",
+		},
+		{
+			name: "Failure - remote chain selector equals own chain selector",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					func() tokens.TokenTransferConfig {
+						token := baseToken()
+						token.RemoteChains = map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							chainA: {},
+						}
+						return token
+					}(),
+				},
+			},
+			expectedErr: "must not equal the token's own chain selector",
+		},
+		{
+			name: "Failure - invalid remote chain selector",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					func() tokens.TokenTransferConfig {
+						token := baseToken()
+						token.RemoteChains = map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							0: {},
+						}
+						return token
+					}(),
+				},
+			},
+			expectedErr: "invalid remote chain selector 0",
+		},
+		{
+			name: "Failure - remote fee config without isEnabled",
+			cfg: tokens.ConfigureTokensForTransfersConfig{
+				Tokens: []tokens.TokenTransferConfig{
+					func() tokens.TokenTransferConfig {
+						token := baseToken()
+						token.RemoteChains = map[uint64]tokens.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+							chainB: {
+								TokenTransferFeeConfig: &tokens.PartialTokenTransferFeeConfig{
+									DestGasOverhead: utils.NewOptional(uint32(100)),
+								},
+							},
+						}
+						return token
+					}(),
+				},
+			},
+			expectedErr: "must specify isEnabled",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			changeset := tokens.ConfigureTokensForTransfers(tokens.GetTokenAdapterRegistry(), changesets.GetRegistry())
+			err := changeset.VerifyPreconditions(deployment.Environment{}, tc.cfg)
+
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
 }
