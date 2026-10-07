@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	solchain "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -35,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/lockrelease_token_pool"
+	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
@@ -1662,6 +1664,163 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 				})
 				require.NoError(t, err)
 			})
+		})
+
+		// SkipIfMissingPermissions on Solana: the Solana pool's per-mint config is handed to a foreign
+		// wallet, so connecting with skipIfMissingPermissions configures only the EVM side.
+		t.Run("SkipIfMissingPermissions", func(t *testing.T) {
+			const evmTokenSymbol = "S5_SKIP_EVM_TOK"
+			const solTokenSymbol = "S5_SKIP_SOL_TOK"
+			const evmPoolQual = "S5_SKIP_EVM_POOL"
+
+			// Deploy token+pool on both chains without connecting. SkipOwnershipTransfer keeps the
+			// deployer as pool owner so we can hand the Solana pool to a foreign wallet below.
+			out, err := tokensapi.TokenExpansion().Apply(*env, tokensapi.TokenExpansionInput{
+				ChainAdapterVersion: v1_6_0_scenarios,
+				MCMS:                NewDefaultInputForMCMS("Scenario 5 skip deploy"),
+				TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+					evmChainSel: {
+						SkipOwnershipTransfer: true,
+						TokenPoolVersion:      v1_5_1_scenarios,
+						DeployTokenInput: &tokensapi.DeployTokenInput{
+							Name: "Scenario5 skip EVM Token", Symbol: evmTokenSymbol, Decimals: evmDecimals,
+							Type: bnmERC20ops.ContractType, Supply: &defaultMaxSupply, PreMint: &defaultPreMint,
+						},
+						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+							TokenPoolQualifier: evmPoolQual,
+							PoolType:           cciputils.BurnMintTokenPool.String(),
+						},
+					},
+					solChainSel: {
+						SkipOwnershipTransfer: true,
+						TokenPoolVersion:      v1_6_0_scenarios,
+						DeployTokenInput: &tokensapi.DeployTokenInput{
+							Name: "Scenario5 skip SOL Token", Symbol: solTokenSymbol, Decimals: svmDecimals,
+							Type:          solanautils.SPLTokens,
+							ExternalAdmin: solana.NewWallet().PublicKey().String(),
+							Senders:       []string{solChain.DeployerKey.PublicKey().String()},
+							PreMint:       &defaultPreMint,
+						},
+						DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
+							TokenPoolQualifier: "",
+							PoolType:           cciputils.LockReleaseTokenPool.String(),
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			MergeAddresses(t, env, out.DataStore)
+			testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+			evmPoolAddr, err := evmAdapter.FindLatestAddressRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: evmChainSel,
+				Qualifier:     evmPoolQual,
+				Type:          datastore.ContractType(cciputils.BurnMintTokenPool),
+			})
+			require.NoError(t, err)
+			evmPool, err := bnmpool.NewBurnMintTokenPool(evmPoolAddr, evmChain.Client)
+			require.NoError(t, err)
+			solTokenRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{Qualifier: solTokenSymbol}, solChainSel, datastore_utils.FullRef)
+			require.NoError(t, err)
+			solPoolRef, err := datastore_utils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
+				ChainSelector: solChainSel,
+				Type:          datastore.ContractType(cciputils.LockReleaseTokenPool),
+				Version:       v1_6_0_scenarios,
+			}, solChainSel, datastore_utils.FullRef)
+			require.NoError(t, err)
+			solPoolProgramID := solana.MustPublicKeyFromBase58(solPoolRef.Address)
+			solTokenMint := solana.MustPublicKeyFromBase58(solTokenRef.Address)
+			solPoolPDA, _ := tokens.TokenPoolConfigAddress(solTokenMint, solPoolProgramID)
+			solChainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
+			require.NoError(t, err)
+
+			// Hand the Solana pool to a foreign wallet (2-step ownership: deployer proposes, wallet
+			// accepts). The deployer pays the fees so the foreign wallet needs no funding.
+			owner, err := tokenpoolops.GetAuthorityLockRelease(solChain, solPoolProgramID, solTokenMint)
+			require.NoError(t, err)
+			require.Equal(t, solChain.DeployerKey.PublicKey(), owner, "fresh Solana pool should be owned by the deployer")
+			foreignWallet := solana.NewWallet()
+			transferReport, err := operations.ExecuteOperation(env.OperationsBundle, tokenpoolops.TransferOwnershipLockRelease, solChain, tokenpoolops.TokenPoolTransferOwnershipInput{
+				Program:   solPoolProgramID,
+				NewOwner:  foreignWallet.PublicKey(),
+				TokenMint: solTokenMint,
+			})
+			require.NoError(t, err)
+			require.Empty(t, transferReport.Output.BatchOps, "deployer-owned pool should transfer ownership directly")
+			lockrelease_token_pool.SetProgramID(solPoolProgramID)
+			acceptIx, err := lockrelease_token_pool.NewAcceptOwnershipInstruction(solPoolPDA, solTokenMint, foreignWallet.PublicKey()).ValidateAndBuild()
+			require.NoError(t, err)
+			require.NoError(t, solChain.Confirm([]solana.Instruction{acceptIx}, solcommon.AddSigners(foreignWallet.PrivateKey)))
+			owner, err = tokenpoolops.GetAuthorityLockRelease(solChain, solPoolProgramID, solTokenMint)
+			require.NoError(t, err)
+			require.Equal(t, foreignWallet.PublicKey(), owner)
+
+			connectInput := func(skipIfMissingPermissions bool, desc string) tokensapi.TokenExpansionInput {
+				return tokensapi.TokenExpansionInput{
+					ChainAdapterVersion: v1_6_0_scenarios,
+					MCMS:                NewDefaultInputForMCMS(desc),
+					TokenExpansionInputPerChain: map[uint64]tokensapi.TokenExpansionInputPerChain{
+						evmChainSel: {
+							SkipOwnershipTransfer: true,
+							TokenTransferConfig: &tokensapi.TokenTransferConfig{
+								SkipIfMissingPermissions: skipIfMissingPermissions,
+								TokenPoolRef:             datastore.AddressRef{Address: evmPoolAddr.Hex()},
+								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+									solChainSel: {OutboundRateLimiterConfig: &defaultRL},
+								},
+							},
+						},
+						solChainSel: {
+							SkipOwnershipTransfer: true,
+							TokenTransferConfig: &tokensapi.TokenTransferConfig{
+								SkipIfMissingPermissions: skipIfMissingPermissions,
+								TokenPoolRef:             datastore.AddressRef{Address: solPoolPDA.String()},
+								RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+									evmChainSel: {OutboundRateLimiterConfig: &defaultRL},
+								},
+							},
+						},
+					},
+				}
+			}
+
+			// Flag on: the EVM pool (deployer-owned) is configured, the Solana pool (foreign-owned) is skipped
+			out, err = tokensapi.TokenExpansion().Apply(*env, connectInput(true, "Scenario 5 skip connect one-sided"))
+			require.NoError(t, err)
+			MergeAddresses(t, env, out.DataStore)
+			for _, prop := range out.MCMSTimelockProposals {
+				for _, op := range prop.Operations {
+					require.NotEqual(t, solChainSel, uint64(op.ChainSelector), "no ops should target Solana whose pool is externally owned")
+				}
+			}
+			testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+			supportedChains, err := evmPool.GetSupportedChains(&bind.CallOpts{Context: t.Context()})
+			require.NoError(t, err)
+			require.Contains(t, supportedChains, solChainSel, "EVM pool should support Solana after the one-sided connect")
+			_, err = solChain.Client.GetAccountInfo(t.Context(), solChainCfgPDA)
+			require.ErrorIs(t, err, rpc.ErrNotFound, "Solana pool should have no chain config for EVM")
+
+			// Flag off (control): the Solana pool's writes are emitted eagerly as MCMS ops and fail
+			// on execution since the timelock is not the owner of the Solana pool
+			out, err = tokensapi.TokenExpansion().Apply(*env, connectInput(false, "Scenario 5 skip connect eager"))
+			require.NoError(t, err)
+			require.NotEmpty(t, out.MCMSTimelockProposals)
+			require.NoError(t, timelockdelay.CorrectTimelockDelays(env.GetContext(), env.Logger, env.BlockChains, out.MCMSTimelockProposals))
+			var execErr error
+			for _, prop := range out.MCMSTimelockProposals {
+				p := testhelpers.SignMCMSTimelockProposal(t, *env, &prop, false)
+				if err := testhelpers.ExecuteMCMSProposal(t, *env, p); err != nil {
+					execErr = err
+					continue
+				}
+				if err := testhelpers.ExecuteMCMSTimelockProposal(t, *env, &prop); err != nil {
+					execErr = err
+				}
+			}
+			require.Error(t, execErr, "configuring the externally owned Solana pool without skipIfMissingPermissions should fail")
+			_, err = solChain.Client.GetAccountInfo(t.Context(), solChainCfgPDA)
+			require.ErrorIs(t, err, rpc.ErrNotFound, "Solana pool should still have no chain config for EVM")
 		})
 
 		// Test address ref inference
