@@ -11,6 +11,45 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
+  # 1.2.0
+  #
+  # The oldest pool generation still in service. A surviving v1.2.0 pool is never registered in the
+  # TokenAdminRegistry (which did not exist until v1.5.0) - it sits behind a v1.5.0 *TokenPoolAndProxy
+  # that is, reachable only via that proxy's getPreviousPool().
+  #
+  # v1.2.0 pools are RAMP-keyed, not chain-keyed: there is no applyChainUpdates, no getSupportedChains
+  # and no router. Lanes are expressed as onRamp/offRamp addresses and rate limits are stored per ramp.
+  # Behind a proxy the proxy itself is the only registered ramp, so there is exactly ONE outbound and
+  # ONE inbound limiter shared across every lane.
+  #
+  # Only reads are generated. Everything lane-shaped is served by the fronting proxy, and a write here
+  # would hit the shared per-ramp limiter and silently affect every lane at once, so no write
+  # operation is exposed at all. BurnMintTokenPool declares no external functions beyond the base
+  # surface, so its ABI IS the base ABI (same pattern as v1.5.0's TokenPoolAndProxy).
+  #
+  # No deployment: a new v1.2.0 pool is never correct.
+  - contract_name: TokenPool
+    version: "1.2.0"
+    abi_file: "burn_mint_token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getToken
+        access: public
+      - name: getArmProxy
+        access: public
+      - name: getOnRamps
+        access: public
+      - name: getOffRamps
+        access: public
+      - name: isOnRamp
+        access: public
+      - name: isOffRamp
+        access: public
+      - name: currentOnRampRateLimiterState
+        access: public
+      - name: currentOffRampRateLimiterState
+        access: public
+
   # 1.4.0
   #
   # Legacy pools that survive only behind a v1.5.0 *TokenPoolAndProxy. TokenPool is the shared
@@ -75,6 +114,25 @@ contracts:
       - name: provideLiquidity
         access: public
       - name: withdrawLiquidity
+        access: public
+
+  # LockReleaseTokenPool as deployed for v1.2.0 lanes.
+  #
+  # There are no official v1.2.0 LockRelease gobindings; the v1.0.0 binding's selectors are
+  # identical, so the ABI is read from v1_0_0 and these operations are generated there. The v1.2.0
+  # adapter imports them, which is the same reuse the v1.5.0 migration path already relies on (see
+  # readV12Limits in v1_5_0/adapters/tokens.go). ContractType/Version therefore read 1.0.0 while the
+  # deployed contract reports "LockReleaseTokenPool 1.2.0".
+  #
+  # Only getProvidedLiquidity is generated: the whole shared pool surface lives in the v1.2.0
+  # TokenPool package with identical selectors, and the liquidity WRITE path (addLiquidity /
+  # removeLiquidity) is deliberately not exposed - see the v1.2.0 adapter for why draining is out of
+  # scope.
+  - contract_name: LockReleaseTokenPool
+    version: "1.0.0"
+    no_deployment: true
+    functions:
+      - name: getProvidedLiquidity
         access: public
 
   # 1.5.0
