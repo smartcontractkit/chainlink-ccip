@@ -659,7 +659,55 @@ var (
 	_ tokenapi.TokenPoolDynamicConfigAdapter = (*SolanaAdapter)(nil)
 	_ tokenapi.RemotePoolRemover             = (*SolanaAdapter)(nil)
 	_ tokenapi.TokenPoolMigrator             = (*SolanaAdapter)(nil)
+	_ tokenapi.TokenPoolOwnershipChecker     = (*SolanaAdapter)(nil)
 )
+
+// IsPoolExternallyOwned implements tokenapi.TokenPoolOwnershipChecker. A Solana 1.6 pool program
+// is shared across mints and ownership lives in the per-mint pool config PDA, so tokenRef must
+// resolve to the token mint. The pool is externally owned when its config owner is neither the
+// CLL timelock signer PDA nor the deployer key.
+func (a *SolanaAdapter) IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, tokenRef datastore.AddressRef) (bool, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return false, fmt.Errorf("solana chain with selector %d not defined", chainSelector)
+	}
+	fullTokenRef, _, err := a.getTokenMintAndTokenProgram(e.OperationsBundle, e.BlockChains, e.DataStore, chainSelector, tokenRef)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve token mint for ref (%s): %w", datastore_utils.SprintRef(tokenRef), err)
+	}
+	fullPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve pool ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
+	}
+	tokenMint, err := solana.PublicKeyFromBase58(fullTokenRef.Address)
+	if err != nil {
+		return false, fmt.Errorf("invalid token mint address for chain %d: %s: %w", chainSelector, fullTokenRef.Address, err)
+	}
+	tokenPool, err := solana.PublicKeyFromBase58(fullPoolRef.Address)
+	if err != nil {
+		return false, fmt.Errorf("invalid token pool address for chain %d: %s: %w", chainSelector, fullPoolRef.Address, err)
+	}
+
+	getAuthority := tokenpoolops.GetAuthorityBurnMint
+	switch fullPoolRef.Type.String() {
+	case common_utils.BurnMintTokenPool.String():
+		// Already set to burn mint
+	case common_utils.LockReleaseTokenPool.String():
+		getAuthority = tokenpoolops.GetAuthorityLockRelease
+	default:
+		return false, fmt.Errorf("unsupported token pool type '%s' for Solana", fullPoolRef.Type)
+	}
+
+	timelockSigner, err := utils.GetTimelockSignerPDA(e.DataStore.Addresses().Filter(), chainSelector, common_utils.CLLQualifier)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve timelock signer for chain %d: %w", chainSelector, err)
+	}
+	owner, err := getAuthority(chain, tokenPool, tokenMint)
+	if err != nil {
+		return false, fmt.Errorf("failed to get owner of token pool %s for mint %s on chain %d: %w", tokenPool, tokenMint, chainSelector, err)
+	}
+	return !owner.Equals(timelockSigner) && !owner.Equals(chain.DeployerKey.PublicKey()), nil
+}
 
 // RemoveRemotePools removes remote pool entries from a Solana 1.6 token pool. The pool address
 // is a program ID shared across mints, so the token mint comes from input.TokenRef and the pool
