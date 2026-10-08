@@ -23,18 +23,29 @@ import (
 )
 
 type ConfigureTokenPoolForRemoteChainsInput struct {
+	// ChainSelector identifies the chain the pool lives on. It must be carried in the
+	// input (not only the executor dependency) so that two invocations with otherwise
+	// identical inputs on different chains do not collide in the operations report
+	// cache, which keys on the sequence input alone. Without it, configuring two
+	// chains whose pool addresses are identical reuses the first chain's cached report
+	// and emits ops against the wrong chain.
+	ChainSelector    uint64
 	TokenPoolAddress common.Address
 	TokenPoolVersion *semver.Version
 	RemoteChains     map[uint64]tokensapi.RemoteChainConfig[[]byte, string]
 }
 
 type ConfigureTokenPoolForRemoteChainInput struct {
+	ChainSelector       uint64
 	TokenPoolAddress    common.Address
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
 
-func (c ConfigureTokenPoolForRemoteChainInput) Validate() error {
+func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
+	if c.ChainSelector != chain.Selector {
+		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
+	}
 	return evmutils.Wrap(
 		c.RemoteChainConfig.Validate(),
 		fmt.Sprintf("invalid remote chain config for remote chain selector %d", c.RemoteChainSelector),
@@ -53,6 +64,9 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 		// ConfigureTokensForTransfers) so we intentionally use the direct contract bindings
 		// over ExecuteOperation to avoid the possibility of reading stale onchain data from
 		// the operation reports cache.
+		if input.ChainSelector != chain.Selector {
+			return sequences.OnChainOutput{}, fmt.Errorf("chain selector %d does not match chain %s", input.ChainSelector, chain)
+		}
 		tokenPool, err := token_pool.NewTokenPool(input.TokenPoolAddress, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
@@ -77,6 +91,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				ConfigureTokenPoolForRemoteChain,
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
+					ChainSelector:       input.ChainSelector,
 					TokenPoolAddress:    tokenPool.Address(),
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
@@ -100,7 +115,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	tpops.Version,
 	"Configures a token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (sequences.OnChainOutput, error) {
-		if err := input.Validate(); err != nil {
+		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 
@@ -138,7 +153,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// A pool's type and version is immutable so we can safely use ExecuteOperation here
 		// without worrying about stale data from the cache.
 		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
+			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 			Args:          struct{}{},
 		})
@@ -282,7 +297,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If either rate limiter config is different, then update it
 				if !isOutboundEqual || !isInboundEqual {
 					report, err := cldf_ops.ExecuteOperation(b, tpops.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpops.SetChainRateLimiterConfigArgs]{
-						ChainSelector: chain.Selector,
+						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
 						Args: tpops.SetChainRateLimiterConfigArgs{
 							OutboundRateLimitConfig: token_pool.RateLimiterConfig{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
@@ -299,7 +314,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 				// If the exact 32-byte remote pool address is not registered, add it
 				if !hasRemoteTP {
 					report, err := cldf_ops.ExecuteOperation(b, tpops.AddRemotePool, chain, contract.FunctionInput[tpops.AddRemotePoolArgs]{
-						ChainSelector: chain.Selector,
+						ChainSelector: input.ChainSelector,
 						Address:       input.TokenPoolAddress,
 						Args: tpops.AddRemotePoolArgs{
 							RemoteChainSelector: remoteCS,
@@ -338,7 +353,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		if len(reportWrites) == 0 {
 			paddedRemoteTokenPoolAddress := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
 			applyChainUpdatesInput := contract.FunctionInput[tpops.ApplyChainUpdatesArgs]{
-				ChainSelector: chain.Selector,
+				ChainSelector: input.ChainSelector,
 				Address:       input.TokenPoolAddress,
 				Args: tpops.ApplyChainUpdatesArgs{
 					RemoteChainSelectorsToRemove: remotesToDel,

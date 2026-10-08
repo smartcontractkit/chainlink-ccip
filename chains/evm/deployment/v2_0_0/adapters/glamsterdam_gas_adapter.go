@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -79,6 +80,35 @@ var glamsterdamTokenPoolKinds = []tokenPoolKind{
 	{lombard_token_pool.ContractType, lombard_token_pool.Version, v2_0_0_adapters.LombardTokenPoolDestGasOverhead},
 	{siloed_usdc_token_pool.ContractType, siloed_usdc_token_pool.Version, v2_0_0_adapters.USDCTokenPoolDestGasOverhead},
 	{cctp_through_ccv_token_pool.ContractType, cctp_through_ccv_token_pool.Version, v2_0_0_adapters.USDCTokenPoolDestGasOverhead},
+}
+
+// legacyUSDCTokenPoolContractTypes are USDC pool contract types, of any version, that are not
+// updated as token pools by this adapter (they are legacy / not IPoolV2, or are proxies) but whose
+// underlying token must still be recognised as USDC when migrating the FeeQuoter per-token
+// overrides: on mainnet the canonical USDC lanes use the legacy USDCTokenPool 1.5.x/1.6.x, whose
+// token gas the OnRamp takes from the FeeQuoter override.
+var legacyUSDCTokenPoolContractTypes = []datastore.ContractType{
+	"USDCTokenPool",
+	"USDCTokenPoolCCTPV2",
+	"USDCTokenPoolProxy",
+}
+
+// resolveAddressRefsAnyVersion returns every distinct address of the given contract type on the
+// chain, regardless of version or qualifier.
+func resolveAddressRefsAnyVersion(addrs []datastore.AddressRef, contractType datastore.ContractType) []common.Address {
+	seen := make(map[common.Address]bool)
+	var out []common.Address
+	for _, ref := range addrs {
+		if ref.Type != contractType {
+			continue
+		}
+		addr := common.HexToAddress(ref.Address)
+		if !seen[addr] {
+			seen[addr] = true
+			out = append(out, addr)
+		}
+	}
+	return out
 }
 
 // HasLaneToTarget checks if a lane exists by checking FeeQuoter's DestChainConfig.IsEnabled,
@@ -162,6 +192,7 @@ func (a *GlamsterdamGasAdapter) ReadDestGasFields(
 		if err != nil {
 			return nil, fmt.Errorf("failed to read FeeQuoter: %w", err)
 		}
+		fields[v2_0_0_adapters.FeeQuoterDestGasOverhead.Name] = fqCur.Output.DestGasOverhead
 		fields[v2_0_0_adapters.FeeQuoterDefaultTokenDestGasOverhead.Name] = fqCur.Output.DefaultTokenDestGasOverhead
 		fields[v2_0_0_adapters.FeeQuoterMaxPerMsgGasLimit.Name] = fqCur.Output.MaxPerMsgGasLimit
 		fields[v2_0_0_adapters.FeeQuoterDestGasPerPayloadByteBase.Name] = uint32(fqCur.Output.DestGasPerPayloadByteBase)
@@ -237,6 +268,11 @@ func (a *GlamsterdamGasAdapter) WriteDestGasFields(
 
 	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
 	var writes []contract.WriteOutput
+	// isolatedWrites are verifier writes that each get their own batch: a timelock batch executes
+	// atomically, so isolating them means a verifier the timelock doesn't own (or that otherwise
+	// reverts) fails only its own batch, not the chain's core OnRamp/FeeQuoter/CommitteeVerifier
+	// update.
+	var isolatedWrites []contract.WriteOutput
 
 	// OnRamp: BaseExecutionGasCost
 	onRampRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, onramp.ContractType, onramp.Version, "")
@@ -295,6 +331,9 @@ func (a *GlamsterdamGasAdapter) WriteDestGasFields(
 		}
 
 		updated := fqCur.Output
+		if val, ok := resolved[v2_0_0_adapters.FeeQuoterDestGasOverhead.Name]; ok {
+			updated.DestGasOverhead = val
+		}
 		if val, ok := resolved[v2_0_0_adapters.FeeQuoterDefaultTokenDestGasOverhead.Name]; ok {
 			updated.DefaultTokenDestGasOverhead = val
 		}
@@ -382,7 +421,7 @@ func (a *GlamsterdamGasAdapter) WriteDestGasFields(
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply LombardVerifier(%s) update: %w", lvAddr, err)
 		}
-		writes = append(writes, lvWrite.Output)
+		isolatedWrites = append(isolatedWrites, lvWrite.Output)
 	}
 
 	// CCTPVerifier: GasForVerification. Same multi-address reasoning as LombardVerifier above.
@@ -410,20 +449,35 @@ func (a *GlamsterdamGasAdapter) WriteDestGasFields(
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply CCTPVerifier(%s) update: %w", ctpAddr, err)
 		}
-		writes = append(writes, ctpWrite.Output)
+		isolatedWrites = append(isolatedWrites, ctpWrite.Output)
 	}
 
-	// Convert all writes to a single batch operation
-	if len(writes) == 0 {
+	return buildLaneBatchOps(writes, isolatedWrites)
+}
+
+// buildLaneBatchOps turns one lane's writes into MCMS batch operations: the core writes (OnRamp,
+// FeeQuoter, CommitteeVerifier) in a single batch, followed by one batch per isolated write.
+func buildLaneBatchOps(core, isolated []contract.WriteOutput) ([]mcms_types.BatchOperation, error) {
+	if len(core) == 0 && len(isolated) == 0 {
 		return []mcms_types.BatchOperation{}, nil
 	}
 
-	batchOp, err := contract.NewBatchOperationFromWrites(writes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build batch operation: %w", err)
+	var ops []mcms_types.BatchOperation
+	if len(core) > 0 {
+		coreBatch, err := contract.NewBatchOperationFromWrites(core)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build core batch operation: %w", err)
+		}
+		ops = append(ops, coreBatch)
 	}
-
-	return []mcms_types.BatchOperation{batchOp}, nil
+	for _, w := range isolated {
+		isolatedBatch, err := contract.NewBatchOperationFromWrites([]contract.WriteOutput{w})
+		if err != nil {
+			return nil, fmt.Errorf("failed to build isolated batch operation: %w", err)
+		}
+		ops = append(ops, isolatedBatch)
+	}
+	return ops, nil
 }
 
 // ReadImmutableSanityFields reads OffRamp immutable fields.
@@ -525,6 +579,20 @@ func (a *GlamsterdamGasAdapter) ReadTokenGasField(
 	}
 
 	poolAddr := common.BytesToAddress(token)
+
+	// Pools such as CCTPThroughCCVTokenPool revert with CCVNotSetOnResolver when queried for a
+	// destination they don't support, so check support first rather than letting the read fail.
+	supported, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, contract.FunctionInput[struct{}]{
+		ChainSelector: srcChainSelector,
+		Address:       poolAddr,
+	})
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to read supported chains from pool %s: %w", poolAddr, err)
+	}
+	if !slices.Contains(supported.Output, targetChainSelector) {
+		return 0, false, nil
+	}
+
 	result, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
 		ChainSelector: srcChainSelector,
 		Address:       poolAddr,
@@ -606,4 +674,58 @@ func (a *GlamsterdamGasAdapter) WriteTokenGasField(
 	}
 
 	return batchOp, nil
+}
+
+// UpdateFeeQuoterTokenOverrides migrates the FeeQuoter per-token TokenTransferFeeConfig overrides
+// for this lane by reusing the existing glamsterdam.UpdateFeeQuoterTokenTransferFeeConfig
+// sequence (not reimplementing its USDC/Lombard classification + batching logic here). Lombard/USDC
+// pool addresses are enumerated the same way DiscoverCandidateTokens does (glamsterdamTokenPoolKinds),
+// plus legacyUSDCTokenPoolContractTypes for legacy/proxy USDC pools that aren't updated as token
+// pools but whose token must still be recognised as USDC for classification purposes.
+func (a *GlamsterdamGasAdapter) UpdateFeeQuoterTokenOverrides(
+	b cldf_ops.Bundle,
+	chains cldf_chain.BlockChains,
+	ds datastore.DataStore,
+	srcChainSelector, targetChainSelector uint64,
+) ([]mcms_types.BatchOperation, []string, error) {
+	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
+
+	fqRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, fee_quoter.ContractType, fee_quoter.Version, "")
+	if datastore_utils.IsAddressRefEmpty(fqRef) {
+		return nil, nil, nil
+	}
+
+	fqLane := glamsterdam.FeeQuoterTokenConfigLane{
+		ChainSelector:    srcChainSelector,
+		FeeQuoterAddress: common.HexToAddress(fqRef.Address),
+	}
+	for _, ref := range addrs {
+		for _, kind := range glamsterdamTokenPoolKinds {
+			if ref.Type != datastore.ContractType(kind.ContractType) || !ref.Version.Equal(kind.Version) {
+				continue
+			}
+			addr := common.HexToAddress(ref.Address)
+			switch kind.ContractType {
+			case lombard_token_pool.ContractType:
+				fqLane.LombardPoolAddresses = append(fqLane.LombardPoolAddresses, addr)
+			default:
+				fqLane.USDCPoolAddresses = append(fqLane.USDCPoolAddresses, addr)
+			}
+		}
+	}
+	// Legacy / proxy USDC pools are not updated as token pools, but their token is still USDC for
+	// the purpose of the FeeQuoter per-token override.
+	for _, legacyType := range legacyUSDCTokenPoolContractTypes {
+		fqLane.USDCPoolAddresses = append(fqLane.USDCPoolAddresses, resolveAddressRefsAnyVersion(addrs, legacyType)...)
+	}
+
+	out, err := cldf_ops.ExecuteSequence(b, glamsterdam.UpdateFeeQuoterTokenTransferFeeConfig, chains, glamsterdam.UpdateFeeQuoterTokenTransferFeeConfigInput{
+		TargetChainSelector: targetChainSelector,
+		Lanes:               []glamsterdam.FeeQuoterTokenConfigLane{fqLane},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to update FeeQuoter token transfer fee config for src %d: %w", srcChainSelector, err)
+	}
+
+	return out.Output.BatchOps, out.Output.Report.Lines, nil
 }

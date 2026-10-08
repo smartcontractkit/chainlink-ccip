@@ -1,17 +1,21 @@
 package adapters
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/tokens/tokenimpl"
 	datastore_utils_evm "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	tarseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/sequences"
+	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -25,10 +29,11 @@ import (
 )
 
 var (
-	_ tokensapi.RateLimitReaderAdapter = &EVMPoolAdapter{}
-	_ tokensapi.TokenRefResolver       = &EVMPoolAdapter{}
-	_ tokensapi.TokenAdapter           = &EVMPoolAdapter{}
-	_ tokensapi.RemotePoolRemover      = &EVMPoolAdapter{}
+	_ tokensapi.RateLimitReaderAdapter    = &EVMPoolAdapter{}
+	_ tokensapi.TokenRefResolver          = &EVMPoolAdapter{}
+	_ tokensapi.TokenAdapter              = &EVMPoolAdapter{}
+	_ tokensapi.RemotePoolRemover         = &EVMPoolAdapter{}
+	_ tokensapi.TokenPoolOwnershipChecker = &EVMPoolAdapter{}
 )
 
 // PoolOps abstracts the version-specific token pool contract calls.
@@ -48,10 +53,10 @@ type PoolOps interface {
 	SetDynamicPoolConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, router, rlAdmin, feeAdmin *common.Address) ([]evm_contract.WriteOutput, error)
 	GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, fastFinality bool) (tokensapi.OnchainRateLimits, error)
 	// RemoveRemotePools removes the given remote pool entries from the pool. Implementations
-	// read the current on-chain remote pools for each remote chain and return a clear error when
-	// a requested remote pool is not currently configured, rather than emitting a no-op
-	// transaction. Remote pool addresses are stored left-padded to 32 bytes on-chain, so
-	// implementations must pad the input address the same way before matching and removal.
+	// read the current on-chain remote pools for each remote chain, match them with
+	// MatchingRemotePools, and remove each match by its stored bytes. A requested remote pool that
+	// is not configured is skipped (with a warning) rather than emitting a no-op transaction, so
+	// re-runs are idempotent.
 	RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error)
 	Version() *semver.Version
 }
@@ -143,6 +148,30 @@ func (a *EVMPoolAdapter) GetOnchainRateLimits(b cldf_ops.Bundle, chains cldf_cha
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	}
 	return a.Ops.GetCurrentRateLimits(b, chain, poolAddr, remoteSelector, fastFinality)
+}
+
+// IsPoolExternallyOwned reports whether the pool's owner is neither the CLL MCMS timelock nor
+// the chain deployer. An error reading the timelock or the pool owner is returned as-is; callers
+// must treat it as fatal rather than as a reason to skip.
+func (a *EVMPoolAdapter) IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, _ datastore.AddressRef) (bool, error) {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return false, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	poolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
+	if err != nil {
+		return false, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
+	}
+	timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chainSelector, Qualifier: cciputils.CLLQualifier}
+	timelockAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, timelockFltr, chainSelector, datastore_utils_evm.ToNonZeroEVMAddress)
+	if err != nil {
+		return false, fmt.Errorf("failed to find timelock address for chain %d: %w", chainSelector, err)
+	}
+	poolOwner, _, err := a.Ops.GetPoolAdmins(e.GetContext(), &chain, poolAddr)
+	if err != nil {
+		return false, fmt.Errorf("failed to get owner of token pool %s on chain %d: %w", poolAddr.Hex(), chainSelector, err)
+	}
+	return poolOwner != timelockAddr && poolOwner != chain.DeployerKey.From, nil
 }
 
 func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -275,8 +304,9 @@ func (a *EVMPoolAdapter) SetTokenPoolDynamicConfig() *cldf_ops.Sequence[tokensap
 
 // RemoveRemotePools removes remote pool entries from an EVM token pool. Version-specific
 // contract calls live in PoolOps.RemoveRemotePools, which reads the current on-chain remote
-// pools for each remote chain and returns a clear error when a requested remote pool is not
-// currently configured. No-op (zero BatchOps) when there are no writes.
+// pools for each remote chain and skips (with a warning) any requested remote pool that is
+// not currently configured, so re-runs are idempotent. No-op (zero BatchOps) when there are
+// no writes.
 func (a *EVMPoolAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokensapi.RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-pool-adapter:remove-remote-pools",
@@ -524,7 +554,36 @@ func (a *EVMPoolAdapter) TidyTokenPoolRoles(
 			)
 			return nil, nil
 		}
-		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.HexToAddress(input.TimelockAddress)); grantErr != nil {
+		// Only emit the pool role grant if CLD can actually administer the token's
+		// roles: either the deployer EOA (direct execution) or the CLL timelock
+		// (MCMS execution) must currently hold the token admin role. For a
+		// 3rd-party-administered token neither holds it, so the grant would be
+		// rerouted into the MCMS batch and revert on-chain when the timelock (which
+		// lacks the admin role) executes it — skip it and rely on the external token
+		// admin to grant the pool's mint/burn roles after deploy. Gated on
+		// SupportsAdminRole so token types that grant via a different mechanism
+		// (e.g. BurnMintERC677) are unaffected.
+		if tokenCaps.SupportsAdminRole {
+			canAdmin, err := a.canAdministerTokenRoles(b, chain, input, tokenAddr, tokenImpl)
+			if err != nil {
+				return nil, err
+			}
+			if !canAdmin {
+				b.Logger.Warnf(
+					"neither deployer (%s) nor CLL timelock holds the admin role on token %q (type %q) on chain %d; skipping pool mint/burn role grant for pool %q — the external token admin must grant it after deploy",
+					chain.DeployerKey.From.Hex(), tokenAddr.Hex(), tokenImpl.ContractType().String(), input.ChainSelector, poolAddr.Hex(),
+				)
+				return nil, nil
+			}
+		}
+		// The proposal-executor argument is only consumed by BurnMintERC677 (which owner-gates it);
+		// every admin-role token type ignores it. Pass the zero address so the ERC677 grant skips the
+		// plan-time owner check and is authorized at execution time instead. This lets same-batch
+		// "transfer ownership to the timelock, then grant" flows plan cleanly and keeps deployer-owned
+		// grants working, rather than failing planning because the deployer (not the timelock) is the
+		// current owner. Role-handling execution is CLL-canonical and enforced up front in
+		// DeployTokenPoolForToken, so no MCMS executor needs to be threaded through here.
+		if grantWrites, grantErr := tokenImpl.GrantPoolRoles(b, chain, tokenAddr, poolAddr, common.Address{}); grantErr != nil {
 			return nil, fmt.Errorf("failed to grant pool roles for token with address %s and type %s and pool %s on chain %d: %w", tokenAddr.Hex(), tokenImpl.ContractType().String(), poolAddr.Hex(), input.ChainSelector, grantErr)
 		} else {
 			return grantWrites, nil
@@ -556,10 +615,16 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	}
 
 	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
-	if err != nil {
-		b.Logger.Infof("CLL timelock not found for chain %d; keeping deployer as token admin: %s", input.ChainSelector, err.Error())
+	if errors.Is(err, ErrCLLTimelockNotConfigured) {
+		b.Logger.Infof("no CLL timelock configured for chain %d; keeping deployer as token admin", input.ChainSelector)
 		return nil, nil
 	}
+	if err != nil {
+		// A CLL timelock ref exists but is unresolvable (ambiguous/malformed/zero): a real
+		// misconfiguration. Fail closed rather than silently leaving the deployer as permanent admin.
+		return nil, fmt.Errorf("failed to resolve CLL timelock for admin handover on token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+
 	// UsesAsyncRoleManagement tokens (e.g. BurnMintERC20Transparent) only *begin* the grant below;
 	// grantRole/revokeRole revert unconditionally for their admin role, so RevokeAdminRole has no
 	// equivalent here. Instead, queue AcceptDefaultAdminTransfer into the batch: this function
@@ -602,6 +667,27 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 		return append(grantWrites, acceptWrites...), nil
 	}
 
+	// The handover below (grant admin to timelock, then revoke it from the deployer)
+	// can only be performed by an account that currently holds the token admin role.
+	// GrantAdminRole/RevokeAdminRole are deployer-signed only when the deployer is an
+	// allowed caller; otherwise they are rerouted into the MCMS batch and executed by
+	// the timelock. If the deployer does not hold the admin role, the token is
+	// administered externally: there is nothing for CLD to hand over, and the emitted
+	// writes would revert (the timelock does not hold the admin role either). Skip and
+	// let the external admin perform any handover out-of-band. Mirrors the async path
+	// above.
+	deployerHasRole, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+	if !deployerHasRole {
+		b.Logger.Warnf(
+			"deployer (%s) does not hold the admin role on token %q (type %q) on chain %d; skipping admin-role handover to the timelock — token is externally administered and its admin must hand over out-of-band",
+			chain.DeployerKey.From.Hex(), tokenAddr.Hex(), tokenImpl.ContractType().String(), input.ChainSelector,
+		)
+		return nil, nil
+	}
+
 	grantWrites, err := tokenImpl.GrantAdminRole(b, chain, tokenAddr, timelockAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
@@ -612,4 +698,76 @@ func (a *EVMPoolAdapter) TidyTokenRoles(
 	}
 
 	return append(grantWrites, revokeWrites...), nil
+}
+
+// canAdministerTokenRoles reports whether CLD can actually execute role changes on
+// the token: either the deployer EOA (direct execution) or the CLL timelock (MCMS
+// execution) currently holds the token admin role. When neither does (e.g. a
+// 3rd-party-administered TIP-20 whose DEFAULT_ADMIN is held by the token issuer),
+// any grant/revoke writes we emit would revert on-chain, so callers must skip
+// emitting them. Only call when tokenImpl.Capabilities().SupportsAdminRole is true.
+func (a *EVMPoolAdapter) canAdministerTokenRoles(
+	b cldf_ops.Bundle,
+	chain evm.Chain,
+	input tokensapi.DeployTokenPoolInput,
+	tokenAddr common.Address,
+	tokenImpl tokenimpl.Token,
+) (bool, error) {
+	hasDeployerAdmin, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, chain.DeployerKey.From)
+	if err != nil {
+		return false, fmt.Errorf("failed to check deployer admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+	if hasDeployerAdmin {
+		return true, nil
+	}
+
+	timelockAddr, err := a.GetTimelockAddressCLL(input.ExistingDataStore, input.ChainSelector)
+	if errors.Is(err, ErrCLLTimelockNotConfigured) {
+		// No CLL timelock configured: only the deployer path could have worked (and it didn't), so
+		// CLD cannot administer the roles — a legitimate skip, not an error.
+		return false, nil
+	}
+	if err != nil {
+		// A CLL timelock ref exists but could not be resolved (ambiguous match or malformed/zero
+		// address): a genuine misconfiguration worth surfacing rather than silently reporting
+		// "neither holds the admin role", which would be inaccurate.
+		return false, fmt.Errorf("failed to resolve CLL timelock address for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+	hasTimelockAdmin, err := tokenImpl.HasAdminRole(b, chain, tokenAddr, timelockAddr)
+	if err != nil {
+		return false, fmt.Errorf("failed to check timelock admin role for token %q on chain %d: %w", tokenAddr.Hex(), input.ChainSelector, err)
+	}
+
+	return hasTimelockAdmin, nil
+}
+
+// MatchingRemotePools returns the entries of stored (a pool's remote pools for remoteSelector) that
+// encode address. An EVM remote pool can be stored raw (20 bytes) or left-padded to 32 bytes, and
+// legacy pools may hold either or both, so an EVM address matches both forms; other families are
+// matched in their single native encoding. Entries are returned as stored, so callers remove each
+// one by its exact on-chain bytes.
+func MatchingRemotePools(stored [][]byte, remoteSelector uint64, address string) ([][]byte, error) {
+	family, err := chainsel.GetSelectorFamily(remoteSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get selector family for chain %d: %w", remoteSelector, err)
+	}
+
+	native, err := deployapi.StringToBytes(remoteSelector, address)
+	if err != nil {
+		return nil, fmt.Errorf("invalid remote pool address for chain %d: %s: %w", remoteSelector, address, err)
+	}
+
+	encodings := [][]byte{native}
+	if family == chainsel.FamilyEVM {
+		encodings = append(encodings, common.LeftPadBytes(native, 32))
+	}
+
+	var matches [][]byte
+	for _, remote := range stored {
+		if slices.ContainsFunc(encodings, func(encoding []byte) bool { return bytes.Equal(remote, encoding) }) {
+			matches = append(matches, remote)
+		}
+	}
+
+	return matches, nil
 }

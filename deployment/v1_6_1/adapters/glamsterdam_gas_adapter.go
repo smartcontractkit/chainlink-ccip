@@ -15,8 +15,11 @@ type GasUpdateAdapter interface {
 	// HasLaneToTarget reports whether srcChainSelector has an enabled lane pointed at
 	// targetChainSelector, per that family's dest-chain-config-equivalent contract.
 	// Returns an error only for hard failures (RPC error, stale address); "no lane" is a
-	// normal false, not an error.
-	HasLaneToTarget(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector, targetChainSelector uint64) (bool, error)
+	// normal false, not an error. reason is an optional human-readable explanation to use in the
+	// report INSTEAD of the generic "no lane" line when hasLane is false — e.g. "this chain's
+	// gas config is migrated by a different version's changeset" — and is ignored when hasLane
+	// is true or empty.
+	HasLaneToTarget(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector, targetChainSelector uint64) (hasLane bool, reason string, err error)
 
 	// ReadDestGasFields reads the current on-chain values for every field this version's
 	// mapping table defines (FeeQuoter.DestChainConfig.DestGasOverhead, DefaultTokenDestGasOverhead, ...)

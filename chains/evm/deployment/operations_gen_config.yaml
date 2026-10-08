@@ -11,9 +11,154 @@ output:
 # - (none): Public/Read functions don't need access control
 
 contracts:
+  # 1.2.0
+  #
+  # The oldest pool generation still in service. A surviving v1.2.0 pool is never registered in the
+  # TokenAdminRegistry (which did not exist until v1.5.0) - it sits behind a v1.5.0 *TokenPoolAndProxy
+  # that is, reachable only via that proxy's getPreviousPool().
+  #
+  # v1.2.0 pools are RAMP-keyed, not chain-keyed: there is no applyChainUpdates, no getSupportedChains
+  # and no router. Lanes are expressed as onRamp/offRamp addresses and rate limits are stored per ramp.
+  # Behind a proxy the proxy itself is the only registered ramp, so there is exactly ONE outbound and
+  # ONE inbound limiter shared across every lane.
+  #
+  # Only reads are generated. Everything lane-shaped is served by the fronting proxy, and a write here
+  # would hit the shared per-ramp limiter and silently affect every lane at once, so no write
+  # operation is exposed at all. BurnMintTokenPool declares no external functions beyond the base
+  # surface, so its ABI IS the base ABI (same pattern as v1.5.0's TokenPoolAndProxy).
+  #
+  # No deployment: a new v1.2.0 pool is never correct.
+  - contract_name: TokenPool
+    version: "1.2.0"
+    abi_file: "burn_mint_token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getToken
+        access: public
+      - name: getArmProxy
+        access: public
+      - name: getOnRamps
+        access: public
+      - name: getOffRamps
+        access: public
+      - name: isOnRamp
+        access: public
+      - name: isOffRamp
+        access: public
+      - name: currentOnRampRateLimiterState
+        access: public
+      - name: currentOffRampRateLimiterState
+        access: public
+
+  # 1.4.0
+  #
+  # Legacy pools that survive only behind a v1.5.0 *TokenPoolAndProxy. TokenPool is the shared
+  # base surface of both v1.4.0 pool types; its ABI is read from token_pool.json. BurnMintTokenPool
+  # and LockReleaseTokenPool are supersets of it and every shared function is signature-identical,
+  # so both are driven through the TokenPool package and the per-pool entries below carry only what
+  # is type-specific.
+  #
+  # No deployment: a new v1.4.0 pool is never correct, so no bytecode is read and no Deploy op is
+  # generated.
+  - contract_name: TokenPool
+    version: "1.4.0"
+    abi_file: "token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getToken
+        access: public
+      - name: getRouter
+        access: public
+      - name: getArmProxy
+        access: public
+      - name: getSupportedChains
+        access: public
+      - name: isSupportedChain
+        access: public
+      - name: getCurrentInboundRateLimiterState
+        access: public
+      - name: getCurrentOutboundRateLimiterState
+        access: public
+      - name: applyChainUpdates
+        access: owner
+      - name: setChainRateLimiterConfig
+        access: owner
+      - name: setRouter
+        access: owner
+
+  - contract_name: BurnMintTokenPool
+    version: "1.4.0"
+    abi_file: "burn_mint_token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getAllowList
+        access: public
+      - name: getAllowListEnabled
+        access: public
+
+  - contract_name: LockReleaseTokenPool
+    version: "1.4.0"
+    abi_file: "lock_release_token_pool.json"
+    no_deployment: true
+    functions:
+      - name: getRebalancer
+        access: public
+      - name: getRateLimitAdmin
+        access: public
+      - name: canAcceptLiquidity
+        access: public
+      - name: setRebalancer
+        access: owner
+      - name: setRateLimitAdmin
+        access: owner
+      - name: provideLiquidity
+        access: public
+      - name: withdrawLiquidity
+        access: public
+
+  # LockReleaseTokenPool as deployed for v1.2.0 lanes.
+  #
+  # There are no official v1.2.0 LockRelease gobindings; the v1.0.0 binding's selectors are
+  # identical, so the ABI is read from v1_0_0 and these operations are generated there. The v1.2.0
+  # adapter imports them, which is the same reuse the v1.5.0 migration path already relies on (see
+  # readV12Limits in v1_5_0/adapters/tokens.go). ContractType/Version therefore read 1.0.0 while the
+  # deployed contract reports "LockReleaseTokenPool 1.2.0".
+  #
+  # Only getProvidedLiquidity is generated: the whole shared pool surface lives in the v1.2.0
+  # TokenPool package with identical selectors, and the liquidity WRITE path (addLiquidity /
+  # removeLiquidity) is deliberately not exposed - see the v1.2.0 adapter for why draining is out of
+  # scope.
+  - contract_name: LockReleaseTokenPool
+    version: "1.0.0"
+    no_deployment: true
+    functions:
+      - name: getProvidedLiquidity
+        access: public
+
   # 1.5.0
-  - contract_name: BurnMintTokenPoolAndProxy
+  #
+  # TokenPoolAndProxy is the shared base surface of every v1.5.0 pool. Its ABI is read from
+  # burn_mint_token_pool_and_proxy.json because BurnMintTokenPoolAndProxy declares no external
+  # functions of its own - that file IS the base ABI. LockReleaseTokenPoolAndProxy is a strict
+  # superset of it (adding only the liquidity functions), and every shared function is
+  # signature-identical, so both pool types are read and configured through this one package.
+  # The per-pool entries below carry only Deploy plus whatever is type-specific.
+  #
+  # The plain (non-proxy) BurnMintTokenPool and LockReleaseTokenPool v1.5.0 are driven through
+  # this package too. They inherit the same v1.5.0 TokenPool base and differ from their *AndProxy
+  # siblings only by LACKING the legacy-proxy getPreviousPool/setPreviousPool pair, so every
+  # function here except getPreviousPool is present on them with an identical selector. Never
+  # call getPreviousPool on a pool whose type is not *AndProxy - it will revert.
+  #
+  # NOTE: v1.5.0 pools expose a narrower surface than v1.5.1. There is no
+  # getTokenDecimals, no getRemotePools/addRemotePool/removeRemotePool (a
+  # v1.5.0 pool holds exactly one remote pool per lane, replaced via
+  # setRemotePool), and applyChainUpdates takes a single ChainUpdate[] with
+  # removals expressed as allowed=false entries.
+  - contract_name: TokenPoolAndProxy
     version: "1.5.0"
+    abi_file: "burn_mint_token_pool_and_proxy.json"
+    no_deployment: true
     functions:
       - name: getRemotePool
         access: public
@@ -23,11 +168,6 @@ contracts:
         access: public
       - name: getPreviousPool
         access: public
-      # NOTE: v1.5.0 pools expose a narrower surface than v1.5.1. There is no
-      # getTokenDecimals, no getRemotePools/addRemotePool/removeRemotePool (a
-      # v1.5.0 pool holds exactly one remote pool per lane, replaced via
-      # setRemotePool), and applyChainUpdates takes a single ChainUpdate[] with
-      # removals expressed as allowed=false entries.
       - name: getToken
         access: public
       - name: getSupportedChains
@@ -49,6 +189,51 @@ contracts:
       - name: getRouter
         access: public
       - name: setRouter
+        access: owner
+
+  # Deploy only. Every read/write on a deployed pool goes through TokenPoolAndProxy above.
+  - contract_name: BurnMintTokenPoolAndProxy
+    version: "1.5.0"
+    functions: []
+
+  # Deploy plus the small lock-release surface that TokenPoolAndProxy does not cover.
+  #
+  # provideLiquidity/withdrawLiquidity/transferLiquidity are deliberately NOT generated. They are
+  # unused - MigrateLockReleasePoolLiquidity drives a v1.5.0 pool through the v1.6.1 lock-release
+  # ops, whose signatures it shares - and neither access alias describes them honestly: on v1.5.0
+  # both provideLiquidity and withdrawLiquidity are gated on the REBALANCER, not the owner
+  # (verified on a simulated chain: the owner is rejected until it is also made rebalancer).
+  # Declaring them `owner` would be wrong, and `public` would only defer to a check the framework
+  # cannot see. Add them with a rebalancer-aware access rule if a v1.5.0-native liquidity path is
+  # ever needed.
+  #
+  # setRebalancer IS onlyOwner (same verification), so it is generated as such.
+  - contract_name: LockReleaseTokenPoolAndProxy
+    version: "1.5.0"
+    functions:
+      - name: canAcceptLiquidity
+        access: public
+      - name: getRebalancer
+        access: public
+      - name: setRebalancer
+        access: owner
+
+  # The plain (non-proxy) v1.5.0 pools. Deploy only, plus the same lock-release surface as
+  # LockReleaseTokenPoolAndProxy above; the liquidity-function omission applies here for the same
+  # reason (provideLiquidity/withdrawLiquidity are rebalancer-gated on v1.5.0). Every base read
+  # and write goes through TokenPoolAndProxy.
+  - contract_name: BurnMintTokenPool
+    version: "1.5.0"
+    functions: []
+
+  - contract_name: LockReleaseTokenPool
+    version: "1.5.0"
+    functions:
+      - name: canAcceptLiquidity
+        access: public
+      - name: getRebalancer
+        access: public
+      - name: setRebalancer
         access: owner
 
   # 1.6.3

@@ -13,7 +13,7 @@ import (
 	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
-	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	tpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -23,18 +23,29 @@ import (
 )
 
 type ConfigureTokenPoolForRemoteChainsInput struct {
+	// ChainSelector identifies the chain the pool lives on. It must be carried in the
+	// input (not only the executor dependency) so that two invocations with otherwise
+	// identical inputs on different chains do not collide in the operations report
+	// cache, which keys on the sequence input alone. Without it, configuring two
+	// chains whose pool addresses are identical reuses the first chain's cached report
+	// and emits ops against the wrong chain.
+	ChainSelector    uint64
 	TokenPoolAddress common.Address
 	TokenPoolVersion *semver.Version
 	RemoteChains     map[uint64]tokensapi.RemoteChainConfig[[]byte, string]
 }
 
 type ConfigureTokenPoolForRemoteChainInput struct {
+	ChainSelector       uint64
 	TokenPoolAddress    common.Address
 	RemoteChainSelector uint64
 	RemoteChainConfig   tokensapi.RemoteChainConfig[[]byte, string]
 }
 
-func (c ConfigureTokenPoolForRemoteChainInput) Validate() error {
+func (c ConfigureTokenPoolForRemoteChainInput) Validate(chain evm.Chain) error {
+	if c.ChainSelector != chain.Selector {
+		return fmt.Errorf("chain selector %d does not match chain %s", c.ChainSelector, chain)
+	}
 	return evmutils.Wrap(
 		c.RemoteChainConfig.Validate(),
 		fmt.Sprintf("invalid remote chain config for remote chain selector %d", c.RemoteChainSelector),
@@ -44,8 +55,8 @@ func (c ConfigureTokenPoolForRemoteChainInput) Validate() error {
 // disabledRateLimit is the zero-value rate limiter config. v1.5.0's applyChainUpdates validates
 // each entry with `_validateTokenBucketConfig(cfg, mustBeDisabled: !allowed)`, so a removal entry
 // (allowed=false) that carries a non-zero or enabled config reverts with RateLimitMustBeDisabled.
-func disabledRateLimit() bmtpap.Config {
-	return bmtpap.Config{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
+func disabledRateLimit() tpap.Config {
+	return tpap.Config{IsEnabled: false, Capacity: big.NewInt(0), Rate: big.NewInt(0)}
 }
 
 // ConfigureTokenPoolForRemoteChains configures a v1.5.0 token pool on an EVM chain for cross-
@@ -60,16 +71,20 @@ func disabledRateLimit() bmtpap.Config {
 //   - there is no addRemotePool/removeRemotePool; setRemotePool REPLACES the single entry
 //   - applyChainUpdates takes one ChainUpdate[] (with a singular remotePoolAddress) and expresses
 //     removals as allowed=false entries, rather than v1.5.1's (selectorsToRemove, chainsToAdd)
+//
+// Pool-type agnostic: every call below is on the TokenPoolAndProxy base surface, which
+// BurnMintTokenPoolAndProxy, LockReleaseTokenPoolAndProxy, and the plain BurnMintTokenPool and
+// LockReleaseTokenPool share with byte-identical signatures. Type-specific state (lock-release liquidity and rebalancer) is not touched here.
 var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 	"token-pool:configure-token-pool-for-remote-chains",
-	bmtpap.Version,
+	tpap.Version,
 	"Configure a v1.5.0 token pool on an EVM chain for cross-chain transfers",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainsInput) (sequences.OnChainOutput, error) {
 		// NOTE: this sequence will be called repeatedly as part of a larger changeset (e.g.
 		// ConfigureTokensForTransfers) so we intentionally use the direct contract bindings
 		// over ExecuteOperation to avoid the possibility of reading stale onchain data from
 		// the operation reports cache.
-		tokenPool, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(input.TokenPoolAddress, chain.Client)
+		tokenPool, err := tpap.NewTokenPoolAndProxyContract(input.TokenPoolAddress, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
 		}
@@ -93,6 +108,7 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 				ConfigureTokenPoolForRemoteChain,
 				chain,
 				ConfigureTokenPoolForRemoteChainInput{
+					ChainSelector:       input.ChainSelector,
 					TokenPoolAddress:    tokenPool.Address(),
 					RemoteChainSelector: remoteChainSelector,
 					RemoteChainConfig:   remoteChainConfig,
@@ -113,10 +129,10 @@ var ConfigureTokenPoolForRemoteChains = cldf_ops.NewSequence(
 // level ConfigureTokenPoolForRemoteChains sequence to handle multiple remote chains
 var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 	"token-pool:configure-token-pool-for-remote-chain",
-	bmtpap.Version,
+	tpap.Version,
 	"Configures a v1.5.0 token pool on an EVM chain for transfers with other chains",
 	func(b cldf_ops.Bundle, chain evm.Chain, input ConfigureTokenPoolForRemoteChainInput) (sequences.OnChainOutput, error) {
-		if err := input.Validate(); err != nil {
+		if err := input.Validate(chain); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 
@@ -125,7 +141,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// the operations reports cache if this sequence is called as part of a broader, and
 		// more complex changeset that repeatedly reads and writes to the same config during
 		// execution (e.g. ConfigureTokensForTransfers)
-		tp, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(input.TokenPoolAddress, chain.Client)
+		tp, err := tpap.NewTokenPoolAndProxyContract(input.TokenPoolAddress, chain.Client)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to instantiate token pool contract: %w", err)
 		}
@@ -155,7 +171,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token from token pool: %w", err)
 		}
 		decimalsReport, err := cldf_ops.ExecuteOperation(b, erc20.GetDecimals, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
+			ChainSelector: input.ChainSelector,
 			Address:       localTokenAddr,
 		})
 		if err != nil {
@@ -166,7 +182,7 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		// A pool's type and version is immutable so we can safely use ExecuteOperation here
 		// without worrying about stale data from the cache.
 		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
-			ChainSelector: chain.Selector,
+			ChainSelector: input.ChainSelector,
 			Address:       input.TokenPoolAddress,
 			Args:          struct{}{},
 		})
@@ -309,12 +325,12 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 
 				// If either rate limiter config is different, then update it
 				if !isOutboundEqual || !isInboundEqual {
-					report, err := cldf_ops.ExecuteOperation(b, bmtpap.SetChainRateLimiterConfig, chain, contract.FunctionInput[bmtpap.SetChainRateLimiterConfigArgs]{
+					report, err := cldf_ops.ExecuteOperation(b, tpap.SetChainRateLimiterConfig, chain, contract.FunctionInput[tpap.SetChainRateLimiterConfigArgs]{
 						ChainSelector: chain.Selector,
 						Address:       input.TokenPoolAddress,
-						Args: bmtpap.SetChainRateLimiterConfigArgs{
-							OutboundConfig:      bmtpap.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
-							InboundConfig:       bmtpap.Config{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
+						Args: tpap.SetChainRateLimiterConfigArgs{
+							OutboundConfig:      tpap.Config{IsEnabled: inputORL.IsEnabled, Capacity: inputORL.Capacity, Rate: inputORL.Rate},
+							InboundConfig:       tpap.Config{IsEnabled: inputIRL.IsEnabled, Capacity: inputIRL.Capacity, Rate: inputIRL.Rate},
 							RemoteChainSelector: remoteCS,
 						},
 					})
@@ -340,10 +356,10 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 						input.TokenPoolAddress.Hex(), chain.Selector, remoteCS,
 						common.Bytes2Hex(onchainRemoteTP), common.Bytes2Hex(remoteTP),
 					)
-					report, err := cldf_ops.ExecuteOperation(b, bmtpap.SetRemotePool, chain, contract.FunctionInput[bmtpap.SetRemotePoolArgs]{
+					report, err := cldf_ops.ExecuteOperation(b, tpap.SetRemotePool, chain, contract.FunctionInput[tpap.SetRemotePoolArgs]{
 						ChainSelector: chain.Selector,
 						Address:       input.TokenPoolAddress,
-						Args: bmtpap.SetRemotePoolArgs{
+						Args: tpap.SetRemotePoolArgs{
 							RemoteChainSelector: remoteCS,
 							RemotePoolAddress:   remoteTP,
 						},
@@ -381,11 +397,11 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		//
 		if len(reportWrites) == 0 {
 			paddedRemoteTokenPoolAddress := common.LeftPadBytes(input.RemoteChainConfig.RemotePool, 32)
-			chainUpdates := make([]bmtpap.ChainUpdate, 0, 2)
+			chainUpdates := make([]tpap.ChainUpdate, 0, 2)
 			if removeRemoteFirst {
 				// Removal entries must carry disabled, zeroed rate limiter configs or the
 				// contract reverts with RateLimitMustBeDisabled.
-				chainUpdates = append(chainUpdates, bmtpap.ChainUpdate{
+				chainUpdates = append(chainUpdates, tpap.ChainUpdate{
 					RemoteChainSelector:       input.RemoteChainSelector,
 					Allowed:                   false,
 					RemotePoolAddress:         []byte{},
@@ -394,24 +410,24 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 					InboundRateLimiterConfig:  disabledRateLimit(),
 				})
 			}
-			chainUpdates = append(chainUpdates, bmtpap.ChainUpdate{
+			chainUpdates = append(chainUpdates, tpap.ChainUpdate{
 				RemoteChainSelector: input.RemoteChainSelector,
 				Allowed:             true,
 				RemotePoolAddress:   paddedRemoteTokenPoolAddress,
 				RemoteTokenAddress:  input.RemoteChainConfig.RemoteToken,
-				OutboundRateLimiterConfig: bmtpap.Config{
+				OutboundRateLimiterConfig: tpap.Config{
 					IsEnabled: inputORL.IsEnabled,
 					Capacity:  inputORL.Capacity,
 					Rate:      inputORL.Rate,
 				},
-				InboundRateLimiterConfig: bmtpap.Config{
+				InboundRateLimiterConfig: tpap.Config{
 					IsEnabled: inputIRL.IsEnabled,
 					Capacity:  inputIRL.Capacity,
 					Rate:      inputIRL.Rate,
 				},
 			})
 
-			report, err := cldf_ops.ExecuteOperation(b, bmtpap.ApplyChainUpdates, chain, contract.FunctionInput[[]bmtpap.ChainUpdate]{
+			report, err := cldf_ops.ExecuteOperation(b, tpap.ApplyChainUpdates, chain, contract.FunctionInput[[]tpap.ChainUpdate]{
 				ChainSelector: chain.Selector,
 				Address:       input.TokenPoolAddress,
 				Args:          chainUpdates,

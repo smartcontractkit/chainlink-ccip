@@ -44,6 +44,19 @@ type TokenPoolDynamicConfigAdapter interface {
 	SetTokenPoolDynamicConfig() *cldf_ops.Sequence[SetTokenPoolDynamicConfigSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
+// TokenPoolOwnershipChecker is an optional interface for adapters that can report whether a
+// token pool is owned by a third party. It is used by ConfigureTokensForTransfers to skip
+// owner-gated writes on pools we do not control when SkipIfMissingPermissions is enabled.
+type TokenPoolOwnershipChecker interface {
+	// IsPoolExternallyOwned reports whether neither the MCMS timelock nor the chain deployer owns the
+	// pool referenced by poolRef on chainSelector. Implementations read the owner on-chain and compare
+	// against the timelock (from the datastore) and the chain deployer (from env). tokenRef is needed by
+	// families whose ownership is per token (e.g. Solana, where one pool program serves many mints) and
+	// may be ignored by others. A failure to read the owner is returned as an error and must be treated
+	// as fatal (never treated as a skip).
+	IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, tokenRef datastore.AddressRef) (bool, error)
+}
+
 // SetTokenPoolDynamicConfigSequenceInput defines the input for updating a token pool's router
 // and admin roles. Nil fields are left unchanged on-chain.
 type SetTokenPoolDynamicConfigSequenceInput struct {
@@ -73,9 +86,9 @@ type TokenAdminRoleAdapter interface {
 }
 
 // RemotePoolRemover is an optional interface for adapters that support removing remote pool
-// entries from a token pool. Implementations must read the current on-chain remote pools and
-// return a clear error when a requested remote pool is not currently configured, rather than
-// emitting a no-op transaction.
+// entries from a token pool. Implementations must read the current on-chain remote pools and skip
+// (with a warning) a requested remote pool that is not currently configured, rather than emitting a
+// no-op transaction, so removals are idempotent across re-runs.
 type RemotePoolRemover interface {
 	RemoveRemotePools() *cldf_ops.Sequence[RemoveRemotePoolsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
@@ -90,8 +103,8 @@ type RemoveRemotePoolsSequenceInput struct {
 }
 
 // RemotePoolToRemove identifies a single remote pool entry to remove from a token pool. The
-// remote pool is referenced by an AddressRef so operators can identify it by qualifier, by
-// address, or by any other unique combination of ref fields.
+// remote pool's Address is required: it is the address the pool stores for the remote (in the
+// remote chain family's address format), and is what the removal matches against on-chain.
 type RemotePoolToRemove struct {
 	Selector uint64               `json:"selector" yaml:"selector"`
 	Remote   datastore.AddressRef `json:"remote" yaml:"remote"`
@@ -132,11 +145,15 @@ type RateLimitReaderAdapter interface {
 
 // TokenAdminRegistryReader is a versionless interface for reading the active pool from a chain's
 // TokenAdminRegistry (or equivalent). Implementations are registered per chain family via
-// TokenAdapterRegistry.RegisterTokenAdminRegistryReader and can be looked up by family regardless
-// of pool version.
+// TokenAdapterRegistry.RegisterTokenAdminRegistryReader, or implicitly by registering a
+// TokenAdminRegistryManager, and can be looked up by family regardless of pool version.
 type TokenAdminRegistryReader interface {
 	// GetActivePool returns the pool currently registered for tokenRef in the TokenAdminRegistry
-	// as raw address bytes. Returns empty bytes (no error) when no pool is registered.
+	// as raw address bytes. Returns empty bytes (no error) when no pool is registered; any other
+	// failure to read the registry must be returned as an error, not reported as "no pool".
+	// The bytes must be in the same form the family's TokenAdapter.AddressRefToBytes returns for
+	// the resolved pool ref, so callers can compare them chain-agnostically with bytes.Equal (e.g.
+	// EVM: the pool contract address; Solana: the pool program ID).
 	// Overrides are optional registry refs to use instead of the datastore default;
 	// the first one that resolves from the datastore is used.
 	GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error)
@@ -144,19 +161,65 @@ type TokenAdminRegistryReader interface {
 	GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error)
 }
 
+// TokenAdminRegistryWriter is a versionless interface for write operations on a chain's
+// TokenAdminRegistry (or equivalent). A family provides it by registering a
+// TokenAdminRegistryManager. There is no official unregister on-chain: a pool is unregistered by
+// setting the registry's pool to the null/zero pool.
+//
+// UnregisterToken is unconditional: it clears the token's registry entry whatever pool it
+// currently points at. Callers that must not clobber a registration that has moved on to another
+// pool are responsible for checking the active pool first (e.g. compare GetActivePool with the
+// family adapter's AddressRefToBytes for the pool being removed), as RemoveRemotePools does.
+type TokenAdminRegistryWriter interface {
+	// UnregisterToken returns a sequence that sets the token's registry pool to the null/zero pool.
+	UnregisterToken() *cldf_ops.Sequence[UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+}
+
+// TokenAdminRegistryManager combines the versionless TAR reader and writer for a chain family. A
+// family whose TAR can only be read registers a TokenAdminRegistryReader instead.
+type TokenAdminRegistryManager interface {
+	TokenAdminRegistryReader
+	TokenAdminRegistryWriter
+}
+
+// UnregisterTokenSequenceInput defines the input for unregistering a token from the
+// TokenAdminRegistry. The token is unregistered by setting its registry pool to the null/zero
+// pool; see TokenAdminRegistryWriter for the caller's responsibility to check the active pool.
+type UnregisterTokenSequenceInput struct {
+	// Selector is the chain selector for the chain on which the registry lives.
+	Selector uint64 `json:"selector" yaml:"selector"`
+	// TokenRef is the fully resolved token reference.
+	TokenRef datastore.AddressRef `json:"tokenRef" yaml:"tokenRef"`
+	// RegistryRef optionally overrides the registry ref used instead of the datastore default.
+	RegistryRef datastore.AddressRef `json:"registryRef,omitempty" yaml:"registryRef,omitempty"`
+	// ExistingDataStore is the datastore containing existing deployment data.
+	ExistingDataStore datastore.DataStore `json:"-" yaml:"-"`
+}
+
 // TokenPoolMigrator is an optional interface implemented by adapters that can read an existing pool's
 // cross-chain configuration on-chain. It powers AutoMigrateRemoteChains: during an upgrade, the remote
 // chains/tokens/pools the active pool is configured for are read back (as raw bytes) and carried forward
-// onto the new pool. All addresses are raw on-chain bytes so the interface stays chain-family-agnostic;
-// callers convert them per family via the AddressNormalizer registry when a string form is needed.
+// onto the new pool. It is also used by RemoveRemotePools to discover a pool's remotes for the
+// allRemotes/deactivate modes and to read a peer's remote list during the reverse pass. All addresses
+// are raw on-chain bytes so the interface stays chain-family-agnostic; callers convert them per family
+// via the AddressNormalizer registry when a string form is needed.
+//
+// NOTE: a Solana pool implementing these reads is NOT a migration source. The auto-migrate gate requires
+// a v2.0.0+ target pool, which no Solana pool has, so Solana always bails at the graceful skip before the
+// TokenPoolMigrator assert.
+//
+// tokenAddr is the token (mint) the pool serves, as raw on-chain bytes. EVM adapters ignore it (the pool
+// contract alone identifies the token), but Solana needs it to derive the pool config PDA, which is keyed
+// by (chain_selector, mint, program_id). poolAddr may be either the pool program ID or the pool config PDA
+// on Solana; implementations must accept both forms.
 type TokenPoolMigrator interface {
 	// GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
-	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr []byte) ([]uint64, error)
+	GetSupportedChains(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte) ([]uint64, error)
 	// GetRemoteToken returns the remote token (raw bytes) the pool at poolAddr uses for remoteSelector.
-	GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([]byte, error)
+	GetRemoteToken(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([]byte, error)
 	// GetRemotePools returns the remote pools (raw bytes) the pool at poolAddr is linked to for remoteSelector.
 	// A pool may have more than one during a remote-side upgrade.
-	GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr []byte, remoteSelector uint64) ([][]byte, error)
+	GetRemotePools(e deployment.Environment, chainSelector uint64, poolAddr, tokenAddr []byte, remoteSelector uint64) ([][]byte, error)
 }
 
 // TokenAdapter defines the interface that each chain family + token pool version combo must implement to support cross-chain token configuration.
@@ -185,9 +248,18 @@ type TokenAdapter interface {
 	DeployTokenVerify(e deployment.Environment, in DeployTokenInput) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]
-	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a legacy
-	// LockReleaseTokenPool (v1.5.1/v1.6.1) to a v2.0 lockbox-based pool. Returns nil if not supported.
+	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a
+	// legacy lock-release pool to a v2.0 lockbox-based pool. Returns nil if not supported.
 	// Used by the standalone MigrateLockReleasePoolLiquidity changeset.
+	//
+	// On EVM the old pool is driven through the v1.6.1 lock-release bindings and dispatched on
+	// its typeAndVersion TYPE (siloed vs not), never its version - so any legacy pool sharing the
+	// getRebalancer/setRebalancer/withdrawLiquidity signatures is migratable. Verified sources:
+	// LockReleaseTokenPool v1.5.0, v1.5.1 and v1.6.1, SiloedLockReleaseTokenPool v1.6.1, and
+	// LockReleaseTokenPoolAndProxy v1.5.0.
+	//
+	// NOTE: the adapter is resolved from the NEW pool's version, not the old one, so a legacy
+	// source needs no adapter registered at its own version to be migratable.
 	MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
@@ -376,6 +448,11 @@ type MigrationMetadata struct {
 	// EVM uses this with LegacyPoolVersion for inbound rate limit decimal normalization.
 	LegacyPoolType string
 
+	// LegacyPoolAddress is the address of the active (TAR-registered) pool being
+	// upgraded from, as raw on-chain bytes. EVM uses it to consult a v1.5.0
+	// *AndProxy pool's getPreviousPool() when resolving the effective rate limits.
+	LegacyPoolAddress []byte
+
 	// LegacyRemotePools is the full set of remote pool addresses registered on the legacy active pool
 	// for this lane. EVM v2 uses this for upgrade cutover (inflight message protection).
 	// RemotePool on RemoteChainConfig remains the primary/target pool; this is the extra legacy set.
@@ -514,19 +591,21 @@ type SetTokenTransferFeeSequenceInput struct {
 
 // TokenAdapterRegistry maintains a registry of TokenAdapters.
 type TokenAdapterRegistry struct {
-	tokenRefResolverReg         map[string]TokenRefResolver
-	tokenAdminRegistryReaderReg map[string]TokenAdminRegistryReader
-	tokenAdapterReg             map[tokenAdapterID]TokenAdapter
-	tokenRefResolverMu          sync.Mutex
-	tokenAdminRegistryReaderMu  sync.Mutex
-	tokenAdapterMu              sync.Mutex
+	tokenRefResolverReg          map[string]TokenRefResolver
+	tokenAdminRegistryReaderReg  map[string]TokenAdminRegistryReader
+	tokenAdminRegistryManagerReg map[string]TokenAdminRegistryManager
+	tokenAdapterReg              map[tokenAdapterID]TokenAdapter
+	tokenRefResolverMu           sync.Mutex
+	tokenAdminRegistryMu         sync.Mutex // guards both TAR maps, so a manager registration updates them together
+	tokenAdapterMu               sync.Mutex
 }
 
 func newTokenAdapterRegistry() *TokenAdapterRegistry {
 	return &TokenAdapterRegistry{
-		tokenRefResolverReg:         make(map[string]TokenRefResolver),
-		tokenAdminRegistryReaderReg: make(map[string]TokenAdminRegistryReader),
-		tokenAdapterReg:             make(map[tokenAdapterID]TokenAdapter),
+		tokenRefResolverReg:          make(map[string]TokenRefResolver),
+		tokenAdminRegistryReaderReg:  make(map[string]TokenAdminRegistryReader),
+		tokenAdminRegistryManagerReg: make(map[string]TokenAdminRegistryManager),
+		tokenAdapterReg:              make(map[tokenAdapterID]TokenAdapter),
 	}
 }
 
@@ -548,20 +627,43 @@ func (r *TokenAdapterRegistry) GetTokenRefResolver(chainFamily string) (TokenRef
 }
 
 // RegisterTokenAdminRegistryReader registers a versionless TAR reader for the given chain family.
+// It is ignored when the family already has a reader, including one registered as a manager.
 func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryReader(family string, reader TokenAdminRegistryReader) {
-	r.tokenAdminRegistryReaderMu.Lock()
-	defer r.tokenAdminRegistryReaderMu.Unlock()
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
 	if _, exists := r.tokenAdminRegistryReaderReg[family]; !exists {
 		r.tokenAdminRegistryReaderReg[family] = reader
 	}
 }
 
-// GetTokenAdminRegistryReader retrieves a registered TokenAdminRegistryReader for the given chain family.
+// GetTokenAdminRegistryReader retrieves the TAR reader for the given chain family: its manager if
+// one is registered, otherwise its registered reader.
 func (r *TokenAdapterRegistry) GetTokenAdminRegistryReader(family string) (TokenAdminRegistryReader, bool) {
-	r.tokenAdminRegistryReaderMu.Lock()
-	defer r.tokenAdminRegistryReaderMu.Unlock()
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
 	reader, ok := r.tokenAdminRegistryReaderReg[family]
 	return reader, ok
+}
+
+// RegisterTokenAdminRegistryManager registers a versionless TAR manager (reader + writer) for the
+// given chain family. The first manager registered for a family also becomes its reader, replacing
+// a reader-only registration, so reads and writes always go through the same implementation.
+func (r *TokenAdapterRegistry) RegisterTokenAdminRegistryManager(family string, manager TokenAdminRegistryManager) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	if _, exists := r.tokenAdminRegistryManagerReg[family]; !exists {
+		r.tokenAdminRegistryManagerReg[family] = manager
+		r.tokenAdminRegistryReaderReg[family] = manager
+	}
+}
+
+// GetTokenAdminRegistryManager retrieves a registered TokenAdminRegistryManager for the given
+// chain family. A family registered only as a reader has none.
+func (r *TokenAdapterRegistry) GetTokenAdminRegistryManager(family string) (TokenAdminRegistryManager, bool) {
+	r.tokenAdminRegistryMu.Lock()
+	defer r.tokenAdminRegistryMu.Unlock()
+	manager, ok := r.tokenAdminRegistryManagerReg[family]
+	return manager, ok
 }
 
 // RegisterTokenAdapter allows chains to register their changeset logic.

@@ -8,20 +8,24 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_1/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	state "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var _ tokensapi.TokenAdminRegistryReader = (*SolanaAdminRegistryReader)(nil)
+var _ tokensapi.TokenAdminRegistryManager = (*SolanaAdminRegistryManager)(nil)
 
-type SolanaAdminRegistryReader struct{}
+type SolanaAdminRegistryManager struct{}
 
-func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error) {
+func (a *SolanaAdminRegistryManager) GetActivePool(e deployment.Environment, chainSelector uint64, tokenRef datastore.AddressRef, overrides ...datastore.AddressRef) ([]byte, error) {
 	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
 		return nil, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -67,9 +71,15 @@ func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chai
 		return nil, fmt.Errorf("failed to derive TAR PDA: %w", err)
 	}
 
+	// A missing TAR account means the token was never registered (no active pool). Any other
+	// failure (RPC error, undecodable account) must surface as an error rather than being
+	// reported as "no pool", since callers act on that answer (e.g. skipping an unregister).
 	var tarAccount ccip_common.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), tarPDA, &tarAccount); err != nil {
-		return nil, nil
+		if errors.Is(err, rpc.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read token admin registry %s for mint %s on chain %d: %w", tarPDA, mint, chainSelector, err)
 	}
 	if tarAccount.LookupTable.IsZero() {
 		return nil, nil
@@ -89,7 +99,7 @@ func (a *SolanaAdminRegistryReader) GetActivePool(e deployment.Environment, chai
 	return entries[2].Bytes(), nil
 }
 
-func (a *SolanaAdminRegistryReader) GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
+func (a *SolanaAdminRegistryManager) GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
 	_, ok := e.BlockChains.SolanaChains()[chainSelector]
 	if !ok {
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not found", chainSelector)
@@ -105,4 +115,46 @@ func (a *SolanaAdminRegistryReader) GetTokenAdminRegistryRef(e deployment.Enviro
 	}
 
 	return refs[0], nil
+}
+
+// UnregisterToken unregisters a token from the router's TokenAdminRegistry by setting its pool
+// lookup table to the zero pubkey. The caller is responsible for the read-check guard (only
+// unregister when the token's current active pool is the pool being removed) before executing
+// this sequence.
+func (a *SolanaAdminRegistryManager) UnregisterToken() *operations.Sequence[tokensapi.UnregisterTokenSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"solana-admin-registry:unregister-token",
+		common_utils.Version_1_0_0,
+		"Unregister a token from the router TokenAdminRegistry by setting its pool lookup table to zero",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokensapi.UnregisterTokenSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.SolanaChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
+			}
+
+			routerRef, err := a.GetTokenAdminRegistryRef(deployment.Environment{DataStore: input.ExistingDataStore, BlockChains: chains}, input.Selector)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve router on chain %d: %w", input.Selector, err)
+			}
+			router, err := solana.PublicKeyFromBase58(routerRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid router address %q on chain %d: %w", routerRef.Address, input.Selector, err)
+			}
+
+			mint, err := solana.PublicKeyFromBase58(input.TokenRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token mint address %q on chain %d: %w", input.TokenRef.Address, input.Selector, err)
+			}
+
+			out, err := operations.ExecuteOperation(b, routerops.UnregisterToken, chain, routerops.UnregisterTokenParams{
+				Router:    router,
+				TokenMint: mint,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to unregister token %s on chain %d: %w", input.TokenRef.Address, input.Selector, err)
+			}
+
+			return out.Output, nil
+		},
+	)
 }

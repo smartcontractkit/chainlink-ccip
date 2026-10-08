@@ -95,7 +95,7 @@ func makeFQDestsApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.
 				}
 
 				// Version inference part 3: the fee quoter adapter is used to configure the dest chain config
-				resolved, err := resolveDestChainConfig(feeQuoterAdp, e, feeQuoterRef, src.Selector, dst.Selector, dst.Override)
+				resolved, err := resolveDestChainConfig(feeQuoterAdp, e, feeQuoterRef, src.Selector, dst)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to resolve dest chain config for src %d, dst %d: %w", src.Selector, dst.Selector, err)
 				}
@@ -141,8 +141,9 @@ func makeFQDestsApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.
 	}
 }
 
-// resolveDestChainConfig reads on-chain state (or defaults) and applies the user's override.
-func resolveDestChainConfig(adapter FeeAdapter, e cldf.Environment, fq datastore.AddressRef, src, dst uint64, override *lanes.FeeQuoterDestChainConfigOverride) (lanes.FeeQuoterDestChainConfig, error) {
+// resolveDestChainConfig reads on-chain state (or defaults) and applies the user's override and config.
+func resolveDestChainConfig(adapter FeeAdapter, e cldf.Environment, fq datastore.AddressRef, src uint64, dstCfg DestChainConfigForDst) (lanes.FeeQuoterDestChainConfig, error) {
+	dst := dstCfg.Selector
 	onchain, err := adapter.GetOnchainDestChainConfig(e.OperationsBundle, e.BlockChains, fq, src, dst)
 	if err != nil {
 		return lanes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to read on-chain dest chain config for src %d, dst %d: %w", src, dst, err)
@@ -155,8 +156,8 @@ func resolveDestChainConfig(adapter FeeAdapter, e cldf.Environment, fq datastore
 		base = adapter.GetDefaultDestChainConfig(src, dst)
 	}
 
-	if override != nil {
-		(*override)(&base)
+	if dstCfg.Override != nil {
+		(*dstCfg.Override)(&base)
 	}
-	return base, nil
+	return dstCfg.Config.Resolve(base), nil
 }

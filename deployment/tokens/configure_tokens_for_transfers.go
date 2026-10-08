@@ -103,6 +103,13 @@ type TokenTransferConfig struct {
 	// AlreadyRegistered at execution time and, because MCMS ops must run in per-chain nonce
 	// order, block every later operation for that chain.
 	SkipTokenAdminRegistrySetup bool `yaml:"skipTokenAdminRegistrySetup" json:"skipTokenAdminRegistrySetup"`
+	// SkipIfMissingPermissions enables one-sided configuration when a pool touched by this config is
+	// owned by a third party (neither the MCMS timelock nor the chain deployer). When true, such a pool
+	// has all of its writes skipped with a warning instead of failing the changeset. This applies to the
+	// target pool on this chain and to each counterpart pool reverse-propagated into by autoMigrateRemoteChains.
+	// Failing to read a pool's owner is always fatal. Adapters that do not implement
+	// TokenPoolOwnershipChecker are configured as if this flag were unset.
+	SkipIfMissingPermissions bool `yaml:"skipIfMissingPermissions" json:"skipIfMissingPermissions"`
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -183,6 +190,13 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for chain selector %d: %w", selector, err)
 		}
+		skipExternallyOwned, err := poolIsExternallyOwned(e, adapter, selector, tokenPool, fullTokenRef, token.SkipIfMissingPermissions)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if skipExternallyOwned {
+			continue
+		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
 		for remoteChainSelector, inCfg := range token.RemoteChains {
@@ -236,6 +250,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				allRemoteSelectors    []uint64
 				activePoolRef         datastore.AddressRef
 				localDecimals         uint8
+				localTokenBytes       []byte
 			)
 			if len(activePool) > 0 {
 				targetPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
@@ -274,15 +289,15 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 										activePoolRef.Version, selector,
 									)
 								}
-								tokenBytes, err := legacyAdapter.AddressRefToBytes(fullTokenRef)
+								localTokenBytes, err = legacyAdapter.AddressRefToBytes(fullTokenRef)
 								if err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes on chain selector %d: %w", selector, err)
 								}
-								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, tokenBytes)
+								localDecimals, err = legacyAdapter.DeriveTokenDecimals(e, selector, activePoolRef, localTokenBytes)
 								if err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to derive local token decimals on chain selector %d: %w", selector, err)
 								}
-								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool); err != nil {
+								if supported, err := legacyPoolMigrator.GetSupportedChains(e, selector, activePool, localTokenBytes); err != nil {
 									return nil, nil, nil, fmt.Errorf("failed to get supported remote chains for token pool on chain selector %d: %w", selector, err)
 								} else {
 									allRemoteSelectors = supported
@@ -301,6 +316,14 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				}
 			}
 			for _, remoteSelector := range allRemoteSelectors {
+				isDeprecated, err := chain_selectors.IsDeprecated(remoteSelector)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to check if remote chain selector %d is deprecated: %w", remoteSelector, err)
+				}
+				if isDeprecated {
+					e.Logger.Infof("skipping deprecated remote chain selector %d", remoteSelector)
+					continue
+				}
 				remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get chain family for remote chain selector %d: %w", remoteSelector, err)
@@ -309,7 +332,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if !ok {
 					return nil, nil, nil, fmt.Errorf("no address normalizer found for chain family %s of remote chain selector %d", remoteFamily, remoteSelector)
 				}
-				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, remoteSelector)
+				remoteTokenBytes, err := legacyPoolMigrator.GetRemoteToken(e, selector, activePool, localTokenBytes, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote token for remote chain selector %d: %w", remoteSelector, err)
 				}
@@ -345,7 +368,14 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for remote chain selector %d: %w", remoteSelector, err)
 				}
-				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, remoteSelector)
+				// remotePoolBytes is the pool's datastore address (e.g. the Solana pool program), which is needed to resolve
+				// the refs above. The local pool must instead store the pool's counterpart form (e.g. the Solana pool config
+				// PDA), so we derive it here to mirror convertRemoteChainConfig.
+				remotePoolBytes, err = remoteAdapter.DeriveTokenPoolCounterpart(e, remoteSelector, remotePoolBytes, remoteTokenBytes)
+				if err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to derive remote pool counterpart for remote chain selector %d: %w", remoteSelector, err)
+				}
+				remotePools, err := legacyPoolMigrator.GetRemotePools(e, selector, activePool, localTokenBytes, remoteSelector)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
 				}
@@ -392,6 +422,7 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				rc.MigrationMetadata = MigrationMetadata{
 					LegacyPoolVersion:            activePoolRef.Version,
 					LegacyPoolType:               activePoolRef.Type.String(),
+					LegacyPoolAddress:            activePool,
 					LegacyRemotePools:            remotePools,
 					LegacyTokenTransferFeeConfig: legacyFC,
 					LegacyRateLimits:             legacyRL,
@@ -484,10 +515,17 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 				return nil, nil, nil, fmt.Errorf("failed to convert token ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
 
-			migratedPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
+			// Counterparts must store the new pool in its counterpart form (e.g. the Solana pool config PDA as
+			// opposed to the pool program), mirroring convertRemoteChainConfig.
+			newPoolBytes, err := adapter.AddressRefToBytes(tokenPool)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to convert new pool ref to bytes for reverse propagation on chain selector %d: %w", selector, err)
 			}
+			migratedPoolBytes, err := adapter.DeriveTokenPoolCounterpart(e, selector, newPoolBytes, migratedTokenBytes)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to derive new pool counterpart for reverse propagation on chain selector %d: %w", selector, err)
+			}
+
 			for _, ru := range discoveredRemotes {
 				// After a pool is migrated, we need to tell every connected chain about the new pool so that the
 				// web stays reachable in both directions. One edge case to consider - suppose we have a web with
@@ -523,6 +561,13 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 					if peerConnectsToMigratingChain {
 						continue
 					}
+				}
+				skipExternallyOwned, err := poolIsExternallyOwned(e, ru.remoteAdapter, ru.remoteSelector, ru.remotePoolRef, ru.remoteTokenRef, token.SkipIfMissingPermissions)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				if skipExternallyOwned {
+					continue
 				}
 				reverseInput := ConfigureTokenForTransfersInput{
 					// Reverse propagation only *ADDS* this migration's new pool as an additional remote to an
@@ -569,6 +614,27 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 	}
 
 	return batchOps, reports, ds, nil
+}
+
+// poolIsExternallyOwned reports whether the pool should be skipped because SkipIfMissingPermissions is
+// enabled and the pool is owned by a third party. It returns false when the flag is off or the adapter
+// does not implement TokenPoolOwnershipChecker. A failure to read the owner is returned as an error.
+func poolIsExternallyOwned(e cldf.Environment, adapter TokenAdapter, chainSelector uint64, poolRef, tokenRef datastore.AddressRef, skipIfMissingPermissions bool) (bool, error) {
+	if !skipIfMissingPermissions {
+		return false, nil
+	}
+	ownershipChecker, ok := adapter.(TokenPoolOwnershipChecker)
+	if !ok {
+		return false, nil
+	}
+	externallyOwned, err := ownershipChecker.IsPoolExternallyOwned(e, chainSelector, poolRef, tokenRef)
+	if err != nil {
+		return false, fmt.Errorf("failed to check ownership of pool (%s) on chain selector %d: %w", datastore_utils.SprintRef(poolRef), chainSelector, err)
+	}
+	if externallyOwned {
+		e.Logger.Warnf("Pool (%s) on chain selector %d is externally owned; skipping its configuration (skipIfMissingPermissions enabled).", datastore_utils.SprintRef(poolRef), chainSelector)
+	}
+	return externallyOwned, nil
 }
 
 // snapshotActivePools reads each chain's active pool from its TokenAdminRegistry. This must run before
@@ -634,7 +700,7 @@ func applyTokenTransferFeeConfig(
 	}
 
 	if fullSrcPoolRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
-		if poolBatches, poolReports, err := applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, srcToDstFeeCfg); err != nil {
+		if poolBatches, poolReports, err := applyTokenTransferFeeConfigOnTokenPool(e, src, dst, fullSrcPoolRef, fullSrcTokenRef, srcToDstFeeCfg); err != nil {
 			return nil, nil, fmt.Errorf("failed to apply token transfer fee config on token pool for chain selector %d and remote chain selector %d: %w", src, dst, err)
 		} else {
 			batches = append(batches, poolBatches...)
@@ -649,15 +715,19 @@ func applyTokenTransferFeeConfigOnTokenPool(
 	e cldf.Environment,
 	src, dst uint64,
 	fullSrcPoolRef datastore.AddressRef,
+	fullSrcTokenRef datastore.AddressRef,
 	partial PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
 	feeAdapter, err := ResolveTokenFeeAdapter(e, src, fullSrcPoolRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve token fee adapter for chain selector %d and token pool address %s: %w", src, fullSrcPoolRef.Address, err)
 	}
-	poolAddress := fullSrcPoolRef.Address
-	if poolAddress == "" {
+	if fullSrcPoolRef.Address == "" {
 		return nil, nil, fmt.Errorf("token pool address is required to apply token transfer fee config for chain selector %d and remote chain selector %d", src, dst)
+	}
+	poolAddress, err := TokenPoolCounterpartAddress(e, src, fullSrcPoolRef, fullSrcTokenRef)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to derive token pool address for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
 
 	onChainConfig, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e, poolAddress, src, dst)
@@ -1064,6 +1134,33 @@ func LegacyRateLimitsForAutoMigrate[R any, CCV any](
 		Outbound: legacy.Outbound,
 		Inbound:  inboundLegacy,
 	}, nil
+}
+
+// TokenPoolCounterpartAddress returns the address that identifies the pool for this token in the
+// pool's own family, as TokenFeeAdapter expects it. That is the pool address itself on EVM, and the
+// pool config PDA on Solana, where one pool program serves many mints. When the counterpart is the
+// pool itself, poolRef.Address is returned unchanged.
+func TokenPoolCounterpartAddress(e cldf.Environment, sel uint64, poolRef, tokenRef datastore.AddressRef) (string, error) {
+	adapter, _, err := ResolveAdapter(GetTokenAdapterRegistry(), sel, poolRef.Version)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve token adapter: %w", err)
+	}
+	poolBytes, err := adapter.AddressRefToBytes(poolRef)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert token pool ref to bytes: %w", err)
+	}
+	tokenBytes, err := adapter.AddressRefToBytes(tokenRef)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert token ref to bytes: %w", err)
+	}
+	counterpart, err := adapter.DeriveTokenPoolCounterpart(e, sel, poolBytes, tokenBytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive token pool counterpart: %w", err)
+	}
+	if bytes.Equal(counterpart, poolBytes) {
+		return poolRef.Address, nil
+	}
+	return deploy.BytesToString(sel, counterpart)
 }
 
 func ResolveTokenFeeAdapter(e cldf.Environment, sel uint64, poolRef datastore.AddressRef) (TokenFeeAdapter, error) {

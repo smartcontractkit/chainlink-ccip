@@ -12,7 +12,11 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	bmtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool"
 	bmtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool"
+	lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
+	tpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -181,6 +185,7 @@ func TestConfigureTokenPoolForRemoteChains_RejectsEnabledZeroRateLimit(t *testin
 	rl := &tokenapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 0, Rate: 0}
 	_, err := cldf_ops.ExecuteSequence(e.OperationsBundle, ConfigureTokenPoolForRemoteChains, chain,
 		ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    testChainSelector,
 			TokenPoolAddress: poolAddr,
 			TokenPoolVersion: utils.Version_1_5_0,
 			RemoteChains: map[uint64]tokenapi.RemoteChainConfig[[]byte, string]{
@@ -194,6 +199,111 @@ func TestConfigureTokenPoolForRemoteChains_RejectsEnabledZeroRateLimit(t *testin
 			},
 		})
 	require.ErrorContains(t, err, "rate and capacity are both zero")
+}
+
+// TestConfigureTokenPoolForRemoteChains_LockReleasePool asserts the sequence drives a
+// LockReleaseTokenPoolAndProxy exactly as it drives the burn-mint one. The sequence touches only
+// the shared TokenPoolAndProxy surface, so this covers both the fresh-chain applyChainUpdates path
+// and the single-remote-pool cutover on the lock-release contract.
+func TestConfigureTokenPoolForRemoteChains_LockReleasePool(t *testing.T) {
+	t.Parallel()
+
+	e, poolAddr := deployConfigurablePoolOfType(t, string(lrtpap.ContractType))
+	chain := e.BlockChains.EVMChains()[testChainSelector]
+	pool := mustPool(t, e, poolAddr)
+
+	remoteToken := common.HexToAddress("0x00000000000000000000000000000000000000aa")
+	firstPool := common.HexToAddress("0x00000000000000000000000000000000000000bb")
+	secondPool := common.HexToAddress("0x00000000000000000000000000000000000000dd")
+
+	configure(t, e, chain.Selector, poolAddr, remoteToken, firstPool, 100, 10)
+
+	supported, err := pool.GetSupportedChains(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, []uint64{remoteChainSelector}, supported)
+
+	onChainRemoteToken, err := pool.GetRemoteToken(&bind.CallOpts{}, remoteChainSelector)
+	require.NoError(t, err)
+	require.Equal(t, remoteToken.Bytes(), onChainRemoteToken)
+
+	outbound, err := pool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{}, remoteChainSelector)
+	require.NoError(t, err)
+	require.True(t, outbound.IsEnabled)
+	require.Positive(t, outbound.Capacity.Sign())
+
+	// Retarget the lane: v1.5.0 replaces its single remote pool rather than appending.
+	configure(t, e, chain.Selector, poolAddr, remoteToken, secondPool, 100, 10)
+
+	onChainRemotePool, err := pool.GetRemotePool(&bind.CallOpts{}, remoteChainSelector)
+	require.NoError(t, err)
+	require.Equal(t, common.LeftPadBytes(secondPool.Bytes(), 32), onChainRemotePool)
+
+	// The lock-release specific state is untouched by the configure flow.
+	lr, err := lrtpap.NewLockReleaseTokenPoolAndProxyContract(poolAddr, chain.Client)
+	require.NoError(t, err)
+	rebalancer, err := lr.GetRebalancer(&bind.CallOpts{})
+	require.NoError(t, err)
+	require.Equal(t, common.Address{}, rebalancer, "configure must not touch the rebalancer")
+}
+
+// TestConfigureTokenPoolForRemoteChains_PlainPools asserts the sequence drives the plain
+// (non-proxy) v1.5.0 BurnMintTokenPool and LockReleaseTokenPool exactly as it drives the *AndProxy
+// pools. The plain pools lack getPreviousPool, so this is what proves the sequence never reaches
+// for it: a fresh-chain applyChainUpdates, then the single-remote-pool cutover that the v2.0.0
+// upgrade relies on to retarget a legacy counterpart at the new pool.
+func TestConfigureTokenPoolForRemoteChains_PlainPools(t *testing.T) {
+	t.Parallel()
+
+	for _, poolType := range []string{string(bmtp.ContractType), string(lrtp.ContractType)} {
+		t.Run(poolType, func(t *testing.T) {
+			t.Parallel()
+
+			e, poolAddr := deployConfigurablePoolOfType(t, poolType)
+			chain := e.BlockChains.EVMChains()[testChainSelector]
+			pool := mustPool(t, e, poolAddr)
+
+			remoteToken := common.HexToAddress("0x00000000000000000000000000000000000000aa")
+			firstPool := common.HexToAddress("0x00000000000000000000000000000000000000bb")
+			secondPool := common.HexToAddress("0x00000000000000000000000000000000000000dd")
+
+			configure(t, e, chain.Selector, poolAddr, remoteToken, firstPool, 100, 10)
+
+			supported, err := pool.GetSupportedChains(&bind.CallOpts{})
+			require.NoError(t, err)
+			require.Equal(t, []uint64{remoteChainSelector}, supported)
+
+			onChainRemoteToken, err := pool.GetRemoteToken(&bind.CallOpts{}, remoteChainSelector)
+			require.NoError(t, err)
+			require.Equal(t, remoteToken.Bytes(), onChainRemoteToken)
+
+			onChainRemotePool, err := pool.GetRemotePool(&bind.CallOpts{}, remoteChainSelector)
+			require.NoError(t, err)
+			require.Equal(t, common.LeftPadBytes(firstPool.Bytes(), 32), onChainRemotePool)
+
+			outbound, err := pool.GetCurrentOutboundRateLimiterState(&bind.CallOpts{}, remoteChainSelector)
+			require.NoError(t, err)
+			require.True(t, outbound.IsEnabled)
+			require.Positive(t, outbound.Capacity.Sign())
+
+			// Retarget the lane: v1.5.0 replaces its single remote pool rather than appending.
+			configure(t, e, chain.Selector, poolAddr, remoteToken, secondPool, 100, 10)
+
+			onChainRemotePool, err = pool.GetRemotePool(&bind.CallOpts{}, remoteChainSelector)
+			require.NoError(t, err)
+			require.Equal(t, common.LeftPadBytes(secondPool.Bytes(), 32), onChainRemotePool)
+
+			// Re-running with identical config sends nothing. Asserted on chain head, for the reason
+			// given on TestConfigureTokenPoolForRemoteChains_Idempotent.
+			before, err := chain.Client.HeaderByNumber(t.Context(), nil)
+			require.NoError(t, err)
+			e.OperationsBundle = freshBundle(e.OperationsBundle)
+			configure(t, e, chain.Selector, poolAddr, remoteToken, secondPool, 100, 10)
+			after, err := chain.Client.HeaderByNumber(t.Context(), nil)
+			require.NoError(t, err)
+			require.Equal(t, before.Number.String(), after.Number.String(),
+				"re-running with identical config should not send a transaction")
+		})
+	}
 }
 
 // configure runs the sequence for a single remote chain and returns its output.
@@ -211,6 +321,7 @@ func configure(
 
 	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, ConfigureTokenPoolForRemoteChains, chain,
 		ConfigureTokenPoolForRemoteChainsInput{
+			ChainSelector:    chainSelector,
 			TokenPoolAddress: poolAddr,
 			TokenPoolVersion: utils.Version_1_5_0,
 			RemoteChains: map[uint64]tokenapi.RemoteChainConfig[[]byte, string]{
@@ -230,14 +341,21 @@ func configure(
 
 func deployConfigurablePool(t *testing.T) (*cldf.Environment, common.Address) {
 	t.Helper()
+	return deployConfigurablePoolOfType(t, string(bmtpap.ContractType))
+}
+
+func deployConfigurablePoolOfType(t *testing.T, poolType string) (*cldf.Environment, common.Address) {
+	t.Helper()
 
 	e, tokenRef, _, _ := setupDeployEnv(t)
+	acceptLiquidity := true
 	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, DeployTokenPool, e.BlockChains, tokenapi.DeployTokenPoolInput{
 		TokenRef:          &tokenRef,
-		PoolType:          string(bmtpap.ContractType),
+		PoolType:          poolType,
 		TokenPoolVersion:  utils.Version_1_5_0,
 		ChainSelector:     testChainSelector,
 		ExistingDataStore: e.DataStore,
+		AcceptLiquidity:   &acceptLiquidity,
 	})
 	require.NoError(t, err)
 	require.Len(t, report.Output.Addresses, 1)
@@ -245,11 +363,11 @@ func deployConfigurablePool(t *testing.T) (*cldf.Environment, common.Address) {
 	return e, common.HexToAddress(report.Output.Addresses[0].Address)
 }
 
-func mustPool(t *testing.T, e *cldf.Environment, poolAddr common.Address) *bmtpap.BurnMintTokenPoolAndProxyContract {
+func mustPool(t *testing.T, e *cldf.Environment, poolAddr common.Address) *tpap.TokenPoolAndProxyContract {
 	t.Helper()
 
 	chain := e.BlockChains.EVMChains()[testChainSelector]
-	pool, err := bmtpap.NewBurnMintTokenPoolAndProxyContract(poolAddr, chain.Client)
+	pool, err := tpap.NewTokenPoolAndProxyContract(poolAddr, chain.Client)
 	require.NoError(t, err)
 
 	return pool

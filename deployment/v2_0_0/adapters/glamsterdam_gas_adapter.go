@@ -55,6 +55,17 @@ type GasUpdateAdapter interface {
 	// values, so the spec cannot be hardcoded; the adapter must identify which kind of pool
 	// `token` refers to (e.g. via its datastore ContractType) and return the matching spec.
 	TokenFieldSpec(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector uint64, token []byte) (glamsterdamutils.FieldSpec[uint32], error)
+
+	// UpdateFeeQuoterTokenOverrides migrates the per-token FeeQuoter overrides (distinct from a
+	// token pool's own fee config, read/written by ReadTokenGasField/WriteTokenGasField) for one
+	// lane. The v2.0 OnRamp sources a token's destination gas from the pool's own fee config when
+	// the pool is IPoolV2 and that config is enabled, and from this FeeQuoter override otherwise,
+	// so both must move together. Per-token classification (USDC vs Lombard vs generic scaling)
+	// doesn't fit the shared map-based resolve pattern used for the other fields above, so the
+	// adapter resolves and reports internally rather than going through Resolve/AddField at the
+	// orchestration layer. Returns one MCMS batch op per chain (covering every updated token) and
+	// report lines to append verbatim.
+	UpdateFeeQuoterTokenOverrides(b cldf_ops.Bundle, chains chain.BlockChains, ds datastore.DataStore, srcChainSelector, targetChainSelector uint64) ([]mcms_types.BatchOperation, []string, error)
 }
 
 // GasUpdateAdapterRegistry maintains a registry of GasUpdateAdapter implementations, one per chain family.

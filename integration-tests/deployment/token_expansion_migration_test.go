@@ -14,7 +14,7 @@ import (
 	evm_datastore_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
 	bnmERC20ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/burn_mint_erc20"
 	bnmERC20DripOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
-	bmtpapOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_token_pool_and_proxy"
+	tpapOps "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_pool_and_proxy"
 	bnmOpsV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	evmtokensseq "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	tarbindings "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -57,11 +57,15 @@ const (
 // legacyPairSpec captures what differs between legacy pool generations when standing up the
 // starting state for an upgrade test.
 type legacyPairSpec struct {
-	poolType   deployment.ContractType
-	tokenType  deployment.ContractType
-	decimalsA  uint8
-	decimalsB  uint8
-	singlePool bool
+	poolType  deployment.ContractType
+	tokenType deployment.ContractType
+	decimalsA uint8
+	decimalsB uint8
+	// acceptLiquidity is required (non-nil) for lock-release pool types and must stay nil for
+	// burn-mint ones. The v1.5.0 deploy sequence rejects a nil value for
+	// LockReleaseTokenPoolAndProxy because the flag is immutable once constructed.
+	acceptLiquidity *bool
+	singlePool      bool
 }
 
 // legacyPairSpecFor derives the spec from the legacy pool version.
@@ -110,6 +114,9 @@ type autoMigrateUpgradeOpts struct {
 	feeOverrideCfg    *tokensapi.PartialTokenTransferFeeConfig
 	explicitRemote    bool
 	skipLegacyFeeSeed bool
+	// legacyPoolType overrides the legacy pool type legacyPairSpecFor picks for the version. Used
+	// to start a v1.5.0 upgrade from the plain BurnMintTokenPool instead of the *AndProxy pool.
+	legacyPoolType deployment.ContractType
 }
 
 // TestTokenExpansionMigration_AutoMigrate exercises AutoMigrateRemoteChains upgrades from legacy BnM
@@ -118,7 +125,8 @@ type autoMigrateUpgradeOpts struct {
 // v1.5.0, v1.5.1 and v1.6.1 are covered. v1.5.1 vs v1.6.1 contrast inbound RL decimal rebasing
 // against native local decimals; v1.5.0 additionally covers the BurnMintTokenPoolAndProxy ABI,
 // whose single-remote-pool-per-lane storage makes reverse propagation a replace rather than an
-// append.
+// append. The v1_5_0_plain cases start from the plain (non-proxy) BurnMintTokenPool 1.5.0, which
+// shares that ABI but is a distinct contract - they are what pin its upgrade path.
 func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -149,6 +157,16 @@ func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
 				},
 			},
+		},
+		{
+			name:           "v1_5_0_plain_to_v2_0_0/full_discovery",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{legacyPoolType: cciputils.BurnMintTokenPool},
+		},
+		{
+			name:           "v1_5_0_plain_to_v2_0_0/explicit_remote_refs",
+			oldPoolVersion: cciputils.Version_1_5_0,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{legacyPoolType: cciputils.BurnMintTokenPool, explicitRemote: true},
 		},
 		{
 			name:           "v1_5_1_to_v2_0_0/full_discovery",
@@ -298,6 +316,13 @@ func TestTokenExpansionMigration_ExtendPoolDoesNotRequireAllRemotes(t *testing.T
 // in its TokenAdminRegistry. It returns the resolved addresses for use in upgrade tests.
 func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) legacyBnMPair {
 	t.Helper()
+	return setupLegacyConnectedPair(t, oldPoolVersion, legacyPairSpecFor(oldPoolVersion))
+}
+
+// setupLegacyConnectedPair is setupLegacyConnectedBnMPair with the pool/token shape supplied
+// directly, so a caller can stand up a non-burn-mint legacy pair (see the v1.5.0 lock-release test).
+func setupLegacyConnectedPair(t *testing.T, oldPoolVersion *semver.Version, spec legacyPairSpec) legacyBnMPair {
+	t.Helper()
 
 	const oldPoolQualA = "MIG_OLD_POOL_A"
 	const oldPoolQualB = "MIG_OLD_POOL_B"
@@ -344,7 +369,6 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 
 	// Deploy a legacy BurnMint pool pair (token + pool on each chain), connect them, and register in TAR.
 	tokenPoolRL := tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10}
-	spec := legacyPairSpecFor(oldPoolVersion)
 	bnmPoolType := spec.poolType
 	oldOut, err := tokensapi.TokenExpansion().Apply(*e, tokensapi.TokenExpansionInput{
 		ChainAdapterVersion: cciputils.Version_1_6_0,
@@ -360,6 +384,7 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: oldPoolQualA,
 					PoolType:           bnmPoolType.String(),
+					AcceptLiquidity:    spec.acceptLiquidity,
 				},
 				TokenTransferConfig: &tokensapi.TokenTransferConfig{
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -377,6 +402,7 @@ func setupLegacyConnectedBnMPair(t *testing.T, oldPoolVersion *semver.Version) l
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
 					TokenPoolQualifier: oldPoolQualB,
 					PoolType:           bnmPoolType.String(),
+					AcceptLiquidity:    spec.acceptLiquidity,
 				},
 				TokenTransferConfig: &tokensapi.TokenTransferConfig{
 					RemoteChains: map[uint64]tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
@@ -437,7 +463,11 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	const newPoolQualA = "MIG_NEW_POOL_A"
 
 	skipLegacyFeeSeed := opts != nil && opts.skipLegacyFeeSeed
-	s := setupLegacyConnectedBnMPair(t, oldPoolVersion)
+	spec := legacyPairSpecFor(oldPoolVersion)
+	if opts != nil && opts.legacyPoolType != "" {
+		spec.poolType = opts.legacyPoolType
+	}
+	s := setupLegacyConnectedPair(t, oldPoolVersion, spec)
 	e, selA, selB := s.env, s.selA, s.selB
 	chainA := e.BlockChains.EVMChains()[selA]
 
@@ -633,7 +663,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		// That is a real behavioural difference from v1.5.1+: there is no window in which the old and
 		// new pool A are both accepted by pool B, so messages already in flight from old pool A are
 		// rejected with InvalidSourcePoolAddress. Asserted here so the cutover is pinned, not implied.
-		oldPoolB, err := bmtpapOps.NewBurnMintTokenPoolAndProxyContract(s.oldPoolAddrB, chainB.Client)
+		oldPoolB, err := tpapOps.NewTokenPoolAndProxyContract(s.oldPoolAddrB, chainB.Client)
 		require.NoError(t, err)
 		gotRemotePoolB, err := oldPoolB.GetRemotePool(&bind.CallOpts{Context: t.Context()}, selA)
 		require.NoError(t, err)
@@ -815,10 +845,13 @@ func TestTokenExpansionMigration_LiquidityMigration(t *testing.T) {
 				SkipOwnershipTransfer: true,
 				TokenPoolVersion:      cciputils.Version_2_0_0,
 				DeployTokenPoolInput: &tokensapi.DeployTokenPoolInput{
-					TokenPoolQualifier:            newPoolQual,
-					PoolType:                      cciputils.LockReleaseTokenPool.String(),
-					TokenRef:                      &datastore.AddressRef{Address: tokenAddr.Hex()},
-					LiquidityMigrationBasisPoints: new(migrateHalf),
+					TokenPoolQualifier: newPoolQual,
+					PoolType:           cciputils.LockReleaseTokenPool.String(),
+					TokenRef:           &datastore.AddressRef{Address: tokenAddr.Hex()},
+					LiquidityMigrationAmount: &tokensapi.LockReleasePoolLiquidityMigrationAmount{
+						Format: tokensapi.LiquidityMigrationAmountFormatBPS,
+						Value:  fmt.Sprintf("%d", migrateHalf),
+					},
 				},
 			},
 		},
@@ -945,7 +978,10 @@ func TestTokenExpansionMigration_LiquidityMigration(t *testing.T) {
 					Type:          datastore.ContractType(cciputils.LockReleaseTokenPool.String()),
 					Version:       cciputils.Version_2_0_0,
 				},
-				BasisPoints: new(uint16(10000)),
+				LiquidityMigrationAmount: &tokensapi.LockReleasePoolLiquidityMigrationAmount{
+					Format: tokensapi.LiquidityMigrationAmountFormatBPS,
+					Value:  "10000",
+				},
 			},
 		},
 	})
@@ -970,13 +1006,21 @@ func TestTokenExpansionMigration_LiquidityMigration(t *testing.T) {
 	require.Contains(t, authCallers, timelockAddr, "timelock should be an authorized caller after deposit")
 }
 
-// TestTokenExpansionMigration_IncrementalMigration reproduces an incremental migration of a
-// fully-connected BurnMint web (A, B, C): migrate A first (A1->A2), then B+C (B1->B2, C1->C2),
-// where each migration uses autoMigrateRemoteChains (remotes discovered from the active legacy
-// pool). This is the sequential-migration shape: reverse-propagation is expected to keep every
-// already-migrated active v2 pools' accept lists up to date (A2 should learn B2 and C2 as remote
-// pools).
-func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
+// incrementalMigrationWeb is a fully-connected BurnMint web (A, B, C) migrated incrementally:
+// A first (A1->A2), then B+C (B1->B2, C1->C2), where each migration uses autoMigrateRemoteChains
+// (remotes discovered from the active legacy pool).
+type incrementalMigrationWeb struct {
+	e          *deployment.Environment
+	tokenA     datastore.AddressRef
+	tokenB     datastore.AddressRef
+	tokenC     datastore.AddressRef
+	v1PoolRefs map[uint64]datastore.AddressRef // legacy pools A1, B1, C1 keyed by chain selector
+	v2PoolRefs []datastore.AddressRef          // migrated pools A2, B2, C2, in that order
+}
+
+// setupIncrementalMigrationWeb deploys the v1 web and migrates it incrementally (see
+// incrementalMigrationWeb).
+func setupIncrementalMigrationWeb(t *testing.T) incrementalMigrationWeb {
 	// Set up a new env with 3 chains
 	selA := chainsel.TEST_90000001.Selector
 	selB := chainsel.TEST_90000002.Selector
@@ -1106,11 +1150,43 @@ func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
 		return v2PoolRefs
 	}
 
+	// Capture the legacy v1 pools before migrating
+	v1PoolRefs := map[uint64]datastore.AddressRef{}
+	for _, sel := range []uint64{selA, selB, selC} {
+		ref, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+			Type:      datastore.ContractType(cciputils.BurnMintTokenPool),
+			Version:   cciputils.Version_1_6_1,
+			Qualifier: legacyWeb[sel].DeployTokenPoolInput.TokenPoolQualifier,
+		}, sel, datastore_utils.FullRef)
+		require.NoError(t, err)
+		v1PoolRefs[sel] = ref
+	}
+
 	// Migrate A (A1 -> A2), then migrate B+C (batched)
 	poolRefs := []datastore.AddressRef{}
 	poolRefs = append(poolRefs, migrate([]datastore.AddressRef{tokenRefA})...)
 	poolRefs = append(poolRefs, migrate([]datastore.AddressRef{tokenRefB, tokenRefC})...)
 	require.Len(t, poolRefs, 3, "should have 3 migrated pools")
+
+	return incrementalMigrationWeb{
+		e:          e,
+		tokenA:     tokenRefA,
+		tokenB:     tokenRefB,
+		tokenC:     tokenRefC,
+		v1PoolRefs: v1PoolRefs,
+		v2PoolRefs: poolRefs,
+	}
+}
+
+// TestTokenExpansionMigration_IncrementalMigration reproduces an incremental migration of a
+// fully-connected BurnMint web (see incrementalMigrationWeb). This is the sequential-migration
+// shape: reverse-propagation is expected to keep every already-migrated active v2 pools' accept
+// lists up to date (A2 should learn B2 and C2 as remote pools).
+func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
+	web := setupIncrementalMigrationWeb(t)
+	e := web.e
+	tokenRefA, tokenRefB, tokenRefC := web.tokenA, web.tokenB, web.tokenC
+	poolRefs := web.v2PoolRefs
 
 	// Get EVM adapter implementations
 	adp, ok := tokensapi.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, cciputils.Version_2_0_0)
@@ -1127,9 +1203,11 @@ func TestTokenExpansionMigration_IncrementalMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the remote pools for A2 on chains B and C. These should include the newly-migrated B2 and C2 pools, respectively, due to reverse propagation.
-	a2b, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenRefB.ChainSelector)
+	tokenA2, err := adp.AddressRefToBytes(tokenRefA)
 	require.NoError(t, err)
-	a2c, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenRefC.ChainSelector)
+	a2b, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenA2, tokenRefB.ChainSelector)
+	require.NoError(t, err)
+	a2c, err := mig.GetRemotePools(*e, tokenRefA.ChainSelector, poolA2, tokenA2, tokenRefC.ChainSelector)
 	require.NoError(t, err)
 
 	// Check that A2's remote pools for B and C include the newly-migrated B2 and C2 pools, respectively. This is the reverse propagation check.

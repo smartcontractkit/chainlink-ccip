@@ -39,13 +39,17 @@ func GlamsterdamGasUpdateSequence(
 
 	for _, chainSel := range input.CandidateChainSelectors {
 		// Check if this chain has a lane to the target
-		hasLane, err := adapter.HasLaneToTarget(b, chains, ds, chainSel, target)
+		hasLane, reason, err := adapter.HasLaneToTarget(b, chains, ds, chainSel, target)
 		if err != nil {
 			report.AddReadError(chainSel, "check lane to target", err)
 			continue
 		}
 		if !hasLane {
-			report.AddNoLane(chainSel)
+			if reason != "" {
+				report.AddLine(reason)
+			} else {
+				report.AddNoLane(chainSel)
+			}
 			continue
 		}
 

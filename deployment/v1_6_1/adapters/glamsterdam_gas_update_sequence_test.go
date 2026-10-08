@@ -23,7 +23,7 @@ import (
 type fakeAdapter struct {
 	t *testing.T
 
-	hasLaneToTarget           func(chainSel uint64) (bool, error)
+	hasLaneToTarget           func(chainSel uint64) (bool, string, error)
 	readDestGasFields         func(chainSel uint64) (map[string]uint32, error)
 	writeDestGasFields        func(chainSel uint64, resolved map[string]uint32) ([]mcms_types.BatchOperation, error)
 	readImmutableSanityFields func(chainSel uint64) (map[string]uint32, error)
@@ -32,7 +32,7 @@ type fakeAdapter struct {
 	writeTokenGasField        func(chainSel uint64, token []byte, value uint32) (mcms_types.BatchOperation, error)
 }
 
-func (f *fakeAdapter) HasLaneToTarget(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, srcChainSelector, _ uint64) (bool, error) {
+func (f *fakeAdapter) HasLaneToTarget(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, srcChainSelector, _ uint64) (bool, string, error) {
 	if f.hasLaneToTarget == nil {
 		f.t.Fatal("HasLaneToTarget called but not stubbed")
 	}
@@ -114,9 +114,9 @@ func TestGlamsterdamGasUpdateSequence_NoLane(t *testing.T) {
 
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget: func(sel uint64) (bool, error) {
+		hasLaneToTarget: func(sel uint64) (bool, string, error) {
 			require.Equal(t, chainSel, sel)
-			return false, nil
+			return false, "", nil
 		},
 	}
 
@@ -133,8 +133,8 @@ func TestGlamsterdamGasUpdateSequence_HasLaneError(t *testing.T) {
 
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget: func(sel uint64) (bool, error) {
-			return false, errors.New("rpc unavailable")
+		hasLaneToTarget: func(sel uint64) (bool, string, error) {
+			return false, "", errors.New("rpc unavailable")
 		},
 	}
 
@@ -154,7 +154,7 @@ func TestGlamsterdamGasUpdateSequence_DestGasFieldsMatchAndFallback(t *testing.T
 	var gotResolved map[string]uint32
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget: func(uint64) (bool, error) { return true, nil },
+		hasLaneToTarget: func(uint64) (bool, string, error) { return true, "", nil },
 		readDestGasFields: func(uint64) (map[string]uint32, error) {
 			return map[string]uint32{
 				adapters.FeeQuoterDestGasOverhead.Name:             300_000, // matches Prague exactly
@@ -189,7 +189,7 @@ func TestGlamsterdamGasUpdateSequence_ImmutableSanityMismatchWarns(t *testing.T)
 
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget:   func(uint64) (bool, error) { return true, nil },
+		hasLaneToTarget:   func(uint64) (bool, string, error) { return true, "", nil },
 		readDestGasFields: func(uint64) (map[string]uint32, error) { return map[string]uint32{}, nil },
 		readImmutableSanityFields: func(uint64) (map[string]uint32, error) {
 			return map[string]uint32{"OffRamp.GasForCallExactCheck": 9_999}, nil
@@ -213,7 +213,7 @@ func TestGlamsterdamGasUpdateSequence_TokenFieldResolvedAndWritten(t *testing.T)
 	var wroteToken []byte
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget:           func(uint64) (bool, error) { return true, nil },
+		hasLaneToTarget:           func(uint64) (bool, string, error) { return true, "", nil },
 		readDestGasFields:         func(uint64) (map[string]uint32, error) { return map[string]uint32{}, nil },
 		readImmutableSanityFields: func(uint64) (map[string]uint32, error) { return map[string]uint32{}, nil },
 		discoverCandidateTokens:   func(uint64) ([][]byte, error) { return [][]byte{token}, nil },
@@ -245,7 +245,7 @@ func TestGlamsterdamGasUpdateSequence_TokenAlreadyAppliedSkipsWrite(t *testing.T
 
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget:           func(uint64) (bool, error) { return true, nil },
+		hasLaneToTarget:           func(uint64) (bool, string, error) { return true, "", nil },
 		readDestGasFields:         func(uint64) (map[string]uint32, error) { return map[string]uint32{}, nil },
 		readImmutableSanityFields: func(uint64) (map[string]uint32, error) { return map[string]uint32{}, nil },
 		discoverCandidateTokens:   func(uint64) ([][]byte, error) { return [][]byte{token}, nil },
@@ -269,7 +269,7 @@ func TestGlamsterdamGasUpdateSequence_TokenNotConfiguredSkipped(t *testing.T) {
 
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget:           func(uint64) (bool, error) { return true, nil },
+		hasLaneToTarget:           func(uint64) (bool, string, error) { return true, "", nil },
 		readDestGasFields:         func(uint64) (map[string]uint32, error) { return map[string]uint32{}, nil },
 		readImmutableSanityFields: func(uint64) (map[string]uint32, error) { return map[string]uint32{}, nil },
 		discoverCandidateTokens:   func(uint64) ([][]byte, error) { return [][]byte{token}, nil },
@@ -292,7 +292,7 @@ func TestGlamsterdamGasUpdateSequence_DiscoverTokensErrorIsolated(t *testing.T) 
 
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget: func(uint64) (bool, error) { return true, nil },
+		hasLaneToTarget: func(uint64) (bool, string, error) { return true, "", nil },
 		readDestGasFields: func(uint64) (map[string]uint32, error) {
 			return map[string]uint32{adapters.FeeQuoterDestGasOverhead.Name: 300_000}, nil
 		},
@@ -319,7 +319,7 @@ func TestGlamsterdamGasUpdateSequence_MultipleChainsIndependent(t *testing.T) {
 
 	adapter := &fakeAdapter{
 		t: t,
-		hasLaneToTarget: func(uint64) (bool, error) { return true, nil },
+		hasLaneToTarget: func(uint64) (bool, string, error) { return true, "", nil },
 		readDestGasFields: func(sel uint64) (map[string]uint32, error) {
 			return map[string]uint32{adapters.FeeQuoterDestGasOverhead.Name: 300_000}, nil
 		},

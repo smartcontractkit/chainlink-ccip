@@ -31,6 +31,7 @@ type fakeAdapter struct {
 	readTokenGasField         func(chainSel uint64, token []byte) (uint32, bool, error)
 	writeTokenGasField        func(chainSel uint64, token []byte, value uint32) (mcms_types.BatchOperation, error)
 	tokenFieldSpec            func(chainSel uint64, token []byte) (glamsterdamutils.FieldSpec[uint32], error)
+	updateFeeQuoterTokenOverrides func(srcChainSelector, targetChainSelector uint64) ([]mcms_types.BatchOperation, []string, error)
 }
 
 func (f *fakeAdapter) HasLaneToTarget(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, srcChainSelector, _ uint64) (bool, error) {
@@ -87,6 +88,15 @@ func (f *fakeAdapter) TokenFieldSpec(_ cldf_ops.Bundle, _ cldf_chain.BlockChains
 		f.t.Fatal("TokenFieldSpec called but not stubbed")
 	}
 	return f.tokenFieldSpec(srcChainSelector, token)
+}
+
+func (f *fakeAdapter) UpdateFeeQuoterTokenOverrides(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, _ datastore.DataStore, srcChainSelector, targetChainSelector uint64) ([]mcms_types.BatchOperation, []string, error) {
+	if f.updateFeeQuoterTokenOverrides == nil {
+		// Unstubbed by default: most scenarios here don't exercise FeeQuoter token overrides, so
+		// unlike the other methods this defaults to a no-op instead of failing the test.
+		return nil, nil, nil
+	}
+	return f.updateFeeQuoterTokenOverrides(srcChainSelector, targetChainSelector)
 }
 
 func batchOp(chainSel uint64) mcms_types.BatchOperation {

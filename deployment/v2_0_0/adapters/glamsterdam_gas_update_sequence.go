@@ -135,6 +135,18 @@ func GlamsterdamGasUpdateSequence(
 				batchOps = append(batchOps, write)
 			}
 		}
+
+		// Migrate FeeQuoter per-token overrides (distinct from the token pool fee config
+		// processed above).
+		fqTokenOps, fqTokenLines, err := adapter.UpdateFeeQuoterTokenOverrides(b, chains, ds, chainSel, target)
+		if err != nil {
+			report.AddReadError(chainSel, "update FeeQuoter token overrides", err)
+			continue
+		}
+		batchOps = append(batchOps, fqTokenOps...)
+		for _, line := range fqTokenLines {
+			report.AddLine(line)
+		}
 	}
 
 	return GlamsterdamGasUpdateSequenceOutput{
@@ -146,6 +158,7 @@ func GlamsterdamGasUpdateSequence(
 func getAllFieldSpecsUint32() []glamsterdamutils.FieldSpec[uint32] {
 	return []glamsterdamutils.FieldSpec[uint32]{
 		OnRampBaseExecutionGasCost,
+		FeeQuoterDestGasOverhead,
 		FeeQuoterDefaultTokenDestGasOverhead,
 		FeeQuoterMaxPerMsgGasLimit,
 		FeeQuoterDefaultTxGasLimit,

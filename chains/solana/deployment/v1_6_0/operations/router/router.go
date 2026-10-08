@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -15,9 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -406,6 +407,72 @@ var SetPool = operations.NewOperation(
 	},
 )
 
+// UnregisterTokenParams is the input for unregistering a token from the router's TokenAdminRegistry.
+type UnregisterTokenParams struct {
+	Router    solana.PublicKey
+	TokenMint solana.PublicKey
+}
+
+// UnregisterToken unregisters a token from the router's TokenAdminRegistry by setting its pool
+// lookup table to the zero pubkey (the Solana counterpart to EVM setPool(address(0))). The
+// instruction is signed by the token's TAR administrator (or the router authority when no admin
+// is set). The caller is responsible for the read-check guard (only unregister when the token's
+// current active pool is the pool being removed) before executing this operation.
+var UnregisterToken = operations.NewOperation(
+	"router:unregister-token",
+	Version,
+	"Unregisters a token from the Router TokenAdminRegistry by setting its pool lookup table to zero",
+	func(b operations.Bundle, chain cldf_solana.Chain, input UnregisterTokenParams) (sequences.OnChainOutput, error) {
+		ccip_router.SetProgramID(input.Router)
+
+		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
+		currentAdmin := GetAuthority(chain, input.Router)
+		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
+		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+			if !tokenAdminRegistryAccount.Administrator.IsZero() {
+				currentAdmin = tokenAdminRegistryAccount.Administrator
+			}
+		}
+
+		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
+		base := ccip_router.NewSetPoolInstruction(
+			[]uint8{},
+			routerConfigPDA,
+			tokenAdminRegistryPDA,
+			input.TokenMint,
+			solana.PublicKey{},
+			currentAdmin,
+		)
+		tempIx, err := base.ValidateAndBuild()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to build router unregister token instruction: %w", err)
+		}
+		ixData, err := tempIx.Data()
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to extract data payload from router unregister token instruction: %w", err)
+		}
+		instruction := solana.NewInstruction(input.Router, tempIx.Accounts(), ixData)
+
+		if currentAdmin != chain.DeployerKey.PublicKey() {
+			batches, err := utils.BuildMCMSBatchOperation(
+				chain.Selector,
+				[]solana.Instruction{instruction},
+				input.Router.String(),
+				ContractType.String(),
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to execute or create batch: %w", err)
+			}
+			return sequences.OnChainOutput{BatchOps: []types.BatchOperation{batches}}, nil
+		}
+
+		if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to confirm unregister token: %w", err)
+		}
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
 var RegisterTokenAdminRegistry = operations.NewOperation(
 	"router:register-token-admin-registry",
 	Version,
@@ -582,11 +649,16 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
 			currentAdmin = tokenAdminRegistryAccount.Administrator
 		}
-		timelockSigner := utils.GetTimelockSignerPDA(
+		// a chain without MCMS has no timelock signer, so nothing can match it
+		timelockSigner, err := utils.GetTimelockSignerPDA(
 			input.ExistingAddresses,
 			chain.Selector,
 			common_utils.CLLQualifier,
 		)
+		hasTimelock := err == nil
+		if err != nil && !errors.Is(err, utils.ErrMCMSInstanceNotFound) {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer: %w", err)
+		}
 		// Administrator already matches the caller's target; accept is unnecessary even if
 		// PendingAdministrator is stale (e.g. a third-party key from an earlier register).
 		if !currentAdmin.IsZero() && !input.Admin.IsZero() && currentAdmin == input.Admin {
@@ -596,20 +668,20 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 		if pendingAdmin.IsZero() {
 			// if there is no pending admin, we assume the authority is timelock
 			// but we need to confirm that timelock is indeed the authority
-			if currentAdmin == timelockSigner {
+			if hasTimelock && currentAdmin == timelockSigner {
 				b.Logger.Info("No pending admin found, but timelock is already the current admin, skipping accept admin role for token admin registry")
 				return sequences.OnChainOutput{}, nil
 			}
-			if input.Admin != timelockSigner {
+			if !hasTimelock || input.Admin != timelockSigner {
 				return sequences.OnChainOutput{}, fmt.Errorf("no pending admin found for token admin registry, expected timelock signer %s but got %s", timelockSigner.String(), input.Admin.String())
 			}
 			pendingAdmin = input.Admin
-		} else if pendingAdmin != timelockSigner && pendingAdmin != chain.DeployerKey.PublicKey() {
+		} else if (!hasTimelock || pendingAdmin != timelockSigner) && pendingAdmin != chain.DeployerKey.PublicKey() {
 			// MCMS batches don't execute immediately: Register may have queued an override to
 			// timelock/deployer while on-chain PendingAdministrator still shows a prior third
 			// party. Trust input.Admin (the intended accept signer from orchestration) when the
 			// admin slot is not yet settled.
-			if currentAdmin.IsZero() && !input.Admin.IsZero() && (input.Admin == timelockSigner || input.Admin == chain.DeployerKey.PublicKey()) {
+			if currentAdmin.IsZero() && !input.Admin.IsZero() && ((hasTimelock && input.Admin == timelockSigner) || input.Admin == chain.DeployerKey.PublicKey()) {
 				pendingAdmin = input.Admin
 			} else {
 				return sequences.OnChainOutput{}, fmt.Errorf("pending admin %s does not match timelock signer %s or deployer %s", pendingAdmin.String(), timelockSigner.String(), chain.DeployerKey.PublicKey().String())

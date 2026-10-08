@@ -2,6 +2,7 @@ package glamsterdam
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -79,6 +80,24 @@ var UpdateTokenPoolGasConfig = cldf_ops.NewSequence(
 			chain, ok := chains.EVMChains()[lane.ChainSelector]
 			if !ok {
 				return fmt.Errorf("chain with selector %d not found", lane.ChainSelector)
+			}
+
+			// Check support first: some pools (e.g. CCTPThroughCCVTokenPool) revert in
+			// getTokenTransferFeeConfig (CCVNotSetOnResolver) when the destination isn't configured,
+			// which would otherwise abort the whole changeset.
+			supported, err := cldf_ops.ExecuteOperation(b, token_pool.GetSupportedChains, chain, contract.FunctionInput[struct{}]{
+				ChainSelector: lane.ChainSelector,
+				Address:       lane.PoolAddress,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to read TokenPool(%s) supported chains on src %d: %w", lane.PoolAddress, lane.ChainSelector, err)
+			}
+			if !slices.Contains(supported.Output, input.TargetChainSelector) {
+				output.Report.AddLine(fmt.Sprintf(
+					"chain %d: TokenPool(%s) does not support dst %d, skipping",
+					lane.ChainSelector, lane.PoolAddress, input.TargetChainSelector,
+				))
+				return nil
 			}
 
 			cur, err := cldf_ops.ExecuteOperation(b, token_pool.GetTokenTransferFeeConfig, chain, contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{

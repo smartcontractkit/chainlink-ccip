@@ -13,12 +13,94 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/sequences/glamsterdam"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 )
+
+// feeQuoterUse classifies the FeeQuoter a chain's v1.6 OnRamp actually prices messages with.
+type feeQuoterUse int
+
+const (
+	// feeQuoterV16 is a 1.6.x FeeQuoter, which this adapter's v1.6 ABI can read and write.
+	feeQuoterV16 feeQuoterUse = iota
+	// feeQuoterOtherVersion is a FeeQuoter of another version (typically 2.0.0, after an in-place
+	// upgrade). It has a different DestChainConfig struct/selectors, so this adapter cannot write
+	// it; its gas config is migrated by the v2.0 changeset instead.
+	feeQuoterOtherVersion
+	// feeQuoterUnknown is a FeeQuoter address that is not in the datastore at all.
+	feeQuoterUnknown
+)
+
+// classifyUsedFeeQuoter looks up the FeeQuoter address that the OnRamp points at in the chain's
+// datastore entries and reports whether it is a 1.6.x FeeQuoter this adapter can update, and its
+// datastore version (empty if unknown).
+func classifyUsedFeeQuoter(addrs []datastore.AddressRef, sel uint64, used common.Address) (feeQuoterUse, string) {
+	for _, ref := range addrs {
+		if ref.ChainSelector != sel || ref.Type != datastore.ContractType(fee_quoter.ContractType) {
+			continue
+		}
+		if common.HexToAddress(ref.Address) != used {
+			continue
+		}
+		if ref.Version.Major() == 1 && ref.Version.Minor() == 6 {
+			return feeQuoterV16, ref.Version.String()
+		}
+		return feeQuoterOtherVersion, ref.Version.String()
+	}
+	return feeQuoterUnknown, ""
+}
+
+// resolveFeeQuoterAddr returns the FeeQuoter address to read/write for srcChainSelector, or false
+// (with a human-readable reason) if the chain must be skipped. The FeeQuoter that matters is the
+// one the chain's v1.6 OnRamp is wired to (dynamicConfig.feeQuoter), NOT necessarily the
+// datastore's FeeQuoter 1.6.0: on a chain whose FeeQuoter was upgraded in place the OnRamp uses
+// the 2.0.0 one, and updating the old 1.6.0 would change a contract nothing prices with. If the
+// chain has no v1.6 OnRamp in the datastore, fall back to the datastore's FeeQuoter 1.6.0.
+func resolveFeeQuoterAddr(
+	b cldf_ops.Bundle, chains cldf_chain.BlockChains, srcChainSelector uint64, addrs []datastore.AddressRef,
+) (common.Address, bool, string, error) {
+	onRampRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, onramp.ContractType, onramp.Version, "")
+	if datastore_utils.IsAddressRefEmpty(onRampRef) {
+		fqRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, fee_quoter.ContractType, fee_quoter.Version, "")
+		if datastore_utils.IsAddressRefEmpty(fqRef) {
+			return common.Address{}, false, "", fmt.Errorf("could not resolve FeeQuoter address on chain %d", srcChainSelector)
+		}
+		return common.HexToAddress(fqRef.Address), true, "", nil
+	}
+
+	chain, ok := chains.EVMChains()[srcChainSelector]
+	if !ok {
+		return common.Address{}, false, "", fmt.Errorf("EVM chain %d not found", srcChainSelector)
+	}
+	dyn, err := cldf_ops.ExecuteOperation(b, onramp.GetDynamicConfig, chain, contract.FunctionInput[struct{}]{
+		ChainSelector: srcChainSelector,
+		Address:       common.HexToAddress(onRampRef.Address),
+	})
+	if err != nil {
+		return common.Address{}, false, "", fmt.Errorf("failed to read v1.6 OnRamp dynamic config: %w", err)
+	}
+
+	used := dyn.Output.FeeQuoter
+	switch kind, version := classifyUsedFeeQuoter(addrs, srcChainSelector, used); kind {
+	case feeQuoterV16:
+		return used, true, "", nil
+	case feeQuoterOtherVersion:
+		return common.Address{}, false, fmt.Sprintf(
+			"chain %d: v1.6 OnRamp %s is wired to FeeQuoter %s (%s), not a 1.6.x FeeQuoter - its gas config is "+
+				"migrated by the v2.0 changeset, skipping this chain",
+			srcChainSelector, onRampRef.Address, used, version,
+		), nil
+	default:
+		return common.Address{}, false, fmt.Sprintf(
+			"chain %d: ERROR - v1.6 OnRamp %s is wired to FeeQuoter %s, which is not in the datastore, skipping this chain",
+			srcChainSelector, onRampRef.Address, used,
+		), nil
+	}
+}
 
 // resolveUSDCTokenPoolRef finds the chain's non-canonical USDC token pool address ref, if any.
 // v1.6.1 has no USDC-specific ContractType; by this version's convention (see
@@ -38,36 +120,42 @@ func resolveUSDCTokenPoolRef(addrs []datastore.AddressRef, sel uint64) datastore
 type GlamsterdamGasAdapter struct{}
 
 // HasLaneToTarget checks if a lane exists from srcChainSelector to targetChainSelector
-// by reading the FeeQuoter's dest chain config.
+// by reading the FeeQuoter's dest chain config. The FeeQuoter checked is the one the chain's v1.6
+// OnRamp is actually wired to, not necessarily the datastore's FeeQuoter 1.6.0 — see
+// resolveFeeQuoterAddr. If that FeeQuoter isn't a 1.6.x one (e.g. upgraded to 2.0.0 in place), this
+// chain is skipped with a specific reason instead of a generic "no lane" line: its gas config is
+// migrated by the v2.0 changeset instead.
 func (a *GlamsterdamGasAdapter) HasLaneToTarget(
 	b cldf_ops.Bundle,
 	chains cldf_chain.BlockChains,
 	ds datastore.DataStore,
 	srcChainSelector, targetChainSelector uint64,
-) (bool, error) {
+) (bool, string, error) {
 	chain, ok := chains.EVMChains()[srcChainSelector]
 	if !ok {
-		return false, fmt.Errorf("EVM chain %d not found", srcChainSelector)
+		return false, "", fmt.Errorf("EVM chain %d not found", srcChainSelector)
 	}
 
 	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
-	fqRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, fee_quoter.ContractType, fee_quoter.Version, "")
-	if datastore_utils.IsAddressRefEmpty(fqRef) {
-		return false, fmt.Errorf("could not resolve FeeQuoter address on chain %d", srcChainSelector)
+	feeQuoterAddr, ok, reason, err := resolveFeeQuoterAddr(b, chains, srcChainSelector, addrs)
+	if err != nil {
+		return false, "", err
+	}
+	if !ok {
+		return false, reason, nil
 	}
 
-	feeQuoterAddr := common.HexToAddress(fqRef.Address)
 	result, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 		ChainSelector: srcChainSelector,
 		Address:       feeQuoterAddr,
 		Args:          targetChainSelector,
 	})
 	if err != nil {
-		return false, fmt.Errorf("failed to read FeeQuoter dest chain config: %w", err)
+		return false, "", fmt.Errorf("failed to read FeeQuoter dest chain config: %w", err)
 	}
 
 	// A lane is enabled if IsEnabled is true
-	return result.Output.IsEnabled, nil
+	return result.Output.IsEnabled, "", nil
 }
 
 // ReadDestGasFields reads the current gas field values from FeeQuoter.
@@ -83,12 +171,15 @@ func (a *GlamsterdamGasAdapter) ReadDestGasFields(
 	}
 
 	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
-	fqRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, fee_quoter.ContractType, fee_quoter.Version, "")
-	if datastore_utils.IsAddressRefEmpty(fqRef) {
-		return nil, fmt.Errorf("could not resolve FeeQuoter address on chain %d", srcChainSelector)
+	feeQuoterAddr, ok, _, err := resolveFeeQuoterAddr(b, chains, srcChainSelector, addrs)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		// HasLaneToTarget already would have skipped this chain for the same reason; nothing to read.
+		return map[string]uint32{}, nil
 	}
 
-	feeQuoterAddr := common.HexToAddress(fqRef.Address)
 	result, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestChainConfig, chain, contract.FunctionInput[uint64]{
 		ChainSelector: srcChainSelector,
 		Address:       feeQuoterAddr,
@@ -118,12 +209,14 @@ func (a *GlamsterdamGasAdapter) WriteDestGasFields(
 	}
 
 	addrs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(srcChainSelector))
-	fqRef := datastore_utils.GetAddressRef(addrs, srcChainSelector, fee_quoter.ContractType, fee_quoter.Version, "")
-	if datastore_utils.IsAddressRefEmpty(fqRef) {
-		return nil, fmt.Errorf("could not resolve FeeQuoter address on chain %d", srcChainSelector)
+	feeQuoterAddr, ok, _, err := resolveFeeQuoterAddr(b, chains, srcChainSelector, addrs)
+	if err != nil {
+		return nil, err
 	}
-
-	feeQuoterAddr := common.HexToAddress(fqRef.Address)
+	if !ok {
+		// HasLaneToTarget already would have skipped this chain for the same reason; nothing to write.
+		return nil, nil
+	}
 
 	// Read current config to build the updated one
 	current, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestChainConfig, chain, contract.FunctionInput[uint64]{

@@ -2,6 +2,9 @@ package config
 
 import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
 // CanonicalUSDCDecimals is the number of decimals used by canonical USDC on every
@@ -11,6 +14,32 @@ import (
 // on-chain instead. Stellar is the documented exception, using 7 decimals, but it is
 // not supported by the CCTP deployment changeset.
 const CanonicalUSDCDecimals uint8 = 6
+
+// Defaults for native CCTP lanes, i.e. lanes that move USDC with CCTP burn/mint
+// rather than lock/release. They are applied to the CCTPVerifier remote chain
+// config (gas/payload) and the token transfer fee config used by the FeeQuoter and
+// the CCTP-through-CCV token pool.
+const (
+	// DefaultGasForVerification is the gas allocated to verify a CCTP message on a remote chain.
+	DefaultGasForVerification uint32 = 220_000
+	// DefaultPayloadSizeBytes is the size of the CCTP verification payload checked on a remote chain.
+	DefaultPayloadSizeBytes uint16 = 1024
+)
+
+// NativeCCTPTokenTransferFeeConfig returns the default token transfer fee config for
+// native (non-lock-release) CCTP lanes. The destination overheads account for the CCTP
+// message, and the finality fees default to zero.
+func NativeCCTPTokenTransferFeeConfig() *tokens.PartialTokenTransferFeeConfig {
+	return &tokens.PartialTokenTransferFeeConfig{
+		DefaultFinalityTransferFeeBps: utils.NewOptional(uint16(0)),
+		CustomFinalityTransferFeeBps:  utils.NewOptional(uint16(0)),
+		DefaultFinalityFeeUSDCents:    utils.NewOptional(uint32(0)),
+		CustomFinalityFeeUSDCents:     utils.NewOptional(uint32(0)),
+		DestBytesOverhead:             utils.NewOptional(uint32(32)),
+		DestGasOverhead:               utils.NewOptional(uint32(90_000)),
+		IsEnabled:                     utils.NewOptional(true),
+	}
+}
 
 // CCTPChainDefaults holds the Circle-defined CCTP contract addresses and the
 // Circle domain identifier for a chain. These values are sourced from Circle's
@@ -54,6 +83,11 @@ var CCTPChainDefaultsBySelector = map[uint64]CCTPChainDefaults{
 		TokenMessengerV1: "0x6B25532e1060CE10cc3B0A99e5683b91BFDe6982",
 		TokenMessengerV2: "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
 		USDCToken:        "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+	},
+	chain_selectors.ARC_MAINNET.Selector: {
+		DomainIdentifier: 26,
+		TokenMessengerV2: "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+		USDCToken:        "0x3600000000000000000000000000000000000000",
 	},
 	chain_selectors.ETHEREUM_MAINNET_OPTIMISM_1.Selector: {
 		DomainIdentifier: 2,
