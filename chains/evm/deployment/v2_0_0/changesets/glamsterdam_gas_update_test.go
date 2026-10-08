@@ -24,6 +24,7 @@ import (
 	ccipdeploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	v2_0_0_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 )
 
 const (
@@ -235,7 +236,7 @@ func TestUpdateGasConfigForGlamsterdamV2(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	mcmsRegistry := cs_core.GetRegistry()
-	out, err := changesets.UpdateGasConfigForGlamsterdamV2(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.GlamsterdamGasUpdateCfg]{
+	out, err := changesets.UpdateGasConfigForGlamsterdamV2(mcmsRegistry, v2_0_0_adapters.GetGasUpdateAdapterRegistry()).Apply(*e, cs_core.WithMCMS[changesets.GlamsterdamGasUpdateCfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.GlamsterdamGasUpdateCfg{
 			TargetChainSelector: ggTargetChainSel,

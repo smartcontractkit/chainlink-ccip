@@ -22,8 +22,18 @@ type GlamsterdamGasUpdateV16Cfg struct {
 }
 
 // UpdateGasConfigForGlamsterdamV16 returns the v1.6.1 Glamsterdam gas update changeset.
-func UpdateGasConfigForGlamsterdamV16(registry *changesets.MCMSReaderRegistry) deployment.ChangeSetV2[changesets.WithMCMS[GlamsterdamGasUpdateV16Cfg]] {
+//
+// adapterRegistry is injected rather than looked up from the GetGasUpdateAdapterRegistry global
+// so the changeset is testable with mocks (see ConfigureChainsForLanesFromTopology's
+// ChainFamilyRegistry for the established convention this follows). Candidate chains are
+// discovered across every chain family present in the environment, grouped by family, and
+// dispatched to that family's registered adapter — a family with no registered adapter fails the
+// changeset rather than silently skipping chains from that family.
+func UpdateGasConfigForGlamsterdamV16(mcmsRegistry *changesets.MCMSReaderRegistry, adapterRegistry *v1_6_1_adapters.GasUpdateAdapterRegistry) deployment.ChangeSetV2[changesets.WithMCMS[GlamsterdamGasUpdateV16Cfg]] {
 	validate := func(e deployment.Environment, cfg changesets.WithMCMS[GlamsterdamGasUpdateV16Cfg]) error {
+		if adapterRegistry == nil {
+			return fmt.Errorf("gas update adapter registry is required")
+		}
 		if cfg.Cfg.TargetChainSelector == 0 {
 			return fmt.Errorf("TargetChainSelector must be set")
 		}
@@ -45,11 +55,11 @@ func UpdateGasConfigForGlamsterdamV16(registry *changesets.MCMSReaderRegistry) d
 			skipSet[sel] = true
 		}
 
-		// Get all candidate chain selectors (all chains except target and skip list). Sorted so
-		// that identical inputs always produce operations/descriptions in the same order,
-		// regardless of Go's randomized map iteration order.
+		// Get all candidate chain selectors across every chain family (all chains except target
+		// and skip list). Sorted so that identical inputs always produce operations/descriptions
+		// in the same order, regardless of Go's randomized map iteration order.
 		candidateChains := []uint64{}
-		for sel := range e.BlockChains.EVMChains() {
+		for _, sel := range e.BlockChains.ListChainSelectors() {
 			if sel != cfg.Cfg.TargetChainSelector && !skipSet[sel] {
 				candidateChains = append(candidateChains, sel)
 			}
@@ -66,34 +76,48 @@ func UpdateGasConfigForGlamsterdamV16(registry *changesets.MCMSReaderRegistry) d
 			report.AddLine(fmt.Sprintf("chain %d: skipped (explicit SkipChainSelectors entry)", sel))
 		}
 
-		// Get the EVM adapter from the registry
-		adapterRegistry := v1_6_1_adapters.GetGasUpdateAdapterRegistry()
-		adapter := adapterRegistry.GetGasUpdateAdapter(chain_selectors.FamilyEVM)
-		if adapter == nil {
-			// A missing adapter means this migration cannot run at all for this chain family —
-			// fail loudly rather than silently returning a "successful" no-op output, which would
-			// let automation treat an unexecuted update as complete.
-			return deployment.ChangesetOutput{}, fmt.Errorf("no gas update adapter registered for EVM family")
+		// Group candidate chains by chain family, so each family's registered adapter only ever
+		// sees its own chains. Sorted for deterministic dispatch order.
+		byFamily := make(map[string][]uint64)
+		for _, sel := range candidateChains {
+			family, err := chain_selectors.GetSelectorFamily(sel)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get chain family for chain %d: %w", sel, err)
+			}
+			byFamily[family] = append(byFamily[family], sel)
 		}
-
-		// Run the orchestration sequence for EVM chains
-		seqOutput, err := v1_6_1_adapters.GlamsterdamGasUpdateSequence(
-			e.OperationsBundle,
-			e.BlockChains,
-			e.DataStore,
-			v1_6_1_adapters.GlamsterdamGasUpdateSequenceInput{
-				Adapter:                 adapter,
-				TargetChainSelector:     cfg.Cfg.TargetChainSelector,
-				CandidateChainSelectors: candidateChains,
-				Report:                  report,
-			},
-		)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute glamsterdam gas update sequence: %w", err)
+		families := make([]string, 0, len(byFamily))
+		for family := range byFamily {
+			families = append(families, family)
 		}
+		sort.Strings(families)
 
-		// Merge batch ops
-		allBatchOps = append(allBatchOps, seqOutput.BatchOps...)
+		for _, family := range families {
+			adapter := adapterRegistry.GetGasUpdateAdapter(family)
+			if adapter == nil {
+				// A missing adapter means this migration cannot run at all for this chain family —
+				// fail loudly rather than silently returning a "successful" no-op output, which would
+				// let automation treat an unexecuted update as complete.
+				return deployment.ChangesetOutput{}, fmt.Errorf("no gas update adapter registered for chain family %q", family)
+			}
+
+			seqOutput, err := v1_6_1_adapters.GlamsterdamGasUpdateSequence(
+				e.OperationsBundle,
+				e.BlockChains,
+				e.DataStore,
+				v1_6_1_adapters.GlamsterdamGasUpdateSequenceInput{
+					Adapter:                 adapter,
+					TargetChainSelector:     cfg.Cfg.TargetChainSelector,
+					CandidateChainSelectors: byFamily[family],
+					Report:                  report,
+				},
+			)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to execute glamsterdam gas update sequence for chain family %q: %w", family, err)
+			}
+
+			allBatchOps = append(allBatchOps, seqOutput.BatchOps...)
+		}
 
 		// Build the output with MCMS proposal
 		mcmsInput := cfg.MCMS
@@ -102,7 +126,7 @@ func UpdateGasConfigForGlamsterdamV16(registry *changesets.MCMSReaderRegistry) d
 		} else {
 			mcmsInput.Description = mcmsInput.Description + "\n\n" + report.String()
 		}
-		return changesets.NewOutputBuilder(e, registry).
+		return changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithBatchOps(allBatchOps).
 			Build(mcmsInput)
 	}

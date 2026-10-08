@@ -57,12 +57,19 @@ var (
 	registry     *GasUpdateAdapterRegistry
 )
 
+// NewGasUpdateAdapterRegistry returns a fresh, empty GasUpdateAdapterRegistry. Callers that need
+// an isolated registry (e.g. tests) should use this instead of the GetGasUpdateAdapterRegistry
+// singleton.
+func NewGasUpdateAdapterRegistry() *GasUpdateAdapterRegistry {
+	return &GasUpdateAdapterRegistry{
+		adapters: make(map[string]GasUpdateAdapter),
+	}
+}
+
 // GetGasUpdateAdapterRegistry returns the singleton GasUpdateAdapterRegistry.
 func GetGasUpdateAdapterRegistry() *GasUpdateAdapterRegistry {
 	registryOnce.Do(func() {
-		registry = &GasUpdateAdapterRegistry{
-			adapters: make(map[string]GasUpdateAdapter),
-		}
+		registry = NewGasUpdateAdapterRegistry()
 	})
 	return registry
 }
