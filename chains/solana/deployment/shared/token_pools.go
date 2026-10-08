@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -9,7 +10,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
-// This file carries the four symbols the Solana changesets need from
+// This file carries the symbols the Solana changesets need from
 // chainlink/deployment/ccip/shared's helpers.go, token_pools.go and token_info.go.
 //
 // Those three files are deliberately not copied. Between them they import
@@ -56,13 +57,65 @@ func QualifierFromParts(parts ...string) string {
 	return strings.Join(quoted, "/")
 }
 
+// ParseQualifierParts decodes a qualifier written by QualifierFromParts. It also accepts the
+// historical unquoted form so existing datastore entries remain readable during the migration.
+func ParseQualifierParts(qualifier string) ([]string, error) {
+	if qualifier == "" {
+		return nil, nil
+	}
+	if qualifier[0] != '"' {
+		return strings.Split(qualifier, "/"), nil
+	}
+
+	var parts []string
+	for remaining := qualifier; remaining != ""; {
+		if remaining[0] != '"' {
+			return nil, fmt.Errorf("invalid qualifier %q: expected quoted part", qualifier)
+		}
+
+		closingQuote := -1
+		escaped := false
+		for i := 1; i < len(remaining); i++ {
+			switch {
+			case escaped:
+				escaped = false
+			case remaining[i] == '\\':
+				escaped = true
+			case remaining[i] == '"':
+				closingQuote = i
+			}
+			if closingQuote >= 0 {
+				break
+			}
+		}
+		if closingQuote < 0 {
+			return nil, fmt.Errorf("invalid qualifier %q: unterminated quoted part", qualifier)
+		}
+
+		part, err := strconv.Unquote(remaining[:closingQuote+1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid qualifier %q: %w", qualifier, err)
+		}
+		parts = append(parts, part)
+
+		remaining = remaining[closingQuote+1:]
+		if remaining == "" {
+			break
+		}
+		if remaining[0] != '/' {
+			return nil, fmt.Errorf("invalid qualifier %q: expected separator", qualifier)
+		}
+		remaining = remaining[1:]
+	}
+	return parts, nil
+}
+
 // TokenPoolLookupTableQualifier returns the datastore qualifier for a Solana token-pool lookup
 // table, which is uniquely identified by (token mint, pool type, metadata).
 //
 // Each component is quoted rather than joined on a bare separator. metadata is caller-supplied
 // free-form text, so a plain "a/b/c" join would let ("A", "B/C") and ("A/B", "C") produce the same
-// qualifier and collide in the datastore. Quoting escapes any separator inside a component, so
-// distinct inputs always yield distinct qualifiers.
+// qualifier and collide in the datastore. ParseQualifierParts restores the component boundaries.
 func TokenPoolLookupTableQualifier(tokenPubKey, poolType, metadata string) string {
 	return QualifierFromParts(tokenPubKey, poolType, metadata)
 }

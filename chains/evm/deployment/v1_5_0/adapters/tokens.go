@@ -9,9 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	v1_2_0_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/token_pool"
 	v1_4_0_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_4_0/token_pool"
-	v1_2_0_burn_mint_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/burn_mint_token_pool"
-	v1_0_0_lock_release_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/lock_release_token_pool"
 
 	evm1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
@@ -519,7 +518,7 @@ func EffectiveMigrationRateLimits(
 	case prevVersion.GreaterThanEqual(utils.Version_1_4_0) && prevVersion.LessThan(utils.Version_1_5_0):
 		prevOut, prevIn, err = readV14Limits(chain, previous, remoteSelector, opts)
 	case prevVersion.GreaterThanEqual(utils.Version_1_2_0) && prevVersion.LessThan(utils.Version_1_4_0):
-		prevOut, prevIn, err = readV12Limits(chain, previous, proxy, prevType, opts)
+		prevOut, prevIn, err = readV12Limits(chain, previous, proxy, opts)
 		if err == nil && (prevOut.IsEnabled || prevIn.IsEnabled) {
 			b.Logger.Warnf(
 				"v1.5.0 *AndProxy pool %s lane %d: previous v1.2 pool %s applies an enabled, "+
@@ -629,67 +628,36 @@ func readV14Limits(
 		nil
 }
 
-// TODO: if v1.2 has a shared `TokenPool` base contract that BnM and LnR pools inherit
-// from, then this function should be refactored such that it re-uses the shared bindings
-// for both pool types similar to `readV14Limits`.
-//
 // readV12Limits reads the per-proxy-address outbound/inbound buckets from a v1.2 previous pool.
 // v1.2 pools key rate limiter state by onRamp (outbound)/offRamp (inbound) address, shared across
 // every lane the proxy pool serves (see the aggregate-bucket caveat logged by the caller). Bucket
 // state is mutable, so this is a raw call rather than a cached operation.
+//
+// Pool-type agnostic, like readV14Limits: BurnMintTokenPool and LockReleaseTokenPool both inherit
+// the v1.2.0 TokenPool base, and these two reads are byte-identical on each - same selectors and
+// the same RateLimiter.TokenBucket return shape, so the shared base contract serves both.
 func readV12Limits(
-	chain evm.Chain, previous, proxy common.Address, prevType string, opts *bind.CallOpts,
+	chain evm.Chain, previous, proxy common.Address, opts *bind.CallOpts,
 ) (outbound, inbound tokensapi.RateLimiterConfig, err error) {
-	switch deployment.ContractType(prevType) {
-	case utils.BurnMintTokenPool:
-		caller, err := v1_2_0_burn_mint_token_pool.NewBurnMintTokenPoolCaller(previous, chain.Client)
-		if err != nil {
-			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, err
-		}
-		out, err := caller.CurrentOnRampRateLimiterState(opts, proxy)
-		if err != nil {
-			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
-				"failed to get onRamp rate limiter state for v1.2 BurnMintTokenPool %s: %w", previous.Hex(), err,
-			)
-		}
-		in, err := caller.CurrentOffRampRateLimiterState(opts, proxy)
-		if err != nil {
-			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
-				"failed to get offRamp rate limiter state for v1.2 BurnMintTokenPool %s: %w", previous.Hex(), err,
-			)
-		}
-		return tokensapi.RateLimiterConfig{IsEnabled: out.IsEnabled, Capacity: out.Capacity, Rate: out.Rate},
-			tokensapi.RateLimiterConfig{IsEnabled: in.IsEnabled, Capacity: in.Capacity, Rate: in.Rate},
-			nil
-
-	case utils.LockReleaseTokenPool:
-		// No official v1.2.0 LockRelease gobindings exist; the v1.0.0 binding's read selectors
-		// are identical, so it is reused here. Revisit if official v1.2.0 bindings become available.
-		caller, err := v1_0_0_lock_release_token_pool.NewLockReleaseTokenPoolCaller(previous, chain.Client)
-		if err != nil {
-			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, err
-		}
-		out, err := caller.CurrentOnRampRateLimiterState(opts, proxy)
-		if err != nil {
-			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
-				"failed to get onRamp rate limiter state for v1.2 LockReleaseTokenPool %s: %w", previous.Hex(), err,
-			)
-		}
-		in, err := caller.CurrentOffRampRateLimiterState(opts, proxy)
-		if err != nil {
-			return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
-				"failed to get offRamp rate limiter state for v1.2 LockReleaseTokenPool %s: %w", previous.Hex(), err,
-			)
-		}
-		return tokensapi.RateLimiterConfig{IsEnabled: out.IsEnabled, Capacity: out.Capacity, Rate: out.Rate},
-			tokensapi.RateLimiterConfig{IsEnabled: in.IsEnabled, Capacity: in.Capacity, Rate: in.Rate},
-			nil
-
-	default:
+	caller, err := v1_2_0_token_pool.NewTokenPoolContract(previous, chain.Client)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, err
+	}
+	out, err := caller.CurrentOnRampRateLimiterState(opts, proxy)
+	if err != nil {
 		return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
-			"unsupported v1.2 previous pool type %q for pool %s", prevType, previous.Hex(),
+			"failed to get onRamp rate limiter state for v1.2 previous pool %s: %w", previous.Hex(), err,
 		)
 	}
+	in, err := caller.CurrentOffRampRateLimiterState(opts, proxy)
+	if err != nil {
+		return tokensapi.RateLimiterConfig{}, tokensapi.RateLimiterConfig{}, fmt.Errorf(
+			"failed to get offRamp rate limiter state for v1.2 previous pool %s: %w", previous.Hex(), err,
+		)
+	}
+	return tokensapi.RateLimiterConfig{IsEnabled: out.IsEnabled, Capacity: out.Capacity, Rate: out.Rate},
+		tokensapi.RateLimiterConfig{IsEnabled: in.IsEnabled, Capacity: in.Capacity, Rate: in.Rate},
+		nil
 }
 
 // minBigInt returns the smaller of a and b, treating nil as zero.

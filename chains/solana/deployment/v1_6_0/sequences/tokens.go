@@ -16,7 +16,7 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/token_pools"
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_0/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
@@ -76,7 +76,12 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
 			pendingSigner := rtarOut.Output.PendingSigner
 
-			timelockSigner := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+			// a chain without MCMS has no timelock signer, so nothing can match it
+			timelockSigner, err := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+			hasTimelock := err == nil
+			if err != nil && !errors.Is(err, utils.ErrMCMSInstanceNotFound) {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer: %w", err)
+			}
 			tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			deployerPK := chain.DeployerKey.PublicKey()
 			routerPK := solana.PublicKeyFromBytes(routerAddr)
@@ -88,7 +93,7 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			// to bugs since it is operating on an incomplete snapshot. The switch statement below should
 			// account for this case and cover the non-batch case as well.
 			hasMCMSProposal := len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0
-			isTimelockPendingAdmin := pendingSigner == timelockSigner
+			isTimelockPendingAdmin := hasTimelock && pendingSigner == timelockSigner
 			isDeployerPendingAdmin := pendingSigner == deployerPK
 			switch {
 			// Case 1: the RegisterTokenAdminRegistry changes are already confirmed on-chain and require
@@ -654,7 +659,55 @@ var (
 	_ tokenapi.TokenPoolDynamicConfigAdapter = (*SolanaAdapter)(nil)
 	_ tokenapi.RemotePoolRemover             = (*SolanaAdapter)(nil)
 	_ tokenapi.TokenPoolMigrator             = (*SolanaAdapter)(nil)
+	_ tokenapi.TokenPoolOwnershipChecker     = (*SolanaAdapter)(nil)
 )
+
+// IsPoolExternallyOwned implements tokenapi.TokenPoolOwnershipChecker. A Solana 1.6 pool program
+// is shared across mints and ownership lives in the per-mint pool config PDA, so tokenRef must
+// resolve to the token mint. The pool is externally owned when its config owner is neither the
+// CLL timelock signer PDA nor the deployer key.
+func (a *SolanaAdapter) IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, tokenRef datastore.AddressRef) (bool, error) {
+	chain, ok := e.BlockChains.SolanaChains()[chainSelector]
+	if !ok {
+		return false, fmt.Errorf("solana chain with selector %d not defined", chainSelector)
+	}
+	fullTokenRef, _, err := a.getTokenMintAndTokenProgram(e.OperationsBundle, e.BlockChains, e.DataStore, chainSelector, tokenRef)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve token mint for ref (%s): %w", datastore_utils.SprintRef(tokenRef), err)
+	}
+	fullPoolRef, err := datastore_utils.FindAndFormatRef(e.DataStore, poolRef, chainSelector, datastore_utils.FullRef)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve pool ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
+	}
+	tokenMint, err := solana.PublicKeyFromBase58(fullTokenRef.Address)
+	if err != nil {
+		return false, fmt.Errorf("invalid token mint address for chain %d: %s: %w", chainSelector, fullTokenRef.Address, err)
+	}
+	tokenPool, err := solana.PublicKeyFromBase58(fullPoolRef.Address)
+	if err != nil {
+		return false, fmt.Errorf("invalid token pool address for chain %d: %s: %w", chainSelector, fullPoolRef.Address, err)
+	}
+
+	getAuthority := tokenpoolops.GetAuthorityBurnMint
+	switch fullPoolRef.Type.String() {
+	case common_utils.BurnMintTokenPool.String():
+		// Already set to burn mint
+	case common_utils.LockReleaseTokenPool.String():
+		getAuthority = tokenpoolops.GetAuthorityLockRelease
+	default:
+		return false, fmt.Errorf("unsupported token pool type '%s' for Solana", fullPoolRef.Type)
+	}
+
+	timelockSigner, err := utils.GetTimelockSignerPDA(e.DataStore.Addresses().Filter(), chainSelector, common_utils.CLLQualifier)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve timelock signer for chain %d: %w", chainSelector, err)
+	}
+	owner, err := getAuthority(chain, tokenPool, tokenMint)
+	if err != nil {
+		return false, fmt.Errorf("failed to get owner of token pool %s for mint %s on chain %d: %w", tokenPool, tokenMint, chainSelector, err)
+	}
+	return !owner.Equals(timelockSigner) && !owner.Equals(chain.DeployerKey.PublicKey()), nil
+}
 
 // RemoveRemotePools removes remote pool entries from a Solana 1.6 token pool. The pool address
 // is a program ID shared across mints, so the token mint comes from input.TokenRef and the pool
@@ -1180,13 +1233,13 @@ func (a *SolanaAdapter) DeployTokenPoolForToken() *cldf_ops.Sequence[tokenapi.De
 					return sequences.OnChainOutput{}, errors.New("rate limit admin cannot be the zero pubkey")
 				}
 			} else {
-				rlAdmin = utils.GetTimelockSignerPDA(
+				rlAdmin, err = utils.GetTimelockSignerPDA(
 					input.ExistingDataStore.Addresses().Filter(),
 					chain.Selector,
 					common_utils.CLLQualifier,
 				)
-				if rlAdmin.IsZero() {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer PDA as rate limit admin for chain %d: ensure MCMS RBACTimelock is in the datastore", chain.Selector)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer PDA as rate limit admin for chain %d: %w", chain.Selector, err)
 				}
 			}
 
@@ -1276,11 +1329,14 @@ func (a *SolanaAdapter) UpdateAuthorities() *cldf_ops.Sequence[tokenapi.UpdateAu
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get token and token program address using the specified reference (%+v): %w", input.TokenRef, err)
 			}
 
-			timelockSigner := utils.GetTimelockSignerPDA(
+			timelockSigner, err := utils.GetTimelockSignerPDA(
 				ds.Addresses().Filter(),
 				chain.Selector,
 				common_utils.CLLQualifier,
 			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer: %w", err)
+			}
 
 			tokenPoolRef, err := datastore_utils.FindAndFormatRef(ds, input.TokenPoolRef, chain.Selector, datastore_utils.FullRef)
 			if err != nil {

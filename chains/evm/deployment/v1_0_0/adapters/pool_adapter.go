@@ -29,10 +29,11 @@ import (
 )
 
 var (
-	_ tokensapi.RateLimitReaderAdapter = &EVMPoolAdapter{}
-	_ tokensapi.TokenRefResolver       = &EVMPoolAdapter{}
-	_ tokensapi.TokenAdapter           = &EVMPoolAdapter{}
-	_ tokensapi.RemotePoolRemover      = &EVMPoolAdapter{}
+	_ tokensapi.RateLimitReaderAdapter    = &EVMPoolAdapter{}
+	_ tokensapi.TokenRefResolver          = &EVMPoolAdapter{}
+	_ tokensapi.TokenAdapter              = &EVMPoolAdapter{}
+	_ tokensapi.RemotePoolRemover         = &EVMPoolAdapter{}
+	_ tokensapi.TokenPoolOwnershipChecker = &EVMPoolAdapter{}
 )
 
 // PoolOps abstracts the version-specific token pool contract calls.
@@ -147,6 +148,30 @@ func (a *EVMPoolAdapter) GetOnchainRateLimits(b cldf_ops.Bundle, chains cldf_cha
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
 	}
 	return a.Ops.GetCurrentRateLimits(b, chain, poolAddr, remoteSelector, fastFinality)
+}
+
+// IsPoolExternallyOwned reports whether the pool's owner is neither the CLL MCMS timelock nor
+// the chain deployer. An error reading the timelock or the pool owner is returned as-is; callers
+// must treat it as fatal rather than as a reason to skip.
+func (a *EVMPoolAdapter) IsPoolExternallyOwned(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, _ datastore.AddressRef) (bool, error) {
+	chain, ok := e.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return false, fmt.Errorf("chain with selector %d not defined", chainSelector)
+	}
+	poolAddr, err := a.EVMTokenBase.ParseNonZeroAddressRef(e.DataStore, poolRef, chainSelector)
+	if err != nil {
+		return false, fmt.Errorf("failed to find token pool address for ref (%s): %w", datastore_utils.SprintRef(poolRef), err)
+	}
+	timelockFltr := datastore.AddressRef{Type: datastore.ContractType(cciputils.RBACTimelock), ChainSelector: chainSelector, Qualifier: cciputils.CLLQualifier}
+	timelockAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, timelockFltr, chainSelector, datastore_utils_evm.ToNonZeroEVMAddress)
+	if err != nil {
+		return false, fmt.Errorf("failed to find timelock address for chain %d: %w", chainSelector, err)
+	}
+	poolOwner, _, err := a.Ops.GetPoolAdmins(e.GetContext(), &chain, poolAddr)
+	if err != nil {
+		return false, fmt.Errorf("failed to get owner of token pool %s on chain %d: %w", poolAddr.Hex(), chainSelector, err)
+	}
+	return poolOwner != timelockAddr && poolOwner != chain.DeployerKey.From, nil
 }
 
 func (a *EVMPoolAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokensapi.TPRLRemotes, sequences.OnChainOutput, cldf_chain.BlockChains] {
