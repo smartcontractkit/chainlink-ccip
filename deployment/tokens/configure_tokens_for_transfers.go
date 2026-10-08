@@ -104,6 +104,13 @@ type TokenTransferConfig struct {
 	// AlreadyRegistered at execution time and, because MCMS ops must run in per-chain nonce
 	// order, block every later operation for that chain.
 	SkipTokenAdminRegistrySetup bool `yaml:"skipTokenAdminRegistrySetup" json:"skipTokenAdminRegistrySetup"`
+	// SkipIfMissingPermissions enables one-sided configuration when a pool touched by this config is
+	// owned by a third party (neither the MCMS timelock nor the chain deployer). When true, such a pool
+	// has all of its writes skipped with a warning instead of failing the changeset. This applies to the
+	// target pool on this chain and to each counterpart pool reverse-propagated into by autoMigrateRemoteChains.
+	// Failing to read a pool's owner is always fatal. Adapters that do not implement
+	// TokenPoolOwnershipChecker are configured as if this flag were unset.
+	SkipIfMissingPermissions bool `yaml:"skipIfMissingPermissions" json:"skipIfMissingPermissions"`
 }
 
 // ConfigureTokensForTransfersConfig is the configuration for the ConfigureTokensForTransfers changeset.
@@ -249,6 +256,13 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 		adapter, family, tokenPool, fullTokenRef, err := ResolveAdapterAndRefs(e, tokenRegistry, selector, token.TokenPoolRef, token.TokenRef)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to resolve adapter and refs for chain selector %d: %w", selector, err)
+		}
+		skipExternallyOwned, err := poolIsExternallyOwned(e, adapter, selector, tokenPool, fullTokenRef, token.SkipIfMissingPermissions)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if skipExternallyOwned {
+			continue
 		}
 
 		remoteChains := make(map[uint64]RemoteChainConfig[[]byte, string], len(token.RemoteChains))
@@ -615,6 +629,13 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 						continue
 					}
 				}
+				skipExternallyOwned, err := poolIsExternallyOwned(e, ru.remoteAdapter, ru.remoteSelector, ru.remotePoolRef, ru.remoteTokenRef, token.SkipIfMissingPermissions)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				if skipExternallyOwned {
+					continue
+				}
 				reverseInput := ConfigureTokenForTransfersInput{
 					// Reverse propagation only *ADDS* this migration's new pool as an additional remote to an
 					// existing active pool including pools that may already be migrated and currently support
@@ -660,6 +681,27 @@ func processTokenConfigForChain(e cldf.Environment, cfg map[uint64]TokenTransfer
 	}
 
 	return batchOps, reports, ds, nil
+}
+
+// poolIsExternallyOwned reports whether the pool should be skipped because SkipIfMissingPermissions is
+// enabled and the pool is owned by a third party. It returns false when the flag is off or the adapter
+// does not implement TokenPoolOwnershipChecker. A failure to read the owner is returned as an error.
+func poolIsExternallyOwned(e cldf.Environment, adapter TokenAdapter, chainSelector uint64, poolRef, tokenRef datastore.AddressRef, skipIfMissingPermissions bool) (bool, error) {
+	if !skipIfMissingPermissions {
+		return false, nil
+	}
+	ownershipChecker, ok := adapter.(TokenPoolOwnershipChecker)
+	if !ok {
+		return false, nil
+	}
+	externallyOwned, err := ownershipChecker.IsPoolExternallyOwned(e, chainSelector, poolRef, tokenRef)
+	if err != nil {
+		return false, fmt.Errorf("failed to check ownership of pool (%s) on chain selector %d: %w", datastore_utils.SprintRef(poolRef), chainSelector, err)
+	}
+	if externallyOwned {
+		e.Logger.Warnf("Pool (%s) on chain selector %d is externally owned; skipping its configuration (skipIfMissingPermissions enabled).", datastore_utils.SprintRef(poolRef), chainSelector)
+	}
+	return externallyOwned, nil
 }
 
 // snapshotActivePools reads each chain's active pool from its TokenAdminRegistry. This must run before
