@@ -6,12 +6,13 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
 type productTest_MockTokenAdapter struct{}
@@ -178,4 +179,115 @@ func TestTokenAdminRegistryRegistration(t *testing.T) {
 		_, ok = registry.GetTokenAdminRegistryManager(family)
 		require.False(t, ok)
 	})
+}
+
+func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
+	const chainSel = uint64(5009297550715157269)
+
+	// Register a mock adapter for the chain family/version the cases below resolve against.
+	registry := tokens.GetTokenAdapterRegistry()
+	registry.RegisterTokenAdapter("evm", semver.MustParse("9.9.9"), &productTest_MockTokenAdapter{})
+
+	baseInput := func() tokens.TokenExpansionInput {
+		return tokens.TokenExpansionInput{
+			ChainAdapterVersion: semver.MustParse("9.9.9"),
+			TokenExpansionInputPerChain: map[uint64]tokens.TokenExpansionInputPerChain{
+				chainSel: {
+					TokenPoolVersion: semver.MustParse("9.9.9"),
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		mutate      func(cfg *tokens.TokenExpansionInput)
+		expectedErr string
+	}{
+		{
+			name:   "Success - valid input with no deploy token pool",
+			mutate: func(cfg *tokens.TokenExpansionInput) {},
+		},
+		{
+			name: "Failure - invalid chain selector",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				cfg.TokenExpansionInputPerChain = map[uint64]tokens.TokenExpansionInputPerChain{
+					0: {TokenPoolVersion: semver.MustParse("9.9.9")},
+				}
+			},
+			expectedErr: "not a valid selector",
+		},
+		{
+			name: "Failure - no adapter registered for version",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("8.8.8"),
+				}
+			},
+			expectedErr: "no TokenPoolAdapter registered",
+		},
+		{
+			name: "Failure - invalid liquidity migration amount",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("9.9.9"),
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						PoolType: "LockReleaseTokenPool",
+						LiquidityMigrationAmount: &tokens.LockReleasePoolLiquidityMigrationAmount{
+							Format: tokens.LiquidityMigrationAmountFormatBPS,
+							Value:  "10001",
+						},
+					},
+				}
+			},
+			expectedErr: "invalid liquidity migration amount",
+		},
+		{
+			name: "Failure - liquidity migration on a non lock-release pool",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("9.9.9"),
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						PoolType: "BurnMintTokenPool",
+						LiquidityMigrationAmount: &tokens.LockReleasePoolLiquidityMigrationAmount{
+							Format: tokens.LiquidityMigrationAmountFormatBPS,
+							Value:  "5000",
+						},
+					},
+				}
+			},
+			expectedErr: "only supported for lock-release pools",
+		},
+		{
+			name: "Failure - unsiloed lockbox selector without lockbox groups",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				selector := chainSel
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("9.9.9"),
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						PoolType:                     "SiloedLockReleaseTokenPool",
+						UnsiloedLockBoxChainSelector: &selector,
+					},
+				}
+			},
+			expectedErr: "unsiloedLockBoxChainSelector requires lockBoxGroups",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := baseInput()
+			tc.mutate(&cfg)
+
+			changeset := tokens.TokenExpansion()
+			err := changeset.VerifyPreconditions(deployment.Environment{}, cfg)
+
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
 }

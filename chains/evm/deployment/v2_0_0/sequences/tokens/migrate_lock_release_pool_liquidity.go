@@ -47,27 +47,35 @@ var MigrateLockReleasePoolLiquidity = cldf_ops.NewSequence(
 		newPoolAddr := common.HexToAddress(input.NewPoolAddress)
 		timelockAddr := common.HexToAddress(input.TimelockAddress)
 
-		tvReport, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, evmChain, evm_contract.FunctionInput[struct{}]{
+		oldPoolTV, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       oldPoolAddr,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get typeAndVersion from old pool %s: %w", oldPoolAddr, err)
 		}
-		oldPoolType := string(tvReport.Output.Type)
+		oldPoolType := string(oldPoolTV.Output.Type)
 
-		tokenReport, err := cldf_ops.ExecuteOperation(b, token_pool_ops.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
+		newPoolTV, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, evmChain, evm_contract.FunctionInput[struct{}]{
 			ChainSelector: input.ChainSelector,
 			Address:       newPoolAddr,
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to get token address from new pool %s: %w", newPoolAddr, err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to get typeAndVersion from new pool %s: %w", newPoolAddr, err)
 		}
-		tokenAddr := tokenReport.Output
 
 		// Only the generic siloed lock-release pool is handled here. A substring match on "Siloed"
 		// would also catch SiloedUSDCTokenPool, which migrates through the CCTP hybrid path instead.
 		isSiloed := oldPoolType == utils.SiloedLockReleaseTokenPool.String()
+
+		if err := validatePoolPair(oldPoolAddr, newPoolAddr, oldPoolTV.Output, newPoolTV.Output); err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		tokenAddr, err := resolveMigrationToken(b, evmChain, input.ChainSelector, oldPoolAddr, newPoolAddr, isSiloed)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
 
 		if isSiloed {
 			return migrateSiloedPool(b, evmChain, input, oldPoolAddr, newPoolAddr, tokenAddr, timelockAddr)
@@ -146,6 +154,102 @@ func validateMigrationInput(input tokens.MigrateLockReleasePoolLiquidityInput) e
 		return fmt.Errorf("TimelockAddress must be provided")
 	}
 	return nil
+}
+
+// isLegacyLockReleasePoolType reports whether poolType is a lock-release pool the migration can
+// drain. It is deliberately broader than utils.IsLockReleasePoolType, which excludes
+// LockReleaseTokenPoolAndProxy: that predicate exists for the v2.0.0 deploy dispatch, which has no
+// v1.5.0 contract to offer, whereas the migration drives the v1.5.0 pool through the v1.6.1
+// getRebalancer/setRebalancer/withdrawLiquidity bindings and supports it as a source.
+func isLegacyLockReleasePoolType(poolType string) bool {
+	return utils.IsLockReleasePoolType(poolType) ||
+		poolType == utils.LockReleaseTokenPoolAndProxy.String()
+}
+
+// validatePoolPair rejects a migration whose old and new pools are not a legacy -> v2.0.0
+// lock-release pair.
+//
+// The version check cannot reject a valid pair today. The destination is pinned to exactly
+// v2.0.0 and every legacy source type is older than that, so the ordering is already implied by
+// the two type checks. It is kept so that a future destination version does not silently accept
+// a source that is the same version or newer.
+//
+// A v2.0.0 source is rejected on purpose. v2.0.0 pools have no getRebalancer, setRebalancer or
+// withdrawLiquidity, and this sequence drives the old pool through those calls, so a
+// same-version migration would revert on the first one. Moving liquidity between two v2.0.0
+// pools is a lockbox-to-lockbox transfer, not a pool migration.
+func validatePoolPair(oldPoolAddr, newPoolAddr common.Address, oldTV, newTV type_and_version.TypeAndVersion) error {
+	if !isLegacyLockReleasePoolType(string(oldTV.Type)) {
+		return fmt.Errorf(
+			"old pool %s is a %s %s, not a lock-release pool; the migration source must be a LockReleaseTokenPool, SiloedLockReleaseTokenPool, or LockReleaseTokenPoolAndProxy",
+			oldPoolAddr, oldTV.Type, oldTV.Version,
+		)
+	}
+
+	if !oldTV.Version.LessThan(newTV.Version) {
+		return fmt.Errorf(
+			"old pool %s is %s %s and new pool %s is %s %s; the old pool must be strictly older than the new pool (are the refs reversed?)",
+			oldPoolAddr, oldTV.Type, oldTV.Version, newPoolAddr, newTV.Type, newTV.Version,
+		)
+	}
+
+	if !utils.IsLockReleasePoolType(string(newTV.Type)) || !newTV.Version.Equal(utils.Version_2_0_0) {
+		return fmt.Errorf(
+			"new pool %s is a %s %s, not a %s lock-release pool; the migration destination must be a v2.0.0 lockbox-based pool",
+			newPoolAddr, newTV.Type, newTV.Version, utils.Version_2_0_0,
+		)
+	}
+
+	return nil
+}
+
+// resolveMigrationToken reads getToken() from both pools and requires them to match, returning the
+// shared token address. The old pool's token is what the balance read and every funding op are
+// denominated in.
+func resolveMigrationToken(
+	b cldf_ops.Bundle,
+	evmChain evm.Chain,
+	chainSel uint64,
+	oldPoolAddr, newPoolAddr common.Address,
+	isSiloed bool,
+) (common.Address, error) {
+	newTokenReport, err := cldf_ops.ExecuteOperation(b, token_pool_ops.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSel,
+		Address:       newPoolAddr,
+	})
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to get token address from new pool %s: %w", newPoolAddr, err)
+	}
+
+	var oldToken common.Address
+	if isSiloed {
+		report, err := cldf_ops.ExecuteOperation(b, siloed_ops_v161.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       oldPoolAddr,
+		})
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to get token address from old siloed pool %s: %w", oldPoolAddr, err)
+		}
+		oldToken = report.Output
+	} else {
+		report, err := cldf_ops.ExecuteOperation(b, lrtp_ops_v161.GetToken, evmChain, evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       oldPoolAddr,
+		})
+		if err != nil {
+			return common.Address{}, fmt.Errorf("failed to get token address from old pool %s: %w", oldPoolAddr, err)
+		}
+		oldToken = report.Output
+	}
+
+	if oldToken != newTokenReport.Output {
+		return common.Address{}, fmt.Errorf(
+			"old pool %s manages token %s but new pool %s manages token %s; both pools must manage the same token",
+			oldPoolAddr, oldToken, newPoolAddr, newTokenReport.Output,
+		)
+	}
+
+	return newTokenReport.Output, nil
 }
 
 // resolveUnsiloedLockBox validates the supplied destination in the input for the unsiloed (shared)

@@ -8,6 +8,8 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
 
@@ -109,4 +111,74 @@ func TestErrInboundRateLimitNotPortable(t *testing.T) {
 	require.ErrorContains(t, err, "rate 11000000")
 	require.ErrorContains(t, err, "cannot be reinterpreted for the new one")
 	require.ErrorContains(t, err, "Specify the rate limits explicitly")
+}
+
+func TestSetTokenPoolRateLimits_VerifyPreconditions(t *testing.T) {
+	const (
+		chainA = uint64(5009297550715157269)
+		chainB = uint64(15971525489660198786)
+	)
+
+	validOutbound := RemoteOutbounds{
+		RateLimit: &RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10},
+	}
+
+	tests := []struct {
+		name        string
+		cfg         TPRLInput
+		expectedErr string
+	}{
+		{
+			name:        "Failure - no chain configs",
+			cfg:         TPRLInput{},
+			expectedErr: "at least one chain config",
+		},
+		{
+			name: "Success - valid config",
+			cfg: TPRLInput{
+				Configs: map[uint64]TPRLConfig{
+					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: validOutbound}},
+					chainB: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainA: validOutbound}},
+				},
+			},
+		},
+		{
+			// The counterpart of an OutboundOnly lane is read-only: it needs refs for the
+			// validation read but no RemoteOutbounds of its own, so an empty map must be allowed.
+			name: "Success - outbound-only lane with a refs-only counterpart",
+			cfg: TPRLInput{
+				Configs: map[uint64]TPRLConfig{
+					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {
+						OutboundOnly: true,
+						RateLimit:    &RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10},
+					}}},
+					chainB: {},
+				},
+			},
+		},
+		{
+			name: "Failure - outbound-only lane with no outbound buckets",
+			cfg: TPRLInput{
+				Configs: map[uint64]TPRLConfig{
+					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {OutboundOnly: true}}},
+					chainB: {},
+				},
+			},
+			expectedErr: "has no outbound buckets",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			changeset := SetTokenPoolRateLimits()
+			err := changeset.VerifyPreconditions(cldf.Environment{}, tc.cfg)
+
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
 }
