@@ -72,11 +72,14 @@ const (
 // the former uses the CCTP hybrid migration path; the latter is not a lock-release pool.
 //
 // LockReleaseTokenPoolAndProxy (the v1.5.0 lock-release pool) is also excluded, deliberately and
-// asymmetrically with IsBurnMintPoolType below. The sole consumer of this predicate is the v2.0.0
+// asymmetrically with IsBurnMintPoolType below. The motivating consumer is the v2.0.0
 // DeployTokenPool dispatch, which has no v1.5.0 contract to offer: including the type there would
 // route it into DeployLockReleaseTokenPool, which deploys a lockbox and an AdvancedPoolHooks
 // before failing on the missing bytecode, leaving both orphaned on-chain. The v1.5.0 deploy
 // sequence keys on the full "Type Version" string and needs no predicate.
+//
+// Callers that must also accept the v1.5.0 pool widen the check themselves, as
+// isLegacyLockReleasePoolType does in the v2.0.0 liquidity migration sequence.
 func IsLockReleasePoolType(poolType string) bool {
 	return poolType == LockReleaseTokenPool.String() ||
 		poolType == SiloedLockReleaseTokenPool.String()

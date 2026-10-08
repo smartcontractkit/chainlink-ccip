@@ -2404,7 +2404,7 @@ func TestMigrateLockReleasePoolLiquidity_PoolPairValidation(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	s := setupMigrationTest(t, chainSel, big.NewInt(1000))
 
-	// A v1.6.1 lock-release pool that manages a different token than the migration's new pool.
+	// A v2.0.0 lock-release pool that manages a different token than the migration's new pool.
 	otherToken := deploySecondToken(t, s)
 	otherTokenPool := deployV2LockReleasePool(t, s, otherToken)
 

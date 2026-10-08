@@ -178,9 +178,6 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 			return errors.New("input must contain at least one chain config")
 		}
 		for localSelector, config := range cfg.Configs {
-			if len(config.RemoteOutbounds) == 0 {
-				return fmt.Errorf("no remote outbounds provided for chain with selector %d", localSelector)
-			}
 			if err := verifyRemoteOutbounds(cfg, localSelector, config); err != nil {
 				return err
 			}

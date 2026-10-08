@@ -170,12 +170,6 @@ func verifyTokenTransferConfig(i int, token TokenTransferConfig) error {
 		}
 	}
 
-	if !token.AllowedFinalityConfig.IsZero() {
-		if err := token.AllowedFinalityConfig.Validate(); err != nil {
-			return fmt.Errorf("token[%d]: invalid AllowedFinalityConfig: %w", i, err)
-		}
-	}
-
 	for remoteSelector, remote := range token.RemoteChains {
 		if remoteSelector == token.ChainSelector {
 			return fmt.Errorf(

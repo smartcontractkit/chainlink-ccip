@@ -134,15 +134,6 @@ func TestSetTokenPoolRateLimits_VerifyPreconditions(t *testing.T) {
 			expectedErr: "at least one chain config",
 		},
 		{
-			name: "Failure - chain config with no remote outbounds",
-			cfg: TPRLInput{
-				Configs: map[uint64]TPRLConfig{
-					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{}},
-				},
-			},
-			expectedErr: "no remote outbounds provided for chain with selector",
-		},
-		{
 			name: "Success - valid config",
 			cfg: TPRLInput{
 				Configs: map[uint64]TPRLConfig{
@@ -150,6 +141,30 @@ func TestSetTokenPoolRateLimits_VerifyPreconditions(t *testing.T) {
 					chainB: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainA: validOutbound}},
 				},
 			},
+		},
+		{
+			// The counterpart of an OutboundOnly lane is read-only: it needs refs for the
+			// validation read but no RemoteOutbounds of its own, so an empty map must be allowed.
+			name: "Success - outbound-only lane with a refs-only counterpart",
+			cfg: TPRLInput{
+				Configs: map[uint64]TPRLConfig{
+					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {
+						OutboundOnly: true,
+						RateLimit:    &RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10},
+					}}},
+					chainB: {},
+				},
+			},
+		},
+		{
+			name: "Failure - outbound-only lane with no outbound buckets",
+			cfg: TPRLInput{
+				Configs: map[uint64]TPRLConfig{
+					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {OutboundOnly: true}}},
+					chainB: {},
+				},
+			},
+			expectedErr: "has no outbound buckets",
 		},
 	}
 
