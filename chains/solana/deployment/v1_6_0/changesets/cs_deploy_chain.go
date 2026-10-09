@@ -24,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared"
 	solanastateview "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared/stateview/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/solutils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
+	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
 	solBinary "github.com/gagliardetto/binary"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
@@ -40,17 +42,17 @@ import (
 
 func getTypeToProgramDeployName() map[cldf.ContractType]string {
 	return map[cldf.ContractType]string{
-		shared.Router:                   solutils.ProgCCIPRouter,
-		shared.OffRamp:                  solutils.ProgCCIPOfframp,
-		shared.FeeQuoter:                solutils.ProgFeeQuoter,
-		shared.BurnMintTokenPool:        solutils.ProgBurnMintTokenPool,
-		shared.LockReleaseTokenPool:     solutils.ProgLockReleaseTokenPool,
-		shared.RMNRemote:                solutils.ProgRMNRemote,
-		shared.AccessControllerProgram:  solutils.ProgAccessController,
-		shared.ManyChainMultisigProgram: solutils.ProgMCM,
-		shared.RBACTimelockProgram:      solutils.ProgTimelock,
-		shared.Receiver:                 solutils.ProgTestCCIPReceiver,
-		shared.CCTPTokenPool:            solutils.ProgCCTPTokenPool,
+		shared.Router:                     solutils.ProgCCIPRouter,
+		shared.OffRamp:                    solutils.ProgCCIPOfframp,
+		shared.FeeQuoter:                  solutils.ProgFeeQuoter,
+		shared.BurnMintTokenPool:          solutils.ProgBurnMintTokenPool,
+		shared.LockReleaseTokenPool:       solutils.ProgLockReleaseTokenPool,
+		shared.RMNRemote:                  solutils.ProgRMNRemote,
+		utils.AccessControllerProgramType: solutils.ProgAccessController,
+		utils.McmProgramType:              solutils.ProgMCM,
+		utils.TimelockProgramType:         solutils.ProgTimelock,
+		shared.Receiver:                   solutils.ProgTestCCIPReceiver,
+		shared.CCTPTokenPool:              solutils.ProgCCTPTokenPool,
 	}
 }
 
@@ -323,7 +325,7 @@ func resolveProgram(
 ) (address solana.PublicKey, justDeployed bool, outBatches []mcmsTypes.BatchOperation, err error) {
 	switch {
 	case existingAddress.IsZero():
-		address, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, contractType, shared.Version1_0_0, false, "")
+		address, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, contractType, *common_utils.Version_1_0_0, false, "")
 		if err != nil {
 			return solana.PublicKey{}, false, batches, fmt.Errorf("failed to deploy %s: %w", contractType, err)
 		}
@@ -415,7 +417,7 @@ func deployChainContractsSolana(
 	switch {
 	case chainState.OffRamp.IsZero():
 		// deploy offramp
-		offRampAddress, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.OffRamp, shared.Version1_0_0, false, "")
+		offRampAddress, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.OffRamp, *common_utils.Version_1_0_0, false, "")
 		if err != nil {
 			return batches, fmt.Errorf("failed to deploy program: %w", err)
 		}
@@ -570,7 +572,7 @@ func deployChainContractsSolana(
 		switch {
 		case chainState.BurnMintTokenPools[metadata].IsZero():
 			e.Logger.Infow("Deploying new burn mint token pool", "metadata", metadata)
-			burnMintTokenPool, err := DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.BurnMintTokenPool, shared.Version1_0_0, false, metadata)
+			burnMintTokenPool, err := DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.BurnMintTokenPool, *common_utils.Version_1_0_0, false, metadata)
 			if err != nil {
 				return batches, fmt.Errorf("failed to deploy program: %w", err)
 			}
@@ -617,7 +619,7 @@ func deployChainContractsSolana(
 		switch {
 		case chainState.LockReleaseTokenPools[metadata].IsZero():
 			e.Logger.Infow("Deploying new lock release token pool", "metadata", metadata)
-			lockReleaseTokenPool, err := DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.LockReleaseTokenPool, shared.Version1_0_0, false, metadata)
+			lockReleaseTokenPool, err := DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.LockReleaseTokenPool, *common_utils.Version_1_0_0, false, metadata)
 			if err != nil {
 				return batches, fmt.Errorf("failed to deploy program: %w", err)
 			}
@@ -660,7 +662,7 @@ func deployChainContractsSolana(
 	metadata := shared.CLLMetadata
 	switch {
 	case chainState.CCTPTokenPool.IsZero():
-		cctpTokenPool, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.CCTPTokenPool, shared.Version1_0_0, false, metadata)
+		cctpTokenPool, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, ds, shared.CCTPTokenPool, *common_utils.Version_1_0_0, false, metadata)
 		if err != nil {
 			return batches, fmt.Errorf("failed to deploy program: %w", err)
 		}
@@ -698,15 +700,15 @@ func deployChainContractsSolana(
 	if err != nil {
 		return batches, fmt.Errorf("failed to load MCMS with timelock chain state: %w", err)
 	}
-	batches, err = upgradeProgramIfConfigured(e, chain, ab, config, batches, config.UpgradeConfig.NewMCMVersion, mcmState.McmProgram, shared.ManyChainMultisigProgram, ds)
+	batches, err = upgradeProgramIfConfigured(e, chain, ab, config, batches, config.UpgradeConfig.NewMCMVersion, mcmState.McmProgram, utils.McmProgramType, ds)
 	if err != nil {
 		return batches, err
 	}
-	batches, err = upgradeProgramIfConfigured(e, chain, ab, config, batches, config.UpgradeConfig.NewAccessControllerVersion, mcmState.AccessControllerProgram, shared.AccessControllerProgram, ds)
+	batches, err = upgradeProgramIfConfigured(e, chain, ab, config, batches, config.UpgradeConfig.NewAccessControllerVersion, mcmState.AccessControllerProgram, utils.AccessControllerProgramType, ds)
 	if err != nil {
 		return batches, err
 	}
-	batches, err = upgradeProgramIfConfigured(e, chain, ab, config, batches, config.UpgradeConfig.NewTimelockVersion, mcmState.TimelockProgram, shared.RBACTimelockProgram, ds)
+	batches, err = upgradeProgramIfConfigured(e, chain, ab, config, batches, config.UpgradeConfig.NewTimelockVersion, mcmState.TimelockProgram, utils.TimelockProgramType, ds)
 	if err != nil {
 		return batches, err
 	}

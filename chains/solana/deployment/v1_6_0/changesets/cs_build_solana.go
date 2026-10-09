@@ -31,17 +31,17 @@ const (
 // Map program names to their Rust file paths (relative to the Anchor project root)
 // Needed for upgrades in place
 var programToFileMap = map[cldf.ContractType]string{
-	shared.Router:                   "programs/ccip-router/src/lib.rs",
-	shared.CCIPCommon:               "programs/ccip-common/src/lib.rs",
-	shared.FeeQuoter:                "programs/fee-quoter/src/lib.rs",
-	shared.OffRamp:                  "programs/ccip-offramp/src/lib.rs",
-	shared.BurnMintTokenPool:        "programs/burnmint-token-pool/src/lib.rs",
-	shared.LockReleaseTokenPool:     "programs/lockrelease-token-pool/src/lib.rs",
-	shared.RMNRemote:                "programs/rmn-remote/src/lib.rs",
-	shared.AccessControllerProgram:  "programs/access-controller/src/lib.rs",
-	shared.ManyChainMultisigProgram: "programs/mcm/src/lib.rs",
-	shared.RBACTimelockProgram:      "programs/timelock/src/lib.rs",
-	shared.CCTPTokenPool:            "programs/cctp-token-pool/src/lib.rs",
+	shared.Router:                     "programs/ccip-router/src/lib.rs",
+	shared.CCIPCommon:                 "programs/ccip-common/src/lib.rs",
+	shared.FeeQuoter:                  "programs/fee-quoter/src/lib.rs",
+	shared.OffRamp:                    "programs/ccip-offramp/src/lib.rs",
+	shared.BurnMintTokenPool:          "programs/burnmint-token-pool/src/lib.rs",
+	shared.LockReleaseTokenPool:       "programs/lockrelease-token-pool/src/lib.rs",
+	shared.RMNRemote:                  "programs/rmn-remote/src/lib.rs",
+	utils.AccessControllerProgramType: "programs/access-controller/src/lib.rs",
+	utils.McmProgramType:              "programs/mcm/src/lib.rs",
+	utils.TimelockProgramType:         "programs/timelock/src/lib.rs",
+	shared.CCTPTokenPool:              "programs/cctp-token-pool/src/lib.rs",
 }
 
 var programToVanityKey = map[cldf.ContractType]string{
