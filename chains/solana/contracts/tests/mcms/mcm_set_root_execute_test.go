@@ -1187,7 +1187,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 						result := testutils.SendAndFailWith(ctx, t, solanaGoClient,
 							tx.Instructions,
 							admin,
-							rpc.CommitmentConfirmed,
+							rpc.CommitmentFinalized,
 							[]string{tt.errorMsg},
 						)
 						require.NotNil(t, result)
