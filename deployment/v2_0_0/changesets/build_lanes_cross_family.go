@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -44,9 +45,13 @@ type CrossFamilyLanePair struct {
 //  1. YAML ChainOverrides on CrossFamilyLanePair (per-lane user input)
 //  2. Chain-family adapter defaults (applied inside ConfigureChainsForLanesFromTopology)
 type BuildLanesCrossFamilyConfig struct {
-	Lanes      []CrossFamilyLanePair `json:"lanes" yaml:"lanes"`
-	MCMS       mcms.Input            `json:"mcms" yaml:"mcms"`
-	TestRouter *bool                 `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	Lanes []CrossFamilyLanePair `json:"lanes" yaml:"lanes"`
+	MCMS  mcms.Input            `json:"mcms" yaml:"mcms"`
+	// TestRouter wires the lanes' EVM ends to the TestRouter instead of the production Router. It
+	// applies to the whole run rather than per lane, because each chain's lanes are all configured
+	// against the one router resolved for that chain. Solana ends are staged per lane through
+	// PartialRemoteChainConfig.TestSenders instead.
+	TestRouter *bool `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
 	// AllowOnrampOverride permits replacing an existing OnRamp mapping in the production Router
 	// with a different OnRamp address. This should only be used for v2 migrations.
 	AllowOnrampOverride bool `json:"allowOnrampOverride,omitempty" yaml:"allowOnrampOverride,omitempty"`
@@ -64,6 +69,39 @@ type BuildLanesCrossFamilyConfig struct {
 // UseTestRouter reports whether the test router should be used instead of the production router.
 func (c BuildLanesCrossFamilyConfig) UseTestRouter() bool {
 	return c.TestRouter != nil && *c.TestRouter
+}
+
+// ValidateTestSendersChain checks that a chain can be staged through test senders, which only
+// Solana chains are.
+func ValidateTestSendersChain(chainSelector uint64) error {
+	family, err := chainsel.GetSelectorFamily(chainSelector)
+	if err != nil {
+		return fmt.Errorf("failed to get family of chain %d: %w", chainSelector, err)
+	}
+	if family != chainsel.FamilySolana {
+		return fmt.Errorf("testSenders are set on %s chain %d, but only Solana chains are staged through them (EVM chains use testRouter)", family, chainSelector)
+	}
+	return nil
+}
+
+// validateTestSenders checks that test senders are only set on the Solana end of a lane, the only
+// family staged through them. EVM chains are staged through TestRouter instead.
+func (c BuildLanesCrossFamilyConfig) validateTestSenders() error {
+	for _, lane := range c.Lanes {
+		ends := []struct {
+			chain     uint64
+			overrides *ChainOverrides
+		}{{lane.ChainA, lane.ChainAOverrides}, {lane.ChainB, lane.ChainBOverrides}}
+		for _, end := range ends {
+			if end.overrides == nil || len(end.overrides.RemoteChainCfg.TestSenders) == 0 {
+				continue
+			}
+			if err := ValidateTestSendersChain(end.chain); err != nil {
+				return fmt.Errorf("lane %d<->%d: %w", lane.ChainA, lane.ChainB, err)
+			}
+		}
+	}
+	return nil
 }
 
 // ConfigureChainsForLanesFromTopologyConfig configures CCIP 2.0 lanes from topology plus
@@ -271,6 +309,9 @@ func mergePartialRemoteInput(base, overlay PartialRemoteChainConfig) PartialRemo
 	}
 	if overlay.BaseExecutionGasCost != nil {
 		base.BaseExecutionGasCost = overlay.BaseExecutionGasCost
+	}
+	if overlay.TestSenders != nil {
+		base.TestSenders = overlay.TestSenders
 	}
 	base.FeeQuoterDestChainConfig = mergeFeeQuoterDestChainConfig(base.FeeQuoterDestChainConfig, overlay.FeeQuoterDestChainConfig)
 	base.ExecutorDestChainConfig = utils.CoalescePtr(overlay.ExecutorDestChainConfig, base.ExecutorDestChainConfig)

@@ -489,3 +489,37 @@ func TestExpandLanesToPartialChainConfigs_CommitteeCoverage(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateTestSenders(t *testing.T) {
+	const solana, evm = uint64(16423721717087811551), uint64(16015286601757825753) // solana-devnet, sepolia
+	senders := &ChainOverrides{RemoteChainCfg: PartialRemoteChainConfig{TestSenders: []string{"wallet"}}}
+	lanes := func(lane CrossFamilyLanePair) BuildLanesCrossFamilyConfig {
+		return BuildLanesCrossFamilyConfig{Lanes: []CrossFamilyLanePair{lane}}
+	}
+
+	require.NoError(t, lanes(CrossFamilyLanePair{ChainA: evm, ChainB: solana}).validateTestSenders())
+	require.NoError(t, lanes(CrossFamilyLanePair{ChainA: evm, ChainB: solana, ChainBOverrides: senders}).validateTestSenders(),
+		"the Solana end is staged through test senders, with or without testRouter")
+	require.ErrorContains(t, lanes(CrossFamilyLanePair{ChainA: evm, ChainB: solana, ChainAOverrides: senders}).validateTestSenders(),
+		"only Solana chains are staged through them")
+}
+
+func TestExpandLanesToPartialChainConfigs_TestSendersArePerLane(t *testing.T) {
+	solana, evmA, evmB := uint64(1), uint64(2), uint64(3)
+	senders := []string{"wallet"}
+
+	chains, err := expandLanesToPartialChainConfigs([]CrossFamilyLanePair{
+		{ChainA: evmA, ChainB: solana, ChainBOverrides: &ChainOverrides{RemoteChainCfg: PartialRemoteChainConfig{TestSenders: senders}}},
+		{ChainA: evmB, ChainB: solana},
+	}, nil)
+	require.NoError(t, err)
+
+	for _, c := range chains {
+		if c.ChainSelector == solana {
+			require.Equal(t, senders, c.RemoteChains[evmA].TestSenders, "the lane that sets them is restricted")
+			require.Empty(t, c.RemoteChains[evmB].TestSenders, "another lane of the same chain is not")
+		} else {
+			require.Empty(t, c.RemoteChains[solana].TestSenders, "the other end of the lane is not restricted")
+		}
+	}
+}
