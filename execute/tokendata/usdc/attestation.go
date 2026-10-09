@@ -3,6 +3,7 @@ package usdc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
@@ -126,17 +127,24 @@ func (s *USDCAttestationClient) fetchSingleMessage(
 	message cciptypes.Bytes,
 ) tokendata.AttestationStatus {
 	messageHash := cciptypes.Bytes32(s.hasher.Hash(message))
-	body, _, err := s.client.Get(ctx, fmt.Sprintf("%s/%s/%s", apiVersion, attestationPath, messageHash.String()))
+	body, status, err := s.client.Get(ctx, fmt.Sprintf("%s/%s/%s", apiVersion, attestationPath, messageHash.String()))
 	if err != nil {
 		s.lggr.Errorw("CCTP Attestation: Failed to fetch attestation from the API", "err", err)
+		trackAttestationFetch(attestationFetchOutcome(err, status))
 		return tokendata.ErrorAttestationStatus(err)
 	}
 	response, err := attestationFromResponse(body)
 	if err != nil {
 		s.lggr.Errorw("CCTP Attestation: Failed to parse attestation from the response", "err", err, "body", body)
+		outcome := usdcOutcomeParseError
+		if errors.Is(err, tokendata.ErrNotReady) {
+			outcome = usdcOutcomeNotReady
+		}
+		trackAttestationFetch(outcome)
 		return tokendata.ErrorAttestationStatus(err)
 	}
 
+	trackAttestationFetch(usdcOutcomeOK)
 	s.lggr.Debugw("CCTP Attestation: Attestation received", "message", message, "response", response)
 	return tokendata.SuccessAttestationStatus(messageHash[:], message, response)
 }

@@ -50,6 +50,24 @@ type compositeTokenDataObserver struct {
 	observers []TokenDataObserver
 }
 
+// namedObserver pairs a TokenDataObserver with its adapter type, used as a low-cardinality
+// metric label by the composite observer.
+type namedObserver struct {
+	TokenDataObserver
+	name string
+}
+
+func (n namedObserver) observerName() string {
+	return n.name
+}
+
+func observerMetricLabel(ob TokenDataObserver) string {
+	if named, ok := ob.(interface{ observerName() string }); ok {
+		return named.observerName()
+	}
+	return "unknown"
+}
+
 // NewConfigBasedCompositeObservers creates a compositeTokenDataObserver based on the provided configuration.
 // Slice of []pluginconfig.TokenDataObserverConfig must be deduped and validated by the plugin.
 // Therefore, we don't re-run any validation and only match configs to the proper TokenDataObserver implementation.
@@ -73,9 +91,11 @@ func NewConfigBasedCompositeObservers(
 		case c.USDCCCTPObserverConfig != nil:
 			var observer TokenDataObserver
 			var err error
+			observerName := "usdc_v1"
 
 			// Use version to determine which observer implementation to use
 			if c.Version == "2" {
+				observerName = "usdc_v2"
 				lggr.Info("Creating USDC/CCTP v2 token observer")
 				observer, err = cctpv2.NewCCTPv2TokenDataObserver(
 					lggr, destChainSelector,
@@ -109,6 +129,7 @@ func NewConfigBasedCompositeObservers(
 					c.USDCCCTPObserverConfig.ObserveTimeout.Duration(),
 				)
 			}
+			observers[i] = namedObserverWithBackgroundName(observers[i], observerName)
 		case c.LBTCObserverConfig != nil:
 			observer, err := lbtc.NewLBTCTokenDataObserver(lggr, destChainSelector, *c.LBTCObserverConfig)
 			if err != nil {
@@ -129,6 +150,7 @@ func NewConfigBasedCompositeObservers(
 					c.LBTCObserverConfig.ObserveTimeout.Duration(),
 				)
 			}
+			observers[i] = namedObserverWithBackgroundName(observers[i], "lbtc")
 		default:
 			return nil, errors.New("unsupported token data observer")
 		}
@@ -143,6 +165,15 @@ func NewCompositeObservers(lggr logger.Logger, observers ...TokenDataObserver) T
 	return &compositeTokenDataObserver{lggr: lggr, observers: observers}
 }
 
+// namedObserverWithBackgroundName tags a background observer with the adapter name used in
+// metric labels and wraps the observer so the composite can report its type.
+func namedObserverWithBackgroundName(ob TokenDataObserver, name string) TokenDataObserver {
+	if bg, ok := ob.(*backgroundObserver); ok {
+		bg.observerName = name
+	}
+	return namedObserver{TokenDataObserver: ob, name: name}
+}
+
 // Observe start with stubbing exectypes.TokenDataObservations with empty data based on the supported tokens.
 // Then it iterates over all observers and merges token data returned from them into the final result.
 func (c *compositeTokenDataObserver) Observe(
@@ -152,15 +183,18 @@ func (c *compositeTokenDataObserver) Observe(
 	tokenDataObservations := c.initTokenDataObservations(msgObservations)
 	merged := tokenDataObservations
 	for _, ob := range c.observers {
+		observerName := observerMetricLabel(ob)
 		tokenData, err := ob.Observe(ctx, msgObservations)
 		if err != nil {
 			c.lggr.Error("Error while observing token data", "error", err)
+			trackObserverError(observerName, "observe")
 			continue
 		}
 		merged, err = merge(c.lggr, tokenDataObservations, tokenData)
 		if err != nil {
 			c.lggr.Error("Error while merging token data",
 				"error", err)
+			trackObserverError(observerName, "merge")
 			merged = tokenDataObservations
 		}
 	}
