@@ -49,9 +49,10 @@ func (a *EVMDeployer) UpdateMCMSConfig() *cldf_ops.Sequence[ccipapi.UpdateMCMSCo
 
 			// create sequence input
 			seqInput := seq.SeqSetMCMSConfigInput{
-				ChainSelector: in.ChainSelector,
-				MCMConfig:     &in.MCMConfig,
-				MCMContracts:  in.MCMContracts,
+				ChainSelector:  in.ChainSelector,
+				MCMConfig:      &in.MCMConfig,
+				MCMContracts:   in.MCMContracts,
+				PartialRollout: in.PartialRollout,
 			}
 			report, err := cldf_ops.ExecuteSequence(b, seq.SeqSetMCMSConfigs, evmChain, seqInput)
 			if err != nil {
