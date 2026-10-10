@@ -387,7 +387,11 @@ contract LombardVerifier is BaseVerifier, Ownable2StepMsgSender {
       bytes32 expected = Internal._leftPadBytesToBytes32(expectedToken);
       // When a local adapter is configured, the bridge payload encodes the adapter address
       // instead of the local token address.
-      address localToken = address(bytes20(expectedToken));
+      // Derive the lookup key from the padded form: explicit bytes20() conversion keeps the
+      // FIRST 20 bytes, so a 32-byte left-padded address would truncate to the padding and
+      // silently skip the adapter override while the identity comparison below still uses
+      // the full padded value.
+      address localToken = address(uint160(uint256(expected)));
       if (s_supportedTokens.contains(localToken)) {
         address localAdapter = s_supportedTokens.get(localToken);
         if (localAdapter != address(0)) {
