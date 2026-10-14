@@ -212,6 +212,18 @@ func validatePoolPair(oldPoolAddr, newPoolAddr common.Address, oldTV, newTV type
 		)
 	}
 
+	// The migration path is chosen from the old pool's subtype, and the two subtypes expose
+	// different lockbox ABIs (plain getLockBox() vs siloed getLockBox(uint64) +
+	// getAllLockBoxConfigs), so a mismatched pair would fail on the first read.
+	oldSiloed := string(oldTV.Type) == utils.SiloedLockReleaseTokenPool.String()
+	newSiloed := string(newTV.Type) == utils.SiloedLockReleaseTokenPool.String()
+	if oldSiloed != newSiloed {
+		return fmt.Errorf(
+			"old pool %s is a %s and new pool %s is a %s; the migration source and destination must both be siloed or both be unsiloed",
+			oldPoolAddr, oldTV.Type, newPoolAddr, newTV.Type,
+		)
+	}
+
 	return nil
 }
 
