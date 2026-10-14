@@ -72,6 +72,16 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 			return fmt.Errorf("at least one migration is required")
 		}
 		for i, migration := range cfg.Migrations {
+			// IsDeprecated both rejects an unknown selector and fails fast on a chain that is no
+			// longer live; GetSelectorFamily would only do the former.
+			isDeprecated, err := chain_selectors.IsDeprecated(migration.ChainSelector)
+			if err != nil {
+				return fmt.Errorf("migration[%d]: invalid chain selector %d: %w", i, migration.ChainSelector, err)
+			}
+			if isDeprecated {
+				return fmt.Errorf("migration[%d]: chain selector %d is deprecated/decommissioned", i, migration.ChainSelector)
+			}
+
 			exactMode := len(migration.SiloExactAmounts) > 0 || migration.UnsiloedExactAmount != nil
 			legacyMode := migration.LiquidityMigrationAmount != nil
 
