@@ -247,12 +247,30 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 							deployTokenPoolInput.PoolType, selector,
 						)
 					}
+					// adapterVersion is the version the pool is actually deployed at: apply overwrites
+					// DeployTokenPoolInput.TokenPoolVersion with input.TokenPoolVersion, so checking the
+					// nested field would be wrong. Only the v2.0.0 adapter can seed a lockbox.
+					if !adapterVersion.Equal(utils.Version_2_0_0) {
+						return fmt.Errorf(
+							"liquidityMigrationAmount is only supported for v2.0.0 pools, "+
+								"but version %s was given for chain selector %d",
+							adapterVersion, selector,
+						)
+					}
 				}
-				if deployTokenPoolInput.UnsiloedLockBoxChainSelector != nil && len(deployTokenPoolInput.LockBoxGroups) == 0 {
-					return fmt.Errorf(
-						"unsiloedLockBoxChainSelector requires lockBoxGroups to be set for chain selector %d",
-						selector,
-					)
+				if deployTokenPoolInput.UnsiloedLockBoxChainSelector != nil {
+					if deployTokenPoolInput.PoolType != utils.SiloedLockReleaseTokenPool.String() {
+						return fmt.Errorf(
+							"unsiloedLockBoxChainSelector is only supported for %s pools, but pool type %q was given for chain selector %d",
+							utils.SiloedLockReleaseTokenPool, deployTokenPoolInput.PoolType, selector,
+						)
+					}
+					if len(deployTokenPoolInput.LockBoxGroups) == 0 {
+						return fmt.Errorf(
+							"unsiloedLockBoxChainSelector requires lockBoxGroups to be set for chain selector %d",
+							selector,
+						)
+					}
 				}
 			}
 		}

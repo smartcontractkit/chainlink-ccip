@@ -187,6 +187,7 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 	// Register a mock adapter for the chain family/version the cases below resolve against.
 	registry := tokens.GetTokenAdapterRegistry()
 	registry.RegisterTokenAdapter("evm", semver.MustParse("9.9.9"), &productTest_MockTokenAdapter{})
+	registry.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), &productTest_MockTokenAdapter{})
 
 	baseInput := func() tokens.TokenExpansionInput {
 		return tokens.TokenExpansionInput{
@@ -271,6 +272,37 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 				}
 			},
 			expectedErr: "unsiloedLockBoxChainSelector requires lockBoxGroups",
+		},
+		{
+			name: "Failure - liquidity migration on a pre-v2 pool",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("1.5.1"),
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						PoolType: "LockReleaseTokenPool",
+						LiquidityMigrationAmount: &tokens.LockReleasePoolLiquidityMigrationAmount{
+							Format: tokens.LiquidityMigrationAmountFormatBPS,
+							Value:  "5000",
+						},
+					},
+				}
+			},
+			expectedErr: "liquidityMigrationAmount is only supported for v2.0.0 pools",
+		},
+		{
+			name: "Failure - unsiloed lockbox selector on a non-siloed pool",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				selector := chainSel
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("9.9.9"),
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						PoolType:                     "LockReleaseTokenPool",
+						UnsiloedLockBoxChainSelector: &selector,
+						LockBoxGroups:                [][]uint64{{chainSel}},
+					},
+				}
+			},
+			expectedErr: "unsiloedLockBoxChainSelector is only supported for SiloedLockReleaseTokenPool pools",
 		},
 	}
 
