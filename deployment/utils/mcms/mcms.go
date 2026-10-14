@@ -1,20 +1,21 @@
 package mcms
 
 import (
-	"crypto/rand"
 	"fmt"
-	"math"
-	"math/big"
 	"time"
 
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
+
+// DefaultValidDuration is how long a proposal stays valid when the input does not set ValidUntil.
+const DefaultValidDuration = 7 * 24 * time.Hour
 
 type Input struct {
 	// OverridePreviousRoot indicates whether to override the root of the MCMS contract.
 	OverridePreviousRoot bool
 	// ValidUntil is a unix timestamp indicating when the proposal expires.
 	// Root can't be set or executed after this time.
+	// Defaults to DefaultValidDuration from proposal generation when unset.
 	ValidUntil uint32
 	// NO LONGER USED. THIS VALUE AUTO RESOLVES.
 	TimelockDelay mcms_types.Duration
@@ -50,16 +51,9 @@ func (c *Input) PopulateDefaults() error {
 		c.TimelockAction = mcms_types.TimelockActionSchedule
 	}
 	if c.ValidUntil == 0 {
-		// Randomise ValidUntil so duplicate payloads get distinct operation IDs in timelock.
-		randUint, err := rand.Int(rand.Reader, new(big.Int).SetUint64(24*60*60))
-		if err != nil {
-			return fmt.Errorf("failed to generate random number: %w", err)
-		}
-		randDiff := randUint.Uint64()
-		if randDiff > math.MaxUint32 {
-			return fmt.Errorf("generated random number %d exceeds max uint32", randDiff)
-		}
-		c.ValidUntil = uint32(math.MaxUint32 - randDiff)
+		// The timelock salt is derived from ValidUntil, so a generation-time value also gives
+		// regenerated proposals with identical payloads distinct operation IDs.
+		c.ValidUntil = uint32(time.Now().Add(DefaultValidDuration).Unix()) //nolint:gosec // G115: Unix timestamp fits in uint32 until 2106
 	}
 	return nil
 }

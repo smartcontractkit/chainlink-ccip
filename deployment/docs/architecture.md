@@ -143,7 +143,7 @@ This is why **every chain family must register an `MCMSReader`**. Without one, n
 | Field | Meaning |
 |---|---|
 | `TimelockAction` | `schedule` (default), `bypass`, or `cancel` |
-| `ValidUntil` | Unix expiry. If unset, it defaults to a randomized time in the next ~24h, so identical payloads get distinct operation IDs |
+| `ValidUntil` | Unix expiry. If unset, it defaults to 7 days after proposal generation. The timelock salt is derived from it, so regenerated proposals with identical payloads get distinct operation IDs |
 | `Qualifier` | Which MCMS/timelock pair to use (see qualifiers above) |
 | `OverridePreviousRoot` | Replace an unexecuted root on the MCM |
 | `Description` | Shown to signers |

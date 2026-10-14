@@ -3,6 +3,7 @@ package tokens
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 
@@ -428,6 +429,26 @@ func (rl RateLimiterConfigFloatInput) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+// ValidatePrecision rejects capacity/rate that cannot be represented exactly at
+// the given number of token decimals. Disabled configs carry no amount and are skipped.
+func (rl RateLimiterConfigFloatInput) ValidatePrecision(decimals uint8) error {
+	if !rl.IsEnabled {
+		return nil
+	}
+	for _, f := range []struct {
+		name  string
+		value float64
+	}{{"capacity", rl.Capacity}, {"rate", rl.Rate}} {
+		if math.IsNaN(f.value) || math.IsInf(f.value, 0) {
+			return fmt.Errorf("%s %v is not a finite number", f.name, f.value)
+		}
+		if n := utils.FractionalDigits(f.value); n > int(decimals) {
+			return fmt.Errorf("%s %v has %d decimal places but the token has only %d", f.name, f.value, n, decimals)
+		}
+	}
 	return nil
 }
 

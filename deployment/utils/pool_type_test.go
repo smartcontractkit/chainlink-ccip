@@ -30,8 +30,8 @@ func TestPoolTypePredicates_V1_5_0AndProxyTypes(t *testing.T) {
 		"BurnMintTokenPoolAndProxy must stay a burn-mint type or the v1.5.0 pool silently loses its mint/burn role grant")
 
 	require.False(t, IsLockReleasePoolType(LockReleaseTokenPoolAndProxy.String()),
-		"LockReleaseTokenPoolAndProxy must NOT be a lock-release type: the only consumer is the v2.0.0 "+
-			"deploy dispatch, which would deploy a lockbox and hooks before failing on the missing bytecode")
+		"LockReleaseTokenPoolAndProxy must NOT be a lock-release type: the v2.0.0 deploy dispatch "+
+			"would deploy a lockbox and hooks before failing on the missing bytecode")
 }
 
 // TestPoolTypePredicates_StandardTypes guards the members that the v2.0.0 deploy dispatch relies

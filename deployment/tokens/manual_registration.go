@@ -91,9 +91,8 @@ func manualRegistrationVerify() func(cldf.Environment, ManualRegistrationInput) 
 			}
 			seen[registration.ChainSelector] = struct{}{}
 
-			if registration.ProposedOwner == "" {
-				return fmt.Errorf("registration[%d]: ProposedOwner is required", i)
-			}
+			// ProposedOwner is deliberately not required: the Solana flow treats an empty value as
+			// "the CCIP admin becomes the admin", and accepts it alongside non-empty svmExtraArgs.
 			if datastore_utils.IsAddressRefEmpty(registration.TokenPoolRef) &&
 				datastore_utils.IsAddressRefEmpty(registration.TokenRef) {
 				return fmt.Errorf("registration[%d]: at least one of TokenPoolRef or TokenRef is required", i)

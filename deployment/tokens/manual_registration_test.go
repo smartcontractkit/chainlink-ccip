@@ -68,7 +68,9 @@ func TestManualRegistration_VerifyPreconditions(t *testing.T) {
 			expectedErr: "duplicate entry for chain selector",
 		},
 		{
-			name: "Failure - missing ProposedOwner",
+			// The Solana flow treats an empty ProposedOwner as "the CCIP admin becomes the admin",
+			// so it must stay valid here.
+			name: "Success - empty ProposedOwner",
 			cfg: tokens.ManualRegistrationInput{
 				Registrations: []tokens.RegisterTokenConfig{
 					func() tokens.RegisterTokenConfig {
@@ -78,7 +80,6 @@ func TestManualRegistration_VerifyPreconditions(t *testing.T) {
 					}(),
 				},
 			},
-			expectedErr: "ProposedOwner is required",
 		},
 		{
 			name: "Failure - both refs empty",

@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
@@ -179,6 +182,117 @@ func TestSetTokenPoolRateLimits_VerifyPreconditions(t *testing.T) {
 			}
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+func TestRateLimiterConfigFloatInput_ValidatePrecision(t *testing.T) {
+	tests := []struct {
+		name    string
+		rl      RateLimiterConfigFloatInput
+		wantErr string
+	}{
+		{name: "over-precision capacity", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1.123456789, Rate: 1}, wantErr: "capacity 1.123456789 has 9 decimal places but the token has only 8"},
+		{name: "capacity truncating to zero", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 0.000000001, Rate: 0}, wantErr: "capacity 1e-09 has 9 decimal places but the token has only 8"},
+		{name: "over-precision rate", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 10, Rate: 0.000000001}, wantErr: "rate 1e-09 has 9 decimal places but the token has only 8"},
+		{name: "within precision", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 0.29, Rate: 0.00000003}},
+		{name: "exactly at precision", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1.12345678, Rate: 0.00000001}},
+		{name: "disabled is skipped", rl: RateLimiterConfigFloatInput{IsEnabled: false, Capacity: 1.123456789, Rate: 0.000000001}},
+		{name: "NaN capacity", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: math.NaN(), Rate: 1}, wantErr: "capacity NaN is not a finite number"},
+		{name: "+Inf capacity", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: math.Inf(1), Rate: 1}, wantErr: "capacity +Inf is not a finite number"},
+		{name: "-Inf rate", rl: RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 1, Rate: math.Inf(-1)}, wantErr: "rate -Inf is not a finite number"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.rl.ValidatePrecision(8)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestBuildTPRLRemotesForSetRateLimitsLane_Precision(t *testing.T) {
+	const localSel, remoteSel = uint64(1), uint64(2)
+	enabled := func(capacity, rate float64) *RateLimiterConfigFloatInput {
+		return &RateLimiterConfigFloatInput{IsEnabled: true, Capacity: capacity, Rate: rate}
+	}
+	poolRef := func(version *semver.Version) datastore.AddressRef {
+		return datastore.AddressRef{Type: datastore.ContractType(utils.BurnMintTokenPool), Version: version}
+	}
+
+	tests := []struct {
+		name           string
+		poolRef        datastore.AddressRef
+		localDecimals  uint8
+		remoteDecimals uint8
+		local          RemoteOutbounds
+		remote         RemoteOutbounds
+		wantErr        string
+	}{
+		{
+			name:          "over-precision outbound capacity rejected",
+			poolRef:       poolRef(utils.Version_1_6_1),
+			localDecimals: 8, remoteDecimals: 8,
+			local:   RemoteOutbounds{RateLimit: enabled(1.123456789, 1)},
+			remote:  RemoteOutbounds{RateLimit: enabled(10, 1)},
+			wantErr: "outbound rate limit for chain selector 1 and remote selector 2: capacity 1.123456789 has 9 decimal places but the token has only 8",
+		},
+		{
+			name:          "inbound zero-truncating capacity and rate rejected",
+			poolRef:       poolRef(utils.Version_1_6_1),
+			localDecimals: 8, remoteDecimals: 18,
+			local:   RemoteOutbounds{RateLimit: enabled(10, 1)},
+			remote:  RemoteOutbounds{RateLimit: enabled(0.000000001, 0.000000001)},
+			wantErr: "inbound rate limit for chain selector 1 and remote selector 2: capacity 1e-09 has 9 decimal places but the token has only 8",
+		},
+		{
+			name:          "fast-finality outbound rejected",
+			poolRef:       poolRef(utils.Version_1_6_1),
+			localDecimals: 6, remoteDecimals: 6,
+			local:   RemoteOutbounds{Outbounds: []RateLimitConfig{{RateLimit: *enabled(1, 0.1234567), FastFinality: true}}},
+			remote:  RemoteOutbounds{Outbounds: []RateLimitConfig{{RateLimit: *enabled(1, 1), FastFinality: true}}},
+			wantErr: "fast-finality outbound rate limit for chain selector 1 and remote selector 2: rate 0.1234567 has 7 decimal places but the token has only 6",
+		},
+		{
+			// Pre-1.6.1 EVM pools scale inbound by remote decimals, so 9 places fit an 18-decimal remote.
+			name:          "inbound checked against remote decimals for pre-1.6.1 EVM pool",
+			poolRef:       poolRef(utils.Version_1_5_1),
+			localDecimals: 8, remoteDecimals: 18,
+			local:  RemoteOutbounds{RateLimit: enabled(10, 1)},
+			remote: RemoteOutbounds{RateLimit: enabled(1.123456789, 1)},
+		},
+		{
+			name:          "outboundOnly ignores unused remote bucket",
+			poolRef:       poolRef(utils.Version_1_6_1),
+			localDecimals: 8, remoteDecimals: 8,
+			local:  RemoteOutbounds{RateLimit: enabled(10, 1), OutboundOnly: true},
+			remote: RemoteOutbounds{RateLimit: enabled(1.123456789, 1)},
+		},
+		{
+			name:          "valid precision passes",
+			poolRef:       poolRef(utils.Version_1_6_1),
+			localDecimals: 8, remoteDecimals: 8,
+			local:  RemoteOutbounds{RateLimit: enabled(0.29, 0.00000003)},
+			remote: RemoteOutbounds{RateLimit: enabled(100, 1.5)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, buckets, err := buildTPRLRemotesForSetRateLimitsLane(
+				chain_selectors.FamilyEVM, tt.poolRef,
+				localSel, tt.localDecimals, tt.local,
+				remoteSel, tt.remoteDecimals, tt.remote,
+			)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				require.NotEmpty(t, buckets)
+				return
+			}
+			require.EqualError(t, err, tt.wantErr)
+			require.Nil(t, buckets)
 		})
 	}
 }
