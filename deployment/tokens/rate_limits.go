@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
@@ -178,6 +179,9 @@ func setTokenPoolRateLimitsVerify() func(cldf.Environment, TPRLInput) error {
 			return errors.New("input must contain at least one chain config")
 		}
 		for localSelector, config := range cfg.Configs {
+			if datastore_utils.IsAddressRefEmpty(config.TokenPoolRef) {
+				return fmt.Errorf("no token pool ref provided for chain with selector %d", localSelector)
+			}
 			if err := verifyRemoteOutbounds(cfg, localSelector, config); err != nil {
 				return err
 			}

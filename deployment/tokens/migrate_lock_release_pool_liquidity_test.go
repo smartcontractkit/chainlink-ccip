@@ -10,17 +10,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testMigrationChainSelector is a real chain selector. VerifyPreconditions rejects unknown
+// selectors, so the verify tests cannot use an arbitrary number like 1.
+const testMigrationChainSelector = uint64(5009297550715157269)
+
 func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *testing.T) {
 	baseMigration := func() LockReleasePoolMigration {
 		return LockReleasePoolMigration{
-			ChainSelector: 1,
+			ChainSelector: testMigrationChainSelector,
 			OldPoolRef: datastore.AddressRef{
-				ChainSelector: 1,
+				ChainSelector: testMigrationChainSelector,
 				Address:       "0x0000000000000000000000000000000000000001",
 				Version:       semver.MustParse("1.6.1"),
 			},
 			NewPoolRef: datastore.AddressRef{
-				ChainSelector: 1,
+				ChainSelector: testMigrationChainSelector,
 				Address:       "0x0000000000000000000000000000000000000002",
 				Version:       semver.MustParse("2.0.0"),
 			},
@@ -127,14 +131,14 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *tes
 func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_PoolRefs(t *testing.T) {
 	oldRef := func() datastore.AddressRef {
 		return datastore.AddressRef{
-			ChainSelector: 1,
+			ChainSelector: testMigrationChainSelector,
 			Address:       "0x0000000000000000000000000000000000000001",
 			Version:       semver.MustParse("1.6.1"),
 		}
 	}
 	newRef := func() datastore.AddressRef {
 		return datastore.AddressRef{
-			ChainSelector: 1,
+			ChainSelector: testMigrationChainSelector,
 			Address:       "0x0000000000000000000000000000000000000002",
 			Version:       semver.MustParse("2.0.0"),
 		}
@@ -149,6 +153,13 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_PoolRefs(t *testing
 			name: "Success - valid legacy to v2 pair",
 			mutate: func(m *LockReleasePoolMigration) {
 			},
+		},
+		{
+			name: "Failure - invalid chain selector",
+			mutate: func(m *LockReleasePoolMigration) {
+				m.ChainSelector = 1
+			},
+			expectedErr: "invalid chain selector 1",
 		},
 		{
 			name: "Failure - empty OldPoolRef",
@@ -171,7 +182,7 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_PoolRefs(t *testing
 				ref.ChainSelector = 2
 				m.OldPoolRef = ref
 			},
-			expectedErr: "OldPoolRef.ChainSelector 2 does not match the migration's ChainSelector 1",
+			expectedErr: "OldPoolRef.ChainSelector 2 does not match the migration's ChainSelector",
 		},
 		{
 			name: "Failure - NewPoolRef chain selector mismatch",
@@ -180,7 +191,7 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_PoolRefs(t *testing
 				ref.ChainSelector = 2
 				m.NewPoolRef = ref
 			},
-			expectedErr: "NewPoolRef.ChainSelector 2 does not match the migration's ChainSelector 1",
+			expectedErr: "NewPoolRef.ChainSelector 2 does not match the migration's ChainSelector",
 		},
 		{
 			name: "Failure - reversed versions",
@@ -210,7 +221,7 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_PoolRefs(t *testing
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			migration := LockReleasePoolMigration{
-				ChainSelector: 1,
+				ChainSelector: testMigrationChainSelector,
 				OldPoolRef:    oldRef(),
 				NewPoolRef:    newRef(),
 				LiquidityMigrationAmount: &LockReleasePoolLiquidityMigrationAmount{
@@ -272,14 +283,14 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_AmountFormat(t *tes
 			err := cs.VerifyPreconditions(cldf.Environment{}, MigrateLockReleasePoolLiquidityConfig{
 				Migrations: []LockReleasePoolMigration{
 					{
-						ChainSelector: 1,
+						ChainSelector: testMigrationChainSelector,
 						OldPoolRef: datastore.AddressRef{
-							ChainSelector: 1,
+							ChainSelector: testMigrationChainSelector,
 							Address:       "0x0000000000000000000000000000000000000001",
 							Version:       semver.MustParse("1.6.1"),
 						},
 						NewPoolRef: datastore.AddressRef{
-							ChainSelector: 1,
+							ChainSelector: testMigrationChainSelector,
 							Address:       "0x0000000000000000000000000000000000000002",
 							Version:       semver.MustParse("2.0.0"),
 						},

@@ -126,6 +126,14 @@ func TestSetTokenPoolRateLimits_VerifyPreconditions(t *testing.T) {
 		RateLimit: &RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10},
 	}
 
+	validPoolRef := func(sel uint64) datastore.AddressRef {
+		return datastore.AddressRef{
+			Type:          "TokenPool",
+			Version:       semver.MustParse("1.0.0"),
+			ChainSelector: sel,
+		}
+	}
+
 	tests := []struct {
 		name        string
 		cfg         TPRLInput
@@ -140,8 +148,8 @@ func TestSetTokenPoolRateLimits_VerifyPreconditions(t *testing.T) {
 			name: "Success - valid config",
 			cfg: TPRLInput{
 				Configs: map[uint64]TPRLConfig{
-					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: validOutbound}},
-					chainB: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainA: validOutbound}},
+					chainA: {TokenPoolRef: validPoolRef(chainA), RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: validOutbound}},
+					chainB: {TokenPoolRef: validPoolRef(chainB), RemoteOutbounds: map[uint64]RemoteOutbounds{chainA: validOutbound}},
 				},
 			},
 		},
@@ -151,20 +159,30 @@ func TestSetTokenPoolRateLimits_VerifyPreconditions(t *testing.T) {
 			name: "Success - outbound-only lane with a refs-only counterpart",
 			cfg: TPRLInput{
 				Configs: map[uint64]TPRLConfig{
-					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {
+					chainA: {TokenPoolRef: validPoolRef(chainA), RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {
 						OutboundOnly: true,
 						RateLimit:    &RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 10},
 					}}},
-					chainB: {},
+					chainB: {TokenPoolRef: validPoolRef(chainB)},
 				},
 			},
+		},
+		{
+			name: "Failure - empty token pool ref",
+			cfg: TPRLInput{
+				Configs: map[uint64]TPRLConfig{
+					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: validOutbound}},
+					chainB: {TokenPoolRef: validPoolRef(chainB), RemoteOutbounds: map[uint64]RemoteOutbounds{chainA: validOutbound}},
+				},
+			},
+			expectedErr: "no token pool ref provided for chain",
 		},
 		{
 			name: "Failure - outbound-only lane with no outbound buckets",
 			cfg: TPRLInput{
 				Configs: map[uint64]TPRLConfig{
-					chainA: {RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {OutboundOnly: true}}},
-					chainB: {},
+					chainA: {TokenPoolRef: validPoolRef(chainA), RemoteOutbounds: map[uint64]RemoteOutbounds{chainB: {OutboundOnly: true}}},
+					chainB: {TokenPoolRef: validPoolRef(chainB)},
 				},
 			},
 			expectedErr: "has no outbound buckets",
