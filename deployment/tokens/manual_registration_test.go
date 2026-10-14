@@ -48,6 +48,25 @@ func TestManualRegistration_VerifyPreconditions(t *testing.T) {
 			},
 		},
 		{
+			// A chain can host several tokens; the apply loop registers each independently, so two
+			// different tokens on the same chain must both pass verification.
+			name: "Success - multiple different tokens on the same chain",
+			cfg: tokens.ManualRegistrationInput{
+				Registrations: []tokens.RegisterTokenConfig{
+					func() tokens.RegisterTokenConfig {
+						registration := baseRegistration()
+						registration.TokenPoolRef.Qualifier = "pool-a"
+						return registration
+					}(),
+					func() tokens.RegisterTokenConfig {
+						registration := baseRegistration()
+						registration.TokenPoolRef.Qualifier = "pool-b"
+						return registration
+					}(),
+				},
+			},
+		},
+		{
 			name: "Failure - invalid chain selector",
 			cfg: tokens.ManualRegistrationInput{
 				Registrations: []tokens.RegisterTokenConfig{

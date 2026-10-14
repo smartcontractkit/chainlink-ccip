@@ -58,7 +58,8 @@ type RegisterTokenConfig struct {
 	// The chain selector for the token being registered (required).
 	ChainSelector uint64 `yaml:"chainSelector" json:"chainSelector"`
 
-	// The proposed owner of the token (required).
+	// The proposed owner of the token. Required on EVM. On SVM an empty value means the CCIP
+	// admin becomes the admin, so it may be omitted alongside non-empty SVMExtraArgs.
 	ProposedOwner string `yaml:"proposedOwner" json:"proposedOwner"`
 
 	// Extra args specific to SVM manual registration. Only required for SVM chains.
@@ -81,15 +82,32 @@ func manualRegistrationVerify() func(cldf.Environment, ManualRegistrationInput) 
 			return errors.New("at least one registration is required")
 		}
 
-		seen := make(map[uint64]struct{}, len(cfg.Registrations))
+		// Key on the refs, not just the chain: a single chain can host several tokens and the apply
+		// loop registers each entry independently, so keying on the chain alone would reject a valid
+		// multi-token batch.
+		type registrationKey struct {
+			chainSelector uint64
+			tokenPoolRef  string
+			tokenRef      string
+		}
+
+		seen := make(map[registrationKey]struct{}, len(cfg.Registrations))
 		for i, registration := range cfg.Registrations {
 			if _, err := chain_selectors.GetSelectorFamily(registration.ChainSelector); err != nil {
 				return fmt.Errorf("registration[%d]: invalid chain selector %d: %w", i, registration.ChainSelector, err)
 			}
-			if _, dup := seen[registration.ChainSelector]; dup {
-				return fmt.Errorf("registration[%d]: duplicate entry for chain selector %d", i, registration.ChainSelector)
+			key := registrationKey{
+				chainSelector: registration.ChainSelector,
+				tokenPoolRef:  datastore_utils.SprintRef(registration.TokenPoolRef),
+				tokenRef:      datastore_utils.SprintRef(registration.TokenRef),
 			}
-			seen[registration.ChainSelector] = struct{}{}
+			if _, dup := seen[key]; dup {
+				return fmt.Errorf(
+					"registration[%d]: duplicate entry for chain selector %d and refs (tokenPoolRef=%s, tokenRef=%s)",
+					i, registration.ChainSelector, key.tokenPoolRef, key.tokenRef,
+				)
+			}
+			seen[key] = struct{}{}
 
 			// ProposedOwner is deliberately not required: the Solana flow treats an empty value as
 			// "the CCIP admin becomes the admin", and accepts it alongside non-empty svmExtraArgs.
