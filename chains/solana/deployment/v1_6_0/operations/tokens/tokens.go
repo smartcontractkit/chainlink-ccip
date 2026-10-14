@@ -26,7 +26,11 @@ import (
 
 var (
 	LinkContractType cldf_deployment.ContractType = "LinkToken"
-	Version          *semver.Version              = semver.MustParse("1.6.0")
+	// TokenMultisigType is the mint-authority multisig created for a token pool. It uses the
+	// PascalCase spelling of every other Solana contract type, matching chainlink's 1.6
+	// CreateTokenMultisig and chainlink-ccip-solana's 2.0 writer.
+	TokenMultisigType cldf_deployment.ContractType = "TokenMultisig"
+	Version           *semver.Version              = semver.MustParse("1.6.0")
 )
 
 type Params struct {
@@ -218,7 +222,7 @@ var CreateTokenMultisig = operations.NewOperation(
 				{
 					ChainSelector: chain.Selector,
 					Address:       multisig.PublicKey().String(),
-					Type:          "TOKEN_MULTISIG",
+					Type:          datastore.ContractType(TokenMultisigType),
 					Version:       Version,
 					Qualifier:     input.TokenSymbol,
 					Labels:        datastore.NewLabelSet(input.TokenMint.String()),
