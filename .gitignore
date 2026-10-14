@@ -63,5 +63,11 @@ devenv/env-out.toml
 .claude/
 operations-gen
 .agents/
+# Shared tooling API skill is versioned; everything else under .agents/ stays ignored.
+!/deployment/.agents/
+/deployment/.agents/*
+!/deployment/.agents/skills/
+/deployment/.agents/skills/*
+!/deployment/.agents/skills/tooling-api/
 AGENTS.md
 /.gocache

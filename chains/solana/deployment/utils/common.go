@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -81,45 +82,118 @@ func BuildMCMSBatchOperation(
 	}, nil
 }
 
+// ErrMCMSInstanceNotFound is returned when the datastore has no ref for a Solana timelock or MCM instance.
+var ErrMCMSInstanceNotFound = errors.New("solana mcms instance not found in datastore")
+
+// mcmsInstanceRefTypes maps the "<program>.<seed>" ref type of a Solana MCMS instance to its
+// seed-only ref type and its program ref type. Deploys write both instance refs, but some
+// datastores only have the "<program>.<seed>" one.
+var mcmsInstanceRefTypes = map[cldf_deployment.ContractType]struct {
+	seed, program cldf_deployment.ContractType
+}{
+	common_utils.RBACTimelock:               {RBACTimelockSeed, TimelockProgramType},
+	common_utils.ProposerManyChainMultisig:  {ProposerSeed, McmProgramType},
+	common_utils.CancellerManyChainMultisig: {CancellerSeed, McmProgramType},
+	common_utils.BypasserManyChainMultisig:  {BypasserSeed, McmProgramType},
+}
+
+// MCMSInstance is a Solana timelock or MCM instance resolved from the datastore.
+type MCMSInstance struct {
+	ProgramID solana.PublicKey
+	Seed      state.PDASeed
+	// MissingRefs are the refs for this instance the datastore lacks, derived from the ref it has.
+	MissingRefs []cldf_datastore.AddressRef
+}
+
+// ResolveMCMSInstance resolves a Solana timelock or MCM instance. instanceType is the
+// "<program>.<seed>" ref type (RBACTimelock or one of the *ManyChainMultiSig types). When that ref
+// is missing, the instance is rebuilt from the program ref and the seed ref. It returns
+// ErrMCMSInstanceNotFound when neither the instance ref nor the seed ref exists.
+func ResolveMCMSInstance(
+	existingAddresses []cldf_datastore.AddressRef,
+	chainSelector uint64,
+	instanceType cldf_deployment.ContractType,
+	qualifier string) (MCMSInstance, error) {
+	refTypes, ok := mcmsInstanceRefTypes[instanceType]
+	if !ok {
+		return MCMSInstance{}, fmt.Errorf("unsupported solana mcms instance type %q", instanceType)
+	}
+	instanceRef := datastore.GetAddressRef(existingAddresses, chainSelector, instanceType, common_utils.Version_1_6_0, qualifier)
+	seedRef := datastore.GetAddressRef(existingAddresses, chainSelector, refTypes.seed, common_utils.Version_1_6_0, qualifier)
+
+	if instanceRef.Address != "" {
+		id, seed, err := mcms_solana.ParseContractAddress(instanceRef.Address)
+		if err != nil {
+			return MCMSInstance{}, fmt.Errorf("invalid %s ref %q on chain %d: %w", instanceType, instanceRef.Address, chainSelector, err)
+		}
+		out := MCMSInstance{ProgramID: id, Seed: state.PDASeed(seed)}
+		seedStr := string(bytes.TrimRight(seed[:], "\x00"))
+		switch seedRef.Address {
+		case "":
+			out.MissingRefs = append(out.MissingRefs, cldf_datastore.AddressRef{
+				Address:       seedStr,
+				ChainSelector: chainSelector,
+				Type:          cldf_datastore.ContractType(refTypes.seed),
+				Version:       common_utils.Version_1_6_0,
+				Qualifier:     instanceRef.Qualifier,
+			})
+		case seedStr:
+		default:
+			return MCMSInstance{}, fmt.Errorf("%s ref %q and %s ref %q disagree on chain %d", instanceType, instanceRef.Address, refTypes.seed, seedRef.Address, chainSelector)
+		}
+		return out, nil
+	}
+
+	if seedRef.Address == "" {
+		return MCMSInstance{}, fmt.Errorf("%w: no %s or %s ref on chain %d with qualifier %q", ErrMCMSInstanceNotFound, instanceType, refTypes.seed, chainSelector, qualifier)
+	}
+	programRef := datastore.GetAddressRef(existingAddresses, chainSelector, refTypes.program, common_utils.Version_1_6_0, "")
+	if programRef.Address == "" {
+		return MCMSInstance{}, fmt.Errorf("found %s ref but no %s ref on chain %d", refTypes.seed, refTypes.program, chainSelector)
+	}
+	id, err := solana.PublicKeyFromBase58(programRef.Address)
+	if err != nil {
+		return MCMSInstance{}, fmt.Errorf("invalid %s ref %q on chain %d: %w", refTypes.program, programRef.Address, chainSelector, err)
+	}
+	var seed state.PDASeed
+	if len(seedRef.Address) > len(seed) {
+		return MCMSInstance{}, fmt.Errorf("%s ref %q on chain %d is longer than %d bytes", refTypes.seed, seedRef.Address, chainSelector, len(seed))
+	}
+	copy(seed[:], seedRef.Address)
+	return MCMSInstance{
+		ProgramID: id,
+		Seed:      seed,
+		MissingRefs: []cldf_datastore.AddressRef{{
+			Address:       mcms_solana.ContractAddress(id, mcms_solana.PDASeed(seed)),
+			ChainSelector: chainSelector,
+			Type:          cldf_datastore.ContractType(instanceType),
+			Version:       common_utils.Version_1_6_0,
+			Qualifier:     seedRef.Qualifier,
+		}},
+	}, nil
+}
+
 func GetTimelockSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
 	chainSelector uint64,
-	qualifier string) solana.PublicKey {
-	// timelock seeds stored as a separate program type
-	// qualifier will identify the correct timelock instance
-	timelock := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		common_utils.RBACTimelock,
-		common_utils.Version_1_6_0,
-		qualifier,
-	)
-	id, seed, _ := mcms_solana.ParseContractAddress(timelock.Address)
-	return state.GetTimelockSignerPDA(
-		id,
-		state.PDASeed([]byte(seed[:])),
-	)
+	qualifier string) (solana.PublicKey, error) {
+	timelock, err := ResolveMCMSInstance(existingAddresses, chainSelector, common_utils.RBACTimelock, qualifier)
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+	return state.GetTimelockSignerPDA(timelock.ProgramID, timelock.Seed), nil
 }
 
 func GetMCMSignerPDA(
 	existingAddresses []cldf_datastore.AddressRef,
 	chainSelector uint64,
 	signerType cldf_deployment.ContractType,
-	qualifier string) solana.PublicKey {
-	// mcm seeds stored as a separate program type
-	// qualifier will identify the correct mcm instance
-	mcm := datastore.GetAddressRef(
-		existingAddresses,
-		chainSelector,
-		signerType,
-		common_utils.Version_1_6_0,
-		qualifier,
-	)
-	id, seed, _ := mcms_solana.ParseContractAddress(mcm.Address)
-	return state.GetMCMSignerPDA(
-		id,
-		state.PDASeed([]byte(seed[:])),
-	)
+	qualifier string) (solana.PublicKey, error) {
+	mcm, err := ResolveMCMSInstance(existingAddresses, chainSelector, signerType, qualifier)
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+	return state.GetMCMSignerPDA(mcm.ProgramID, mcm.Seed), nil
 }
 
 func FundSolanaAccounts(

@@ -18,10 +18,47 @@ type ApplyDestChainConfigSequenceInput struct {
 
 // DestChainConfigForDst represents a destination chain config override for a single destination.
 // Override is a functional option that mutates the base config (read from on-chain or defaults).
-// If Override is nil, the existing on-chain config is re-applied as-is (idempotent re-apply).
+// Config sets individual fields of the base config and is applied after Override.
+// If both are empty, the existing on-chain config is re-applied as-is (idempotent re-apply).
 type DestChainConfigForDst struct {
 	Selector uint64                                  `json:"selector" yaml:"selector"`
 	Override *lanes.FeeQuoterDestChainConfigOverride `json:"-" yaml:"-"`
+	Config   UnresolvedFeeQuoterDestChainConfig      `json:"config" yaml:"config"`
+}
+
+// UnresolvedFeeQuoterDestChainConfig allows for partial specification of a FeeQuoter dest chain config.
+type UnresolvedFeeQuoterDestChainConfig struct {
+	IsEnabled                   utils.Optional[bool]   `json:"isEnabled" yaml:"isEnabled"`
+	MaxDataBytes                utils.Optional[uint32] `json:"maxDataBytes" yaml:"maxDataBytes"`
+	MaxPerMsgGasLimit           utils.Optional[uint32] `json:"maxPerMsgGasLimit" yaml:"maxPerMsgGasLimit"`
+	DestGasOverhead             utils.Optional[uint32] `json:"destGasOverhead" yaml:"destGasOverhead"`
+	DestGasPerPayloadByteBase   utils.Optional[uint8]  `json:"destGasPerPayloadByteBase" yaml:"destGasPerPayloadByteBase"`
+	DefaultTokenFeeUSDCents     utils.Optional[uint16] `json:"defaultTokenFeeUSDCents" yaml:"defaultTokenFeeUSDCents"`
+	DefaultTokenDestGasOverhead utils.Optional[uint32] `json:"defaultTokenDestGasOverhead" yaml:"defaultTokenDestGasOverhead"`
+	DefaultTxGasLimit           utils.Optional[uint32] `json:"defaultTxGasLimit" yaml:"defaultTxGasLimit"`
+	NetworkFeeUSDCents          utils.Optional[uint16] `json:"networkFeeUSDCents" yaml:"networkFeeUSDCents"`
+}
+
+// IsEmpty reports whether no field is set.
+func (cfg UnresolvedFeeQuoterDestChainConfig) IsEmpty() bool {
+	return !cfg.IsEnabled.IsPresent() && !cfg.MaxDataBytes.IsPresent() && !cfg.MaxPerMsgGasLimit.IsPresent() &&
+		!cfg.DestGasOverhead.IsPresent() && !cfg.DestGasPerPayloadByteBase.IsPresent() && !cfg.DefaultTokenFeeUSDCents.IsPresent() &&
+		!cfg.DefaultTokenDestGasOverhead.IsPresent() && !cfg.DefaultTxGasLimit.IsPresent() && !cfg.NetworkFeeUSDCents.IsPresent()
+}
+
+// Resolve fills in any unset fields in the unresolved configuration using the provided fallback values.
+func (cfg UnresolvedFeeQuoterDestChainConfig) Resolve(fallbacks lanes.FeeQuoterDestChainConfig) lanes.FeeQuoterDestChainConfig {
+	resolved := fallbacks
+	resolved.IsEnabled = cfg.IsEnabled.GetOrDefault(fallbacks.IsEnabled)
+	resolved.MaxDataBytes = cfg.MaxDataBytes.GetOrDefault(fallbacks.MaxDataBytes)
+	resolved.MaxPerMsgGasLimit = cfg.MaxPerMsgGasLimit.GetOrDefault(fallbacks.MaxPerMsgGasLimit)
+	resolved.DestGasOverhead = cfg.DestGasOverhead.GetOrDefault(fallbacks.DestGasOverhead)
+	resolved.DestGasPerPayloadByteBase = cfg.DestGasPerPayloadByteBase.GetOrDefault(fallbacks.DestGasPerPayloadByteBase)
+	resolved.DefaultTokenFeeUSDCents = cfg.DefaultTokenFeeUSDCents.GetOrDefault(fallbacks.DefaultTokenFeeUSDCents)
+	resolved.DefaultTokenDestGasOverhead = cfg.DefaultTokenDestGasOverhead.GetOrDefault(fallbacks.DefaultTokenDestGasOverhead)
+	resolved.DefaultTxGasLimit = cfg.DefaultTxGasLimit.GetOrDefault(fallbacks.DefaultTxGasLimit)
+	resolved.NetworkFeeUSDCents = cfg.NetworkFeeUSDCents.GetOrDefault(fallbacks.NetworkFeeUSDCents)
+	return resolved
 }
 
 // DestChainConfigForSrc represents all destination chain config updates originating from a single source.

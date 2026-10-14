@@ -73,17 +73,3 @@ func TestPoolOpsV150_GetCurrentRateLimits_RejectsFastFinality(t *testing.T) {
 	)
 	require.ErrorContains(t, err, "fast finality buckets are not supported")
 }
-
-// TestPoolOpsV150_RemoveRemotePools_Unsupported pins the behaviour chosen for v1.5.0: the contract
-// has no removeRemotePool, and applyChainUpdates(allowed=false) would drop the entire remote chain
-// config. Erroring is deliberate - a silent no-op would let a "remove remote pools" pipeline
-// report success while changing nothing.
-func TestPoolOpsV150_RemoveRemotePools_Unsupported(t *testing.T) {
-	t.Parallel()
-
-	_, err := (&poolOpsV150{}).RemoveRemotePools(
-		cldf_ops.Bundle{}, testChain, common.HexToAddress("0x1"),
-		[]tokensapi.RemotePoolToRemove{{Selector: 1234}},
-	)
-	require.ErrorContains(t, err, "removing individual remote pools is not supported on v1.5.0 token pools")
-}

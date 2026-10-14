@@ -402,6 +402,37 @@ func buildTPRLRemotesForSetRateLimitsLane(
 		)
 	}
 
+	// Reject capacity/rate with more fractional digits than the token can represent before
+	// scaling truncates them. Inbound rows use the same decimals GenerateTPRLConfigs scales by.
+	// Missing buckets are the zero value (disabled) and pass trivially. When outboundOnly, the
+	// remote buckets are not used for this lane, so they are not checked here.
+	scaleDecimals := remoteDecimals
+	if DoesPoolUseLocalDecimals(chainFamily, tokenPoolRef.Version, tokenPoolRef.Type.String()) {
+		scaleDecimals = localDecimals
+	}
+	type precisionCheck struct {
+		rl       RateLimiterConfigFloatInput
+		decimals uint8
+		label    string
+	}
+	precisionChecks := []precisionCheck{
+		{localFastFinalityBucket.RateLimit, localDecimals, "fast-finality outbound"},
+		{localDefaultBucket.RateLimit, localDecimals, "outbound"},
+	}
+	if !outboundOnly {
+		precisionChecks = append(precisionChecks,
+			precisionCheck{remoteFastFinalityBucket.RateLimit, scaleDecimals, "fast-finality inbound"},
+			precisionCheck{remoteDefaultBucket.RateLimit, scaleDecimals, "inbound"},
+		)
+	}
+	for _, b := range precisionChecks {
+		if err := b.rl.ValidatePrecision(b.decimals); err != nil {
+			return RateLimiterConfig{}, RateLimiterConfig{}, nil, fmt.Errorf(
+				"%s rate limit for chain selector %d and remote selector %d: %w", b.label, localSelector, remoteSelector, err,
+			)
+		}
+	}
+
 	// When outboundOnly, inbound is left zero here; the changeset overwrites each bucket's
 	// InboundRateLimiterConfig with the local pool's current on-chain inbound before dispatch.
 	var fastFinalityOutboundRL, fastFinalityInboundRL RateLimiterConfig

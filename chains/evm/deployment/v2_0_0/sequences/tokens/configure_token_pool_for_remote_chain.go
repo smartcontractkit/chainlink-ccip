@@ -17,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/advanced_pool_hooks"
@@ -25,6 +26,7 @@ import (
 
 	evmutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
+	v150adapters "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 )
 
 // ConfigureTokenPoolForRemoteChainInput is the input for the ConfigureTokenPoolForRemoteChain sequence.
@@ -116,6 +118,39 @@ var ConfigureTokenPoolForRemoteChain = cldf_ops.NewSequence(
 		case imported.LegacyRateLimits != nil:
 			outboundRateLimiterConfig = imported.LegacyRateLimits.Outbound
 			inboundRateLimiterConfig = imported.LegacyRateLimits.Inbound
+
+			// EMERGENCY EXCEPTION: a v1.5.0 *AndProxy pool forwards every transfer
+			// to a previous pool that applies its OWN rate limiter, so the
+			// effective limit is the tighter of the two. The legacy reader only saw
+			// the proxy pool. Remove this once legacy pools are migrated.
+			if imported.LegacyPoolVersion != nil &&
+				imported.LegacyPoolVersion.Equal(utils.Version_1_5_0) &&
+				(imported.LegacyPoolType == utils.BurnMintTokenPoolAndProxy.String() ||
+					imported.LegacyPoolType == utils.LockReleaseTokenPoolAndProxy.String()) {
+				if len(imported.LegacyPoolAddress) == 0 {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"v1.5.0 *AndProxy pool detected for lane %d but LegacyPoolAddress is empty",
+						input.RemoteChainSelector,
+					)
+				}
+				effective, err := v150adapters.EffectiveMigrationRateLimits(
+					b,
+					chain,
+					common.BytesToAddress(imported.LegacyPoolAddress),
+					input.RemoteChainSelector,
+					outboundRateLimiterConfig,
+					inboundRateLimiterConfig,
+					input.RemoteChainConfig.RemoteDecimals,
+					localDecimalsReport.Output,
+				)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf(
+						"failed to resolve effective rate limits for v1.5.0 *AndProxy pool: %w", err,
+					)
+				}
+				outboundRateLimiterConfig = effective.Outbound
+				inboundRateLimiterConfig = effective.Inbound
+			}
 
 		case (!defaultOutboundExists && !defaultInboundExists) && imported.LegacyRateLimits == nil:
 			if input.RemoteChainAlreadySupported {
@@ -549,38 +584,45 @@ func makeTokenTransferFeeConfigUpdates(b cldf_ops.Bundle, chain evm.Chain, input
 		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, nil
 	}
 
-	report, err := cldf_ops.ExecuteOperation(
-		b, token_pool.GetTokenTransferFeeConfig, chain,
-		evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
-			ChainSelector: input.ChainSelector,
-			Address:       input.TokenPoolAddress,
-			Args: token_pool.GetTokenTransferFeeConfigArgs{
-				Arg0:              common.Address{},            // unused
-				DestChainSelector: remoteChainSelector,         // this IS used
-				Arg2:              finality.RawWaitForFinality, // unused
-				Arg3:              []byte{},                    // unused
+	// Only read the on-chain fee config when the remote chain is already supported by the pool.
+	// For a not-yet-supported remote (e.g. a brand-new lane) pools that resolve their CCVs per
+	// destination can revert (CCVNotSetOnResolver) because the resolver and chain-update writes in
+	// this same batch have not been executed yet. In that case treat the current config as unset and
+	// rely on the defaults.
+	var currentConfig tokens.TokenTransferFeeConfig
+	if input.RemoteChainAlreadySupported {
+		report, err := cldf_ops.ExecuteOperation(
+			b, token_pool.GetTokenTransferFeeConfig, chain,
+			evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs]{
+				ChainSelector: input.ChainSelector,
+				Address:       input.TokenPoolAddress,
+				Args: token_pool.GetTokenTransferFeeConfigArgs{
+					Arg0:              common.Address{},            // unused
+					DestChainSelector: remoteChainSelector,         // this IS used
+					Arg2:              finality.RawWaitForFinality, // unused
+					Arg3:              []byte{},                    // unused
+				},
 			},
-		},
-		cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
-	)
-	if err != nil {
-		return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
+			cldf_ops.WithForceExecute[evm_contract.FunctionInput[token_pool.GetTokenTransferFeeConfigArgs], evm.Chain](),
+		)
+		if err != nil {
+			return token_pool.ApplyTokenTransferFeeConfigUpdatesArgs{}, fmt.Errorf("failed to get token transfer fee config: %w", err)
+		}
+		currentConfig = tokens.TokenTransferFeeConfig{
+			DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
+			CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
+			DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
+			CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
+			DestBytesOverhead:             report.Output.DestBytesOverhead,
+			DestGasOverhead:               report.Output.DestGasOverhead,
+			IsEnabled:                     report.Output.IsEnabled,
+		}
 	}
 
 	defaultConfig := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(
 		input.ChainSelector,
 		input.RemoteChainSelector,
 	)
-
-	currentConfig := tokens.TokenTransferFeeConfig{
-		DefaultFinalityTransferFeeBps: report.Output.FinalityTransferFeeBps,
-		CustomFinalityTransferFeeBps:  report.Output.FastFinalityTransferFeeBps,
-		DefaultFinalityFeeUSDCents:    report.Output.FinalityFeeUSDCents,
-		CustomFinalityFeeUSDCents:     report.Output.FastFinalityFeeUSDCents,
-		DestBytesOverhead:             report.Output.DestBytesOverhead,
-		DestGasOverhead:               report.Output.DestGasOverhead,
-		IsEnabled:                     report.Output.IsEnabled,
-	}
 
 	// Resolution strategy:
 	// (1) If on-chain config is enabled, merge it with the user's provided config (giving precedence to user's config)
