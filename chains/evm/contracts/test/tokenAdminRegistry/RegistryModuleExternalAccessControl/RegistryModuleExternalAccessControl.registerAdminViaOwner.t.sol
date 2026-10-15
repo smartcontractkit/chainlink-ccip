@@ -56,7 +56,7 @@ contract RegistryModuleExternalAccessControl_registerAdminViaOwner is RegistryMo
     _assertPendingAdministrators(tokens, OWNER);
   }
 
-  function test_registerAdminViaOwner_ReRegisterAfterAuthorityTransfer() public {
+  function test_registerAdminViaOwner_ReRegisterAfterOwnerTransfer() public {
     address newAdmin = makeAddr("newAdmin");
     s_registryModuleExternalAccessControl.registerAdminViaOwner(s_tokens);
     for (uint256 i = 0; i < s_tokens.length; ++i) {

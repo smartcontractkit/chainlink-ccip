@@ -9,12 +9,13 @@ import {IExternalAccessControlRegistry} from "../interfaces/externalRegistry/IEx
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 import {AccessControl} from "@openzeppelin/contracts@5.3.0/access/AccessControl.sol";
 
-/// @notice Proposes token administrators in batches using token ownership, CCIP administration, or default admin roles
-/// held on the tokens themselves or in external access control registries.
-/// @dev The module must be enabled in TokenAdminRegistry. Each token is checked independently and any failure reverts
-/// the entire batch. Empty batches do nothing; duplicate tokens are processed in order. The caller is only proposed as
-/// pending administrator and must separately call TokenAdminRegistry.acceptAdminRole for each token. An accepted
-/// administrator cannot be replaced through this module; a pending administrator can be replaced by a current authority.
+/// @notice Registers token admins in batches using the token's getCCIPAdmin, owner, or DEFAULT_ADMIN_ROLE.
+/// @dev AccessControl roles can be stored on the token or in the contract returned by ACCESS_CONTROLLED_REGISTRY.
+/// This module must be added to TokenAdminRegistry before it can register tokens. Registration sets the caller as the
+/// pending admin. The caller must call acceptAdminRole on TokenAdminRegistry for each token to accept the role.
+/// If any token cannot be registered, the call reverts and no tokens are registered. Empty arrays do nothing, and
+/// duplicate tokens are processed in order. Pending admins can be replaced, but an admin that has accepted the role
+/// cannot be replaced through this module.
 contract RegistryModuleExternalAccessControl is ITypeAndVersion {
   error CanOnlySelfRegister(address admin, address token);
   error RequiredRoleNotFound(address msgSender, bytes32 role, address token);
@@ -26,8 +27,7 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
 
   ITokenAdminRegistry private immutable i_tokenAdminRegistry;
 
-  /// @notice Creates a batch registration module.
-  /// @param tokenAdminRegistry The registry in which to propose token administrators.
+  /// @param tokenAdminRegistry The TokenAdminRegistry contract to register token admins in.
   constructor(
     address tokenAdminRegistry
   ) {
@@ -37,9 +37,9 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
     i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
   }
 
-  /// @notice Proposes the caller as administrator of each token using its getCCIPAdmin method.
-  /// @param tokens The tokens to register.
-  /// @dev The caller must equal getCCIPAdmin for every token. Any failure reverts the entire batch.
+  /// @notice Registers the admin of the tokens using the `getCCIPAdmin` method.
+  /// @param tokens The tokens to register the admin for.
+  /// @dev The caller must be the admin returned by the `getCCIPAdmin` method for every token.
   function registerAdminViaGetCCIPAdmin(
     address[] calldata tokens
   ) external {
@@ -49,9 +49,9 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
     }
   }
 
-  /// @notice Proposes the caller as administrator of each token using its owner method.
-  /// @param tokens The tokens to register.
-  /// @dev The caller must equal owner for every token. Any failure reverts the entire batch.
+  /// @notice Registers the admin of the tokens using the `owner` method.
+  /// @param tokens The tokens to register the admin for.
+  /// @dev The caller must be the admin returned by the `owner` method for every token.
   function registerAdminViaOwner(
     address[] calldata tokens
   ) external {
@@ -61,9 +61,9 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
     }
   }
 
-  /// @notice Proposes the caller as administrator of each token using its own DEFAULT_ADMIN_ROLE.
-  /// @param tokens The tokens to register.
-  /// @dev The caller must hold DEFAULT_ADMIN_ROLE on every token. Any failure reverts the entire batch.
+  /// @notice Registers the admin of the tokens using OZ's AccessControl DEFAULT_ADMIN_ROLE.
+  /// @param tokens The tokens to register the admin for.
+  /// @dev The caller must have the DEFAULT_ADMIN_ROLE as defined by each token itself.
   function registerAccessControlDefaultAdmin(
     address[] calldata tokens
   ) external {
@@ -73,11 +73,10 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
     }
   }
 
-  /// @notice Proposes the caller as administrator of each token using its external registry's DEFAULT_ADMIN_ROLE.
-  /// @param tokens The tokens to register.
-  /// @dev The caller must have the DEFAULT_ADMIN_ROLE on the contract returned by `ACCESS_CONTROLLED_REGISTRY` of
-  /// every token. If the caller does not have the role for one of the tokens, the call reverts and no token is
-  /// registered.
+  /// @notice Registers the admin of the tokens using the DEFAULT_ADMIN_ROLE of their external AccessControl contracts.
+  /// @param tokens The tokens to register the admin for.
+  /// @dev The caller must have the DEFAULT_ADMIN_ROLE on the contract returned by `ACCESS_CONTROLLED_REGISTRY`
+  /// for every token.
   function registerExternalAccessControlDefaultAdmin(
     address[] calldata tokens
   ) external {
@@ -88,10 +87,13 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
     }
   }
 
+  /// @notice Registers the admin of the token using the DEFAULT_ADMIN_ROLE of the given AccessControl contract.
+  /// @param token The token to register the admin for.
+  /// @param accessControl The contract that holds the DEFAULT_ADMIN_ROLE for the token.
   function _registerAccessControlDefaultAdmin(
     address token,
     AccessControl accessControl
-  ) internal {
+  ) private {
     bytes32 defaultAdminRole = accessControl.DEFAULT_ADMIN_ROLE();
     if (!accessControl.hasRole(defaultAdminRole, msg.sender)) {
       revert RequiredRoleNotFound(msg.sender, defaultAdminRole, token);
@@ -100,10 +102,13 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
     _registerAdmin(token, msg.sender);
   }
 
+  /// @notice Registers the caller as the pending admin of the token.
+  /// @param token The token to register the admin for.
+  /// @param admin The admin to register, which must be the caller.
   function _registerAdmin(
     address token,
     address admin
-  ) internal {
+  ) private {
     if (admin != msg.sender) {
       revert CanOnlySelfRegister(admin, token);
     }

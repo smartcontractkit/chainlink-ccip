@@ -58,7 +58,7 @@ contract RegistryModuleExternalAccessControl_registerAccessControlDefaultAdmin i
     _assertPendingAdministrators(tokens, OWNER);
   }
 
-  function test_registerAccessControlDefaultAdmin_ReRegisterAfterAuthorityTransfer() public {
+  function test_registerAccessControlDefaultAdmin_ReRegisterAfterDefaultAdminTransfer() public {
     address newAdmin = makeAddr("newAdmin");
     s_registryModuleExternalAccessControl.registerAccessControlDefaultAdmin(s_tokens);
     for (uint256 i = 0; i < s_tokens.length; ++i) {

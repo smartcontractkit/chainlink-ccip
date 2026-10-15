@@ -56,7 +56,7 @@ contract RegistryModuleExternalAccessControl_registerAdminViaGetCCIPAdmin is Reg
     _assertPendingAdministrators(tokens, OWNER);
   }
 
-  function test_registerAdminViaGetCCIPAdmin_ReRegisterAfterAuthorityTransfer() public {
+  function test_registerAdminViaGetCCIPAdmin_ReRegisterAfterCCIPAdminTransfer() public {
     address newAdmin = makeAddr("newAdmin");
     s_registryModuleExternalAccessControl.registerAdminViaGetCCIPAdmin(s_tokens);
     vm.startPrank(STRANGER);

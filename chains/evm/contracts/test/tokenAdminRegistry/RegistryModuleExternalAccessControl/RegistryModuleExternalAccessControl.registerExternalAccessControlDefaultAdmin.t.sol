@@ -20,19 +20,17 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
     super.setUp();
 
     s_tokens.push(s_token);
-    s_tokens.push(address(new MockExternalAccessControlledToken(address(s_accessControlsRegistry))));
-    s_tokens.push(address(new MockExternalAccessControlledToken(address(s_accessControlsRegistry))));
+    s_tokens.push(address(new MockExternalAccessControlledToken(address(s_accessControlRegistry))));
+    s_tokens.push(address(new MockExternalAccessControlledToken(address(s_accessControlRegistry))));
   }
 
   function test_registerExternalAccessControlDefaultAdmin() public {
     assertEq(address(0), s_tokenAdminRegistry.getTokenConfig(s_token).pendingAdministrator);
 
-    bytes32 defaultAdminRole = s_accessControlsRegistry.DEFAULT_ADMIN_ROLE();
+    bytes32 defaultAdminRole = s_accessControlRegistry.DEFAULT_ADMIN_ROLE();
 
     vm.expectCall(s_token, abi.encodeCall(IExternalAccessControlRegistry.ACCESS_CONTROLLED_REGISTRY, ()), 1);
-    vm.expectCall(
-      address(s_accessControlsRegistry), abi.encodeCall(AccessControl.hasRole, (defaultAdminRole, OWNER)), 1
-    );
+    vm.expectCall(address(s_accessControlRegistry), abi.encodeCall(AccessControl.hasRole, (defaultAdminRole, OWNER)), 1);
     vm.expectCall(
       address(s_tokenAdminRegistry), abi.encodeCall(TokenAdminRegistry.proposeAdministrator, (s_token, OWNER)), 1
     );
@@ -89,13 +87,13 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
 
   function test_registerExternalAccessControlDefaultAdmin_ReRegisterAfterRoleRevoked() public {
     address newAdmin = makeAddr("newAdmin");
-    bytes32 defaultAdminRole = s_accessControlsRegistry.DEFAULT_ADMIN_ROLE();
+    bytes32 defaultAdminRole = s_accessControlRegistry.DEFAULT_ADMIN_ROLE();
 
     s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
 
     // The default admin role moves to a new admin before the pending admin has accepted.
-    s_accessControlsRegistry.grantRole(defaultAdminRole, newAdmin);
-    s_accessControlsRegistry.revokeRole(defaultAdminRole, OWNER);
+    s_accessControlRegistry.grantRole(defaultAdminRole, newAdmin);
+    s_accessControlRegistry.revokeRole(defaultAdminRole, OWNER);
 
     vm.startPrank(newAdmin);
     s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
@@ -123,7 +121,7 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
     count = uint8(bound(count, 1, 16));
     address[] memory tokens = new address[](count);
     for (uint256 i = 0; i < count; ++i) {
-      tokens[i] = address(new MockExternalAccessControlledToken(address(s_accessControlsRegistry)));
+      tokens[i] = address(new MockExternalAccessControlledToken(address(s_accessControlRegistry)));
     }
     s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(tokens);
     _assertPendingAdministrators(tokens, OWNER);
@@ -141,7 +139,7 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
       abi.encodeWithSelector(
         RegistryModuleExternalAccessControl.RequiredRoleNotFound.selector,
         STRANGER,
-        s_accessControlsRegistry.DEFAULT_ADMIN_ROLE(),
+        s_accessControlRegistry.DEFAULT_ADMIN_ROLE(),
         s_token
       )
     );
@@ -155,15 +153,15 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
     public
   {
     // The last token uses an AccessControl contract where OWNER is not the default admin.
-    MockExternalAccessControlRegistry otherAccessControlsRegistry =
+    MockExternalAccessControlRegistry otherAccessControlRegistry =
       new MockExternalAccessControlRegistry(makeAddr("otherAdmin"));
-    s_tokens.push(address(new MockExternalAccessControlledToken(address(otherAccessControlsRegistry))));
+    s_tokens.push(address(new MockExternalAccessControlledToken(address(otherAccessControlRegistry))));
 
     vm.expectRevert(
       abi.encodeWithSelector(
         RegistryModuleExternalAccessControl.RequiredRoleNotFound.selector,
         OWNER,
-        otherAccessControlsRegistry.DEFAULT_ADMIN_ROLE(),
+        otherAccessControlRegistry.DEFAULT_ADMIN_ROLE(),
         s_tokens[s_tokens.length - 1]
       )
     );
@@ -173,6 +171,27 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
     for (uint256 i = 0; i < s_tokens.length; ++i) {
       assertEq(address(0), s_tokenAdminRegistry.getTokenConfig(s_tokens[i]).pendingAdministrator);
     }
+  }
+
+  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_RequiredRoleNotFound_RoleRevoked() public {
+    address newAdmin = makeAddr("newAdmin");
+    bytes32 defaultAdminRole = s_accessControlRegistry.DEFAULT_ADMIN_ROLE();
+    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
+
+    s_accessControlRegistry.grantRole(defaultAdminRole, newAdmin);
+    s_accessControlRegistry.revokeRole(defaultAdminRole, OWNER);
+    vm.startPrank(newAdmin);
+    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
+
+    // The previous admin can no longer replace the pending admin.
+    vm.startPrank(OWNER);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        RegistryModuleExternalAccessControl.RequiredRoleNotFound.selector, OWNER, defaultAdminRole, s_token
+      )
+    );
+    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
+    _assertPendingAdministrators(s_tokens, newAdmin);
   }
 
   function test_registerExternalAccessControlDefaultAdmin_RevertWhen_AlreadyRegistered() public {

@@ -14,15 +14,15 @@ contract RegistryModuleExternalAccessControlSetup is BaseTest {
 
   RegistryModuleExternalAccessControl internal s_registryModuleExternalAccessControl;
   TokenAdminRegistry internal s_tokenAdminRegistry;
-  MockExternalAccessControlRegistry internal s_accessControlsRegistry;
+  MockExternalAccessControlRegistry internal s_accessControlRegistry;
   address internal s_token;
 
   function setUp() public virtual override {
     super.setUp();
 
     s_tokenAdminRegistry = new TokenAdminRegistry();
-    s_accessControlsRegistry = new MockExternalAccessControlRegistry(OWNER);
-    s_token = address(new MockExternalAccessControlledToken(address(s_accessControlsRegistry)));
+    s_accessControlRegistry = new MockExternalAccessControlRegistry(OWNER);
+    s_token = address(new MockExternalAccessControlledToken(address(s_accessControlRegistry)));
     s_registryModuleExternalAccessControl = new RegistryModuleExternalAccessControl(address(s_tokenAdminRegistry));
     s_tokenAdminRegistry.addRegistryModule(address(s_registryModuleExternalAccessControl));
   }

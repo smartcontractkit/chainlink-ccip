@@ -2,4 +2,4 @@
 "@chainlink/contracts-ccip": minor
 ---
 
-Add RegistryModuleExternalAccessControl for atomic batch token administrator proposals using token ownership, CCIP administration, token-local default admin roles, or external access control registries.
+Add RegistryModuleExternalAccessControl to register token admins in batches using getCCIPAdmin, owner, or the DEFAULT_ADMIN_ROLE on the token or an external AccessControl contract.
