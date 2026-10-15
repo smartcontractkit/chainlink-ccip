@@ -10,6 +10,7 @@ import (
 	"maps"
 	"math/big"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -378,6 +379,7 @@ var (
 	getChainsFeeComponentsAccessorLastLog     atomic.Pointer[time.Time]
 	wrappedNativeTokenPriceAccessorLastLog    atomic.Pointer[time.Time]
 	wrappedNativeTokenPriceChainConfigLastLog atomic.Pointer[time.Time]
+	wrappedNativeTokenPriceNoBindingsLastLog  atomic.Pointer[time.Time]
 )
 
 // MsgMisconfiguredSourceChainsSkipped is logged when source chains are skipped in NextSeqNum due to
@@ -601,10 +603,20 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 			price, err := chainAccessor.GetTokenPriceUSD(chainCtx, cciptypes.UnknownAddress(nativeTokenAddress))
 			if err != nil {
-				r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "error")
 				if errors.Is(err, context.DeadlineExceeded) {
+					r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "error")
 					lggr.Warnw(MsgTimedOutGettingNativeTokenPrice, logutil.FieldChain, chain, "address", nativeTokenAddress.String())
+				} else if isNoBindingsError(err) {
+					// The source FeeQuoter is discovered through the OnRamp, which is only bound when the destination
+					// OffRamp has an enabled source chain config. Chains without a live lane to this destination
+					// have no FeeQuoter binding, so this is expected and not an error.
+					r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "no_bindings")
+					logutil.LogWhenExceedFrequency(&wrappedNativeTokenPriceNoBindingsLastLog, readerLogFrequency, func() {
+						lggr.Debugw("no fee quoter binding, chain native price skipped, ignore if lane is not live",
+							logutil.FieldChain, chain, "err", err)
+					})
 				} else {
+					r.rcMetrc.RecordChainGap("GetWrappedNativeTokenPriceUSD", chain, "error")
 					lggr.Errorw(MsgFailedToGetNativeTokenPrice,
 						logutil.FieldChain, chain, "address", nativeTokenAddress.String(), "err", err)
 				}
@@ -1171,3 +1183,10 @@ func (r *ccipChainReader) GetOnRampConfig(
 
 // Interface compliance check
 var _ CCIPReader = (*ccipChainReader)(nil)
+
+// isNoBindingsError reports whether err is a missing-binding error. The string match is needed because
+// errors from LOOP chain accessors cross a gRPC boundary and lose their error chain.
+func isNoBindingsError(err error) bool {
+	return errors.Is(err, contractreader.ErrNoBindings) ||
+		strings.Contains(err.Error(), contractreader.ErrNoBindings.Error())
+}
