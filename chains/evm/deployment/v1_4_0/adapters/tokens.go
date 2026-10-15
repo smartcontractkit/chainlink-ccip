@@ -72,11 +72,10 @@ var (
 // through the shared TokenPool base ops, whose surface they share with
 // byte-identical signatures, so nothing here branches on pool type.
 //
-// Lock-release liquidity is deliberately not handled here: the v2.0.0
-// MigrateLockReleasePoolLiquidity sequence drives the old pool through the v1.6.1
-// lock-release bindings, whose getRebalancer/setRebalancer/withdrawLiquidity
-// signatures v1.4.0 shares, so a v1.4.0 lock-release pool migrates through that
-// path unchanged.
+// Lock-release liquidity migration is not supported yet: this adapter inherits
+// the nil MigrateLockReleasePoolLiquiditySequence from EVMTokenBase, so migrating
+// a v1.4.0 lock-release pool fails fast with an explicit "unsupported" error until
+// a v1.4.0 source exists.
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }

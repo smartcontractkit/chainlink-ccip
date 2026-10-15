@@ -14,12 +14,16 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/burn_mint_erc20_with_drip"
 	old_lrtp150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool"
 	old_lrtpap "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/lock_release_token_pool_and_proxy"
 	tar "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	old_lrtp151 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/operations/lock_release_token_pool"
 	old_lrtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	old_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
 
@@ -39,8 +43,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	lock_release_token_pool_v151 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
 	latest_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_lock_release_token_pool"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
+
+	// Register the token adapters the migration resolves its source and sink from.
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	seqtypes "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
@@ -237,9 +249,8 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := operations.ExecuteSequence(
+			_, err := migrateLockReleasePoolLiquidity(
 				e.OperationsBundle,
-				tokens.MigrateLockReleasePoolLiquidity,
 				e.BlockChains,
 				tc.input,
 			)
@@ -266,13 +277,13 @@ const (
 	// oldPoolV1_6_1 is the plain v1.6.1 LockReleaseTokenPool.
 	oldPoolV1_6_1 oldPoolKind = iota
 	// oldPoolV1_5_0AndProxy is the v1.5.0 LockReleaseTokenPoolAndProxy - one contract that is its
-	// own proxy. Its getRebalancer/setRebalancer/withdrawLiquidity signatures are identical to
-	// v1.6.1's, which is why MigrateLockReleasePoolLiquidity can drive it through the v1.6.1
-	// bindings without a v1.5.0-specific path.
+	// own proxy. There is no v1.5.0 liquidity migration source yet, so migrating it must fail.
 	oldPoolV1_5_0AndProxy
 	// oldPoolV1_5_0 is the plain (non-proxy) v1.5.0 LockReleaseTokenPool. Same constructor and
 	// lock-release surface as oldPoolV1_5_0AndProxy, minus the legacy-proxy previous-pool hook.
 	oldPoolV1_5_0
+	// oldPoolV1_5_1 is the v1.5.1 LockReleaseTokenPool, migrated by the v1.5.1 source.
+	oldPoolV1_5_1
 )
 
 // setupMigrationTest deploys all contracts needed for a migration test:
@@ -385,6 +396,26 @@ func setupMigrationTestWithOldPool(t *testing.T, chainSel uint64, liquidityAmoun
 		)
 		require.NoError(t, err)
 		oldPoolAddr = common.HexToAddress(oldPoolReport.Output.Address)
+	case oldPoolV1_5_1:
+		oldPoolReport, err := operations.ExecuteOperation(
+			e.OperationsBundle,
+			old_lrtp151.Deploy,
+			chain,
+			evm_contract.DeployInput[old_lrtp151.ConstructorArgs]{
+				ChainSelector:  chainSel,
+				TypeAndVersion: deployment.NewTypeAndVersion(old_lrtp151.ContractType, *old_lrtp151.Version),
+				Args: old_lrtp151.ConstructorArgs{
+					Token:              tokenAddr,
+					LocalTokenDecimals: 18,
+					Allowlist:          []common.Address{},
+					RmnProxy:           rmnProxyAddr,
+					AcceptLiquidity:    true,
+					Router:             routerAddr,
+				},
+			},
+		)
+		require.NoError(t, err)
+		oldPoolAddr = common.HexToAddress(oldPoolReport.Output.Address)
 	default:
 		oldPoolReport, err := operations.ExecuteOperation(
 			e.OperationsBundle,
@@ -480,6 +511,79 @@ func setupMigrationTestWithOldPool(t *testing.T, chainSel uint64, liquidityAmoun
 	}
 }
 
+// migrateLockReleasePoolLiquidity mirrors the chain-agnostic composer in deployment/tokens (which is
+// unexported): the SOURCE is resolved from the old pool's on-chain typeAndVersion through the token
+// adapter registry, the amounts it resolves are fed to the v2.0.0 SINK, and both batches are merged
+// into one.
+func migrateLockReleasePoolLiquidity(
+	bundle operations.Bundle,
+	blockChains chain.BlockChains,
+	input tokens_core.MigrateLockReleasePoolLiquidityInput,
+) (seqtypes.OnChainOutput, error) {
+	if err := input.Validate(); err != nil {
+		return seqtypes.OnChainOutput{}, fmt.Errorf("invalid migration input: %w", err)
+	}
+	evmChain, ok := blockChains.EVMChains()[input.ChainSelector]
+	if !ok {
+		return seqtypes.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
+	}
+
+	srcSeq, err := resolveMigrationSource(bundle, evmChain, common.HexToAddress(input.OldPoolAddress))
+	if err != nil {
+		return seqtypes.OnChainOutput{}, err
+	}
+	input.Resolved = &tokens_core.MigrateLockReleasePoolLiquidityResolved{}
+	srcReport, err := operations.ExecuteSequence(bundle, srcSeq, blockChains, input)
+	if err != nil {
+		return seqtypes.OnChainOutput{}, fmt.Errorf("source migration failed: %w", err)
+	}
+
+	sinkAdapter, ok := tokens_core.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, cciputils.Version_2_0_0)
+	if !ok {
+		return seqtypes.OnChainOutput{}, fmt.Errorf("no v2.0.0 sink adapter registered")
+	}
+	sinkInput := input
+	sinkInput.Amount = input.Resolved.Amount
+	sinkInput.BasisPoints = nil
+	sinkInput.SiloExactAmounts = input.Resolved.SiloAmounts
+	sinkInput.UnsiloedExactAmount = input.Resolved.UnsiloedAmount
+	sinkInput.Resolved = nil
+	sinkReport, err := operations.ExecuteSequence(bundle, sinkAdapter.MigrateLockReleasePoolLiquiditySequence(), blockChains, sinkInput)
+	if err != nil {
+		return seqtypes.OnChainOutput{}, fmt.Errorf("sink migration failed: %w", err)
+	}
+
+	merged := mcms_types.BatchOperation{ChainSelector: mcms_types.ChainSelector(input.ChainSelector)}
+	for _, batch := range append(srcReport.Output.BatchOps, sinkReport.Output.BatchOps...) {
+		merged.Transactions = append(merged.Transactions, batch.Transactions...)
+	}
+	if len(merged.Transactions) == 0 {
+		return seqtypes.OnChainOutput{}, nil
+	}
+	return seqtypes.OnChainOutput{BatchOps: []mcms_types.BatchOperation{merged}}, nil
+}
+
+// resolveMigrationSource returns the source sequence of the adapter registered at the old pool's
+// on-chain version.
+func resolveMigrationSource(
+	bundle operations.Bundle,
+	evmChain evm.Chain,
+	oldPool common.Address,
+) (*operations.Sequence[tokens_core.MigrateLockReleasePoolLiquidityInput, seqtypes.OnChainOutput, chain.BlockChains], error) {
+	tvReport, err := operations.ExecuteOperation(bundle, type_and_version.GetTypeAndVersion, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: evmChain.Selector,
+		Address:       oldPool,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get typeAndVersion from old pool %s: %w", oldPool, err)
+	}
+	adapter, ok := tokens_core.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, tvReport.Output.Version)
+	if !ok || adapter.MigrateLockReleasePoolLiquiditySequence() == nil {
+		return nil, fmt.Errorf("old pool %s (chain %d) does not support liquidity migration yet", oldPool, evmChain.Selector)
+	}
+	return adapter.MigrateLockReleasePoolLiquiditySequence(), nil
+}
+
 // executeMigrationSequence runs the liquidity migration sequence and sends any prepared
 // batch transactions using the chain deployer key (standing in for the timelock in tests).
 func executeMigrationSequence(
@@ -490,9 +594,8 @@ func executeMigrationSequence(
 ) seqtypes.OnChainOutput {
 	t.Helper()
 
-	report, err := operations.ExecuteSequence(
+	report, err := migrateLockReleasePoolLiquidity(
 		bundle,
-		tokens.MigrateLockReleasePoolLiquidity,
 		blockChains,
 		input,
 	)
@@ -501,7 +604,7 @@ func executeMigrationSequence(
 	evmChain, ok := blockChains.EVMChains()[input.ChainSelector]
 	require.True(t, ok, "chain %d not found", input.ChainSelector)
 
-	for _, batch := range report.Output.BatchOps {
+	for _, batch := range report.BatchOps {
 		for _, mcmsTx := range batch.Transactions {
 			to := common.HexToAddress(mcmsTx.To)
 			nonce, err := evmChain.Client.PendingNonceAt(t.Context(), evmChain.DeployerKey.From)
@@ -529,7 +632,7 @@ func executeMigrationSequence(
 		}
 	}
 
-	return report.Output
+	return report
 }
 
 func TestMigrateLockReleasePoolLiquidity_UnsiloedPartialBasisPoints(t *testing.T) {
@@ -714,24 +817,24 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 // reports "LockReleaseTokenPool" just like v1.5.1/v1.6.1, so it must take the unsiloed path. It
 // covers the full round trip: rebalancer take-over, withdrawal, lockbox funding, and rebalancer
 // restore.
-func TestMigrateLockReleasePoolLiquidity_V1_5_0Pools(t *testing.T) {
+// TestMigrateLockReleasePoolLiquidity_UnsupportedV1_5_0Pools checks that v1.5.0 old pools, which have
+// no liquidity migration source yet, fail fast with an explicit error instead of being driven through
+// another version's bindings - and that nothing is done to the pool.
+func TestMigrateLockReleasePoolLiquidity_UnsupportedV1_5_0Pools(t *testing.T) {
 	cases := []struct {
 		name           string
 		kind           oldPoolKind
 		typeAndVersion string
-		setRebalancer  *operations.Operation[evm_contract.FunctionInput[common.Address], evm_contract.WriteOutput, evm.Chain]
 	}{
 		{
 			name:           "AndProxy",
 			kind:           oldPoolV1_5_0AndProxy,
 			typeAndVersion: "LockReleaseTokenPoolAndProxy 1.5.0",
-			setRebalancer:  old_lrtpap.SetRebalancer,
 		},
 		{
 			name:           "Plain",
 			kind:           oldPoolV1_5_0,
 			typeAndVersion: "LockReleaseTokenPool 1.5.0",
-			setRebalancer:  old_lrtp150.SetRebalancer,
 		},
 	}
 
@@ -752,28 +855,11 @@ func TestMigrateLockReleasePoolLiquidity_V1_5_0Pools(t *testing.T) {
 			// Both v1.5.0 lock-release pools share these selectors, so one binding reads either.
 			poolBinding, err := old_lrtp150.NewLockReleaseTokenPoolContract(s.oldPoolAddr, chain.Client)
 			require.NoError(t, err)
-			canAccept, err := poolBinding.CanAcceptLiquidity(&bind.CallOpts{Context: t.Context()})
-			require.NoError(t, err)
-			require.True(t, canAccept, "setup should have deployed the pool with acceptLiquidity=true")
-
-			// Start from a non-zero rebalancer so the restore step is observable.
-			originalRebalancer := common.HexToAddress("0x2222222222222222222222222222222222222222")
-			_, err = operations.ExecuteOperation(
-				s.env.OperationsBundle,
-				tc.setRebalancer,
-				chain,
-				evm_contract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       s.oldPoolAddr,
-					Args:          originalRebalancer,
-				},
-			)
+			rebalancerBefore, err := poolBinding.GetRebalancer(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
 
 			basisPoints := uint16(10000)
-			// Fresh reporter so the setup SetRebalancer report does not collide with the migration's
-			// restore-SetRebalancer call (same def+input hash).
-			executeMigrationSequence(t,
+			_, err = migrateLockReleasePoolLiquidity(
 				testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
 				s.env.BlockChains,
 				tokens_core.MigrateLockReleasePoolLiquidityInput{
@@ -784,6 +870,7 @@ func TestMigrateLockReleasePoolLiquidity_V1_5_0Pools(t *testing.T) {
 					BasisPoints:     &basisPoints,
 				},
 			)
+			require.ErrorContains(t, err, "does not support liquidity migration yet")
 
 			oldPoolBal, err := operations.ExecuteOperation(
 				testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
@@ -796,26 +883,114 @@ func TestMigrateLockReleasePoolLiquidity_V1_5_0Pools(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
-			require.Equal(t, 0, oldPoolBal.Output.Sign(), "Old v1.5.0 pool should be fully drained")
+			require.Equal(t, 0, totalLiquidity.Cmp(oldPoolBal.Output), "Old v1.5.0 pool must keep its liquidity")
 
-			lockboxBal, err := operations.ExecuteOperation(
-				testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-				erc20.BalanceOf,
-				chain,
-				evm_contract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       s.tokenAddr,
-					Args:          s.lockBoxAddr,
-				},
-			)
+			rebalancerAfter, err := poolBinding.GetRebalancer(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
-			require.Equal(t, 0, totalLiquidity.Cmp(lockboxBal.Output), "Lockbox should hold the full migrated amount")
-
-			rebalancer, err := poolBinding.GetRebalancer(&bind.CallOpts{Context: t.Context()})
-			require.NoError(t, err)
-			require.Equal(t, originalRebalancer, rebalancer, "Rebalancer should be restored on the v1.5.0 pool")
+			require.Equal(t, rebalancerBefore, rebalancerAfter, "Rebalancer of the v1.5.0 pool must not be touched")
 		})
 	}
+}
+
+// TestMigrateLockReleasePoolLiquidity_V1_5_1RoundTrip migrates a v1.5.1 pool end to end through the
+// v1.5.1 source and the v2.0.0 sink: rebalancer take-over, withdraw, fund the lockbox, restore.
+//
+// The v1.5.1 withdraw is proposal-only while setRebalancer is owner-gated, so with the deployer owning
+// the old pool the take-over and restore execute directly and only the withdraw is batched. The
+// original rebalancer is therefore the deployer (standing in for the timelock), so the batched
+// withdraw is still authorized when the test sends it.
+func TestMigrateLockReleasePoolLiquidity_V1_5_1RoundTrip(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	totalLiquidity := big.NewInt(10000)
+	s := setupMigrationTestWithOldPool(t, chainSel, totalLiquidity, oldPoolV1_5_1)
+	chain := s.env.BlockChains.EVMChains()[chainSel]
+
+	tvBinding, err := type_and_version.NewTypeAndVersionContract(s.oldPoolAddr, chain.Client)
+	require.NoError(t, err)
+	tv, err := tvBinding.TypeAndVersion(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, "LockReleaseTokenPool 1.5.1", tv)
+
+	_, err = operations.ExecuteOperation(
+		s.env.OperationsBundle,
+		old_lrtp151.SetRebalancer,
+		chain,
+		evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+			Args:          s.deployer,
+		},
+	)
+	require.NoError(t, err)
+
+	basisPoints := uint16(5000)
+	output := executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			BasisPoints:     &basisPoints,
+		},
+	)
+
+	// Source and sink land in a single batch, with the proposal-only withdraw first.
+	require.Len(t, output.BatchOps, 1)
+	require.NotEmpty(t, output.BatchOps[0].Transactions)
+	withdrawTx := output.BatchOps[0].Transactions[0]
+	require.Equal(t, s.oldPoolAddr, common.HexToAddress(withdrawTx.To))
+
+	balanceOf := func(holder common.Address) *big.Int {
+		report, err := operations.ExecuteOperation(
+			testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+			erc20.BalanceOf,
+			chain,
+			evm_contract.FunctionInput[common.Address]{
+				ChainSelector: chainSel,
+				Address:       s.tokenAddr,
+				Args:          holder,
+			},
+		)
+		require.NoError(t, err)
+		return report.Output
+	}
+	require.Equal(t, big.NewInt(5000), balanceOf(s.oldPoolAddr), "Old v1.5.1 pool should keep half its liquidity")
+	require.Equal(t, big.NewInt(5000), balanceOf(s.lockBoxAddr), "Lockbox should hold the migrated half")
+
+	poolBinding, err := lock_release_token_pool_v151.NewLockReleaseTokenPool(s.oldPoolAddr, chain.Client)
+	require.NoError(t, err)
+	rebalancer, err := poolBinding.GetRebalancer(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Equal(t, s.deployer, rebalancer, "Rebalancer should be restored on the v1.5.1 pool")
+}
+
+// TestMigrateLockReleasePoolLiquidity_SourceRejectsOtherOnChainVersion checks that a source refuses an
+// old pool whose on-chain version it does not own, even when handed that pool directly (e.g. after the
+// adapter was resolved from a stale datastore version). It must fail before emitting anything.
+func TestMigrateLockReleasePoolLiquidity_SourceRejectsOtherOnChainVersion(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	s := setupMigrationTestWithOldPool(t, chainSel, big.NewInt(10000), oldPoolV1_5_1)
+
+	adapter, ok := tokens_core.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, cciputils.Version_1_6_1)
+	require.True(t, ok)
+
+	basisPoints := uint16(10000)
+	_, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		adapter.MigrateLockReleasePoolLiquiditySequence(),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			BasisPoints:     &basisPoints,
+			Resolved:        &tokens_core.MigrateLockReleasePoolLiquidityResolved{},
+		},
+	)
+	require.ErrorContains(t, err, "the v1.6.1 liquidity migration source only supports v1.6.1 and v1.6.2 pools")
 }
 
 func TestMigrateLockReleasePoolLiquidity_RebalancerRestore(t *testing.T) {
@@ -874,9 +1049,8 @@ func TestMigrateLockReleasePoolLiquidity_AmountExceedsBalance(t *testing.T) {
 	s := setupMigrationTest(t, chainSel, totalLiquidity)
 
 	tooMuch := new(big.Int).Add(totalLiquidity, big.NewInt(1))
-	_, err := operations.ExecuteSequence(
+	_, err := migrateLockReleasePoolLiquidity(
 		s.env.OperationsBundle,
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -1242,9 +1416,8 @@ func TestMigrateLockReleasePoolLiquidity_SiloedUnsiloedDestinationRequired(t *te
 	timelock := common.HexToAddress("0x00000000000000000000000000000000000000A1")
 
 	basisPoints := uint16(10000)
-	_, err := operations.ExecuteSequence(
+	_, err := migrateLockReleasePoolLiquidity(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -1282,9 +1455,8 @@ func TestMigrateLockReleasePoolLiquidity_SiloedUnsiloedDestinationNotConfigured(
 	})
 
 	basisPoints := uint16(10000)
-	_, err := operations.ExecuteSequence(
+	_, err := migrateLockReleasePoolLiquidity(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:          chainSel,
@@ -1325,9 +1497,8 @@ func TestMigrateLockReleasePoolLiquidity_SiloedOutputIsDeterministic(t *testing.
 		s := setupSiloedMigrationTest(t, chainSel, topology)
 
 		basisPoints := uint16(10000)
-		report, err := operations.ExecuteSequence(
+		report, err := migrateLockReleasePoolLiquidity(
 			testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-			tokens.MigrateLockReleasePoolLiquidity,
 			s.env.BlockChains,
 			tokens_core.MigrateLockReleasePoolLiquidityInput{
 				ChainSelector:          chainSel,
@@ -1347,7 +1518,7 @@ func TestMigrateLockReleasePoolLiquidity_SiloedOutputIsDeterministic(t *testing.
 		}
 
 		var routes []string
-		for _, batch := range report.Output.BatchOps {
+		for _, batch := range report.BatchOps {
 			for _, mcmsTx := range batch.Transactions {
 				// ERC20 transfer(address,uint256): selector, then two 32-byte words.
 				if len(mcmsTx.Data) != 4+32+32 {
@@ -2098,9 +2269,8 @@ func TestMigrateSiloedPool_ExactAmounts_MissingSilo(t *testing.T) {
 		unsiloedAmount: big.NewInt(0),
 	})
 
-	_, err := operations.ExecuteSequence(
+	_, err := migrateLockReleasePoolLiquidity(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -2130,9 +2300,8 @@ func TestMigrateSiloedPool_ExactAmounts_UnknownChainSelector(t *testing.T) {
 		unsiloedAmount: big.NewInt(0),
 	})
 
-	_, err := operations.ExecuteSequence(
+	_, err := migrateLockReleasePoolLiquidity(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -2207,9 +2376,8 @@ func TestMigrateSiloedPool_ExactAmounts_OverWithdrawal(t *testing.T) {
 		unsiloedAmount: big.NewInt(0),
 	})
 
-	_, err := operations.ExecuteSequence(
+	_, err := migrateLockReleasePoolLiquidity(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,
@@ -2241,9 +2409,8 @@ func TestMigrateSiloedPool_ExactAmounts_UnsiloedRequired(t *testing.T) {
 		unsiloedAmount: big.NewInt(1000),
 	})
 
-	_, err := operations.ExecuteSequence(
+	_, err := migrateLockReleasePoolLiquidity(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
-		tokens.MigrateLockReleasePoolLiquidity,
 		s.env.BlockChains,
 		tokens_core.MigrateLockReleasePoolLiquidityInput{
 			ChainSelector:   chainSel,

@@ -249,18 +249,16 @@ type TokenAdapter interface {
 	DeployTokenVerify(e deployment.Environment, in DeployTokenInput) error
 	DeployTokenPoolForToken() *cldf_ops.Sequence[DeployTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 	UpdateAuthorities() *cldf_ops.Sequence[UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment]
-	// MigrateLockReleasePoolLiquiditySequence returns a sequence that migrates liquidity from a
-	// legacy lock-release pool to a v2.0 lockbox-based pool. Returns nil if not supported.
-	// Used by the standalone MigrateLockReleasePoolLiquidity changeset.
+	// MigrateLockReleasePoolLiquiditySequence returns the adapter's half of a lock-release liquidity
+	// migration. Returns nil if not supported. Used by the standalone MigrateLockReleasePoolLiquidity
+	// changeset and the token expansion liquidity seed.
 	//
-	// On EVM the old pool is driven through the v1.6.1 lock-release bindings and dispatched on
-	// its typeAndVersion TYPE (siloed vs not), never its version - so any legacy pool sharing the
-	// getRebalancer/setRebalancer/withdrawLiquidity signatures is migratable. Verified sources:
-	// LockReleaseTokenPool v1.5.0, v1.5.1 and v1.6.1, SiloedLockReleaseTokenPool v1.6.1, and
-	// LockReleaseTokenPoolAndProxy v1.5.0.
+	// A migration is composed of two sequences from two adapters:
+	//   - the SOURCE, resolved from the OLD pool's version, extracts liquidity to the timelock with
+	//     that version's own bindings and records the amounts it moved in input.Resolved;
+	//   - the SINK, always the v2.0.0 adapter, funds the new pool's lockbox(es) with those amounts.
 	//
-	// NOTE: the adapter is resolved from the NEW pool's version, not the old one, so a legacy
-	// source needs no adapter registered at its own version to be migratable.
+	// A legacy adapter therefore returns its source here, and the v2.0.0 adapter returns its sink.
 	MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
@@ -302,6 +300,115 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	UsePlainTransfer bool
 	// SetPoolConfig, if provided, triggers a setPool call on the TokenAdminRegistry after migration.
 	SetPoolConfig *MigrationSetPoolConfig
+
+	// Below is not provided by the user and populated programmatically.
+
+	// Resolved is written by the source sequence and read by the caller to fund the v2.0.0 sink. The
+	// caller pre-allocates it before executing the source; the source mutates it through the
+	// value-passed input.
+	Resolved *MigrateLockReleasePoolLiquidityResolved
+}
+
+// MigrateLockReleasePoolLiquidityResolved carries the amounts the SOURCE resolved (the amounts it
+// moves to the timelock), so the caller can feed them to the v2.0.0 SINK.
+type MigrateLockReleasePoolLiquidityResolved struct {
+	// Amount is the raw token amount the source moves to the timelock (bps/raw resolved). Unset for
+	// siloed sources, which populate SiloAmounts/UnsiloedAmount instead.
+	Amount *big.Int
+	// SiloAmounts is populated only by siloed sources.
+	SiloAmounts []SiloExactAmount
+	// UnsiloedAmount is populated only by siloed sources; nil/zero means none.
+	UnsiloedAmount *big.Int
+}
+
+// Validate checks the user-provided migration parameters. It does not touch the chain.
+func (input MigrateLockReleasePoolLiquidityInput) Validate() error {
+	exactMode := input.IsExactSiloMode()
+	legacyMode := input.Amount != nil || input.BasisPoints != nil
+
+	if exactMode && legacyMode {
+		return errors.New("SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints")
+	}
+	if !exactMode && !legacyMode {
+		return errors.New("one of Amount, BasisPoints, or SiloExactAmounts/UnsiloedExactAmount must be provided")
+	}
+	if input.Amount != nil && input.BasisPoints != nil {
+		return errors.New("Amount and BasisPoints are mutually exclusive")
+	}
+	if input.BasisPoints != nil {
+		bp := *input.BasisPoints
+		if bp == 0 || bp > 10000 {
+			return fmt.Errorf("BasisPoints must be between 1 and 10000, got %d", bp)
+		}
+	}
+	if input.Amount != nil && input.Amount.Sign() <= 0 {
+		return errors.New("Amount must be positive")
+	}
+	if exactMode {
+		// UnsiloedExactAmount is a companion to SiloExactAmounts, not a standalone mode: migrating
+		// only the shared bucket while leaving every silo untouched isn't supported by the siloed
+		// source (it would migrate all siloed chains too), so reject it outright rather than silently
+		// draining silos the operator didn't intend to touch.
+		if input.UnsiloedExactAmount != nil && len(input.SiloExactAmounts) == 0 {
+			return errors.New("UnsiloedExactAmount requires SiloExactAmounts to also be set; exact mode cannot migrate the unsiloed bucket alone")
+		}
+		seen := make(map[uint64]bool, len(input.SiloExactAmounts))
+		for i, sa := range input.SiloExactAmounts {
+			if seen[sa.ChainSelector] {
+				return fmt.Errorf("duplicate ChainSelector %d in SiloExactAmounts", sa.ChainSelector)
+			}
+			seen[sa.ChainSelector] = true
+			if sa.Amount == nil || sa.Amount.Sign() < 0 {
+				return fmt.Errorf("SiloExactAmounts[%d].Amount must be positive", i)
+			}
+		}
+		if input.UnsiloedExactAmount != nil && input.UnsiloedExactAmount.Sign() <= 0 {
+			return errors.New("UnsiloedExactAmount must be positive")
+		}
+	}
+	if input.OldPoolAddress == "" || input.NewPoolAddress == "" {
+		return errors.New("OldPoolAddress and NewPoolAddress must be provided")
+	}
+	if input.TimelockAddress == "" {
+		return errors.New("TimelockAddress must be provided")
+	}
+	return nil
+}
+
+// IsExactSiloMode reports whether the input requests exact-amount migration (per-silo and/or
+// unsiloed shared bucket) rather than the legacy Amount/BasisPoints proportional mode.
+func (input MigrateLockReleasePoolLiquidityInput) IsExactSiloMode() bool {
+	return len(input.SiloExactAmounts) > 0 || input.UnsiloedExactAmount != nil
+}
+
+// SiloExactAmount returns the exact amount configured for the given remote chain's silo, if any.
+func (input MigrateLockReleasePoolLiquidityInput) SiloExactAmount(chainSel uint64) (*big.Int, bool) {
+	for _, sa := range input.SiloExactAmounts {
+		if sa.ChainSelector == chainSel {
+			return sa.Amount, true
+		}
+	}
+	return nil, false
+}
+
+// ComputeAmount resolves the legacy Amount/BasisPoints mode against balance. A raw Amount is
+// returned as-is; BasisPoints is applied to balance, rounding down.
+func (input MigrateLockReleasePoolLiquidityInput) ComputeAmount(balance *big.Int) (*big.Int, error) {
+	if input.Amount != nil {
+		return new(big.Int).Set(input.Amount), nil
+	}
+	if input.BasisPoints == nil {
+		return nil, errors.New("one of Amount or BasisPoints must be provided")
+	}
+	bp := *input.BasisPoints
+	if bp == 0 || bp > 10000 {
+		return nil, fmt.Errorf("BasisPoints must be between 1 and 10000, got %d", bp)
+	}
+	if bp == 10000 {
+		return new(big.Int).Set(balance), nil
+	}
+	amount := new(big.Int).Mul(balance, big.NewInt(int64(bp)))
+	return amount.Div(amount, big.NewInt(10000)), nil
 }
 
 // SiloExactAmount specifies an exact migration amount for a single silo, keyed by the remote chain

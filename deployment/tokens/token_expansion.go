@@ -758,11 +758,6 @@ func buildSeedMigrationBatchOps(
 		return nil, nil, fmt.Errorf("failed to resolve adapter and refs for liquidity seed on chain selector %d: %w", selector, err)
 	}
 
-	migrationSeq := tokenPoolAdapter.MigrateLockReleasePoolLiquiditySequence()
-	if migrationSeq == nil {
-		return nil, nil, fmt.Errorf("adapter for chain selector %d does not support liquidity migration", selector)
-	}
-
 	registryReader, ok := tokenPoolRegistry.GetTokenAdminRegistryReader(family)
 	if !ok {
 		return nil, nil, fmt.Errorf(
@@ -798,7 +793,7 @@ func buildSeedMigrationBatchOps(
 		return nil, nil, fmt.Errorf("failed to normalize legacy pool address on chain selector %d: %w", selector, err)
 	}
 
-	migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
+	migrationOutput, migrationReports, err := runLockReleaseLiquidityMigration(e, tokenPoolRegistry, selector, MigrateLockReleasePoolLiquidityInput{
 		ChainSelector:          selector,
 		OldPoolAddress:         oldPoolAddr,
 		NewPoolAddress:         fullPoolRef.Address,
@@ -812,5 +807,5 @@ func buildSeedMigrationBatchOps(
 		return nil, nil, fmt.Errorf("failed to build liquidity migration on chain %d: %w", selector, err)
 	}
 
-	return migrationReport.Output.BatchOps, migrationReport.ExecutionReports, nil
+	return migrationOutput.BatchOps, migrationReports, nil
 }

@@ -2,7 +2,9 @@ package lock_release_token_pool
 
 import (
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
@@ -35,4 +37,29 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(args ConstructorArgs) error { return nil },
+})
+
+var GetRebalancer = contract.NewRead(contract.ReadParams[struct{}, common.Address, *lock_release_token_pool.LockReleaseTokenPool]{
+	Name:         "lock_release_token_pool:get-rebalancer",
+	Version:      Version,
+	Description:  "Gets the rebalancer of the LockReleaseTokenPool 1.5.1 contract",
+	ContractType: ContractType,
+	NewContract:  lock_release_token_pool.NewLockReleaseTokenPool,
+	CallContract: func(c *lock_release_token_pool.LockReleaseTokenPool, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRebalancer(opts)
+	},
+})
+
+var SetRebalancer = contract.NewWrite(contract.WriteParams[common.Address, *lock_release_token_pool.LockReleaseTokenPool]{
+	Name:            "lock_release_token_pool:set-rebalancer",
+	Version:         Version,
+	Description:     "Sets the rebalancer of the LockReleaseTokenPool 1.5.1 contract",
+	ContractType:    ContractType,
+	ContractABI:     lock_release_token_pool.LockReleaseTokenPoolABI,
+	NewContract:     lock_release_token_pool.NewLockReleaseTokenPool,
+	IsAllowedCaller: contract.OnlyOwner[*lock_release_token_pool.LockReleaseTokenPool, common.Address],
+	Validate:        func(common.Address) error { return nil },
+	CallContract: func(c *lock_release_token_pool.LockReleaseTokenPool, opts *bind.TransactOpts, args common.Address) (*types.Transaction, error) {
+		return c.SetRebalancer(opts, args)
+	},
 })
