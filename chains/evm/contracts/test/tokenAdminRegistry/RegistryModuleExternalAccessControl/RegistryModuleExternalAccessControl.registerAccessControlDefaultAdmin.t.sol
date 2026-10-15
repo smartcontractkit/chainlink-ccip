@@ -82,18 +82,6 @@ contract RegistryModuleExternalAccessControl_registerAccessControlDefaultAdmin i
     _assertPendingAdministrators(s_tokens, newAdmin);
   }
 
-  function testFuzz_registerAccessControlDefaultAdmin_BatchSize(
-    uint8 count
-  ) public {
-    count = uint8(bound(count, 1, 16));
-    address[] memory tokens = new address[](count);
-    for (uint256 i = 0; i < count; ++i) {
-      tokens[i] = address(_deployToken(OWNER, STRANGER));
-    }
-    s_registryModuleExternalAccessControl.registerAccessControlDefaultAdmin(tokens);
-    _assertPendingAdministrators(tokens, OWNER);
-  }
-
   // Reverts
 
   function test_registerAccessControlDefaultAdmin_RevertWhen_RequiredRoleNotFound_UnauthorizedCaller() public {

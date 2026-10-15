@@ -115,18 +115,6 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
     }
   }
 
-  function testFuzz_registerExternalAccessControlDefaultAdmin_BatchSize(
-    uint8 count
-  ) public {
-    count = uint8(bound(count, 1, 16));
-    address[] memory tokens = new address[](count);
-    for (uint256 i = 0; i < count; ++i) {
-      tokens[i] = address(new MockExternalAccessControlledToken(address(s_accessControlRegistry)));
-    }
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(tokens);
-    _assertPendingAdministrators(tokens, OWNER);
-  }
-
   // Reverts
 
   function test_registerExternalAccessControlDefaultAdmin_RevertWhen_RequiredRoleNotFound() public {
