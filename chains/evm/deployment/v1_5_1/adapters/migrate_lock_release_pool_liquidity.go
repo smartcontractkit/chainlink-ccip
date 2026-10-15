@@ -77,6 +77,10 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 				return sequences.OnChainOutput{}, fmt.Errorf("migration amount %s exceeds old pool balance %s", amount, balance)
 			}
 
+			if err := t.RequireTimelockOwnsOldPool(b, evmChain, oldPool, timelock); err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
 			rebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
 				ChainSelector: chainSel,
 				Address:       oldPool,

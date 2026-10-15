@@ -52,6 +52,27 @@ func (a *EVMTokenBase) ValidateLockReleaseMigrationPoolPair(b cldf_ops.Bundle, c
 	return oldTV, newTV, nil
 }
 
+// RequireTimelockOwnsOldPool requires the old pool to be owned by the timelock. The source's
+// owner-gated writes then always land in the timelock batch (never executed directly by the
+// deployer), so the rebalancer handover, withdrawal, and restore run in order and in the same
+// proposal as the sink's funding. A deployer-owned pool would otherwise have the handover and
+// restore executed immediately while the withdrawal waits in the proposal.
+func (a *EVMTokenBase) RequireTimelockOwnsOldPool(b cldf_ops.Bundle, chain evm.Chain, oldPool, timelock common.Address) error {
+	ownerReport, err := cldf_ops.ExecuteOperation(b, token_pool.Owner, chain, contract.FunctionInput[any]{
+		ChainSelector: chain.Selector,
+		Address:       oldPool,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get owner of old pool %s: %w", oldPool, err)
+	}
+	if ownerReport.Output != timelock {
+		return fmt.Errorf(
+			"old pool %s is owned by %s, not the timelock %s; transfer ownership of the old pool to the timelock before migrating its liquidity",
+			oldPool, ownerReport.Output, timelock)
+	}
+	return nil
+}
+
 // ResolveMigrationToken reads getToken() from both pools and requires them to match. Every lock-release
 // pool version exposes getToken() with the same ABI, so the v1.5.0 read binding serves all versions.
 func (a *EVMTokenBase) ResolveMigrationToken(b cldf_ops.Bundle, chain evm.Chain, oldPool, newPool common.Address) (common.Address, error) {

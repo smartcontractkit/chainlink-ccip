@@ -229,7 +229,10 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 //
 // The source and sink batches for a chain are merged into a single batch operation so the timelock
 // executes the extraction and the funding atomically - otherwise a failed funding batch would leave
-// the extracted liquidity stranded in the timelock.
+// the extracted liquidity stranded in the timelock. Merging only combines emitted batch operations;
+// it cannot make writes that already executed directly atomic. Sources therefore must emit their
+// extraction writes into the batch rather than executing them directly (the EVM sources require
+// the old pool to be owned by the timelock, so every owner-gated write is batched).
 func runLockReleaseLiquidityMigration(
 	e cldf.Environment,
 	reg *TokenAdapterRegistry,

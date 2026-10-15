@@ -95,6 +95,10 @@ func (t *TokenAdapter) migratePlainLockReleaseSource(
 		return sequences.OnChainOutput{}, fmt.Errorf("migration amount %s exceeds old pool balance %s", amount, balance)
 	}
 
+	if err := t.RequireTimelockOwnsOldPool(b, evmChain, oldPool, timelock); err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
 	rebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
 		ChainSelector: chainSel,
 		Address:       oldPool,
@@ -290,6 +294,10 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 	// reads the v2.0.0 sink pool: the framework executes a write immediately when the deployer is an
 	// allowed caller, so the check cannot be left to the sink alone.
 	if err := checkSiloedSinkCoverage(b, evmChain, input, oldPool, newPool, siloedChains, unsiloedAmount); err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	if err := t.RequireTimelockOwnsOldPool(b, evmChain, oldPool, timelock); err != nil {
 		return sequences.OnChainOutput{}, err
 	}
 

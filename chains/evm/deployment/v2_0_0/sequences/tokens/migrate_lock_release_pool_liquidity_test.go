@@ -52,6 +52,7 @@ import (
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_2/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	seqtypes "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
@@ -809,14 +810,6 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 	require.Equal(t, 0, exactAmount.Cmp(lockboxBal.Output), "Lockbox should hold the exact migrated amount")
 }
 
-// TestMigrateLockReleasePoolLiquidity_V1_5_0Pools verifies the migration runs unchanged against
-// both v1.5.0 lock-release pools: LockReleaseTokenPoolAndProxy and the plain LockReleaseTokenPool.
-// The sequence drives the old pool through the v1.6.1 lock-release bindings, and v1.5.0 shares
-// those signatures exactly, so no v1.5.0-specific path exists - this test is what holds that
-// assumption honest. It dispatches on the old pool's typeAndVersion TYPE, and the plain pool
-// reports "LockReleaseTokenPool" just like v1.5.1/v1.6.1, so it must take the unsiloed path. It
-// covers the full round trip: rebalancer take-over, withdrawal, lockbox funding, and rebalancer
-// restore.
 // TestMigrateLockReleasePoolLiquidity_UnsupportedV1_5_0Pools checks that v1.5.0 old pools, which have
 // no liquidity migration source yet, fail fast with an explicit error instead of being driven through
 // another version's bindings - and that nothing is done to the pool.
@@ -895,10 +888,11 @@ func TestMigrateLockReleasePoolLiquidity_UnsupportedV1_5_0Pools(t *testing.T) {
 // TestMigrateLockReleasePoolLiquidity_V1_5_1RoundTrip migrates a v1.5.1 pool end to end through the
 // v1.5.1 source and the v2.0.0 sink: rebalancer take-over, withdraw, fund the lockbox, restore.
 //
-// The v1.5.1 withdraw is proposal-only while setRebalancer is owner-gated, so with the deployer owning
-// the old pool the take-over and restore execute directly and only the withdraw is batched. The
-// original rebalancer is therefore the deployer (standing in for the timelock), so the batched
-// withdraw is still authorized when the test sends it.
+// The v1.5.1 withdraw is proposal-only while setRebalancer is owner-gated. In production the source
+// requires the timelock to own the old pool, so all three writes are batched in order. Here the
+// deployer stands in for the timelock and owns the pool, so the take-over and restore execute
+// directly and only the withdraw is batched; the original rebalancer is set to the deployer so the
+// batched withdraw is still authorized when the test sends it.
 func TestMigrateLockReleasePoolLiquidity_V1_5_1RoundTrip(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	totalLiquidity := big.NewInt(10000)
@@ -991,6 +985,52 @@ func TestMigrateLockReleasePoolLiquidity_SourceRejectsOtherOnChainVersion(t *tes
 		},
 	)
 	require.ErrorContains(t, err, "the v1.6.1 liquidity migration source only supports v1.6.1 and v1.6.2 pools")
+}
+
+// TestMigrateLockReleasePoolLiquidity_OldPoolNotOwnedByTimelock checks that a source refuses an old
+// pool the timelock does not own. Otherwise the deployer would execute the owner-gated rebalancer
+// handover directly instead of batching it with the withdrawal and the sink's funding. It must fail
+// before touching the pool.
+func TestMigrateLockReleasePoolLiquidity_OldPoolNotOwnedByTimelock(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	totalLiquidity := big.NewInt(10000)
+	s := setupMigrationTest(t, chainSel, totalLiquidity)
+	chain := s.env.BlockChains.EVMChains()[chainSel]
+	timelock := common.HexToAddress("0x00000000000000000000000000000000000000A1")
+
+	basisPoints := uint16(10000)
+	_, err := migrateLockReleasePoolLiquidity(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: timelock.Hex(),
+			BasisPoints:     &basisPoints,
+		},
+	)
+	require.ErrorContains(t, err, "not the timelock")
+
+	balance, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), erc20.BalanceOf, chain,
+		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: s.tokenAddr, Args: s.oldPoolAddr})
+	require.NoError(t, err)
+	require.Equal(t, 0, totalLiquidity.Cmp(balance.Output), "old pool must keep its full balance")
+
+	rebalancer, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), old_lrtp.GetRebalancer, chain,
+		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.oldPoolAddr})
+	require.NoError(t, err)
+	require.NotEqual(t, timelock, rebalancer.Output, "old pool's rebalancer must not have been repointed at the timelock")
+}
+
+// TestMigrateLockReleasePoolLiquidity_V1_6_2SourceRegistered checks that v1.6.2 old pools resolve a
+// migration source: the composer looks the source up at the old pool's exact version.
+func TestMigrateLockReleasePoolLiquidity_V1_6_2SourceRegistered(t *testing.T) {
+	adapter, ok := tokens_core.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, cciputils.Version_1_6_2)
+	require.True(t, ok, "no token adapter registered at v1.6.2")
+	require.NotNil(t, adapter.MigrateLockReleasePoolLiquiditySequence())
 }
 
 func TestMigrateLockReleasePoolLiquidity_RebalancerRestore(t *testing.T) {
