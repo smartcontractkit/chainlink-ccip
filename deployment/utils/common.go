@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -165,6 +167,7 @@ var (
 var (
 	Version_1_0_0 = semver.MustParse("1.0.0")
 	Version_1_2_0 = semver.MustParse("1.2.0")
+	Version_1_4_0 = semver.MustParse("1.4.0")
 	Version_1_5_0 = semver.MustParse("1.5.0")
 	Version_1_5_1 = semver.MustParse("1.5.1")
 	Version_1_6_0 = semver.MustParse("1.6.0")
@@ -236,6 +239,17 @@ func CoalescePtr[T any](override, def *T) *T {
 		return override
 	}
 	return def
+}
+
+// FractionalDigits returns the number of digits after the decimal point in the
+// shortest decimal representation of v (0.29 -> 2, 1e-9 -> 9, 100 -> 0).
+// NaN and ±Inf have no decimal point and return 0; callers must check finiteness.
+func FractionalDigits(v float64) int {
+	s := strconv.FormatFloat(v, 'f', -1, 64)
+	if dot := strings.IndexByte(s, '.'); dot >= 0 {
+		return len(s) - dot - 1
+	}
+	return 0
 }
 
 // StringPtr returns a pointer to s.

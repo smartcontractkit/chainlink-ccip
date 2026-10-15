@@ -203,3 +203,37 @@ func TestUpdateTokenPoolGasConfig(t *testing.T) {
 		}
 	})
 }
+
+// TestUpdateTokenPoolGasConfig_SkipsPoolNotSupportingTarget covers pools (e.g.
+// CCTPThroughCCVTokenPool) whose getTokenTransferFeeConfig reverts for a destination they aren't
+// configured for: the sequence must skip them with a report line rather than abort.
+func TestUpdateTokenPoolGasConfig_SkipsPoolNotSupportingTarget(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{tpGasCfgBaselineChain}))
+	require.NoError(t, err)
+
+	supportedAddr := deployTokenPoolFixture(t, e, tpGasCfgBaselineChain, "supported", 250_000)
+	unsupportedAddr := deployTokenPoolFixture(t, e, tpGasCfgBaselineChain, "unsupported", 250_000)
+
+	// Remove the target chain from one pool so it no longer supports it.
+	chain := e.BlockChains.EVMChains()[tpGasCfgBaselineChain]
+	_, err = cldf_ops.ExecuteOperation(e.OperationsBundle, tpops.ApplyChainUpdates, chain, contract.FunctionInput[tpops.ApplyChainUpdatesArgs]{
+		ChainSelector: tpGasCfgBaselineChain,
+		Address:       unsupportedAddr,
+		Args:          tpops.ApplyChainUpdatesArgs{RemoteChainSelectorsToRemove: []uint64{tpGasCfgTargetChainSel}},
+	})
+	require.NoError(t, err)
+
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, glamsterdamseq.UpdateTokenPoolGasConfig, e.BlockChains, glamsterdamseq.UpdateTokenPoolGasConfigInput{
+		TargetChainSelector: tpGasCfgTargetChainSel,
+		USDCPools: []glamsterdamseq.TokenPoolLane{
+			{ChainSelector: tpGasCfgBaselineChain, PoolAddress: unsupportedAddr},
+			{ChainSelector: tpGasCfgBaselineChain, PoolAddress: supportedAddr},
+		},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, report.Output.BatchOps, 1, "only the supporting pool should produce a write")
+	reportStr := report.Output.Report.String()
+	require.Contains(t, reportStr, "TokenPool("+unsupportedAddr.Hex()+") does not support dst 3379446385462418246, skipping")
+	require.Contains(t, reportStr, "chain 4949039107694359620: "+tpGasCfgUSDCFieldName+" matched expected Prague value 250000")
+}

@@ -8,7 +8,7 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"

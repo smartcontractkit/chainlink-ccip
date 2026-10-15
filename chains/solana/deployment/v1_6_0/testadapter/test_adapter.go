@@ -34,10 +34,10 @@ import (
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_ccip_receiver"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/test_ccip_receiver"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -508,7 +508,7 @@ func (a *SVMAdapter) GetInboundNonce(ctx context.Context, sender []byte, srcSel 
 	var nonceCounterAccount ccip_router.Nonce
 	// we ignore the error because the account might not exist yet
 	_ = solcommon.GetAccountDataBorshInto(ctx, a.Client, noncePDA, solconfig.DefaultCommitment, &nonceCounterAccount)
-	return nonceCounterAccount.Counter, nil
+	return nonceCounterAccount.OrderedNonce, nil
 }
 
 func (a *SVMAdapter) ValidateCommit(t *testing.T, sourceSelector uint64, startBlock *uint64, seqNumRange ccipocr3.SeqNumRange) {
@@ -926,9 +926,9 @@ func GetMessageStatesWithSeqNrsSol(
 					MessageStateEvent{
 						SequenceNumber: execEvent.SequenceNumber,
 						Block:          eventWithTxn.Txn.Slot,
-						State:          execEvent.State,
+						State:          ccip_offramp.MessageExecutionState(execEvent.State),
 					})
-				if execEvent.State == ccip_offramp.InProgress_MessageExecutionState {
+				if ccip_offramp.MessageExecutionState(execEvent.State) == ccip_offramp.InProgress_MessageExecutionState {
 					delete(seqNrsInProgress, execEvent.SequenceNumber)
 					// continue watching for final state or timeout
 					continue

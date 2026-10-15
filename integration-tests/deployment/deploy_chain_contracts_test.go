@@ -71,20 +71,23 @@ func TestDeployChainContracts_Apply(t *testing.T) {
 	fromQualifier := common_utils.CLLQualifier
 	toQualifier := common_utils.RMNTimelockQualifier
 	chain := e.BlockChains.SolanaChains()[chain_selectors.SOLANA_MAINNET.Selector]
-	fromTimelockSigner := utils.GetTimelockSignerPDA(
+	fromTimelockSigner, err := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
 		fromQualifier)
-	toTimelockSigner := utils.GetTimelockSignerPDA(
+	require.NoError(t, err)
+	toTimelockSigner, err := utils.GetTimelockSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
 		toQualifier)
-	toMcmSigner := utils.GetMCMSignerPDA(
+	require.NoError(t, err)
+	toMcmSigner, err := utils.GetMCMSignerPDA(
 		e.DataStore.Addresses().Filter(),
 		chain.Selector,
 		common_utils.ProposerManyChainMultisig,
 		toQualifier,
 	)
+	require.NoError(t, err)
 	err = utils.FundSolanaAccounts(
 		t.Context(),
 		[]solana.PublicKey{chain.DeployerKey.PublicKey()},

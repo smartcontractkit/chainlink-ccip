@@ -42,7 +42,7 @@ jobs:
         test:
           - name: TestE2ESmoke
             config: >-
-              ${{ 
+              ${{
                   github.event_name == 'workflow_dispatch' &&
                   ( inputs.custom_config != '' && inputs.custom_config || 'env.toml' )
                   || 'env.toml'
@@ -72,7 +72,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch'  && github.event.inputs.contract_version == 'local' }}
         run: |
           pushd ../chainlink-ton/contracts
-          nix develop .#contracts -c yarn 
+          nix develop .#contracts -c yarn
           nix develop .#contracts -c yarn build
           popd
           mkdir -p ../contracts && mv ../chainlink-ton/contracts/build/ ../contracts/build
@@ -105,7 +105,7 @@ jobs:
         uses: actions/setup-go@v6 # v6
         with:
           cache: true
-          go-version: "1.26.6"
+          go-version: "1.26.7"
           cache-dependency-path: |
             devenv/go.mod
             devenv/go.sum

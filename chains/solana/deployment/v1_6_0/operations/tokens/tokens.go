@@ -10,7 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -80,12 +80,15 @@ var DeploySolanaToken = operations.NewOperation(
 		if err != nil {
 			return datastore.AddressRef{}, err
 		}
-		freezeAuthority := utils.GetTimelockSignerPDA(input.ExistingAddresses, chain.Selector, common_utils.CLLQualifier)
 		tokenAdminPubKey := chain.DeployerKey.PublicKey()
 		// if we're disabling the freeze authority, we first set it to the deployer key so it can
 		// immediately revoke it
-		if input.DisableFreezeAuthority {
-			freezeAuthority = chain.DeployerKey.PublicKey()
+		freezeAuthority := chain.DeployerKey.PublicKey()
+		if !input.DisableFreezeAuthority {
+			freezeAuthority, err = utils.GetTimelockSignerPDA(input.ExistingAddresses, chain.Selector, common_utils.CLLQualifier)
+			if err != nil {
+				return datastore.AddressRef{}, fmt.Errorf("failed to resolve timelock signer as freeze authority: %w", err)
+			}
 		}
 		var mint solana.PublicKey
 		privKey := input.TokenPrivKey

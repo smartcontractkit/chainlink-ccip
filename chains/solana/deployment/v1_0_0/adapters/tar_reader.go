@@ -8,7 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_1/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	state "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"

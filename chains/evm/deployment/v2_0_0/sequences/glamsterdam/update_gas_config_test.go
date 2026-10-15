@@ -283,6 +283,7 @@ func TestUpdateGasConfig(t *testing.T) {
 	t.Run("baseline chain applies literal Glamsterdam values and preserves untouched fields", func(t *testing.T) {
 		require.Contains(t, reportStr, "chain 4949039107694359620: OnRamp.DestChainConfig.BaseExecutionGasCost matched expected Prague value 200000, applying Glamsterdam value 400000")
 		require.Contains(t, reportStr, "chain 4949039107694359620: FeeQuoter.DestChainConfig.DefaultTokenDestGasOverhead matched expected Prague value 90000, applying Glamsterdam value 270000")
+		require.Contains(t, reportStr, "chain 4949039107694359620: FeeQuoter.DestChainConfig.DestGasOverhead matched expected Prague value 300000, applying Glamsterdam value 500000")
 		require.Contains(t, reportStr, "chain 4949039107694359620: CommitteeVerifier.RemoteChainConfigArgs.GasForVerification matched expected Prague value 75000, applying Glamsterdam value 85000")
 
 		batchOp := report.Output.BatchOps[0]
@@ -293,8 +294,8 @@ func TestUpdateGasConfig(t *testing.T) {
 		require.Equal(t, uint32(15_000_000), fqArgs[0].DestChainConfig.MaxPerMsgGasLimit) // no-op field, unchanged
 		require.Equal(t, uint8(64), fqArgs[0].DestChainConfig.DestGasPerPayloadByteBase)
 		require.Equal(t, uint32(400_000), fqArgs[0].DestChainConfig.DefaultTxGasLimit)
-		// untouched field preserved across the merge
-		require.Equal(t, uint32(300_000), fqArgs[0].DestChainConfig.DestGasOverhead)
+		// legacy destGasOverhead (read by v1.6 OnRamps wired to a 2.0.0 FeeQuoter) is migrated too
+		require.Equal(t, uint32(500_000), fqArgs[0].DestChainConfig.DestGasOverhead)
 		require.True(t, fqArgs[0].DestChainConfig.IsEnabled)
 		require.Equal(t, uint32(1_000), fqArgs[0].DestChainConfig.MaxDataBytes)
 	})
