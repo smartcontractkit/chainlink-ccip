@@ -1374,7 +1374,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				ChainSelector: solbnm.Chain.Selector,
 				Version:       cciputils.Version_1_6_0,
 				Qualifier:     solbnm.Token.Symbol,
-				Type:          "TOKEN_MULTISIG",
+				Type:          "TokenMultisig",
 			}, solbnm.Chain.Selector, datastore_utils.FullRef)
 			require.NoError(t, err)
 

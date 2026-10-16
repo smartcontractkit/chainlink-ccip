@@ -105,6 +105,7 @@ compileContract applications/EtherSenderReceiver
 compileContract Router
 compileContract tokenAdminRegistry/TokenAdminRegistry
 compileContract tokenAdminRegistry/RegistryModuleOwnerCustom
+compileContract tokenAdminRegistry/RegistryModuleExternalAccessControl
 compileContract rmn/RMN
 compileContract rmn/RMNProxy
 
