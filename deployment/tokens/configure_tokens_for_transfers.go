@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -127,8 +128,68 @@ func ConfigureTokensForTransfers(tokenRegistry *TokenAdapterRegistry, mcmsRegist
 
 func makeVerify(_ *TokenAdapterRegistry, _ *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) error {
 	return func(_ cldf.Environment, cfg ConfigureTokensForTransfersConfig) error {
+		if len(cfg.Tokens) == 0 {
+			return errors.New("input must contain at least one token entry")
+		}
+
+		seenChains := make(map[uint64]struct{}, len(cfg.Tokens))
+		for i, token := range cfg.Tokens {
+			if _, err := chain_selectors.GetSelectorFamily(token.ChainSelector); err != nil {
+				return fmt.Errorf("token[%d]: invalid chain selector %d: %w", i, token.ChainSelector, err)
+			}
+			if _, dup := seenChains[token.ChainSelector]; dup {
+				return fmt.Errorf("token[%d]: duplicate entry for chain selector %d", i, token.ChainSelector)
+			}
+			seenChains[token.ChainSelector] = struct{}{}
+
+			if err := verifyTokenTransferConfig(i, token); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
+}
+
+func verifyTokenTransferConfig(i int, token TokenTransferConfig) error {
+	if datastore_utils.IsAddressRefEmpty(token.TokenPoolRef) {
+		return fmt.Errorf("token[%d]: TokenPoolRef is required for chain selector %d", i, token.ChainSelector)
+	}
+	for _, ref := range []struct {
+		name string
+		ref  datastore.AddressRef
+	}{
+		{"TokenPoolRef", token.TokenPoolRef},
+		{"TokenRef", token.TokenRef},
+		{"RegistryRef", token.RegistryRef},
+	} {
+		if ref.ref.ChainSelector != 0 && ref.ref.ChainSelector != token.ChainSelector {
+			return fmt.Errorf(
+				"token[%d]: %s.ChainSelector %d does not match the enclosing chain selector %d",
+				i, ref.name, ref.ref.ChainSelector, token.ChainSelector,
+			)
+		}
+	}
+
+	for remoteSelector, remote := range token.RemoteChains {
+		if remoteSelector == token.ChainSelector {
+			return fmt.Errorf(
+				"token[%d]: remote chain selector %d must not equal the token's own chain selector",
+				i, remoteSelector,
+			)
+		}
+		if _, err := chain_selectors.GetSelectorFamily(remoteSelector); err != nil {
+			return fmt.Errorf("token[%d]: invalid remote chain selector %d: %w", i, remoteSelector, err)
+		}
+		if remote.TokenTransferFeeConfig != nil {
+			if remote.TokenTransferFeeConfig.IsEmpty() {
+				return fmt.Errorf("token[%d]: remote entry %d has nothing to update", i, remoteSelector)
+			}
+			if !remote.TokenTransferFeeConfig.IsEnabled.IsPresent() {
+				return fmt.Errorf("token[%d]: remote entry %d must specify isEnabled", i, remoteSelector)
+			}
+		}
+	}
+	return nil
 }
 
 func makeApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, ConfigureTokensForTransfersConfig) (cldf.ChangesetOutput, error) {

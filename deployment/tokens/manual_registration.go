@@ -1,17 +1,20 @@
 package tokens
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 type ManualRegistrationInput struct {
@@ -55,7 +58,8 @@ type RegisterTokenConfig struct {
 	// The chain selector for the token being registered (required).
 	ChainSelector uint64 `yaml:"chainSelector" json:"chainSelector"`
 
-	// The proposed owner of the token (required).
+	// The proposed owner of the token. Required on EVM. On SVM an empty value means the CCIP
+	// admin becomes the admin, so it may be omitted alongside non-empty SVMExtraArgs.
 	ProposedOwner string `yaml:"proposedOwner" json:"proposedOwner"`
 
 	// Extra args specific to SVM manual registration. Only required for SVM chains.
@@ -74,7 +78,58 @@ func ManualRegistration() cldf.ChangeSetV2[ManualRegistrationInput] {
 
 func manualRegistrationVerify() func(cldf.Environment, ManualRegistrationInput) error {
 	return func(e cldf.Environment, cfg ManualRegistrationInput) error {
-		// TODO: implement
+		if len(cfg.Registrations) == 0 {
+			return errors.New("at least one registration is required")
+		}
+
+		// Key on the refs, not just the chain: a single chain can host several tokens and the apply
+		// loop registers each entry independently, so keying on the chain alone would reject a valid
+		// multi-token batch.
+		type registrationKey struct {
+			chainSelector uint64
+			tokenPoolRef  string
+			tokenRef      string
+		}
+
+		seen := make(map[registrationKey]struct{}, len(cfg.Registrations))
+		for i, registration := range cfg.Registrations {
+			if _, err := chain_selectors.GetSelectorFamily(registration.ChainSelector); err != nil {
+				return fmt.Errorf("registration[%d]: invalid chain selector %d: %w", i, registration.ChainSelector, err)
+			}
+			key := registrationKey{
+				chainSelector: registration.ChainSelector,
+				tokenPoolRef:  datastore_utils.SprintRef(registration.TokenPoolRef),
+				tokenRef:      datastore_utils.SprintRef(registration.TokenRef),
+			}
+			if _, dup := seen[key]; dup {
+				return fmt.Errorf(
+					"registration[%d]: duplicate entry for chain selector %d and refs (tokenPoolRef=%s, tokenRef=%s)",
+					i, registration.ChainSelector, key.tokenPoolRef, key.tokenRef,
+				)
+			}
+			seen[key] = struct{}{}
+
+			// ProposedOwner is deliberately not required: the Solana flow treats an empty value as
+			// "the CCIP admin becomes the admin", and accepts it alongside non-empty svmExtraArgs.
+			if datastore_utils.IsAddressRefEmpty(registration.TokenPoolRef) &&
+				datastore_utils.IsAddressRefEmpty(registration.TokenRef) {
+				return fmt.Errorf("registration[%d]: at least one of TokenPoolRef or TokenRef is required", i)
+			}
+			for _, ref := range []struct {
+				name string
+				ref  datastore.AddressRef
+			}{
+				{"TokenPoolRef", registration.TokenPoolRef},
+				{"TokenRef", registration.TokenRef},
+			} {
+				if ref.ref.ChainSelector != 0 && ref.ref.ChainSelector != registration.ChainSelector {
+					return fmt.Errorf(
+						"registration[%d]: %s.ChainSelector %d does not match the registration's ChainSelector %d",
+						i, ref.name, ref.ref.ChainSelector, registration.ChainSelector,
+					)
+				}
+			}
+		}
 		return nil
 	}
 }

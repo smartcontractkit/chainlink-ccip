@@ -5,14 +5,15 @@ import (
 	"math/big"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
-	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
+	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 )
 
 // LockReleasePoolMigration specifies a single pool migration to perform.
@@ -106,9 +107,46 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 			if (migration.RegistryRef == nil) != (migration.TokenRef == nil) {
 				return fmt.Errorf("migration[%d]: RegistryRef and TokenRef must both be set or both be omitted", i)
 			}
+			if err := verifyPoolRefPair(i, migration); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
+}
+
+// verifyPoolRefPair performs the structural checks on a migration's old/new pool refs that need no
+// datastore or on-chain resolution: the refs must be non-empty and the old pool must be strictly
+// older than the new one.
+func verifyPoolRefPair(i int, migration LockReleasePoolMigration) error {
+	if datastore_utils.IsAddressRefEmpty(migration.OldPoolRef) {
+		return fmt.Errorf("migration[%d]: OldPoolRef is required", i)
+	}
+	if datastore_utils.IsAddressRefEmpty(migration.NewPoolRef) {
+		return fmt.Errorf("migration[%d]: NewPoolRef is required", i)
+	}
+	for _, ref := range []struct {
+		name string
+		ref  datastore.AddressRef
+	}{
+		{"OldPoolRef", migration.OldPoolRef},
+		{"NewPoolRef", migration.NewPoolRef},
+	} {
+		if ref.ref.ChainSelector != 0 && ref.ref.ChainSelector != migration.ChainSelector {
+			return fmt.Errorf(
+				"migration[%d]: %s.ChainSelector %d does not match the migration's ChainSelector %d",
+				i, ref.name, ref.ref.ChainSelector, migration.ChainSelector,
+			)
+		}
+	}
+	if migration.OldPoolRef.Version != nil && migration.NewPoolRef.Version != nil &&
+		!migration.OldPoolRef.Version.LessThan(migration.NewPoolRef.Version) {
+		return fmt.Errorf(
+			"migration[%d]: OldPoolRef version %s must be strictly older than NewPoolRef version %s (are the refs reversed?)",
+			i, migration.OldPoolRef.Version, migration.NewPoolRef.Version,
+		)
+	}
+	return nil
 }
 
 func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, MigrateLockReleasePoolLiquidityConfig) (cldf.ChangesetOutput, error) {

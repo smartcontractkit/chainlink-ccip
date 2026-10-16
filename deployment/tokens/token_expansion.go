@@ -11,15 +11,16 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type TokenExpansionInput struct {
@@ -234,9 +235,24 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 				}
 			}
 			// deploy token pool
-			if deployTokenPoolInput := input.DeployTokenPoolInput; deployTokenPoolInput != nil && deployTokenPoolInput.LiquidityMigrationAmount != nil {
-				if err := deployTokenPoolInput.LiquidityMigrationAmount.Validate(); err != nil {
-					return fmt.Errorf("invalid liquidity migration amount for chain selector %d: %w", selector, err)
+			if deployTokenPoolInput := input.DeployTokenPoolInput; deployTokenPoolInput != nil {
+				if deployTokenPoolInput.LiquidityMigrationAmount != nil {
+					if err := deployTokenPoolInput.LiquidityMigrationAmount.Validate(); err != nil {
+						return fmt.Errorf("invalid liquidity migration amount for chain selector %d: %w", selector, err)
+					}
+					if !utils.IsLockReleasePoolType(deployTokenPoolInput.PoolType) {
+						return fmt.Errorf(
+							"liquidityMigrationAmount is only supported for lock-release pools, "+
+								"but pool type %q was given for chain selector %d",
+							deployTokenPoolInput.PoolType, selector,
+						)
+					}
+				}
+				if deployTokenPoolInput.UnsiloedLockBoxChainSelector != nil && len(deployTokenPoolInput.LockBoxGroups) == 0 {
+					return fmt.Errorf(
+						"unsiloedLockBoxChainSelector requires lockBoxGroups to be set for chain selector %d",
+						selector,
+					)
 				}
 			}
 		}
