@@ -107,12 +107,10 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 
 // MigrateLockReleasePoolLiquiditySequence is unsupported on v1.2.0.
 //
-// Unlike v1.4.0, whose lock-release pool shares getRebalancer/setRebalancer/
-// withdrawLiquidity with v1.6.1 and so migrates through the shared v2.0.0
-// sequence unchanged, a v1.2.0 lock-release pool exposes only
-// addLiquidity/removeLiquidity/getProvidedLiquidity and has no rebalancer at
-// all. The shared sequence would revert on its first getRebalancer call, so
-// this fails up front with an explanation instead.
+// The migration source is resolved from the old pool's version, and a v1.2.0
+// lock-release pool exposes only addLiquidity/removeLiquidity/getProvidedLiquidity
+// with no rebalancer at all, so there is no rebalancer-based source to drive it.
+// This fails up front with an explanation instead.
 //
 // Use GetProvidedLiquidity to check whether a legacy pool still holds funds.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {

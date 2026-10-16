@@ -5,24 +5,28 @@ import (
 	"math/big"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	mcms_types "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 // LockReleasePoolMigration specifies a single pool migration to perform.
 type LockReleasePoolMigration struct {
 	// ChainSelector identifies the chain on which both the old and new pools live.
 	ChainSelector uint64
-	// OldPoolRef is a reference to the legacy lock-release pool to migrate from: v1.5.0, v1.5.1
-	// or v1.6.1 LockReleaseTokenPool, or v1.5.0 LockReleaseTokenPoolAndProxy - all of them share
-	// the getRebalancer/setRebalancer/withdrawLiquidity signatures the migration drives.
-	// Required because in step-2 migrations, the TAR already points to the new pool.
+	// OldPoolRef is a reference to the legacy lock-release pool to migrate from. Its version selects
+	// the adapter whose source extracts the liquidity; supported today: LockReleaseTokenPool v1.5.1,
+	// v1.6.1 and v1.6.2, and SiloedLockReleaseTokenPool v1.6.1 and v1.6.2. Other versions fail
+	// with an explicit "unsupported" error. Required because in step-2 migrations, the TAR already
+	// points to the new pool.
 	OldPoolRef datastore.AddressRef
 	// NewPoolRef is a reference to the new v2.0 LockReleaseTokenPool (with lockbox) to migrate to.
 	NewPoolRef datastore.AddressRef
@@ -132,16 +136,6 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to resolve new pool ref: %w", i, err)
 			}
 
-			adapter, ok := tokenRegistry.GetTokenAdapter(family, newPoolRef.Version)
-			if !ok {
-				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: no token adapter registered for chain family '%s' and version '%v'", i, family, newPoolRef.Version)
-			}
-
-			migrationSeq := adapter.MigrateLockReleasePoolLiquiditySequence()
-			if migrationSeq == nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: adapter for family '%s' version '%v' does not support liquidity migration", i, family, newPoolRef.Version)
-			}
-
 			// Derive the timelock address from the MCMS config.
 			mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 			if !ok {
@@ -200,7 +194,7 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				}
 			}
 
-			migrationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, migrationSeq, e.BlockChains, MigrateLockReleasePoolLiquidityInput{
+			migrationOutput, migrationReports, err := runLockReleaseLiquidityMigration(e, tokenRegistry, migration.ChainSelector, MigrateLockReleasePoolLiquidityInput{
 				ChainSelector:          migration.ChainSelector,
 				OldPoolAddress:         oldPoolRef.Address,
 				NewPoolAddress:         newPoolRef.Address,
@@ -217,8 +211,8 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				return cldf.ChangesetOutput{}, fmt.Errorf("migration[%d]: failed to execute liquidity migration: %w", i, err)
 			}
 
-			batchOps = append(batchOps, migrationReport.Output.BatchOps...)
-			reports = append(reports, migrationReport.ExecutionReports...)
+			batchOps = append(batchOps, migrationOutput.BatchOps...)
+			reports = append(reports, migrationReports...)
 		}
 
 		return changesets.NewOutputBuilder(e, mcmsRegistry).
@@ -226,4 +220,111 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 			WithBatchOps(batchOps).
 			Build(cfg.MCMS)
 	}
+}
+
+// runLockReleaseLiquidityMigration composes a lock-release liquidity migration from two adapters:
+// the SOURCE, resolved from the old pool's version, extracts liquidity to the timelock and records
+// the amounts it moved in input.Resolved; the SINK, always the v2.0.0 adapter, funds the new pool's
+// lockbox(es) with exactly those amounts.
+//
+// The source and sink batches for a chain are merged into a single batch operation so the timelock
+// executes the extraction and the funding atomically - otherwise a failed funding batch would leave
+// the extracted liquidity stranded in the timelock. Merging only combines emitted batch operations;
+// it cannot make writes that already executed directly atomic. Sources therefore must emit their
+// extraction writes into the batch rather than executing them directly (the EVM sources require
+// the old pool to be owned by the timelock, so every owner-gated write is batched).
+func runLockReleaseLiquidityMigration(
+	e cldf.Environment,
+	reg *TokenAdapterRegistry,
+	sel uint64,
+	input MigrateLockReleasePoolLiquidityInput,
+) (sequences.OnChainOutput, []cldf_ops.Report[any, any], error) {
+	if err := input.Validate(); err != nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf("invalid migration input: %w", err)
+	}
+
+	// SOURCE - resolved from the OLD pool's version (never the new pool's).
+	oldPoolRef, err := ResolveTokenPoolRef(e, reg, sel, datastore.AddressRef{ChainSelector: sel, Address: input.OldPoolAddress})
+	if err != nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf("failed to resolve old pool ref: %w", err)
+	}
+	// The source must be a legacy pool. A v2.0.0+ pool would resolve to the sink adapter, which must
+	// never be used as a source.
+	if oldPoolRef.Version == nil || !oldPoolRef.Version.LessThan(utils.Version_2_0_0) {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf(
+			"old pool %s (chain %d) is version %v; the migration source must be older than v2.0.0",
+			input.OldPoolAddress, sel, oldPoolRef.Version)
+	}
+	srcAdapter, _, err := ResolveAdapter(reg, sel, oldPoolRef.Version)
+	if err != nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf(
+			"old pool %s (chain %d) does not support liquidity migration yet: %w", input.OldPoolAddress, sel, err)
+	}
+	srcSeq := srcAdapter.MigrateLockReleasePoolLiquiditySequence()
+	if srcSeq == nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf(
+			"old pool %s (chain %d) does not support liquidity migration yet", input.OldPoolAddress, sel)
+	}
+
+	// The source writes the resolved amounts into input.Resolved.
+	input.Resolved = &MigrateLockReleasePoolLiquidityResolved{}
+	srcReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, srcSeq, e.BlockChains, input)
+	if err != nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf("source migration failed: %w", err)
+	}
+	// Resolved is filled in by the source handler, which does not run when the framework replays a
+	// previous report for an identical input. Fail rather than fund the sink with nothing.
+	if input.Resolved.Amount == nil && len(input.Resolved.SiloAmounts) == 0 && input.Resolved.UnsiloedAmount == nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf(
+			"source migration for old pool %s (chain %d) resolved no amounts; if it was replayed from a previous report, rerun with a fresh operations reporter",
+			input.OldPoolAddress, sel)
+	}
+
+	// SINK - always the registered v2.0.0 adapter.
+	sinkAdapter, _, err := ResolveAdapter(reg, sel, utils.Version_2_0_0)
+	if err != nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf("failed to resolve v2.0.0 sink adapter: %w", err)
+	}
+	sinkSeq := sinkAdapter.MigrateLockReleasePoolLiquiditySequence()
+	if sinkSeq == nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf("no v2.0.0 sink registered for chain %d", sel)
+	}
+	sinkInput := input
+	sinkInput.Amount = input.Resolved.Amount
+	sinkInput.BasisPoints = nil
+	sinkInput.SiloExactAmounts = input.Resolved.SiloAmounts
+	sinkInput.UnsiloedExactAmount = input.Resolved.UnsiloedAmount
+	sinkInput.Resolved = nil
+	sinkReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sinkSeq, e.BlockChains, sinkInput)
+	if err != nil {
+		return sequences.OnChainOutput{}, nil, fmt.Errorf("sink migration failed: %w", err)
+	}
+
+	return sequences.OnChainOutput{
+		BatchOps:  mergeBatchOpsByChain(append(srcReport.Output.BatchOps, sinkReport.Output.BatchOps...)),
+		Addresses: append(srcReport.Output.Addresses, sinkReport.Output.Addresses...),
+	}, append(srcReport.ExecutionReports, sinkReport.ExecutionReports...), nil
+}
+
+// mergeBatchOpsByChain merges batch operations targeting the same chain into one, preserving the
+// order of chains and of transactions within each chain. Empty batches (every write was executed
+// directly) are dropped.
+func mergeBatchOpsByChain(batchOps []mcms_types.BatchOperation) []mcms_types.BatchOperation {
+	merged := make([]mcms_types.BatchOperation, 0, len(batchOps))
+	indexByChain := make(map[mcms_types.ChainSelector]int, len(batchOps))
+	for _, op := range batchOps {
+		if len(op.Transactions) == 0 {
+			continue
+		}
+		if i, ok := indexByChain[op.ChainSelector]; ok {
+			merged[i].Transactions = append(merged[i].Transactions, op.Transactions...)
+			continue
+		}
+		indexByChain[op.ChainSelector] = len(merged)
+		merged = append(merged, mcms_types.BatchOperation{
+			ChainSelector: op.ChainSelector,
+			Transactions:  append([]mcms_types.Transaction(nil), op.Transactions...),
+		})
+	}
+	return merged
 }

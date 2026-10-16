@@ -241,6 +241,8 @@ func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.Bloc
 // EVMTokenBase is registered at v1.0.0 so callers that only need token deployment (DeployToken,
 // DeployTokenVerify) can obtain a valid adapter without importing a pool-version package.
 
+// MigrateLockReleasePoolLiquiditySequence returns nil: a pool version without its own liquidity
+// migration source (v1.5.0, v1.4.0) is rejected as an unsupported migration source.
 func (a *EVMTokenBase) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }
@@ -285,6 +287,26 @@ func (a *EVMTokenBase) IsBurnMintPoolType(poolType string) bool {
 // IsLockReleasePoolType returns true if the pool type is one of the lock-release variants (standard or siloed).
 func (a *EVMTokenBase) IsLockReleasePoolType(poolType string) bool {
 	return cciputils.IsLockReleasePoolType(poolType)
+}
+
+// IsLegacyLockReleasePoolType returns true if the pool type is a legacy lock-release variant that can be
+// migrated from. It is broader than IsLockReleasePoolType: it also accepts the v1.5.0
+// LockReleaseTokenPoolAndProxy, which is a valid migration source but excluded from the deploy dispatch
+// predicate.
+func (a *EVMTokenBase) IsLegacyLockReleasePoolType(poolType string) bool {
+	return a.IsLockReleasePoolType(poolType) || poolType == cciputils.LockReleaseTokenPoolAndProxy.String()
+}
+
+// GetTypeAndVersion reads typeAndVersion() from addr.
+func (a *EVMTokenBase) GetTypeAndVersion(b cldf_ops.Bundle, chain evm.Chain, addr common.Address) (type_and_version.TypeAndVersion, error) {
+	report, err := cldf_ops.ExecuteOperation(b, type_and_version.GetTypeAndVersion, chain, contract.FunctionInput[struct{}]{
+		ChainSelector: chain.Selector,
+		Address:       addr,
+	})
+	if err != nil {
+		return type_and_version.TypeAndVersion{}, fmt.Errorf("failed to get typeAndVersion from %s: %w", addr, err)
+	}
+	return report.Output, nil
 }
 
 // IsBurnMintTokenType returns true if the token type is one of the burn-mint variants (ERC20 or ERC677).

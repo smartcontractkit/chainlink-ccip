@@ -78,7 +78,7 @@ Registered once per **token pool version**, because pool versions configure diff
 | `DeployToken()` / `DeployTokenVerify(e, in)` | Deploy a token, and validate the input first |
 | `DeployTokenPoolForToken()` | Deploy or initialize a pool for an existing token |
 | `UpdateAuthorities()` | Hand token/pool ownership to the timelock |
-| `MigrateLockReleasePoolLiquiditySequence()` | Move liquidity from a legacy lock-release pool to a 2.0 lockbox pool. Return `nil` if unsupported |
+| `MigrateLockReleasePoolLiquiditySequence()` | One half of a lock-release liquidity migration, composed by the changeset. On a legacy-version adapter (resolved from the old pool's version) it is the source: extract liquidity to the timelock and record the moved amounts in `input.Resolved`. On the 2.0 adapter it is the sink: fund the new pool's lockbox(es) with those amounts. Return `nil` if the version has no source yet |
 
 **Optional token interfaces.** The changeset discovers these by type assertion on your `TokenAdapter`, or registers them separately where noted:
 
