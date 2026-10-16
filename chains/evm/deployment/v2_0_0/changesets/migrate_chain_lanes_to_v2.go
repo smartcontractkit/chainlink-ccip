@@ -61,7 +61,11 @@ type tokenSymbolLookup func(chainSel uint64, token common.Address) (string, erro
 // The resolved lane list is bidirectional, so a lane discovered from both endpoints (when both
 // chains appear in ChainSelectors) is configured exactly once.
 type MigrateChainLanesToV2Input struct {
-	// ChainSelectors are the chains whose existing lanes should be migrated to CCIP 2.0.
+	// ChainSelectors are the chains whose existing lanes should be migrated to CCIP 2.0. They can
+	// be of any family, but lanes are only discovered from EVM chains: a non-EVM chain (e.g.
+	// Solana) listed here or in RemoteChains has its lanes to the EVM chains in ChainSelectors
+	// migrated, both ends configured by their own family adapter. Non-EVM remotes that are not
+	// listed are left untouched.
 	ChainSelectors []uint64 `json:"chainSelectors" yaml:"chainSelectors"`
 	// ExcludedRemoteChains is an optional blocklist of remote chain selectors to skip during
 	// discovery. Any lane to one of these remotes is left untouched. Useful for routing around
@@ -81,6 +85,16 @@ type MigrateChainLanesToV2Input struct {
 	// TestRouter migrates the lanes onto the TestRouter instead of the production Router, and
 	// configures a TESTTR test token behind the TestRouter on every migrated chain.
 	TestRouter *bool `json:"testRouter,omitempty" yaml:"testRouter,omitempty"`
+	// ChainOverrides are, per chain selector, the overrides applied on that chain's end of each of
+	// its migrated lanes: the same ChainOverrides that build_lanes_cross_family takes per lane as
+	// chainAOverrides/chainBOverrides. Lanes are discovered rather than listed, so they are given
+	// per chain. Solana lanes are staged by setting remoteChainCfg.testSenders under the Solana
+	// chain selector, independently of TestRouter, which stages the EVM ends.
+	//
+	// Test senders are per lane on chain (one allowlist per destination chain), but a migration
+	// stages a batch with one test wallet, so giving them per chain is enough here. Use
+	// build_lanes_cross_family to give lanes of the same chain different senders.
+	ChainOverrides map[uint64]*v2changesets.ChainOverrides `json:"chainOverrides,omitempty" yaml:"chainOverrides,omitempty"`
 	// MaxLanesPerChunk caps how many lanes are configured per underlying apply, bounding each
 	// chain's per-timelock-batch gas below restrictive per-tx caps (e.g. Linea's 2^24). Each
 	// chunk emits its own MCMS proposal, so multi-chunk runs require merge-proposals: true and
@@ -131,6 +145,16 @@ func MigrateChainLanesToV2(
 		case fqRegistry == nil:
 			return fmt.Errorf("fee-quoter/ramp updater registry is required")
 		}
+		for sel, overrides := range cfg.ChainOverrides {
+			if !slices.Contains(cfg.ChainSelectors, sel) && !slices.Contains(cfg.RemoteChains, sel) {
+				return fmt.Errorf("chainOverrides lists chain %d, which is in neither chainSelectors nor remoteChains", sel)
+			}
+			if overrides != nil && len(overrides.RemoteChainCfg.TestSenders) > 0 {
+				if err := v2changesets.ValidateTestSendersChain(sel); err != nil {
+					return err
+				}
+			}
+		}
 
 		// Cheap, non-RPC checks only: on-chain lane discovery happens in Apply. A chain being
 		// migrated must not also be excluded, and each EVM chain must have a lane version resolver
@@ -143,6 +167,9 @@ func MigrateChainLanesToV2(
 			}
 		}
 		excludedRemotes := newUint64Set(cfg.ExcludedRemoteChains)
+		if err := validateNonEVMChainsDiscoverable(cfg.ChainSelectors); err != nil {
+			return err
+		}
 		for _, chainSel := range cfg.ChainSelectors {
 			if _, excluded := excludedRemotes[chainSel]; excluded {
 				return fmt.Errorf("chain %d cannot be in both chainSelectors and excludedRemoteChains", chainSel)
@@ -183,8 +210,9 @@ func MigrateChainLanesToV2(
 		// migration path once MigrateChainLanesToV2 supports the same targeted prod-lane
 		// workflow as LaneMigrateToNewVersionChangeset.
 
-		// Lane migrations to the TestRouter also get a TESTTR test token wired behind it.
-		if cfg.TestRouter == nil || !*cfg.TestRouter {
+		// Lane migrations to the TestRouter also get a TESTTR test token wired behind it, on
+		// EVM-to-EVM lanes only.
+		if cfg.TestRouter == nil || !*cfg.TestRouter || !hasEVMOnlyLane(lanes) {
 			return laneOut, nil
 		}
 
@@ -224,7 +252,7 @@ func applyLanesInChunks(
 		resolvedCfg := v2changesets.ConfigureChainsForLanesFromTopologyConfig{
 			Topology: cfg.Topology,
 			BuildLanesCrossFamilyConfig: v2changesets.BuildLanesCrossFamilyConfig{
-				Lanes:      lanes[start:min(start+chunkSize, len(lanes))],
+				Lanes:      withChainOverrides(lanes[start:min(start+chunkSize, len(lanes))], cfg.ChainOverrides),
 				MCMS:       cfg.MCMS,
 				TestRouter: cfg.TestRouter,
 				// A migration's whole purpose is to swap each lane's pre-2.0 OnRamp for the CCIP 2.0
@@ -420,6 +448,9 @@ type laneDiscoverer struct {
 	allowedRemotes  map[uint64]struct{}
 	excludedRemotes map[uint64]struct{}
 	excludedSymbols map[string]struct{}
+	// nonEVMChains are the non-EVM chains whose lanes are migrated; see
+	// MigrateChainLanesToV2Input.ChainSelectors.
+	nonEVMChains map[uint64]struct{}
 }
 
 // discoverLanesToMigrate returns a deduplicated, deterministically ordered set of bidirectional
@@ -444,6 +475,7 @@ func discoverLanesToMigrate(
 		allowedRemotes:  newUint64Set(cfg.RemoteChains),
 		excludedRemotes: newUint64Set(cfg.ExcludedRemoteChains),
 		excludedSymbols: canonicalSymbolSet(cfg.ExcludeLanesWithTokenSymbols),
+		nonEVMChains:    listedNonEVMChains(cfg),
 	}
 	return d.run(cfg.ChainSelectors)
 }
@@ -518,7 +550,7 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 		return nil, fmt.Errorf("failed to derive lane versions for chain %d: %w", chainSel, err)
 	}
 
-	// Keep only EVM remotes that are connected, not blocklisted, not already on 2.0, not
+	// Keep only EVM remotes (and listed non-EVM ones) that are connected, not blocklisted, not already on 2.0, not
 	// deprecated, and whose source lane version we can migrate (i.e. has a registered config
 	// importer). Lanes with an unknown or unsupported version are skipped — we never migrate a
 	// lane without a resolver.
@@ -529,7 +561,7 @@ func (d *laneDiscoverer) chainCandidates(chainSel uint64) ([]uint64, error) {
 			continue
 		case isExcluded(d.excludedRemotes, remote):
 			continue
-		case !isEVMChain(remote):
+		case !isEVMChain(remote) && !isExcluded(d.nonEVMChains, remote):
 			continue
 		case deprecatedChain(remote):
 			d.env.Logger.Warnf("skipping deprecated remote chain %d on chain %d", remote, chainSel)
@@ -765,6 +797,59 @@ func isExcluded(set map[uint64]struct{}, sel uint64) bool {
 
 // isEVMChain reports whether the chain selector belongs to the EVM family. Unknown selectors are
 // treated as non-EVM.
+// withChainOverrides returns lanes with each end's overrides set from the per-chain overrides,
+// the per-lane form the lane configuration takes them in. Lanes are discovered without overrides.
+func withChainOverrides(lanes []v2changesets.CrossFamilyLanePair, overrides map[uint64]*v2changesets.ChainOverrides) []v2changesets.CrossFamilyLanePair {
+	if len(overrides) == 0 {
+		return lanes
+	}
+	out := make([]v2changesets.CrossFamilyLanePair, len(lanes))
+	for i, lane := range lanes {
+		out[i] = lane
+		out[i].ChainAOverrides = overrides[lane.ChainA]
+		out[i].ChainBOverrides = overrides[lane.ChainB]
+	}
+	return out
+}
+
+// listedNonEVMChains returns the non-EVM chains named in ChainSelectors or RemoteChains, the only
+// non-EVM chains whose lanes are migrated.
+func listedNonEVMChains(cfg MigrateChainLanesToV2Config) map[uint64]struct{} {
+	listed := make(map[uint64]struct{})
+	for _, sel := range slices.Concat(cfg.ChainSelectors, cfg.RemoteChains) {
+		if !isEVMChain(sel) {
+			listed[sel] = struct{}{}
+		}
+	}
+	return listed
+}
+
+// validateNonEVMChainsDiscoverable fails when ChainSelectors names a non-EVM chain but no EVM chain
+// to discover its lanes from, which would otherwise migrate nothing without saying so.
+func validateNonEVMChainsDiscoverable(chainSelectors []uint64) error {
+	var nonEVM []uint64
+	for _, sel := range chainSelectors {
+		if isEVMChain(sel) {
+			return nil
+		}
+		nonEVM = append(nonEVM, sel)
+	}
+	if len(nonEVM) > 0 {
+		return fmt.Errorf("non-EVM chains %v need at least one EVM chain in chainSelectors: their lanes are discovered from the EVM end", nonEVM)
+	}
+	return nil
+}
+
+// hasEVMOnlyLane reports whether any lane has EVM chains on both ends.
+func hasEVMOnlyLane(lanes []v2changesets.CrossFamilyLanePair) bool {
+	for _, lane := range lanes {
+		if isEVMChain(lane.ChainA) && isEVMChain(lane.ChainB) {
+			return true
+		}
+	}
+	return false
+}
+
 func isEVMChain(sel uint64) bool {
 	family, err := chainsel.GetSelectorFamily(sel)
 	return err == nil && family == chainsel.FamilyEVM
