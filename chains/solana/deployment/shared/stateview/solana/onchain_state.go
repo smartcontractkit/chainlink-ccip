@@ -6,6 +6,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	solstate "github.com/smartcontractkit/cld-changesets/legacy/pkg/family/solana"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared"
 )
 
 // CCIPOnChainState is the Solana part of chainlink's multi-family
@@ -55,4 +58,32 @@ func (c CCIPOnChainState) SupportedChains() map[uint64]struct{} {
 		chains[chain] = struct{}{}
 	}
 	return chains
+}
+
+// SolanaMCMSStateByChain returns the default-qualifier MCMS bundle of every Solana chain in the
+// environment, for proposal aggregation.
+//
+// Reproduced from chainlink/deployment/ccip/shared/stateview.CCIPOnChainState.SolanaMCMSStateByChain,
+// including its early return: the first chain whose bundle can't be loaded ends the scan.
+func (c CCIPOnChainState) SolanaMCMSStateByChain(e cldf.Environment) map[uint64]solstate.MCMSWithTimelockState {
+	mcmsStateByChain := make(map[uint64]solstate.MCMSWithTimelockState)
+	for chainSelector := range e.BlockChains.SolanaChains() {
+		if e.DataStore == nil {
+			return mcmsStateByChain
+		}
+		refs, err := e.DataStore.Addresses().Fetch()
+		if err != nil {
+			return mcmsStateByChain
+		}
+		bundle, err := shared.MCMSBundleRefs(refs, chainSelector, shared.DefaultMCMSQualifier)
+		if err != nil || len(bundle) == 0 {
+			return mcmsStateByChain
+		}
+		mcmState, err := solstate.MaybeLoadMCMSWithTimelockChainStateV2(bundle)
+		if err != nil {
+			return mcmsStateByChain
+		}
+		mcmsStateByChain[chainSelector] = *mcmState
+	}
+	return mcmsStateByChain
 }
