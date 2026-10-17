@@ -56,7 +56,7 @@ func GetSolProgramData(client *solrpc.Client, programID solana.PublicKey) (struc
 		Address  solana.PublicKey
 	}
 	data, err := client.GetAccountInfoWithOpts(context.Background(), programID, &solrpc.GetAccountInfoOpts{
-		Commitment: solrpc.CommitmentConfirmed,
+		Commitment: solrpc.CommitmentFinalized,
 	})
 	if err != nil {
 		return programData, fmt.Errorf("failed to deploy program: %w", err)

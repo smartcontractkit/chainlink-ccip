@@ -629,7 +629,7 @@ func TestMcmSetConfig(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, rpc.CommitmentConfirmed, []string{tt.errorMsg})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, rpc.CommitmentFinalized, []string{tt.errorMsg})
 				require.NotNil(t, result)
 			})
 		}
@@ -824,7 +824,7 @@ func TestMcmSetConfig(t *testing.T) {
 						result := testutils.SendAndFailWith(ctx, t, solanaGoClient,
 							tx.Instructions,
 							admin,
-							rpc.CommitmentConfirmed,
+							rpc.CommitmentFinalized,
 							[]string{tt.errorMsg},
 						)
 						require.NotNil(t, result)
