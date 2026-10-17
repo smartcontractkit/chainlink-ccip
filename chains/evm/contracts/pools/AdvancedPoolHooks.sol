@@ -26,6 +26,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   error SenderNotAllowed(address sender);
   error MustSpecifyUnderThresholdCCVsForThresholdCCVs();
   error PolicyEngineDetachReverted(address oldPolicyEngine, bytes err);
+  error ThresholdChangeNotReady(uint256 effectiveAt);
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
@@ -37,6 +38,7 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     address[] thresholdInboundCCVs
   );
   event ThresholdAmountSet(uint256 thresholdAmount);
+  event ThresholdAmountScheduled(uint256 newThreshold, uint256 effectiveAt);
   event PolicyEngineAttached(address indexed policyEngine);
   event PolicyEngineDetachFailed(address indexed policyEngine, bytes reason);
 
@@ -66,6 +68,18 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
   /// @dev Threshold token transfer amount at which additional CCVs are required.
   /// Value of 0 means that there is no threshold and additional CCVs are not required for any transfer amount.
   uint256 internal s_thresholdAmountForAdditionalCCVs;
+
+  /// @dev Pending threshold value queued via setThresholdAmount, takes effect after s_thresholdEffectiveAt.
+  uint256 internal s_pendingThreshold;
+
+  /// @dev Timestamp after which s_pendingThreshold becomes the active threshold.
+  uint256 internal s_thresholdEffectiveAt;
+
+  /// @notice Minimum delay between scheduling and applying a threshold change.
+  /// @dev In-flight messages collect CCVs based on the threshold at send time. Applying a lower threshold
+  /// immediately would require additional CCVs that were never collected, permanently blocking those messages.
+  /// The delay gives in-flight messages enough time to be executed before stricter requirements take effect.
+  uint256 public constant THRESHOLD_CHANGE_DELAY = 2 days;
 
   /// @dev The policy engine to use. Value of 0 disables policy engine checks.
   IPolicyEngine internal s_policyEngine;
@@ -320,20 +334,44 @@ contract AdvancedPoolHooks is IAdvancedPoolHooks, ITypeAndVersion, AuthorizedCal
     return _resolveRequiredCCVs(config.outboundCCVs, config.thresholdOutboundCCVs, amount);
   }
 
-  /// @notice Gets the threshold amount above which additional CCVs are required.
-  /// @return The threshold amount.
+  /// @notice Gets the active threshold amount above which additional CCVs are required.
+  /// @return The threshold amount currently enforced at execution time.
   function getThresholdAmount() public view virtual returns (uint256) {
     return s_thresholdAmountForAdditionalCCVs;
   }
 
-  /// @notice Sets the threshold amount above which additional CCVs are required.
-  /// @param thresholdAmount The new threshold amount.
+  /// @notice Gets the pending threshold and the timestamp when it becomes active.
+  /// @return pendingThreshold The threshold value queued by the most recent setThresholdAmount call.
+  /// @return effectiveAt The timestamp after which applyThresholdAmount can be called.
+  function getPendingThreshold() public view virtual returns (uint256 pendingThreshold, uint256 effectiveAt) {
+    return (s_pendingThreshold, s_thresholdEffectiveAt);
+  }
+
+  /// @notice Schedules a threshold change to take effect after THRESHOLD_CHANGE_DELAY.
+  /// @dev The new threshold is not applied immediately. Call applyThresholdAmount after the delay expires.
+  /// This prevents in-flight messages from being permanently blocked by a retroactive threshold decrease.
+  /// @param thresholdAmount The new threshold amount to schedule.
   function setThresholdAmount(
     uint256 thresholdAmount
   ) public virtual onlyOwner {
-    s_thresholdAmountForAdditionalCCVs = thresholdAmount;
+    s_pendingThreshold = thresholdAmount;
+    s_thresholdEffectiveAt = block.timestamp + THRESHOLD_CHANGE_DELAY;
 
-    emit ThresholdAmountSet(thresholdAmount);
+    emit ThresholdAmountScheduled(thresholdAmount, s_thresholdEffectiveAt);
+  }
+
+  /// @notice Applies the pending threshold change once the delay has elapsed.
+  /// @dev Reverts if the delay period has not yet passed.
+  function applyThresholdAmount() public virtual onlyOwner {
+    uint256 effectiveAt = s_thresholdEffectiveAt;
+    if (block.timestamp < effectiveAt) revert ThresholdChangeNotReady(effectiveAt);
+
+    uint256 newThreshold = s_pendingThreshold;
+    s_thresholdAmountForAdditionalCCVs = newThreshold;
+    delete s_pendingThreshold;
+    delete s_thresholdEffectiveAt;
+
+    emit ThresholdAmountSet(newThreshold);
   }
 
   function _resolveRequiredCCVs(
