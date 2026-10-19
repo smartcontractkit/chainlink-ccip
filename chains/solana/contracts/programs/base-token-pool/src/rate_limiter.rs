@@ -71,7 +71,7 @@ impl RateLimitTokenBucket {
             return Err(CcipTokenPoolError::RLRateLimitReached.into());
         }
 
-        self.tokens = self.tokens.saturating_sub(request_tokens);
+        self.tokens = self.tokens.checked_sub(request_tokens).unwrap();
         emit!(TokensConsumed {
             tokens: request_tokens
         });
