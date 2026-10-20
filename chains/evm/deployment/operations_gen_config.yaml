@@ -96,6 +96,12 @@ contracts:
       - name: getAllowListEnabled
         access: public
 
+  # On v1.4.0 both provideLiquidity and withdrawLiquidity are gated on the REBALANCER, not the
+  # owner, so `owner` would be wrong for them. They are generated `public`, which only defers to a
+  # check the framework cannot see: the generated ops execute directly with the deployer key. The
+  # v1.4.0 liquidity migration source therefore does not use the generated WithdrawLiquidity; it
+  # uses the hand-written proposal-only WithdrawLiquidityProposalOnly (contract.NoCallersAllowed),
+  # as v1.5.0 does. setRebalancer IS onlyOwner, so it is generated as such.
   - contract_name: LockReleaseTokenPool
     version: "1.4.0"
     abi_file: "lock_release_token_pool.json"
