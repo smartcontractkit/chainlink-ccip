@@ -107,13 +107,22 @@ func (t *TokenAdapter) migratePlainLockReleaseSource(
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get rebalancer from old pool %s: %w", oldPool, err)
 	}
 
-	setRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPool,
-		Args:          timelock,
-	})
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to set rebalancer on old pool %s: %w", oldPool, err)
+	// Skip the take-over and the restore when the timelock already is the rebalancer: both
+	// would be no-op writes in the proposal.
+	originalRebalancer := rebalancerReport.Output
+	handOver := originalRebalancer != timelock
+
+	var writes []evm_contract.WriteOutput
+	if handOver {
+		setRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       oldPool,
+			Args:          timelock,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set rebalancer on old pool %s: %w", oldPool, err)
+		}
+		writes = append(writes, setRebalancerReport.Output)
 	}
 
 	withdrawReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.WithdrawLiquidity, evmChain, evm_contract.FunctionInput[*big.Int]{
@@ -124,21 +133,21 @@ func (t *TokenAdapter) migratePlainLockReleaseSource(
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to withdraw liquidity from old pool %s: %w", oldPool, err)
 	}
+	writes = append(writes, withdrawReport.Output)
 
-	restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPool,
-		Args:          rebalancerReport.Output,
-	})
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to restore rebalancer on old pool %s: %w", oldPool, err)
+	if handOver {
+		restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       oldPool,
+			Args:          originalRebalancer,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to restore rebalancer on old pool %s: %w", oldPool, err)
+		}
+		writes = append(writes, restoreRebalancerReport.Output)
 	}
 
-	batchOp, err := evm_contract.NewBatchOperationFromWrites([]evm_contract.WriteOutput{
-		setRebalancerReport.Output,
-		withdrawReport.Output,
-		restoreRebalancerReport.Output,
-	})
+	batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
 	}
@@ -311,16 +320,21 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to get unsiloed rebalancer from old pool %s: %w", oldPool, err)
 	}
 	originalUnsiloedRebalancer := rebalancerReport.Output
+	// Each rebalancer (unsiloed and per silo) that already is the timelock is left alone: its
+	// take-over and restore would be no-op writes in the proposal.
+	handOverUnsiloed := originalUnsiloedRebalancer != timelock
 
-	setRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPool,
-		Args:          timelock,
-	})
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to set unsiloed rebalancer on old pool %s: %w", oldPool, err)
+	if handOverUnsiloed {
+		setRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       oldPool,
+			Args:          timelock,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set unsiloed rebalancer on old pool %s: %w", oldPool, err)
+		}
+		ops = append(ops, setRebalancerReport.Output)
 	}
-	ops = append(ops, setRebalancerReport.Output)
 
 	originalSiloRebalancers := make(map[uint64]common.Address, len(siloedChains))
 	for _, remoteChain := range siloedChains {
@@ -333,6 +347,9 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to get chain rebalancer for chain %d: %w", remoteChain, err)
 		}
 		originalSiloRebalancers[remoteChain] = chainRebalancerReport.Output
+		if chainRebalancerReport.Output == timelock {
+			continue
+		}
 
 		setSiloReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetSiloRebalancer, evmChain, evm_contract.FunctionInput[siloed_ops.SetSiloRebalancerArgs]{
 			ChainSelector: chainSel,
@@ -379,6 +396,9 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 	}
 
 	for _, remoteChain := range siloedChains {
+		if originalSiloRebalancers[remoteChain] == timelock {
+			continue
+		}
 		restoreReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetSiloRebalancer, evmChain, evm_contract.FunctionInput[siloed_ops.SetSiloRebalancerArgs]{
 			ChainSelector: chainSel,
 			Address:       oldPool,
@@ -393,15 +413,17 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 		ops = append(ops, restoreReport.Output)
 	}
 
-	restoreUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-		ChainSelector: chainSel,
-		Address:       oldPool,
-		Args:          originalUnsiloedRebalancer,
-	})
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to restore unsiloed rebalancer: %w", err)
+	if handOverUnsiloed {
+		restoreUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       oldPool,
+			Args:          originalUnsiloedRebalancer,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to restore unsiloed rebalancer: %w", err)
+		}
+		ops = append(ops, restoreUnsiloedReport.Output)
 	}
-	ops = append(ops, restoreUnsiloedReport.Output)
 
 	batchOp, err := evm_contract.NewBatchOperationFromWrites(ops)
 	if err != nil {

@@ -23,9 +23,9 @@ type LockReleasePoolMigration struct {
 	// ChainSelector identifies the chain on which both the old and new pools live.
 	ChainSelector uint64
 	// OldPoolRef is a reference to the legacy lock-release pool to migrate from. Its version selects
-	// the adapter whose source extracts the liquidity; supported today: LockReleaseTokenPool v1.5.1,
-	// v1.6.1 and v1.6.2, and SiloedLockReleaseTokenPool v1.6.1 and v1.6.2. Other versions fail
-	// with an explicit "unsupported" error. Required because in step-2 migrations, the TAR already
+	// the adapter whose source extracts the liquidity; supported today: LockReleaseTokenPool v1.5.0,
+	// v1.5.1, v1.6.1 and v1.6.2, LockReleaseTokenPoolAndProxy v1.5.0, and SiloedLockReleaseTokenPool
+	// v1.6.1 and v1.6.2. Other versions fail with an explicit "unsupported" error. Required because in step-2 migrations, the TAR already
 	// points to the new pool.
 	OldPoolRef datastore.AddressRef
 	// NewPoolRef is a reference to the new v2.0 LockReleaseTokenPool (with lockbox) to migrate to.

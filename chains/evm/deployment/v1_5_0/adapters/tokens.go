@@ -53,9 +53,8 @@ var (
 // (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool) have generated
 // bindings but no deployed footprint, and the deploy sequence rejects them.
 //
-// Lock-release liquidity migration is not supported yet: this adapter inherits the nil
-// MigrateLockReleasePoolLiquiditySequence from EVMTokenBase, so migrating a v1.5.0 lock-release pool
-// (plain or *AndProxy) fails fast with an explicit "unsupported" error until a v1.5.0 source exists.
+// It is also the lock-release liquidity migration source for v1.5.0 pools, plain and *AndProxy (see
+// migrate_lock_release_pool_liquidity.go): both share the lock-release selectors the v1.5.0 bindings call.
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }
