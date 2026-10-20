@@ -45,6 +45,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	lock_release_token_pool_v140 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_4_0/lock_release_token_pool"
 	lock_release_token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/lock_release_token_pool"
 	lock_release_token_pool_v151 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
 	siloed_lock_release_token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/siloed_lock_release_token_pool"
@@ -53,6 +54,7 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
 	// Register the token adapters the migration resolves its source and sink from.
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_4_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
@@ -290,6 +292,9 @@ const (
 	oldPoolV1_5_0
 	// oldPoolV1_5_1 is the v1.5.1 LockReleaseTokenPool, migrated by the v1.5.1 source.
 	oldPoolV1_5_1
+	// oldPoolV1_4_0 is the v1.4.0 LockReleaseTokenPool, migrated by the v1.4.0 source. There are no
+	// v1.4.0 deploy ops, so it is deployed straight from the gobindings.
+	oldPoolV1_4_0
 )
 
 // setupMigrationTest deploys all contracts needed for a migration test:
@@ -363,6 +368,14 @@ func setupMigrationTestWithOldPool(t *testing.T, chainSel uint64, liquidityAmoun
 
 	var oldPoolAddr common.Address
 	switch kind {
+	case oldPoolV1_4_0:
+		// Same constructor as v1.5.0, with the RMN proxy still named armProxy.
+		addr, tx, _, err := lock_release_token_pool_v140.DeployLockReleaseTokenPool(
+			chain.DeployerKey, chain.Client, tokenAddr, []common.Address{}, rmnProxyAddr, true, routerAddr)
+		require.NoError(t, err)
+		_, err = chain.Confirm(tx)
+		require.NoError(t, err)
+		oldPoolAddr = addr
 	case oldPoolV1_5_0AndProxy:
 		// The v1.5.0 constructor has no localTokenDecimals and takes acceptLiquidity instead.
 		oldPoolReport, err := operations.ExecuteOperation(
@@ -858,11 +871,12 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 // (LockReleaseTokenPoolAndProxy and the plain LockReleaseTokenPool) end to end through the v1.5.0
 // source and the v2.0.0 sink: rebalancer take-over, withdraw, fund the lockbox, restore.
 //
-// Both pools report version 1.5.0, so the composer resolves the v1.5.0 source for either, and they
-// share the lock-release selectors the v1.5.0 bindings call. As in the v1.5.1 round trip, the
-// deployer stands in for the timelock and owns the pool, so only the proposal-only withdraw is
-// batched; the original rebalancer is set to the deployer so that withdraw is still authorized.
-func TestMigrateLockReleasePoolLiquidity_V1_5_0RoundTrip(t *testing.T) {
+// The composer resolves the source from the pool's on-chain version (v1.4.0 or v1.5.0), and every
+// one of these pools shares the lock-release selectors the v1.5.0 bindings call. As in the v1.5.1
+// round trip, the deployer stands in for the timelock and owns the pool, so only the proposal-only
+// withdraw is batched; the original rebalancer is set to the deployer so that withdraw is still
+// authorized.
+func TestMigrateLockReleasePoolLiquidity_ProposalOnlyWithdrawRoundTrip(t *testing.T) {
 	cases := []struct {
 		name           string
 		kind           oldPoolKind
@@ -878,6 +892,11 @@ func TestMigrateLockReleasePoolLiquidity_V1_5_0RoundTrip(t *testing.T) {
 			kind:           oldPoolV1_5_0,
 			typeAndVersion: "LockReleaseTokenPool 1.5.0",
 		},
+		{
+			name:           "V1_4_0",
+			kind:           oldPoolV1_4_0,
+			typeAndVersion: "LockReleaseTokenPool 1.4.0",
+		},
 	}
 
 	for _, tc := range cases {
@@ -887,7 +906,7 @@ func TestMigrateLockReleasePoolLiquidity_V1_5_0RoundTrip(t *testing.T) {
 			s := setupMigrationTestWithOldPool(t, chainSel, totalLiquidity, tc.kind)
 			chain := s.env.BlockChains.EVMChains()[chainSel]
 
-			// Confirm we really are migrating off the intended v1.5.0 contract.
+			// Confirm we really are migrating off the intended legacy contract.
 			tvBinding, err := type_and_version.NewTypeAndVersionContract(s.oldPoolAddr, chain.Client)
 			require.NoError(t, err)
 			tv, err := tvBinding.TypeAndVersion(&bind.CallOpts{Context: t.Context()})
@@ -939,25 +958,26 @@ func TestMigrateLockReleasePoolLiquidity_V1_5_0RoundTrip(t *testing.T) {
 				require.NoError(t, err)
 				return report.Output
 			}
-			require.Equal(t, big.NewInt(5000), balanceOf(s.oldPoolAddr), "Old v1.5.0 pool should keep half its liquidity")
+			require.Equal(t, big.NewInt(5000), balanceOf(s.oldPoolAddr), "Old pool should keep half its liquidity")
 			require.Equal(t, big.NewInt(5000), balanceOf(s.lockBoxAddr), "Lockbox should hold the migrated half")
 
-			// Both v1.5.0 lock-release pools share these selectors, so one binding reads either.
+			// Every one of these pools shares these selectors, so one binding reads each.
 			poolBinding, err := old_lrtp150.NewLockReleaseTokenPoolContract(s.oldPoolAddr, chain.Client)
 			require.NoError(t, err)
 			rebalancer, err := poolBinding.GetRebalancer(&bind.CallOpts{Context: t.Context()})
 			require.NoError(t, err)
-			require.Equal(t, s.deployer, rebalancer, "Rebalancer should be restored on the v1.5.0 pool")
+			require.Equal(t, s.deployer, rebalancer, "Rebalancer should be restored on the old pool")
 		})
 	}
 }
 
 // TestMigrateLockReleasePoolLiquidity_TimelockOwned migrates every plain legacy lock-release pool
-// (v1.5.0 plain and *AndProxy, v1.5.1, v1.6.1) owned by a timelock that is distinct from the deployer,
-// with an original rebalancer distinct from both. The deployer then cannot execute any source write,
-// so proposal generation must leave the pool untouched and the single batch must carry take-over ->
-// withdraw -> restore -> sink funding, in that order. When the timelock already is the rebalancer,
-// the take-over and restore are skipped.
+// (v1.4.0, v1.5.0 plain and *AndProxy, v1.5.1, v1.6.1) owned by a timelock that is distinct from the
+// deployer. The deployer then cannot execute any source write, so proposal generation must leave the
+// pool untouched and the single batch must carry take-over -> withdraw -> restore -> sink funding, in
+// that order. The original rebalancer may be any address, including zero or a burn address (a real
+// v1.4.0 pool has getRebalancer() == 0x…01), and is restored afterwards. When the timelock already is
+// the rebalancer, the take-over and restore are skipped.
 func TestMigrateLockReleasePoolLiquidity_TimelockOwned(t *testing.T) {
 	setRebalancerSelector := crypto.Keccak256([]byte("setRebalancer(address)"))[:4]
 	withdrawLiquiditySelector := crypto.Keccak256([]byte("withdrawLiquidity(uint256)"))[:4]
@@ -970,15 +990,25 @@ func TestMigrateLockReleasePoolLiquidity_TimelockOwned(t *testing.T) {
 		{name: "V1_5_0", kind: oldPoolV1_5_0},
 		{name: "V1_5_1", kind: oldPoolV1_5_1},
 		{name: "V1_6_1", kind: oldPoolV1_6_1},
+		{name: "V1_4_0", kind: oldPoolV1_4_0},
+	}
+
+	// The timelock is only known once the test has created it, hence isTimelock.
+	rebalancers := []struct {
+		name       string
+		rebalancer common.Address
+		isTimelock bool
+	}{
+		{name: "DistinctRebalancer", rebalancer: common.HexToAddress("0x0000000000000000000000000000000000000B0B")},
+		{name: "ZeroRebalancer", rebalancer: common.Address{}},
+		{name: "BurnedRebalancer", rebalancer: common.HexToAddress("0x0000000000000000000000000000000000000001")},
+		{name: "RebalancerAlreadyTimelock", isTimelock: true},
 	}
 
 	for _, k := range kinds {
-		for _, rebalancerIsTimelock := range []bool{false, true} {
-			name := k.name + "/DistinctRebalancer"
-			if rebalancerIsTimelock {
-				name = k.name + "/RebalancerAlreadyTimelock"
-			}
-			t.Run(name, func(t *testing.T) {
+		for _, r := range rebalancers {
+			rebalancerIsTimelock := r.isTimelock
+			t.Run(k.name+"/"+r.name, func(t *testing.T) {
 				chainSel := uint64(5009297550715157269)
 				totalLiquidity := big.NewInt(10000)
 				s := setupMigrationTestWithOldPool(t, chainSel, totalLiquidity, k.kind)
@@ -986,7 +1016,7 @@ func TestMigrateLockReleasePoolLiquidity_TimelockOwned(t *testing.T) {
 				timelockKey := newFundedKey(t, chain)
 				timelock := timelockKey.From
 
-				originalRebalancer := common.HexToAddress("0x0000000000000000000000000000000000000B0B")
+				originalRebalancer := r.rebalancer
 				if rebalancerIsTimelock {
 					originalRebalancer = timelock
 				}
@@ -1202,12 +1232,26 @@ func TestMigrateSiloedPool_TimelockOwnedSkipsMatchingRebalancers(t *testing.T) {
 	require.Equal(t, silo2Rebalancer, restoredSilo2Rebalancer, "silo2 rebalancer must be restored")
 }
 
-// TestMigrateLockReleasePoolLiquidity_V1_5_0RejectsExactSiloMode checks that the v1.5.0 source, whose
-// pools are never siloed, refuses per-silo exact amounts before touching the pool.
-func TestMigrateLockReleasePoolLiquidity_V1_5_0RejectsExactSiloMode(t *testing.T) {
+// TestMigrateLockReleasePoolLiquidity_NonSiloedSourceRejectsExactSiloMode checks that the v1.4.0 and
+// v1.5.0 sources, whose pools are never siloed, refuse per-silo exact amounts before touching the pool.
+func TestMigrateLockReleasePoolLiquidity_NonSiloedSourceRejectsExactSiloMode(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		kind oldPoolKind
+	}{
+		{name: "V1_4_0", kind: oldPoolV1_4_0},
+		{name: "V1_5_0", kind: oldPoolV1_5_0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testNonSiloedSourceRejectsExactSiloMode(t, tc.kind)
+		})
+	}
+}
+
+func testNonSiloedSourceRejectsExactSiloMode(t *testing.T, kind oldPoolKind) {
 	chainSel := uint64(5009297550715157269)
 	totalLiquidity := big.NewInt(10000)
-	s := setupMigrationTestWithOldPool(t, chainSel, totalLiquidity, oldPoolV1_5_0)
+	s := setupMigrationTestWithOldPool(t, chainSel, totalLiquidity, kind)
 
 	_, err := migrateLockReleasePoolLiquidity(
 		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
@@ -1340,6 +1384,18 @@ func TestMigrateLockReleasePoolLiquidity_SourceRejectsOtherOnChainVersion(t *tes
 			oldPool:       oldPoolV1_6_1,
 			expectedErr:   "the v1.5.0 liquidity migration source only supports v1.5.0 pools",
 		},
+		{
+			name:          "v1.4.0 source, v1.5.0 pool",
+			sourceVersion: cciputils.Version_1_4_0,
+			oldPool:       oldPoolV1_5_0,
+			expectedErr:   "the v1.4.0 liquidity migration source only supports v1.4.0 pools",
+		},
+		{
+			name:          "v1.5.0 source, v1.4.0 pool",
+			sourceVersion: cciputils.Version_1_5_0,
+			oldPool:       oldPoolV1_4_0,
+			expectedErr:   "the v1.5.0 liquidity migration source only supports v1.5.0 pools",
+		},
 	}
 
 	for _, tc := range cases {
@@ -1382,6 +1438,7 @@ func TestMigrateLockReleasePoolLiquidity_OldPoolNotOwnedByTimelock(t *testing.T)
 		{name: "v1.5.1", kind: oldPoolV1_5_1},
 		{name: "v1.5.0 AndProxy", kind: oldPoolV1_5_0AndProxy},
 		{name: "v1.5.0", kind: oldPoolV1_5_0},
+		{name: "v1.4.0", kind: oldPoolV1_4_0},
 	}
 
 	for _, tc := range cases {
