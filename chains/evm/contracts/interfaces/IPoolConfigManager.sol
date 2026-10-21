@@ -51,6 +51,48 @@ interface IPoolConfigManager {
     uint128 rate; // ──────╯ The tokens per second that refill the bucket.
   }
 
+  /// @notice Current outbound and inbound buckets for one finality class.
+  struct RateLimiterState {
+    TokenBucket outbound; // The outbound bucket.
+    TokenBucket inbound; //  The inbound bucket.
+  }
+
+  /// @notice Identifies one token and remote chain lane in batch queries.
+  struct LaneKey {
+    address localToken; //         The local token.
+    uint64 remoteChainSelector; // The remote chain.
+  }
+
+  /// @notice Resolved fee parameters for one token and destination.
+  struct LaneFee {
+    uint256 feeUSDCents; //        The flat fee in USD cents.
+    uint32 destGasOverhead; // ──╮ The destination token execution gas overhead.
+    uint32 destBytesOverhead; // │ The destination token data byte overhead.
+    uint16 tokenFeeBps; //       │ The fee deducted from the transferred asset, in basis points.
+    bool isEnabled; // ──────────╯ Whether the pool fee is enabled. False requests FeeQuoter fallback.
+  }
+
+  /// @notice Current buckets for both finality classes for one token and remote chain.
+  struct LaneRateLimiterState {
+    RateLimiterState defaultFinality; // The default finality buckets.
+    RateLimiterState fastFinality; //    The FTF buckets.
+  }
+
+  /// @notice Resolved routing state for one token and remote chain.
+  struct LaneRouting {
+    bool isOutboundPaused; // ─╮ Whether outbound transfers are paused.
+    bool isInboundPaused; // ──╯ Whether inbound transfers are paused.
+    bytes remoteToken; //        The encoded remote token address, or empty bytes if no lane exists.
+    bytes[] remotePools; //      The encoded trusted remote pools, or an empty list if no lane or pools exist.
+  }
+
+  /// @notice Resolved verification configuration for one token and remote chain.
+  struct LaneVerification {
+    address hooks; //          The lane's IAdvancedPoolHooks, or zero if none are configured or no lane exists.
+    address[] outboundCCVs; // The configured outbound CCVs, or empty if no lane exists.
+    address[] inboundCCVs; //  The configured inbound CCVs, or empty if no lane exists.
+  }
+
   /// @notice Resolved token-level configuration, independent of lane selection and pause state.
   struct TokenConfig {
     bool isRegistered; //                 True if the token is registered.
@@ -86,107 +128,74 @@ interface IPoolConfigManager {
   ) external returns (ResolvedInboundTransfer memory transfer);
 
   /// @notice Returns the resolved CCV list for a transfer direction.
-  /// @param localTokens The local tokens.
+  /// @param localToken The local token.
   /// @param remoteChainSelector The remote chain.
   /// @param direction The direction of the transfer.
-  /// @return requiredCCVs The configured lists, or empty if no lane exists, aligned with localTokens by index.
+  /// @return requiredCCVs The configured list, or empty if no lane exists.
   function getRequiredCCVs(
-    address[] calldata localTokens,
+    address localToken,
     uint64 remoteChainSelector,
     IPoolV2.MessageDirection direction
-  ) external view returns (address[][] memory requiredCCVs);
+  ) external view returns (address[] memory requiredCCVs);
 
   /// @notice Returns the resolved fee parameters for the requested finality.
-  /// @param localTokens The local tokens.
+  /// @param localToken The local token.
   /// @param destChainSelector The destination chain.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return feeUSDCents The flat fee in USD cents.
-  /// @return destGasOverhead The destination token execution gas overhead.
-  /// @return destBytesOverhead The destination token data byte overhead.
-  /// @return tokenFeeBps The fee deducted from the transferred asset, in basis points.
-  /// @return isEnabled Whether the pool fee is enabled. False requests FeeQuoter fallback.
+  /// @return fee The resolved fee params for the token and destination.
   function getFee(
-    address[] calldata localTokens,
+    address localToken,
     uint64 destChainSelector,
     bytes4 requestedFinalityConfig
-  )
-    external
-    view
-    returns (
-      uint256[] memory feeUSDCents,
-      uint32[] memory destGasOverhead,
-      uint32[] memory destBytesOverhead,
-      uint16[] memory tokenFeeBps,
-      bool[] memory isEnabled
-    );
+  ) external view returns (LaneFee memory fee);
 
-  /// @notice Returns the resolved lane fee configuration.
-  /// @param localTokens The local tokens.
-  /// @param destChainSelector The destination chain.
-  /// @return feeConfigs The configured fees, or a disabled zero configuration if no lane exists, aligned with
-  /// localTokens by index.
-  function getTokenTransferFeeConfig(
-    address[] calldata localTokens,
-    uint64 destChainSelector
+  /// @notice Returns the resolved fee parameters for the requested finality.
+  /// @param lanes The token and remote chain lanes to query.
+  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist return zero
+  /// values.
+  function getFeeBatch(
+    LaneKey[] calldata lanes,
+    bytes4 requestedFinalityConfig
+  ) external view returns (LaneFee[] memory fees);
+
+  /// @notice Returns the resolved lane fee configurations.
+  /// @param lanes The token and remote chain lanes to query.
+  /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist return
+  /// a disabled zero configuration.
+  function getTokenTransferFeeConfigBatch(
+    LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs);
 
-  /// @notice Returns the token's current buckets for the requested finality class under the resolved lane.
-  /// @param localTokens The local tokens.
-  /// @param remoteChainSelector The remote chain.
-  /// @param fastFinality True for the FTF buckets, false for the default finality buckets.
-  /// @return outbound The outbound buckets, aligned with localTokens by index.
-  /// @return inbound The inbound buckets, aligned with localTokens by index.
-  function getCurrentRateLimiterState(
-    address[] calldata localTokens,
-    uint64 remoteChainSelector,
-    bool fastFinality
-  ) external view returns (TokenBucket[] memory outbound, TokenBucket[] memory inbound);
+  /// @notice Returns the current buckets for both finality classes under each resolved lane.
+  /// @param lanes The token and remote chain lanes to query.
+  /// @return states The rate limiter state per lane, aligned with lanes by index. Lanes that do not exist return
+  /// zero values.
+  function getCurrentRateLimiterStateBatch(
+    LaneKey[] calldata lanes
+  ) external view returns (LaneRateLimiterState[] memory states);
 
-  /// @notice Returns the resolved lane hooks.
-  /// @param localTokens The local tokens.
-  /// @param remoteChainSelector The remote chain.
-  /// @return hooks The hooks addresses, or zero if none are configured or no lane exists, aligned with localTokens by
-  /// index.
-  function getHooks(
-    address[] calldata localTokens,
-    uint64 remoteChainSelector
-  ) external view returns (address[] memory hooks);
+  /// @notice Returns the resolved remote token, trusted remote pools and effective pause state.
+  /// @param lanes The token and remote chain lanes to query.
+  /// @return routings The routing state per lane, aligned with lanes by index. Lanes that do not exist return zero
+  /// values.
+  function getLaneRoutingBatch(
+    LaneKey[] calldata lanes
+  ) external view returns (LaneRouting[] memory routings);
 
-  /// @notice Returns the remote token from the resolved lane.
-  /// @param localTokens The local tokens.
-  /// @param remoteChainSelector The remote chain.
-  /// @return remoteTokens The encoded remote token addresses, or empty bytes if no lane exists, aligned with
-  /// localTokens by index.
-  function getRemoteToken(
-    address[] calldata localTokens,
-    uint64 remoteChainSelector
-  ) external view returns (bytes[] memory remoteTokens);
-
-  /// @notice Returns the trusted remote pools from the resolved lane.
-  /// @param localTokens The local tokens.
-  /// @param remoteChainSelector The remote chain.
-  /// @return remotePoolAddresses The encoded remote pool addresses, or an empty list if no lane or pools exist,
-  /// aligned with localTokens by index.
-  function getRemotePools(
-    address[] calldata localTokens,
-    uint64 remoteChainSelector
-  ) external view returns (bytes[][] memory remotePoolAddresses);
-
-  /// @notice Returns the effective outbound and inbound pause state for a token and remote chain.
-  /// @param localTokens The local tokens.
-  /// @param remoteChainSelector The remote chain.
-  /// @return isOutboundPaused Whether outbound transfers are paused, aligned with localTokens by index.
-  /// @return isInboundPaused Whether inbound transfers are paused, aligned with localTokens by index.
-  function isTokenLanePaused(
-    address[] calldata localTokens,
-    uint64 remoteChainSelector
-  ) external view returns (bool[] memory isOutboundPaused, bool[] memory isInboundPaused);
+  /// @notice Returns the resolved hooks and outbound and inbound CCV lists.
+  /// @param lanes The token and remote chain lanes to query.
+  /// @return verifications The verification configuration per lane, aligned with lanes by index. Lanes that do
+  /// not exist return zero values.
+  function getLaneVerificationBatch(
+    LaneKey[] calldata lanes
+  ) external view returns (LaneVerification[] memory verifications);
 
   /// @notice Returns the token's resolved configuration.
   /// @dev Returns the resolved value based on group setting / token override.
   /// @param localTokens The local tokens.
   /// @return configs The resolved token configurations, aligned with localTokens by index.
-  function getTokenConfig(
+  function getTokenConfigBatch(
     address[] calldata localTokens
   ) external view returns (TokenConfig[] memory configs);
 
