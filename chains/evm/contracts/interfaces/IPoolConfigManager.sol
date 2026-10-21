@@ -11,8 +11,6 @@ import {Pool} from "../libraries/Pool.sol";
 /// Views can return values without token registration or a record for the token and chain.
 /// For example, the global pause applies to all tokens and chains.
 interface IPoolConfigManager {
-  error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
-
   /// @notice The token operation used on send. Burn flavors mint on receive; Lock uses a lock box in both directions.
   enum LockOrBurnFlavor {
     Burn, //          burn(amount), as in BurnMintTokenPool.
@@ -34,14 +32,13 @@ interface IPoolConfigManager {
     address hooks; //                       The lane's IAdvancedPoolHooks, called preflight. Zero means no hooks.
   }
 
-  /// @notice Resolved inbound transfer. The pool must validate source-token identity and its supported flavor.
+  /// @notice Resolved inbound transfer. The pool must validate its supported flavor.
   struct ResolvedInboundTransfer {
-    bytes remoteToken; // The expected encoded source token address.
-    uint256 localAmount; // The converted amount charged to the inbound bucket and delivered to the receiver.
-    LockOrBurnFlavor lockOrBurnFlavor; // The token's configured send operation.
-    address lockOrBurnAddress; // BurnToAddress target, Lock box, zero otherwise.
-    bool allowSourceTokenAddressMissingOnReceive; // Whether legacy pool data without a source token is accepted.
-    address hooks; // The postflight hooks to call. Zero means no hooks.
+    uint256 localAmount; //                 The converted amount charged to the inbound bucket and delivered to the
+    //                                      receiver.
+    LockOrBurnFlavor lockOrBurnFlavor; // ╮ The token's configured send operation.
+    address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
+    address hooks; //                       The postflight hooks to call. Zero means no hooks.
   }
 
   /// @notice Token bucket state in local token units, with the ABI layout of RateLimiter.TokenBucket.
@@ -127,10 +124,12 @@ interface IPoolConfigManager {
     bool chargeTokenFee
   ) external returns (OutboundLane memory lane);
 
-  /// @notice Checks the inbound lane, converts the amount and consumes its rate limit.
+  /// @notice Checks the inbound lane and source token, converts the amount and consumes its rate limit.
+  /// @dev Checks effective inbound pause, lane existence, source pool, source pool data, source-token identity and
+  /// available rate-limit capacity. Source pool data without the source token is accepted only if the lane allows it.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
-  /// @return transfer The converted amount, expected source token, token profile and postflight hooks.
+  /// @return transfer The converted amount, token profile and postflight hooks.
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata input,
     bytes4 requestedFinalityConfig
