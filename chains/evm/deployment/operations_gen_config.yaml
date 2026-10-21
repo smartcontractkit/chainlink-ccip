@@ -144,16 +144,15 @@ contracts:
 
   # LockReleaseTokenPool as deployed for v1.2.0 lanes.
   #
-  # There are no official v1.2.0 LockRelease gobindings; the v1.0.0 binding's selectors are
-  # identical, so the ABI is read from v1_0_0 and these operations are generated there. The v1.2.0
-  # adapter imports them, which is the same reuse the v1.5.0 migration path already relies on (see
-  # readV12Limits in v1_5_0/adapters/tokens.go). ContractType/Version therefore read 1.0.0 while the
-  # deployed contract reports "LockReleaseTokenPool 1.2.0".
+  # This entry predates the LockReleaseTokenPool 1.2.0 gobinding (see the v1.2.0 entry above, which
+  # serves canAcceptLiquidity). getProvidedLiquidity was generated here from the v1.0.0 binding,
+  # whose selectors are identical, so ContractType/Version read 1.0.0 while the deployed contract
+  # reports "LockReleaseTokenPool 1.2.0".
   #
-  # Only getProvidedLiquidity is generated: the whole shared pool surface lives in the v1.2.0
-  # TokenPool package with identical selectors, and the liquidity WRITE path (addLiquidity /
-  # removeLiquidity) is deliberately not exposed - see the v1.2.0 adapter for why draining is out of
-  # scope.
+  # Only getProvidedLiquidity is generated: the shared pool surface lives in the v1.2.0 TokenPool
+  # package with identical selectors, and addLiquidity/removeLiquidity only move a provider's own
+  # credit, so they are not exposed (the v1.2.0 liquidity migration source releases through
+  # releaseOrMint instead).
   - contract_name: LockReleaseTokenPool
     version: "1.0.0"
     no_deployment: true

@@ -885,12 +885,13 @@ func TestMigrateLockReleasePoolLiquidity_ExactAmount(t *testing.T) {
 	require.Equal(t, 0, exactAmount.Cmp(lockboxBal.Output), "Lockbox should hold the exact migrated amount")
 }
 
-// TestMigrateLockReleasePoolLiquidity_V1_5_0RoundTrip migrates both v1.5.0 lock-release pools
-// (LockReleaseTokenPoolAndProxy and the plain LockReleaseTokenPool) end to end through the v1.5.0
-// source and the v2.0.0 sink: rebalancer take-over, withdraw, fund the lockbox, restore.
+// TestMigrateLockReleasePoolLiquidity_ProposalOnlyWithdrawRoundTrip migrates every legacy
+// lock-release pool whose source uses a proposal-only withdraw (v1.5.0 LockReleaseTokenPoolAndProxy,
+// v1.5.0 LockReleaseTokenPool and v1.4.0 LockReleaseTokenPool) end to end through its own source and
+// the v2.0.0 sink: rebalancer take-over, withdraw, fund the lockbox, restore.
 //
-// The composer resolves the source from the pool's on-chain version (v1.4.0 or v1.5.0), and every
-// one of these pools shares the lock-release selectors the v1.5.0 bindings call. As in the v1.5.1
+// The composer resolves the source from the pool's on-chain version (v1.4.0 or v1.5.0), and each
+// source drives the pool with that version's own bindings. As in the v1.5.1
 // round trip, the deployer stands in for the timelock and owns the pool, so only the proposal-only
 // withdraw is batched; the original rebalancer is set to the deployer so that withdraw is still
 // authorized.
