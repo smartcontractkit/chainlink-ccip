@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-ccip/devenv
 
-go 1.26.7
+go 1.27.1
 
 replace (
 	github.com/grafana/loki/v3 => github.com/grafana/loki/v3 v3.7.3
