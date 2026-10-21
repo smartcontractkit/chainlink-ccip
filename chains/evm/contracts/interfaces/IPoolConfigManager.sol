@@ -78,12 +78,16 @@ interface IPoolConfigManager {
     RateLimiterState fastFinality; //    The FTF buckets.
   }
 
-  /// @notice Resolved routing state for one token and remote chain.
-  struct LaneRouting {
-    bool isOutboundPaused; // ─╮ Whether outbound transfers are paused.
-    bool isInboundPaused; // ──╯ Whether inbound transfers are paused.
-    bytes remoteToken; //        The encoded remote token address, or empty bytes if no lane exists.
-    bytes[] remotePools; //      The encoded trusted remote pools, or an empty list if no lane or pools exist.
+  /// @notice Resolved connection and chain records and effective pause state for one token and remote chain.
+  struct LaneConnection {
+    bool isOutboundPaused; // ───────────────────────╮ Whether outbound transfers are paused.
+    bool isInboundPaused; //                         │ Whether inbound transfers are paused.
+    bool omitSourceTokenAddressOnSend; //            │ True sends pool data without the source token.
+    bool allowSourceTokenAddressMissingOnReceive; // │ True accepts pool data without the source token.
+    uint32 destGasOverhead; //                       │ The destination token execution gas overhead.
+    uint32 destBytesOverhead; // ────────────────────╯ The destination token data byte overhead.
+    bytes remoteToken; //                             The encoded remote token, or empty bytes if no lane exists.
+    bytes[] remotePools; //                           The encoded trusted remote pools, or an empty list if none exist.
   }
 
   /// @notice Resolved verification configuration for one token and remote chain.
@@ -94,12 +98,14 @@ interface IPoolConfigManager {
   }
 
   /// @notice Resolved token-level configuration, independent of lane selection and pause state.
+  // solhint-disable-next-line gas-struct-packing
   struct TokenConfig {
-    bool isRegistered; //                 True if the token is registered.
-    uint8 localDecimals; //               The decimals of the local token. Zero if the token is not registered.
-    LockOrBurnFlavor lockOrBurnFlavor; // How the pool moves the local token out. Burn if the token is not registered.
-    bytes4 allowedFinalityConfig; //      The allowed finality config. Decode with FinalityCodec.
-    uint64[] supportedChains; //          The remote chains covered by the token's resolved lanes.
+    bool isRegistered; // ────────────────╮ True if the token is registered.
+    uint8 localDecimals; //               │ The decimals of the local token. Zero if the token is not registered.
+    LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out. Burn if not registered.
+    bytes4 allowedFinalityConfig; //      │ The allowed finality config. Decode with FinalityCodec.
+    address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
+    uint64[] supportedChains; //            The remote chains covered by the token's resolved lanes.
   }
 
   /// @notice Validates an outbound transfer and consumes its rate limit after the token fee.
@@ -142,7 +148,10 @@ interface IPoolConfigManager {
   /// @param localToken The local token.
   /// @param destChainSelector The destination chain.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fee The resolved fee params for the token and destination.
+  /// @dev Reverts with FinalityCodec.InvalidRequestedFinality if the token profile does not allow the requested
+  /// finality, also for a token without a lane. This is the only PCM view that reverts.
+  /// @return fee The resolved fee params, or zeros with isEnabled false if the fee record is disabled or the token
+  /// has no lane or chain record.
   function getFee(
     address localToken,
     uint64 destChainSelector,
@@ -150,10 +159,12 @@ interface IPoolConfigManager {
   ) external view returns (LaneFee memory fee);
 
   /// @notice Returns the resolved fee parameters for the requested finality.
+  /// @dev Never reverts. Unlike getFee, it does not check the requested finality against the token profile. Read
+  /// TokenConfig.allowedFinalityConfig to know whether a send with that finality would revert.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist return zero
-  /// values.
+  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fee
+  /// record is disabled, return zeros with isEnabled false.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -175,13 +186,13 @@ interface IPoolConfigManager {
     LaneKey[] calldata lanes
   ) external view returns (LaneRateLimiterState[] memory states);
 
-  /// @notice Returns the resolved remote token, trusted remote pools and effective pause state.
+  /// @notice Returns the resolved connection and chain records and the effective pause state.
   /// @param lanes The token and remote chain lanes to query.
-  /// @return routings The routing state per lane, aligned with lanes by index. Lanes that do not exist return zero
-  /// values.
-  function getLaneRoutingBatch(
+  /// @return connections The connection state per lane, aligned with lanes by index. Lanes that do not exist return
+  /// zero values.
+  function getLaneConnectionBatch(
     LaneKey[] calldata lanes
-  ) external view returns (LaneRouting[] memory routings);
+  ) external view returns (LaneConnection[] memory connections);
 
   /// @notice Returns the resolved hooks and outbound and inbound CCV lists.
   /// @param lanes The token and remote chain lanes to query.

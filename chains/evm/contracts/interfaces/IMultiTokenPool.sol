@@ -6,7 +6,32 @@ import {IPoolV1V2} from "./IPoolV1V2.sol";
 
 /// @notice Shared interface for CCIP pools that serve multiple tokens.
 /// @dev The inherited isSupportedChain(uint64) and getRemoteToken(uint64) views revert with LocalTokenRequired.
-/// Query per-token state from the pool config manager returned by getPoolConfigManager.
+/// Use the overloads that take the local token. Batch views live on the pool config manager.
 interface IMultiTokenPool is IPoolV1V2, IGetPoolConfigManager {
   error LocalTokenRequired();
+
+  /// @notice Returns whether the pool supports the token and the token has a lane to the remote chain.
+  /// @param localToken The local token.
+  /// @param remoteChainSelector The remote chain.
+  /// @return supported True if the pool supports the token and a lane exists.
+  function isSupportedChain(
+    address localToken,
+    uint64 remoteChainSelector
+  ) external view returns (bool supported);
+
+  /// @notice Returns the remote token from the resolved lane.
+  /// @param localToken The local token.
+  /// @param remoteChainSelector The remote chain.
+  /// @return remoteToken The encoded remote token, or empty bytes if no lane exists.
+  function getRemoteToken(
+    address localToken,
+    uint64 remoteChainSelector
+  ) external view returns (bytes memory remoteToken);
+
+  /// @notice Returns the token decimals stored by the pool config manager.
+  /// @param localToken The local token.
+  /// @return decimals The configured decimals, or zero if the token is not registered.
+  function getTokenDecimals(
+    address localToken
+  ) external view returns (uint8 decimals);
 }
