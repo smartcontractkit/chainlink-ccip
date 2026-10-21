@@ -8,6 +8,8 @@ import {Pool} from "../libraries/Pool.sol";
 /// @notice Transfer validation and resolved configuration views for multi-token pools.
 /// @dev Lane configuration resolves through token, covering group chain, then group default records.
 /// Rate-limit consumption accepts calls only from the token's TokenAdminRegistry pool.
+/// Views can return values without token registration or a record for the token and chain.
+/// For example, the global pause applies to all tokens and chains.
 interface IPoolConfigManager {
   error OverflowDetected(uint8 remoteDecimals, uint8 localDecimals, uint256 remoteAmount);
 
@@ -80,7 +82,8 @@ interface IPoolConfigManager {
 
   /// @notice Resolved connection and chain records and effective pause state for one token and remote chain.
   struct LaneConnection {
-    bool isOutboundPaused; // ───────────────────────╮ Whether outbound transfers are paused.
+    bool hasConnection; // ──────────────────────────╮ True if a connection record applies to the token and remote chain.
+    bool isOutboundPaused; //                        │ Whether outbound transfers are paused.
     bool isInboundPaused; //                         │ Whether inbound transfers are paused.
     bool omitSourceTokenAddressOnSend; //            │ True sends pool data without the source token.
     bool allowSourceTokenAddressMissingOnReceive; // │ True accepts pool data without the source token.
@@ -187,9 +190,10 @@ interface IPoolConfigManager {
   ) external view returns (LaneRateLimiterState[] memory states);
 
   /// @notice Returns the resolved connection and chain records and the effective pause state.
+  /// @dev A direction is paused if the global pause, token pause or chain pause applies to it.
+  /// Pause flags do not depend on token registration or connection records.
   /// @param lanes The token and remote chain lanes to query.
-  /// @return connections The connection state per lane, aligned with lanes by index. Lanes that do not exist return
-  /// zero values.
+  /// @return connections The connection state per lane, aligned with lanes by index.
   function getLaneConnectionBatch(
     LaneKey[] calldata lanes
   ) external view returns (LaneConnection[] memory connections);
