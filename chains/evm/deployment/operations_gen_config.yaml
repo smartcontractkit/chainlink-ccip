@@ -22,10 +22,14 @@ contracts:
   # Behind a proxy the proxy itself is the only registered ramp, so there is exactly ONE outbound and
   # ONE inbound limiter shared across every lane.
   #
-  # Only reads are generated. Everything lane-shaped is served by the fronting proxy, and a write here
-  # would hit the shared per-ramp limiter and silently affect every lane at once, so no write
-  # operation is exposed at all. BurnMintTokenPool declares no external functions beyond the base
-  # surface, so its ABI IS the base ABI (same pattern as v1.5.0's TokenPoolAndProxy).
+  # Everything lane-shaped is served by the fronting proxy, and a rate-limit write here would hit
+  # the shared per-ramp limiter and silently affect every lane at once, so no lane write is exposed.
+  # BurnMintTokenPool declares no external functions beyond the base surface, so its ABI IS the base
+  # ABI (same pattern as v1.5.0's TokenPoolAndProxy).
+  #
+  # The one write is applyRampUpdates (onlyOwner), used only by the v1.2.0 liquidity migration
+  # source to register the timelock as an extra offRamp (with its own, disabled limiter) and to
+  # deregister it afterwards. It never touches the proxy's ramp or limiter.
   #
   # No deployment: a new v1.2.0 pool is never correct.
   - contract_name: TokenPool
@@ -48,6 +52,22 @@ contracts:
       - name: currentOnRampRateLimiterState
         access: public
       - name: currentOffRampRateLimiterState
+        access: public
+      - name: applyRampUpdates
+        access: owner
+
+  # The lock-release surface of the v1.2.0 pool on top of TokenPool above. The ABI comes from the
+  # LockReleaseTokenPool 1.2.0 gobinding (taken from the ccip contracts-ccip/v1.2.1 release).
+  #
+  # A v1.2.0 lock-release pool has no rebalancer: addLiquidity/removeLiquidity only move a
+  # provider's own credit, so they are not generated. releaseOrMint is onlyOffRamp, which no access
+  # alias describes; the liquidity migration source uses the hand-written proposal-only
+  # ReleaseOrMintProposalOnly (contract.NoCallersAllowed) instead.
+  - contract_name: LockReleaseTokenPool
+    version: "1.2.0"
+    no_deployment: true
+    functions:
+      - name: canAcceptLiquidity
         access: public
 
   # 1.4.0

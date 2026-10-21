@@ -45,6 +45,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
+	lock_release_token_pool_v120 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/lock_release_token_pool"
 	lock_release_token_pool_v140 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_4_0/lock_release_token_pool"
 	lock_release_token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/lock_release_token_pool"
 	lock_release_token_pool_v151 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
@@ -54,6 +55,7 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 
 	// Register the token adapters the migration resolves its source and sink from.
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_4_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_1/adapters"
@@ -295,6 +297,13 @@ const (
 	// oldPoolV1_4_0 is the v1.4.0 LockReleaseTokenPool, migrated by the v1.4.0 source. There are no
 	// v1.4.0 deploy ops, so it is deployed straight from the gobindings.
 	oldPoolV1_4_0
+	// oldPoolV1_2_0 is the v1.2.0 LockReleaseTokenPool, migrated by the v1.2.0 offRamp-rescue source.
+	// It is deployed with acceptLiquidity=false, so the liquidity minted into it stands in for
+	// bridge-locked tokens credited to no provider.
+	oldPoolV1_2_0
+	// oldPoolV1_2_0AcceptingLiquidity is oldPoolV1_2_0 deployed with acceptLiquidity=true, which the
+	// v1.2.0 source must refuse.
+	oldPoolV1_2_0AcceptingLiquidity
 )
 
 // setupMigrationTest deploys all contracts needed for a migration test:
@@ -368,6 +377,15 @@ func setupMigrationTestWithOldPool(t *testing.T, chainSel uint64, liquidityAmoun
 
 	var oldPoolAddr common.Address
 	switch kind {
+	case oldPoolV1_2_0, oldPoolV1_2_0AcceptingLiquidity:
+		// No v1.2.0 deploy ops exist either; the constructor has no router (v1.2.0 pools are
+		// ramp-keyed).
+		addr, tx, _, err := lock_release_token_pool_v120.DeployLockReleaseTokenPool(
+			chain.DeployerKey, chain.Client, tokenAddr, []common.Address{}, rmnProxyAddr, kind == oldPoolV1_2_0AcceptingLiquidity)
+		require.NoError(t, err)
+		_, err = chain.Confirm(tx)
+		require.NoError(t, err)
+		oldPoolAddr = addr
 	case oldPoolV1_4_0:
 		// Same constructor as v1.5.0, with the RMN proxy still named armProxy.
 		addr, tx, _, err := lock_release_token_pool_v140.DeployLockReleaseTokenPool(
@@ -1395,6 +1413,18 @@ func TestMigrateLockReleasePoolLiquidity_SourceRejectsOtherOnChainVersion(t *tes
 			sourceVersion: cciputils.Version_1_5_0,
 			oldPool:       oldPoolV1_4_0,
 			expectedErr:   "the v1.5.0 liquidity migration source only supports v1.5.0 pools",
+		},
+		{
+			name:          "v1.2.0 source, v1.4.0 pool",
+			sourceVersion: cciputils.Version_1_2_0,
+			oldPool:       oldPoolV1_4_0,
+			expectedErr:   "the v1.2.0 liquidity migration source only supports v1.2.0 pools",
+		},
+		{
+			name:          "v1.4.0 source, v1.2.0 pool",
+			sourceVersion: cciputils.Version_1_4_0,
+			oldPool:       oldPoolV1_2_0,
+			expectedErr:   "the v1.4.0 liquidity migration source only supports v1.4.0 pools",
 		},
 	}
 
