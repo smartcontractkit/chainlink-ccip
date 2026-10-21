@@ -107,7 +107,12 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
-	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
+	// On CCIP 2.0 the OnRamp charges the lane's token network fee (tokenNetworkFeeUSDCents) on top of any
+	// FeeQuoter token transfer fee, so the default FeeQuoter fee must be zero to avoid double charging.
+	// Pre-2.0 FeeQuoters keep the shared 1.x lane defaults.
+	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst, func(cfg *fees.TokenTransferFeeArgs) {
+		cfg.MinFeeUSDCents = 0
+	})
 }
 
 func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(b operations.Bundle, chains cldf_chain.BlockChains, feeRef datastore.AddressRef, src uint64, dst uint64, address string) (fees.TokenTransferFeeArgs, error) {

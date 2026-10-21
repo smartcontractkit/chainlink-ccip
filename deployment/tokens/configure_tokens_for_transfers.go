@@ -810,7 +810,7 @@ func ApplyTokenTransferFeeConfigOnFeeQuoter(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
-	defaultConfig := fees.GetDefaultChainAgnosticTokenTransferFeeConfig(
+	defaultConfig := feeAdapter.GetDefaultTokenTransferFeeConfig(
 		src,
 		dst,
 	)
@@ -1189,25 +1189,18 @@ func ResolveTokenFeeAdapter(e cldf.Environment, sel uint64, poolRef datastore.Ad
 	return feeAdapter, nil
 }
 
-// GetDefaultChainAgnosticTokenTransferFeeConfig returns sensible default token transfer fee configuration
-// for the given source and destination chain selectors. It may be overridden via the optional overrides
-// argument, allowing the caller to customize specific fields of the returned config.
+// GetDefaultChainAgnosticTokenTransferFeeConfig returns the default token transfer fee configuration
+// for a V2 token pool on the given source and destination chains. On CCIP 2.0 the OnRamp already charges
+// the lane's token network fee (tokenNetworkFeeUSDCents) in addition to any pool fee, so the pool fee
+// defaults to zero to avoid double charging. Only the gas/bytes overheads are populated; callers that
+// need a non-zero pool fee (e.g. an agreed fee share with an asset issuer) must set it explicitly via
+// the optional overrides argument.
 func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeConfig)) TokenTransferFeeConfig {
-	var minFeeUSDCents uint32
-	switch {
-	case src == chain_selectors.ETHEREUM_MAINNET.Selector:
-		minFeeUSDCents = 50
-	case dst == chain_selectors.ETHEREUM_MAINNET.Selector:
-		minFeeUSDCents = 150
-	default:
-		minFeeUSDCents = 25
-	}
-
 	cfg := TokenTransferFeeConfig{
 		DefaultFinalityTransferFeeBps: 0,
 		CustomFinalityTransferFeeBps:  0,
-		DefaultFinalityFeeUSDCents:    minFeeUSDCents,
-		CustomFinalityFeeUSDCents:     minFeeUSDCents,
+		DefaultFinalityFeeUSDCents:    0,
+		CustomFinalityFeeUSDCents:     0,
 		DestBytesOverhead:             32,
 		DestGasOverhead:               90_000,
 		IsEnabled:                     true,
