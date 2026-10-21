@@ -37,7 +37,7 @@ func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overr
 	return cfg
 }
 
-func ResolveFeeAdapter(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src, dst uint64) (FeeAdapter, datastore.AddressRef, error) {
+func ResolveFeeAdapterAndOnRamp(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src, dst uint64) (FeeAdapter, datastore.AddressRef, datastore.AddressRef, error) {
 	// NOTE: the OnRamp version and FeeQuoter versions are not guaranteed to be the same.
 	// We need to do a multi-step lookup in order to get the fee quoter that's currently
 	// configured on-chain.
@@ -45,34 +45,39 @@ func ResolveFeeAdapter(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds data
 
 	fam, err := chainsel.GetSelectorFamily(src)
 	if err != nil {
-		return nil, datastore.AddressRef{}, fmt.Errorf("failed to get chain selector family for selector %d: %w", src, err)
+		return nil, datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to get chain selector family for selector %d: %w", src, err)
 	}
 
 	// Fee Quoter resolution part 1: get the current on ramp from the router
 	resolver, ok := registry.GetFeeResolver(fam)
 	if !ok {
-		return nil, datastore.AddressRef{}, fmt.Errorf("no fee resolver found for chain selector %d", src)
+		return nil, datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("no fee resolver found for chain selector %d", src)
 	}
 	onRampRef, err := resolver.GetOnRampRef(b, chains, ds, src, dst)
 	if err != nil {
-		return nil, datastore.AddressRef{}, fmt.Errorf("failed to resolve on-ramp ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
+		return nil, datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to resolve on-ramp ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
 
 	// Fee Quoter resolution part 2: get the current fee quoter from the on ramp
 	onRampAdp, ok := registry.GetFeeAdapter(fam, onRampRef.Version)
 	if !ok {
-		return nil, datastore.AddressRef{}, fmt.Errorf("no fee adapter found for chain selector %d, version %s", src, onRampRef.Version)
+		return nil, datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("no fee adapter found for chain selector %d, version %s", src, onRampRef.Version)
 	}
 	feeRef, err := onRampAdp.GetFeeContractRef(b, chains, ds, onRampRef, src, dst)
 	if err != nil {
-		return nil, datastore.AddressRef{}, fmt.Errorf("failed to get fee contract ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
+		return nil, datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("failed to get fee contract ref for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
 
 	// Fee Quoter resolution part 3: lookup the adapter using the fee quoter version
 	feeQuoterAdp, ok := registry.GetFeeAdapter(fam, feeRef.Version)
 	if !ok {
-		return nil, datastore.AddressRef{}, fmt.Errorf("no fee adapter found for chain selector %d and fee quoter version %s", src, feeRef.Version)
+		return nil, datastore.AddressRef{}, datastore.AddressRef{}, fmt.Errorf("no fee adapter found for chain selector %d and fee quoter version %s", src, feeRef.Version)
 	}
 
-	return feeQuoterAdp, feeRef, nil
+	return feeQuoterAdp, onRampRef, feeRef, nil
+}
+
+func ResolveFeeAdapter(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src, dst uint64) (FeeAdapter, datastore.AddressRef, error) {
+	feeAdapter, _, feeRef, err := ResolveFeeAdapterAndOnRamp(b, chains, ds, src, dst)
+	return feeAdapter, feeRef, err
 }

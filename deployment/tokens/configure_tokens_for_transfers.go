@@ -1008,6 +1008,11 @@ func convertRemoteChainConfig(
 // against rc's YAML input. When YAML specifies tokenTransferFeeConfig, fields merge with legacy;
 // when YAML omits fees, legacy is imported when enabled. Returns nil when legacy is disabled and
 // YAML omits fees. Partial YAML without isEnabled is rejected.
+//
+// On CCIP 2.0 lanes the OnRamp charges a flat token network fee on top of any V2 pool fee. The legacy
+// FeeQuoter/OnRamp token fee already includes the old lane default, which is what the 2.0 OnRamp's
+// token network fee was seeded from, so we subtract it before importing the legacy fee onto the pool
+// (clamped at zero). Without this the same fee is charged twice.
 func LegacyFeesForAutoMigrate[R any, CCV any](
 	e cldf.Environment,
 	localSelector uint64,
@@ -1022,12 +1027,31 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 		}
 	}
 
-	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
+	feeAdapter, onRampRef, fqRef, err := fees.ResolveFeeAdapterAndOnRamp(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w",
 			localSelector, remoteSelector, err,
 		)
+	}
+
+	// On 2.0 lanes the OnRamp token network fee must be subtracted from the legacy fee. If the adapter
+	// cannot read it, refuse rather than import the full legacy fee and reintroduce the double charge.
+	onRampReader, hasOnRampReader := feeAdapter.(fees.OnRampDestChainConfigReader)
+	if !hasOnRampReader && onRampRef.Version != nil && onRampRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
+		return nil, fmt.Errorf(
+			"fee adapter for FeeQuoter version %s cannot read the OnRamp token network fee; refusing to import the legacy fee without subtracting it",
+			fqRef.Version,
+		)
+	}
+
+	var networkFeeUSDCents uint32
+	if hasOnRampReader {
+		if onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector); err != nil {
+			return nil, fmt.Errorf("failed to read OnRamp dest chain config for chain selector %d and remote chain selector %d: %w", localSelector, remoteSelector, err)
+		} else {
+			networkFeeUSDCents = uint32(onRampCfg.TokenNetworkFeeUSDCents)
+		}
 	}
 
 	legacyTTFC, err := feeAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fqRef, localSelector, remoteSelector, tokenAddress)
@@ -1038,10 +1062,24 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 		)
 	}
 
+	// Import the legacy fee minus the OnRamp network fee so the total charged (network + pool) equals
+	// the legacy fee. A legacy fee below the network fee cannot be represented (the pool fee can't be
+	// negative), so it is clamped to zero and surfaced for review.
+	importedFeeUSDCents := uint32(0)
+	switch {
+	case legacyTTFC.MinFeeUSDCents > networkFeeUSDCents:
+		importedFeeUSDCents = legacyTTFC.MinFeeUSDCents - networkFeeUSDCents
+	case legacyTTFC.MinFeeUSDCents < networkFeeUSDCents:
+		e.Logger.Warnf(
+			"legacy token fee (%d cents) for token %s on %d->%d is below the OnRamp token network fee (%d cents); clamping the imported pool fee to 0",
+			legacyTTFC.MinFeeUSDCents, tokenAddress, localSelector, remoteSelector, networkFeeUSDCents,
+		)
+	}
+
 	legacy := TokenTransferFeeConfig{
 		DestGasOverhead:               legacyTTFC.DestGasOverhead,
 		DestBytesOverhead:             legacyTTFC.DestBytesOverhead,
-		DefaultFinalityFeeUSDCents:    legacyTTFC.MinFeeUSDCents,
+		DefaultFinalityFeeUSDCents:    importedFeeUSDCents,
 		CustomFinalityFeeUSDCents:     0,
 		DefaultFinalityTransferFeeBps: legacyTTFC.DeciBps,
 		CustomFinalityTransferFeeBps:  0,
