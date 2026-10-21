@@ -204,7 +204,9 @@ func initAccessController(b operations.Bundle, deps Deps, in InitAccessControlle
 	if ref.Address != "" {
 		accessControllerAccount = solana.PublicKeyFromBytes([]byte(ref.Address))
 		var data access_controller.AccessController
-		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, accessControllerAccount, rpc.CommitmentFinalized, &data)
+		// Poll until the account is visible at the finalized commitment: it may have been
+		// created moments ago by a transaction that was only confirmed, not finalized.
+		err := common.GetFinalizedAccountDataBorshInto(b.GetContext(), deps.Chain.Client, accessControllerAccount, &data)
 		if err == nil {
 			b.Logger.Infow("access controller already initialized, skipping initialization", "chain", deps.Chain.String())
 			return cldf_datastore.AddressRef{}, nil
@@ -269,7 +271,9 @@ func initializeAccessController(
 	}
 
 	var data access_controller.AccessController
-	err = common.GetAccountDataBorshInto(b.GetContext(), chain.Client, roleAccount.PublicKey(), rpc.CommitmentFinalized, &data)
+	// The account was just created and confirmed at a lower commitment level; poll until it is
+	// visible at the finalized commitment.
+	err = common.GetFinalizedAccountDataBorshInto(b.GetContext(), chain.Client, roleAccount.PublicKey(), &data)
 	if err != nil {
 		return fmt.Errorf("failed to read access controller roleAccount: %w", err)
 	}
@@ -307,7 +311,9 @@ func initMCM(b operations.Bundle, deps Deps, in InitMCMInput) (MCMOutput, error)
 		mcmSeed = state.PDASeed([]byte(ref.Address))
 		mcmConfigPDA := state.GetMCMConfigPDA(in.MCM, mcmSeed)
 		var data mcm.MultisigConfig
-		err := common.GetAccountDataBorshInto(b.GetContext(), deps.Chain.Client, mcmConfigPDA, rpc.CommitmentFinalized, &data)
+		// Poll until the account is visible at the finalized commitment: it may have been
+		// created moments ago by a transaction that was only confirmed, not finalized.
+		err := common.GetFinalizedAccountDataBorshInto(b.GetContext(), deps.Chain.Client, mcmConfigPDA, &data)
 		if err == nil {
 			b.Logger.Infow("mcm config already initialized, skipping initialization", "chain", deps.Chain.String())
 			return MCMOutput{}, nil
