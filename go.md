@@ -89,6 +89,8 @@ flowchart LR
 	chainlink-canton --> chainlink/v2
 	chainlink-canton --> mcms
 	click chainlink-canton href "https://github.com/smartcontractkit/chainlink-canton"
+	chainlink-canton/authentication
+	click chainlink-canton/authentication href "https://github.com/smartcontractkit/chainlink-canton"
 	chainlink-canton/contracts/v2 --> go-daml
 	click chainlink-canton/contracts/v2 href "https://github.com/smartcontractkit/chainlink-canton"
 	chainlink-ccip --> chainlink-common
@@ -250,6 +252,7 @@ flowchart LR
 	libocr --> go-sumtype2
 	click libocr href "https://github.com/smartcontractkit/libocr"
 	mcms --> chainlink-canton
+	mcms --> chainlink-canton/authentication
 	mcms --> chainlink-canton/contracts/v2
 	mcms --> chainlink-ccip/chains/solana
 	mcms --> chainlink-ccip/deployment
@@ -274,6 +277,7 @@ flowchart LR
 
 	subgraph chainlink-canton-repo[chainlink-canton]
 		 chainlink-canton
+		 chainlink-canton/authentication
 		 chainlink-canton/contracts/v2
 	end
 	click chainlink-canton-repo href "https://github.com/smartcontractkit/chainlink-canton"
