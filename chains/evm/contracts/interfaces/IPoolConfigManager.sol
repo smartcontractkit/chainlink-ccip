@@ -20,12 +20,12 @@ interface IPoolConfigManager {
     Lock //           ILockBox.deposit and ILockBox.withdraw, as in LockReleaseTokenPool.
   }
 
-  /// @notice Resolved outbound configuration and token fee for a transfer.
+  /// @notice Resolved outbound configuration, pool data and token fee for a transfer.
   // solhint-disable-next-line gas-struct-packing
   struct OutboundLane {
     bytes remoteToken; //                   The token on the remote chain, abi encoded for EVM chains.
-    bool omitSourceTokenAddressOnSend; // ╮ True sends pool data without the source token.
-    uint8 localDecimals; //               │ The decimals of the local token.
+    bytes destPoolData; //                  The pool data for the destination pool.
+    uint8 localDecimals; // ──────────────╮ The decimals of the local token.
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out.
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
     uint256 feeAmount; //                   The token fee. The pool keeps it and locks or burns the rest.
@@ -34,10 +34,9 @@ interface IPoolConfigManager {
 
   /// @notice Resolved inbound transfer. The pool must validate its supported flavor.
   struct ResolvedInboundTransfer {
-    uint256 localAmount; //                 The converted amount charged to the inbound bucket and delivered to the
-    //                                      receiver.
-    LockOrBurnFlavor lockOrBurnFlavor; // ╮ The token's configured send operation.
-    address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
+    uint256 localAmount; //                 The local token amount to be used for the inbound transfer.
+    LockOrBurnFlavor lockOrBurnFlavor; // ╮ The token's type, used to decide if release or mint during inbound.
+    address lockOrBurnAddress; // ────────╯ Used for lockbox address during inbound.
     address hook; //                        The postflight hook to call. Zero means no hook.
   }
 
@@ -105,17 +104,20 @@ interface IPoolConfigManager {
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out. Burn if not registered.
     bytes4 allowedFinalityConfig; //      │ The allowed finality config. Decode with FinalityCodec.
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
+    address tokenIdentityMetadataProvider; // The token's ITokenIdentityMetadataProvider. Zero means none.
     uint64[] supportedChains; //            The remote chains covered by the token's resolved lanes.
   }
 
-  /// @notice Validates an outbound transfer and consumes its rate limit after the token fee.
+  /// @notice Validates an outbound transfer, consumes its rate limit after the token fee and builds the pool data.
   /// @dev Checks effective outbound pause, lane existence, requested finality and available rate-limit capacity.
+  /// Pool data with the source token also carries the metadata from the token's ITokenIdentityMetadataProvider, or
+  /// empty metadata if the token has none.
   /// @param localToken The local token that is being locked or burned.
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @param chargeTokenFee False for the V1 path, which charges no token fee.
-  /// @return lane The resolved outbound configuration, token fee and hook to call before moving tokens.
+  /// @return lane The resolved outbound configuration, pool data, token fee and hook to call before moving tokens.
   function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
@@ -124,9 +126,12 @@ interface IPoolConfigManager {
     bool chargeTokenFee
   ) external returns (OutboundLane memory lane);
 
-  /// @notice Checks the inbound lane and source token, converts the amount and consumes its rate limit.
-  /// @dev Checks effective inbound pause, lane existence, source pool, source pool data, source-token identity and
-  /// available rate-limit capacity. Source pool data without the source token is accepted only if the lane allows it.
+  /// @notice Checks the inbound lane, source token and token identity metadata, converts token transfer amount, and
+  /// consumes inbound rate limit.
+  /// @dev Checks effective inbound pause, lane existence, source pool, source pool data, source-token identity, token
+  /// identity metadata and available rate-limit capacity. Source pool data without the source token is accepted only if
+  /// the lane allows it. The token's ITokenIdentityMetadataProvider, if any, gets the metadata of every transfer, also
+  /// empty metadata. A token without one ignores the metadata.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
   /// @return transfer The converted amount, token profile and postflight hook.
