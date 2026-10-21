@@ -22,3 +22,14 @@ var GetToken = contract.NewRead(contract.ReadParams[any, common.Address, *token_
 		return tokenPool.GetToken(opts)
 	},
 })
+
+var Owner = contract.NewRead(contract.ReadParams[any, common.Address, *token_pool.TokenPool]{
+	Name:         "token-pool:owner",
+	Version:      Version,
+	Description:  "Gets the owner of a TokenPool",
+	ContractType: ContractType,
+	NewContract:  token_pool.NewTokenPool,
+	CallContract: func(tokenPool *token_pool.TokenPool, opts *bind.CallOpts, args any) (common.Address, error) {
+		return tokenPool.Owner(opts)
+	},
+})

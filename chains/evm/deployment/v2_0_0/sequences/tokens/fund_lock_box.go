@@ -74,8 +74,8 @@ type FundLockBoxInput struct {
 }
 
 // FundLockBox deposits tokens into a v2.0 ERC20LockBox, funding either a siloed bucket (keyed by
-// remote chain selector) or the unsiloed (shared) bucket. It is the standalone counterpart to the
-// funding step inside MigrateLockReleasePoolLiquidity: it requires no legacy pool to migrate from,
+// remote chain selector) or the unsiloed (shared) bucket. It is the standalone counterpart to
+// MigrateLockReleasePoolLiquiditySink: it requires no legacy pool to migrate from,
 // so an operator can top up a lockbox directly.
 //
 // All writes are proposal-only: the timelock must be an authorized caller on the lockbox to

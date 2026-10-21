@@ -57,6 +57,15 @@ type PartialRemoteChainConfig struct {
 	TokenReceiverAllowed      *bool                                      `json:"tokenReceiverAllowed,omitempty" yaml:"tokenReceiverAllowed,omitempty"`
 	MessageNetworkFeeUSDCents *uint16                                    `json:"messageNetworkFeeUSDCents,omitempty" yaml:"messageNetworkFeeUSDCents,omitempty"`
 	TokenNetworkFeeUSDCents   *uint16                                    `json:"tokenNetworkFeeUSDCents,omitempty" yaml:"tokenNetworkFeeUSDCents,omitempty"`
+	// TestSenders stages the lane on a Solana chain by restricting it to these senders. Only valid
+	// on Solana chains: EVM chains are staged through TestRouter. See
+	// adapters.RemoteChainConfig.TestSenders.
+	//
+	// This is per lane because the allowlist is per lane on chain: the Solana Router keeps one per
+	// destination chain, in that lane's DestChainCcipV2 account, so lanes of the same chain can be
+	// staged and promoted independently. Unlike TestRouter, which is per run: a chain's lanes are
+	// all wired to the single router resolved for that chain.
+	TestSenders []string `json:"testSenders,omitempty" yaml:"testSenders,omitempty"`
 }
 
 type partialChainConfig struct {
@@ -127,6 +136,9 @@ func ConfigureChainsForLanesFromTopology(
 		laneChainSelectors := make([]uint64, 0, len(chains))
 		for _, chainCfg := range chains {
 			laneChainSelectors = append(laneChainSelectors, chainCfg.ChainSelector)
+		}
+		if err := cfg.validateTestSenders(); err != nil {
+			return err
 		}
 		if err := validateExecutorPoolCoverage(cfg.Topology, laneChainSelectors); err != nil {
 			return fmt.Errorf("executor pool validation failed: %w", err)
@@ -535,6 +547,7 @@ func resolveRemoteChainConfig(
 		TokenReceiverAllowed:      &tokenReceiverAllowed,
 		MessageNetworkFeeUSDCents: utils.Coalesce(inCfg.MessageNetworkFeeUSDCents, defaults.MessageNetworkFeeUSDCents),
 		TokenNetworkFeeUSDCents:   utils.Coalesce(inCfg.TokenNetworkFeeUSDCents, defaults.TokenNetworkFeeUSDCents),
+		TestSenders:               inCfg.TestSenders,
 	}, nil
 }
 

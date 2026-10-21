@@ -58,13 +58,11 @@ impl RateLimitTokenBucket {
             // Wait required until the bucket is refilled enough to accept this value, round up to next higher second
             // Consume is not guaranteed to succeed after wait time passes if there is competing traffic.
             // This acts as a lower bound of wait time.
-            let min_wait_sec = (request_tokens
-                .checked_sub(self.tokens)
-                .unwrap()
-                .checked_add(rate.checked_sub(1).unwrap()))
-            .unwrap()
-            .checked_div(rate)
-            .unwrap();
+            let min_wait_sec = request_tokens
+                .saturating_sub(self.tokens)
+                .saturating_add(rate.saturating_sub(1))
+                .checked_div(rate)
+                .ok_or(CcipTokenPoolError::RLRateLimitReached)?;
 
             // print human readable message before reverting with total wait time
             let msg = "min wait (s): ".to_owned() + &min_wait_sec.to_string();
@@ -83,9 +81,10 @@ impl RateLimitTokenBucket {
 
     fn refill<C: Timestamper>(&mut self) -> Result<()> {
         let current_timestamp = C::instance()?.unix_timestamp();
-        let time_diff = current_timestamp.checked_sub(self.last_updated).unwrap();
-        let increase = time_diff.checked_mul(self.cfg.rate).unwrap();
-        let refill = self.tokens.checked_add(increase).unwrap();
+        // Saturating math: a refill above u64::MAX is capped at capacity below anyway.
+        let time_diff = current_timestamp.saturating_sub(self.last_updated);
+        let increase = time_diff.saturating_mul(self.cfg.rate);
+        let refill = self.tokens.saturating_add(increase);
 
         self.tokens = min(self.cfg.capacity, refill);
         self.last_updated = current_timestamp;
@@ -179,5 +178,103 @@ mod tests {
         }
         // Finally enough time has passed and the bucket is full.
         bucket.consume::<MockTimestamper>(5).unwrap();
+    }
+
+    fn now() -> u64 {
+        TIMESTAMP.with(|ts| *ts.borrow())
+    }
+
+    fn bucket(tokens: u64, last_updated: u64, capacity: u64, rate: u64) -> RateLimitTokenBucket {
+        RateLimitTokenBucket {
+            tokens,
+            last_updated,
+            cfg: RateLimitConfig {
+                enabled: true,
+                capacity,
+                rate,
+            },
+        }
+    }
+
+    #[test]
+    fn refill_after_long_idle_fills_to_capacity() {
+        elapse(1_800_000_000);
+        // 9 decimals, 5,000 tokens/s, 1M capacity: overflows u64 after ~42.7 idle days.
+        let capacity = 1_000_000 * 1_000_000_000;
+        let rate = 5_000 * 1_000_000_000;
+        let mut b = bucket(capacity, now(), capacity, rate);
+
+        elapse(43 * 24 * 60 * 60);
+        b.consume::<MockTimestamper>(1).unwrap();
+        assert_eq!(b.tokens, capacity - 1);
+        assert_eq!(b.last_updated, now());
+    }
+
+    #[test]
+    fn first_refill_of_new_bucket_fills_to_capacity() {
+        elapse(1_800_000_000);
+        // A new bucket has last_updated = 0, so time_diff is the whole unix epoch.
+        let capacity = u64::MAX / 2;
+        let rate = 1_000_000_000_000;
+        let mut b = bucket(0, 0, capacity, rate);
+
+        b.consume::<MockTimestamper>(capacity).unwrap();
+        assert_eq!(b.tokens, 0);
+        assert_eq!(b.last_updated, now());
+    }
+
+    #[test]
+    fn refill_with_max_rate_fills_to_capacity() {
+        let mut b = bucket(0, now(), u64::MAX, u64::MAX);
+
+        elapse(2);
+        b.consume::<MockTimestamper>(1).unwrap();
+        assert_eq!(b.tokens, u64::MAX - 1);
+    }
+
+    #[test]
+    fn refill_near_max_tokens_fills_to_capacity() {
+        let mut b = bucket(u64::MAX - 1, now(), u64::MAX, 10);
+
+        elapse(10);
+        b.consume::<MockTimestamper>(1).unwrap();
+        assert_eq!(b.tokens, u64::MAX - 1);
+    }
+
+    #[test]
+    fn refill_with_last_updated_in_future_does_not_refill() {
+        elapse(1_000);
+        let mut b = bucket(0, now() + 100, 100, 1);
+
+        assert_eq!(
+            b.consume::<MockTimestamper>(1),
+            Err(CcipTokenPoolError::RLRateLimitReached.into())
+        );
+        assert_eq!(b.tokens, 0);
+        assert_eq!(b.last_updated, now());
+    }
+
+    #[test]
+    fn rate_limit_reached_with_zero_rate() {
+        let mut b = bucket(0, now(), 10, 0);
+
+        elapse(10);
+        assert_eq!(
+            b.consume::<MockTimestamper>(1),
+            Err(CcipTokenPoolError::RLRateLimitReached.into())
+        );
+        assert_eq!(b.tokens, 0);
+    }
+
+    #[test]
+    fn rate_limit_reached_with_max_values_does_not_overflow_wait_time() {
+        // No time elapses, so the bucket stays empty and the wait time is computed.
+        let mut b = bucket(0, now(), u64::MAX, u64::MAX);
+
+        assert_eq!(
+            b.consume::<MockTimestamper>(u64::MAX),
+            Err(CcipTokenPoolError::RLRateLimitReached.into())
+        );
+        assert_eq!(b.tokens, 0);
     }
 }
