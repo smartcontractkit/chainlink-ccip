@@ -17,12 +17,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var _ fees.FeeAdapter = (*FeesAdapter)(nil)
+var (
+	_ fees.FeeAdapter                  = (*FeesAdapter)(nil)
+	_ fees.OnRampDestChainConfigReader = (*FeesAdapter)(nil)
+)
 
 type FeesAdapter struct {
 	resolver v1_0_0.EVMFeeResolver
@@ -113,6 +117,52 @@ func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) f
 	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst, func(cfg *fees.TokenTransferFeeArgs) {
 		cfg.MinFeeUSDCents = 0
 	})
+}
+
+// GetOnchainOnRampDestChainConfig implements fees.OnRampDestChainConfigReader. It resolves the lane's
+// OnRamp and reads its destination chain config.
+func (a *FeesAdapter) GetOnchainOnRampDestChainConfig(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src uint64, dst uint64) (fees.OnRampDestChainConfig, error) {
+	onRampRef, err := a.resolver.GetOnRampRef(b, chains, ds, src, dst)
+	if err != nil {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to resolve OnRamp address ref for src %d and dst %d: %w", src, dst, err)
+	}
+	if onRampRef.Type.String() != onramp.ContractType.String() {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("unexpected contract type for OnRamp address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), onramp.ContractType)
+	}
+	if onRampRef.Version == nil || !onRampRef.Version.Equal(utils.Version_2_0_0) {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("unexpected OnRamp contract version for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Version, utils.Version_2_0_0)
+	}
+	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRampRef)
+	if err != nil {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to convert OnRamp address ref to EVM address for src %d and dst %d: %w", src, dst, err)
+	}
+	chain, ok := chains.EVMChains()[src]
+	if !ok {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("chain with selector %d not defined", src)
+	}
+
+	// The OnRamp's dest chain config is mutable on-chain state, so we use WithForceExecute to
+	// bypass the operation report cache. This ensures a cached invocation from earlier in the
+	// bundle (e.g. before lane configuration) is not reused.
+	report, err := operations.ExecuteOperation(
+		b,
+		onramp.GetDestChainConfig,
+		chain,
+		contract.FunctionInput[uint64]{
+			ChainSelector: src,
+			Address:       onRampAddr,
+			Args:          dst,
+		},
+		operations.WithForceExecute[contract.FunctionInput[uint64], cldf_evm.Chain](),
+	)
+	if err != nil {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to execute GetDestChainConfig operation for OnRamp at %s on chain selector %d with dst %d: %w", onRampAddr.Hex(), src, dst, err)
+	}
+
+	return fees.OnRampDestChainConfig{
+		Ref:                     onRampRef,
+		TokenNetworkFeeUSDCents: report.Output.TokenNetworkFeeUSDCents,
+	}, nil
 }
 
 func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(b operations.Bundle, chains cldf_chain.BlockChains, feeRef datastore.AddressRef, src uint64, dst uint64, address string) (fees.TokenTransferFeeArgs, error) {

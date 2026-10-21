@@ -41,6 +41,24 @@ type FeeAdapter interface {
 	GetDefaultDestChainConfig(src, dst uint64) lanes.FeeQuoterDestChainConfig
 }
 
+// OnRampDestChainConfig is a chain-agnostic view of an OnRamp's destination chain config. Fields are
+// version-dependent: consumers must check Ref.Version before reading any other field, and only the
+// fields valid for that version are populated.
+type OnRampDestChainConfig struct {
+	// Ref is the resolved OnRamp contract reference this config was read from.
+	Ref datastore.AddressRef
+	// TokenNetworkFeeUSDCents is the flat fee the OnRamp charges for a token transfer, in USD cents.
+	// Populated on CCIP 2.0+.
+	TokenNetworkFeeUSDCents uint16
+}
+
+// OnRampDestChainConfigReader is an optional interface implemented by FeeAdapters that can read their
+// lane's OnRamp destination chain config. Note this reads the OnRamp contract, not the FeeQuoter.
+// Versions whose OnRamp has no readable destination chain config (e.g. pre-2.0 EVM) do not implement it.
+type OnRampDestChainConfigReader interface {
+	GetOnchainOnRampDestChainConfig(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src uint64, dst uint64) (OnRampDestChainConfig, error)
+}
+
 // FeeAdapterRegistry maintains a registry of FeeAdapters for different chain families and versions.
 type FeeAdapterRegistry struct {
 	muResolvers sync.Mutex
