@@ -29,7 +29,7 @@ interface IPoolConfigManager {
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out.
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
     uint256 feeAmount; //                   The token fee. The pool keeps it and locks or burns the rest.
-    address hooks; //                       The lane's IAdvancedPoolHooks, called preflight. Zero means no hooks.
+    address hook; //                        The lane's IAdvancedPoolHooks, called preflight. Zero means no hook.
   }
 
   /// @notice Resolved inbound transfer. The pool must validate its supported flavor.
@@ -38,7 +38,7 @@ interface IPoolConfigManager {
     //                                      receiver.
     LockOrBurnFlavor lockOrBurnFlavor; // ╮ The token's configured send operation.
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
-    address hooks; //                       The postflight hooks to call. Zero means no hooks.
+    address hook; //                        The postflight hook to call. Zero means no hook.
   }
 
   /// @notice Token bucket state in local token units, with the ABI layout of RateLimiter.TokenBucket.
@@ -92,7 +92,7 @@ interface IPoolConfigManager {
 
   /// @notice Resolved verification configuration for one token and remote chain.
   struct LaneVerification {
-    address hooks; //          The lane's IAdvancedPoolHooks, or zero if none are configured or no lane exists.
+    address hook; //           The lane's IAdvancedPoolHooks, or zero if no hook is configured or no lane exists.
     address[] outboundCCVs; // The configured outbound CCVs, or empty if no lane exists.
     address[] inboundCCVs; //  The configured inbound CCVs, or empty if no lane exists.
   }
@@ -115,7 +115,7 @@ interface IPoolConfigManager {
   /// @param amount The amount before the token fee.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @param chargeTokenFee False for the V1 path, which charges no token fee.
-  /// @return lane The resolved outbound configuration, token fee and hooks to call before moving tokens.
+  /// @return lane The resolved outbound configuration, token fee and hook to call before moving tokens.
   function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
@@ -129,7 +129,7 @@ interface IPoolConfigManager {
   /// available rate-limit capacity. Source pool data without the source token is accepted only if the lane allows it.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
-  /// @return transfer The converted amount, token profile and postflight hooks.
+  /// @return transfer The converted amount, token profile and postflight hook.
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata input,
     bytes4 requestedFinalityConfig
@@ -197,7 +197,7 @@ interface IPoolConfigManager {
     LaneKey[] calldata lanes
   ) external view returns (LaneConnection[] memory connections);
 
-  /// @notice Returns the resolved hooks and outbound and inbound CCV lists.
+  /// @notice Returns the resolved hook and outbound and inbound CCV lists.
   /// @param lanes The token and remote chain lanes to query.
   /// @return verifications The verification configuration per lane, aligned with lanes by index. Lanes that do
   /// not exist return zero values.
