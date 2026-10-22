@@ -51,12 +51,20 @@ func (a *FeesAdapter) validateFeeRef(feeRef datastore.AddressRef) error {
 	return nil
 }
 
-func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
+func (a *FeesAdapter) validateOnRampRef(onRampRef datastore.AddressRef) error {
 	if onRampRef.Type.String() != onramp.ContractType.String() {
-		return datastore.AddressRef{}, fmt.Errorf("unexpected contract type for OnRamp address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), onramp.ContractType)
+		return fmt.Errorf("unexpected contract type for OnRamp address ref: got %s, want %s", onRampRef.Type.String(), onramp.ContractType)
 	}
-	if !onRampRef.Version.Equal(utils.Version_2_0_0) {
-		return datastore.AddressRef{}, fmt.Errorf("unexpected OnRamp contract version for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Version, utils.Version_2_0_0)
+	if onRampRef.Version == nil || !onRampRef.Version.Equal(utils.Version_2_0_0) {
+		return fmt.Errorf("unexpected OnRamp contract version: got %s, want %s", onRampRef.Version, utils.Version_2_0_0)
+	}
+
+	return nil
+}
+
+func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
+	if err := a.validateOnRampRef(onRampRef); err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
 	}
 
 	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRampRef)
@@ -126,11 +134,8 @@ func (a *FeesAdapter) GetOnchainOnRampDestChainConfig(b operations.Bundle, chain
 	if err != nil {
 		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to resolve OnRamp address ref for src %d and dst %d: %w", src, dst, err)
 	}
-	if onRampRef.Type.String() != onramp.ContractType.String() {
-		return fees.OnRampDestChainConfig{}, fmt.Errorf("unexpected contract type for OnRamp address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), onramp.ContractType)
-	}
-	if onRampRef.Version == nil || !onRampRef.Version.Equal(utils.Version_2_0_0) {
-		return fees.OnRampDestChainConfig{}, fmt.Errorf("unexpected OnRamp contract version for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Version, utils.Version_2_0_0)
+	if err := a.validateOnRampRef(onRampRef); err != nil {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
 	}
 	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRampRef)
 	if err != nil {
