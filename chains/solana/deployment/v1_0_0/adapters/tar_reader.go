@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
+	ccip_common_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	state "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -16,6 +18,7 @@ import (
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -74,11 +77,25 @@ func (a *SolanaAdminRegistryManager) GetActivePool(e deployment.Environment, cha
 	// A missing TAR account means the token was never registered (no active pool). Any other
 	// failure (RPC error, undecodable account) must surface as an error rather than being
 	// reported as "no pool", since callers act on that answer (e.g. skipping an unregister).
-	var tarAccount ccip_common.TokenAdminRegistry
-	if err := chain.GetAccountDataBorshInto(e.OperationsBundle.GetContext(), tarPDA, &tarAccount); err != nil {
+	//
+	// Fetch the raw account once and decode it here (instead of using
+	// chain.GetAccountDataBorshInto) so we can fall back to the legacy V1 layout, which the
+	// generated v1.6.4 binding cannot decode.
+	tarResp, err := chain.Client.GetAccountInfoWithOpts(e.OperationsBundle.GetContext(), tarPDA, &rpc.GetAccountInfoOpts{
+		Commitment: cldf_solana.SolDefaultCommitment,
+		DataSlice:  nil,
+	})
+	if err != nil {
 		if errors.Is(err, rpc.ErrNotFound) {
 			return nil, nil
 		}
+		return nil, fmt.Errorf("failed to read token admin registry %s for mint %s on chain %d: %w", tarPDA, mint, chainSelector, err)
+	}
+	if tarResp == nil || tarResp.Value == nil {
+		return nil, nil
+	}
+	tarAccount, err := decodeTokenAdminRegistry(tarResp.Value.Data.GetBinary())
+	if err != nil {
 		return nil, fmt.Errorf("failed to read token admin registry %s for mint %s on chain %d: %w", tarPDA, mint, chainSelector, err)
 	}
 	if tarAccount.LookupTable.IsZero() {
@@ -97,6 +114,40 @@ func (a *SolanaAdminRegistryManager) GetActivePool(e deployment.Environment, cha
 	}
 
 	return entries[2].Bytes(), nil
+}
+
+// decodeTokenAdminRegistry decodes a ccip-common TokenAdminRegistry account,
+// supporting both the legacy V1 layout (pre-supports_auto_derivation) and the
+// current V2 layout. The on-chain program dispatches on account size
+// (load_token_admin_registry_checked in ccip-common/src/v1.rs); the generated
+// Go bindings expose the V1 layout under gobindings/v0_1_0 and the V2 layout
+// under gobindings/v1_6_4, so we mirror that fallback here.
+//
+// V1 is a strict prefix of V2: the only difference is the trailing
+// supports_auto_derivation bool, which the on-chain TryFrom<TokenAdminRegistryV1>
+// defaults to false.
+func decodeTokenAdminRegistry(data []byte) (ccip_common.TokenAdminRegistry, error) {
+	var v2 ccip_common.TokenAdminRegistry
+	v2Err := v2.UnmarshalWithDecoder(bin.NewBorshDecoder(data))
+	if v2Err == nil {
+		return v2, nil
+	}
+
+	var v1 ccip_common_v0_1_0.TokenAdminRegistry
+	if v1Err := v1.UnmarshalWithDecoder(bin.NewBorshDecoder(data)); v1Err != nil {
+		// Surface the V2 error: it describes the current layout callers expect.
+		return ccip_common.TokenAdminRegistry{}, v2Err
+	}
+
+	return ccip_common.TokenAdminRegistry{
+		Version:                v1.Version,
+		Administrator:          v1.Administrator,
+		PendingAdministrator:   v1.PendingAdministrator,
+		LookupTable:            v1.LookupTable,
+		WritableIndexes:        v1.WritableIndexes,
+		Mint:                   v1.Mint,
+		SupportsAutoDerivation: false, // not present in V1; matches on-chain TryFrom
+	}, nil
 }
 
 func (a *SolanaAdminRegistryManager) GetTokenAdminRegistryRef(e deployment.Environment, chainSelector uint64) (datastore.AddressRef, error) {
