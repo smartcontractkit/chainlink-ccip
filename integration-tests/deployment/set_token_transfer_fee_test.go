@@ -385,7 +385,9 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	// Confirm that the config was correctly set on the source
 	srcCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
-	srcSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(src, dst)
+	// Mixed lane (1.6 OnRamp + 2.0 FeeQuoter): no token network fee, so the 1.x lane default applies.
+	srcSensibleDefaults := fees.DefaultTokenTransferFeeConfig(evmFeesAdapterV2_0_0, srcOnRampRef, src, dst)
+	require.NotZero(t, srcSensibleDefaults.MinFeeUSDCents)
 	require.Equal(t, srcCfg.DestBytesOverhead, srcSensibleDefaults.DestBytesOverhead)
 	require.Equal(t, srcCfg.DestGasOverhead, uint32(150_000))
 	require.Equal(t, srcCfg.MinFeeUSDCents, srcSensibleDefaults.MinFeeUSDCents)
@@ -394,7 +396,9 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	// Confirm that the config was correctly set on the destination
 	dstCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
-	dstSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(dst, src)
+	// Mixed lane (1.6 OnRamp + 2.0 FeeQuoter): no token network fee, so the 1.x lane default applies.
+	dstSensibleDefaults := fees.DefaultTokenTransferFeeConfig(evmFeesAdapterV2_0_0, dstOnRampRef, dst, src)
+	require.NotZero(t, dstSensibleDefaults.MinFeeUSDCents)
 	require.Equal(t, dstCfg.DestBytesOverhead, dstSensibleDefaults.DestBytesOverhead)
 	require.Equal(t, dstCfg.DestGasOverhead, uint32(150_000))
 	require.Equal(t, dstCfg.MinFeeUSDCents, dstSensibleDefaults.MinFeeUSDCents)

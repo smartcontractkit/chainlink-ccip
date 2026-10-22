@@ -24,14 +24,22 @@ func DefaultTokenTransferFeeConfig(adapter FeeAdapter, onRamp datastore.AddressR
 }
 
 func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeArgs)) TokenTransferFeeArgs {
-	minFeeUSDCents := uint32(25)
+	dstFam, dstFamErr := chainsel.GetSelectorFamily(dst)
 
 	// NOTE: we validate that src != dst so only one of these if statements will execute
+	minFeeUSDCents := uint32(25)
 	if src == chainsel.ETHEREUM_MAINNET.Selector {
 		minFeeUSDCents = 50
 	}
 	if dst == chainsel.ETHEREUM_MAINNET.Selector {
 		minFeeUSDCents = 150
+	}
+	if dstFamErr == nil && dstFam == chainsel.FamilySolana {
+		if src == chainsel.ETHEREUM_MAINNET.Selector {
+			minFeeUSDCents = 60
+		} else {
+			minFeeUSDCents = 35
+		}
 	}
 
 	cfg := TokenTransferFeeArgs{
