@@ -49,12 +49,6 @@ interface IPoolConfigManager {
     uint128 rate; // ──────╯ The tokens per second that refill the bucket.
   }
 
-  /// @notice Current outbound and inbound buckets for one finality class.
-  struct RateLimiterState {
-    TokenBucket outbound; // The outbound bucket.
-    TokenBucket inbound; //  The inbound bucket.
-  }
-
   /// @notice Identifies one token and remote chain lane in batch queries.
   struct LaneKey {
     address localToken; //         The local token.
@@ -72,8 +66,10 @@ interface IPoolConfigManager {
 
   /// @notice Current buckets for both finality classes for one token and remote chain.
   struct LaneRateLimiterState {
-    RateLimiterState defaultFinality; // The default finality buckets.
-    RateLimiterState fastFinality; //    The FTF buckets.
+    TokenBucket outbound; //             The outbound bucket for default finality.
+    TokenBucket inbound; //              The inbound bucket for default finality.
+    TokenBucket fastFinalityOutbound; // The outbound FTF bucket.
+    TokenBucket fastFinalityInbound; //  The inbound FTF bucket.
   }
 
   /// @notice Resolved connection and chain records and effective pause state for one token and remote chain.
@@ -87,13 +83,6 @@ interface IPoolConfigManager {
     uint32 destBytesOverhead; // ────────────────────╯ The destination token data byte overhead.
     bytes remoteToken; //                             The encoded remote token, or empty bytes if no lane exists.
     bytes[] remotePools; //                           The encoded trusted remote pools, or an empty list if none exist.
-  }
-
-  /// @notice Resolved verification configuration for one token and remote chain.
-  struct LaneVerification {
-    address hook; //           The lane's IAdvancedPoolHooks, or zero if no hook is configured or no lane exists.
-    address[] outboundCCVs; // The configured outbound CCVs, or empty if no lane exists.
-    address[] inboundCCVs; //  The configured inbound CCVs, or empty if no lane exists.
   }
 
   /// @notice Resolved token-level configuration, independent of lane selection and pause state.
@@ -156,7 +145,7 @@ interface IPoolConfigManager {
   /// @param destChainSelector The destination chain.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @dev Reverts with FinalityCodec.InvalidRequestedFinality if the token profile does not allow the requested
-  /// finality, also for a token without a lane. This is the only PCM view that reverts.
+  /// finality, also for a token without a lane. getFee and getFeeBatch are the only PCM views that revert.
   /// @return fee The resolved fee params, or zeros with isEnabled false if the fee record is disabled or the token
   /// has no lane or chain record.
   function getFee(
@@ -202,11 +191,13 @@ interface IPoolConfigManager {
 
   /// @notice Returns the resolved hook and outbound and inbound CCV lists.
   /// @param lanes The token and remote chain lanes to query.
-  /// @return verifications The verification configuration per lane, aligned with lanes by index. Lanes that do
-  /// not exist return zero values.
+  /// @return hooks The lane's IAdvancedPoolHooks per lane, aligned with lanes by index. Zero if no hook is configured
+  /// or no lane exists.
+  /// @return outboundCCVs The configured outbound CCVs per lane, aligned with lanes by index. Empty if no lane exists.
+  /// @return inboundCCVs The configured inbound CCVs per lane, aligned with lanes by index. Empty if no lane exists.
   function getLaneVerificationBatch(
     LaneKey[] calldata lanes
-  ) external view returns (LaneVerification[] memory verifications);
+  ) external view returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs);
 
   /// @notice Returns the token's resolved configuration.
   /// @dev Returns the resolved value based on policy setting / token override.
