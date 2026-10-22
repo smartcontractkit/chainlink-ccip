@@ -613,12 +613,13 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		require.Equal(t, uint32(evmseqV2_0_0.GetDefaultTokenFeeUSDCentsFor1_6Lane(selA, selB)), networkFeeUSDCents)
 
 		importedFeeUSDCents := uint32(0)
-		if legacyFee.MinFeeUSDCents > networkFeeUSDCents {
+		switch {
+		case legacyFee.MinFeeUSDCents > networkFeeUSDCents:
 			importedFeeUSDCents = legacyFee.MinFeeUSDCents - networkFeeUSDCents
-		} else {
-			// Clamp path: only reachable when the legacy fee is below the network fee.
-			require.Greater(t, networkFeeUSDCents, legacyFee.MinFeeUSDCents,
-				"clamp path requires the OnRamp network fee to exceed the legacy fee")
+		case opts != nil && opts.legacyMinFeeUSDCents != 0:
+			// Clamp case: the seeded legacy fee must actually be below the network fee.
+			require.Less(t, legacyFee.MinFeeUSDCents, networkFeeUSDCents,
+				"clamp case requires the legacy fee to be below the OnRamp network fee")
 		}
 
 		legacyTpCfg := tokensapi.TokenTransferFeeConfig{

@@ -5,10 +5,23 @@ import (
 	"math"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
+
+// DefaultTokenTransferFeeConfig returns the default token transfer fee for a lane, accounting for the
+// OnRamp version. On a 2.0 OnRamp the lane's token network fee carries the standard charge, so the
+// FeeQuoter default applies (zero on a 2.0 FeeQuoter). On a 1.x OnRamp there is no token network fee,
+// so the FeeQuoter fee is the whole charge and the shared 1.x lane default applies.
+func DefaultTokenTransferFeeConfig(adapter FeeAdapter, onRamp datastore.AddressRef, src, dst uint64) TokenTransferFeeArgs {
+	if onRamp.Version != nil && onRamp.Version.GreaterThanEqual(utils.Version_2_0_0) {
+		return adapter.GetDefaultTokenTransferFeeConfig(src, dst)
+	} else {
+		return GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
+	}
+}
 
 func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeArgs)) TokenTransferFeeArgs {
 	minFeeUSDCents := uint32(25)

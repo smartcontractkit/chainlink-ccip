@@ -121,17 +121,15 @@ func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) f
 	// V2 OnRamp, there is this notion of a token network fee, and this gets added to whatever fee is
 	// configured on the FeeQuoter (or V2 token pool if it exists). For a V1 OnRamp, there's no token
 	// network fee, so the FeeQuoter fee is the only fee that gets charged. This means that the default
-	// depends on the OnRamp version. For a 2.0 OnRamp, the correct default involves setting `minFeeUSDCents`
+	// depends on the OnRamp version. For a V2 OnRamp, the correct default involves setting `minFeeUSDCents`
 	// to zero on the FeeQuoter as this avoids double charging the token. For a 1.x OnRamp, we should
 	// set `minFeeUSDCents` to a sensible value so it gets set on the FeeQuoter since the FeeQuoter is
 	// the only thing charging the token. The issue here is that this function does NOT have access to
 	// the OnRamp version, so it cannot determine which default to return. To fix this, we would need
-	// to pass the OnRamp version into this function, which would be a heavy breaking change. Thankfully,
-	// all EVM chains have V2 OnRamps paired with V2 FeeQuoters in production at the time of this writing,
-	// so practically speaking, the current implementation below is correct for all production EVM chains
-	// moving forward. If a 1.x OnRamp is ever deployed in production in the future (highly unlikely but
-	// hypothetically speaking), then this function will need to be modified such that the OnRamp version
-	// is passed in allowing it to dynamically determine which default to return.
+	// to pass the OnRamp version into this function, which would be a heavy breaking change. Instead,
+	// callers must use fees.DefaultTokenTransferFeeConfig() instead, which returns this zero default
+	// for a 2.0 OnRamp and the shared 1.x lane default otherwise. If the OnRamp version is ever needed
+	// inside an adapter, thread it into this method instead.
 	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst, func(cfg *fees.TokenTransferFeeArgs) {
 		cfg.MinFeeUSDCents = 0
 	})

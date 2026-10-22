@@ -790,7 +790,7 @@ func ApplyTokenTransferFeeConfigOnFeeQuoter(
 	fullSrcTokenRef datastore.AddressRef,
 	partial PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(b, chains, ds, src, dst)
+	feeAdapter, onRampRef, fqRef, err := fees.ResolveFeeAdapterAndOnRamp(b, chains, ds, src, dst)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
@@ -810,7 +810,9 @@ func ApplyTokenTransferFeeConfigOnFeeQuoter(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
-	defaultConfig := feeAdapter.GetDefaultTokenTransferFeeConfig(
+	defaultConfig := fees.DefaultTokenTransferFeeConfig(
+		feeAdapter,
+		onRampRef,
 		src,
 		dst,
 	)

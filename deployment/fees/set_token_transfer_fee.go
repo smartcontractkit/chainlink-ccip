@@ -135,7 +135,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				// Version inference part 3: the fee quoter adapter is used to configure the fees
 				dstSettings := map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
-					args, shouldApply, err := inferTokenTransferFeeArgs(feeQuoterAdp, e, feeQuoterRef, src.Selector, dst.Selector, feeCfg)
+					args, shouldApply, err := inferTokenTransferFeeArgs(feeQuoterAdp, e, onRampRef, feeQuoterRef, src.Selector, dst.Selector, feeCfg)
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
 					}
@@ -189,7 +189,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 	}
 }
 
-func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
+func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, onRamp datastore.AddressRef, fq datastore.AddressRef, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
 	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
 	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fq, src, dst, cfg.Address)
 	if err != nil {
@@ -211,7 +211,7 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, fq datast
 		fallbacks = onchainCfg
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is already set on-chain; using on-chain values as defaults: %+v", src, dst, cfg.Address, fallbacks)
 	} else {
-		fallbacks = adapter.GetDefaultTokenTransferFeeConfig(src, dst)
+		fallbacks = DefaultTokenTransferFeeConfig(adapter, onRamp, src, dst)
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
