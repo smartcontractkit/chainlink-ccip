@@ -34,4 +34,18 @@ interface IMultiTokenPool is IPoolV1V2, IGetPoolConfigManager {
   function getTokenDecimals(
     address localToken
   ) external view returns (uint8 decimals);
+
+  /// @notice Withdraws accrued fee token balances to the provided `recipient`.
+  /// @dev Only callable by the pool config manager.
+  /// @dev FeeTokenHandler will revert if `recipient` is zero address.
+  /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
+  /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
+  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract
+  /// balance is safe and clears only accrued fees.
+  /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
+  /// @param recipient The address to withdraw the fee tokens to.
+  function withdrawFeeTokens(
+    address[] calldata feeTokens,
+    address recipient
+  ) external;
 }
