@@ -10,9 +10,10 @@ import {MultiTokenPool} from "./MultiTokenPool.sol";
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice A multi-token pool that burns on send and mints on receive.
-/// @dev Serves the four burn flavors, which match the four single-token burn and mint pools. Rejects a token with the
-/// Lock flavor, so it never mints a lock and release token. The pool needs the mint and burn roles of each token.
+/// @notice A multi-token pool that burns 3rd-party tokens on send and mints them on receive.
+/// @dev Serves the four burn flavors, which match BurnMintTokenPool, BurnFromMintTokenPool, BurnWithFromMintTokenPool
+/// and BurnToAddressMintTokenPool. Rejects a token with the Lock flavor, so it never mints a lock and release token.
+/// The pool needs the minter role of each token, and the burner role of each token without the BurnToAddress flavor.
 contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
@@ -34,8 +35,11 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
   }
 
   /// @inheritdoc MultiTokenPool
-  /// @dev BurnFrom and BurnWithFrom spend an allowance of the pool for itself. The pool approves itself for the maximum
-  /// when its allowance is below the amount. The approval is never revoked, and no other address can use it.
+  /// @dev Burns tokens held by the pool. The token fee stays in the pool. BurnToAddress sends the tokens to an address
+  /// which can never transfer them, making the tokens unrecoverable without reducing the total supply.
+  /// Some tokens allow burning from the sender without approval, but not all do. To be safe, BurnFrom and BurnWithFrom
+  /// approve the pool to burn from the pool. The single-token pools approve in the constructor. This pool learns its
+  /// tokens later, so it approves the maximum on a send when the allowance is below the amount.
   function _lockOrBurn(
     address token,
     uint64, // remoteChainSelector
@@ -47,7 +51,10 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
       IBurnMintERC20(token).burn(amount);
     } else if (flavor == IPoolConfigManager.LockOrBurnFlavor.BurnToAddress) {
       IERC20(token).safeTransfer(lockOrBurnAddress, amount);
-    } else {
+    } else if (
+      flavor == IPoolConfigManager.LockOrBurnFlavor.BurnFrom
+        || flavor == IPoolConfigManager.LockOrBurnFlavor.BurnWithFrom
+    ) {
       if (IERC20(token).allowance(address(this), address(this)) < amount) {
         IERC20(token).forceApprove(address(this), type(uint256).max);
       }
@@ -56,6 +63,8 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
       } else {
         IBurnMintERC20(token).burn(address(this), amount);
       }
+    } else {
+      revert UnsupportedLockOrBurnFlavor(token, flavor);
     }
   }
 
