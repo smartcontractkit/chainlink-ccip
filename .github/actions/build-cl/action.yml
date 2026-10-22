@@ -56,7 +56,11 @@ runs:
         if [ -n "${{ inputs.ton_ref }}" ]; then
           for i in 1 2 3; do
             go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }} && break
-            echo "retry $i - unshallow race on chainlink-ton, sleeping 5s"
+            if [ "$i" -eq 3 ]; then
+              echo "failed to fetch chainlink-ton@${{ inputs.ton_ref }} after 3 attempts"
+              exit 1
+            fi
+            echo "retry $i - go get chainlink-ton failed, sleeping 5s"
             sleep 5
           done
         fi

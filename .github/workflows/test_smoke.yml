@@ -105,7 +105,7 @@ jobs:
         uses: actions/setup-go@v6 # v6
         with:
           cache: true
-          go-version: "1.26.7"
+          go-version: "1.27.1"
           cache-dependency-path: |
             devenv/go.mod
             devenv/go.sum
@@ -121,7 +121,11 @@ jobs:
                 && go get github.com/smartcontractkit/chainlink-ton/deployment@${{ inputs.ton_ref }} \
                 && go get github.com/smartcontractkit/chainlink-ton@${{ inputs.ton_ref }} \
                 && break
-              echo "retry $i - unshallow race on chainlink-ton, sleeping 5s"
+              if [ "$i" -eq 3 ]; then
+                echo "failed to fetch chainlink-ton@${{ inputs.ton_ref }} after 3 attempts"
+                exit 1
+              fi
+              echo "retry $i - go get chainlink-ton failed, sleeping 5s"
               sleep 5
             done
             go mod tidy
