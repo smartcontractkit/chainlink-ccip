@@ -17,11 +17,15 @@ import {Ownable2StepMsgSender} from "@chainlink/contracts/src/v0.8/shared/access
 
 import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165.sol";
 
-/// @notice Base contract for CCIP pools that serve many tokens. All token and lane config lives in the pool config
-/// manager, which the pool calls through IPoolConfigManager.
+/// @notice Base abstract class with common functions for all multi-token pools. A multi-token pool serves as isolated
+/// place for holding many tokens and token specific logic that may execute as tokens move across the bridge. All token
+/// and lane config lives in the pool config manager, which the pool calls through IPoolConfigManager.
 /// @dev The pool runs the checks that a pool config manager cannot skip: the RMN curse, the ramp caller and the lock or
 /// burn flavor. The pool config manager resolves the lane, builds and checks the pool data, including the source token
 /// and the token identity metadata, charges the token fee and consumes the rate limits.
+/// @dev A different decimals on different chains can reduce the number of tokens in circulation. The
+/// pool config manager rounds the converted amount down, so the destination can mint or release less than the source
+/// locked or burned. This is not a problem if the decimals are the same on both chains.
 abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   error ZeroAddressInvalid();
   error CursedByRMN();
@@ -116,6 +120,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   // ================================================================
 
   /// @inheritdoc IPoolV2
+  /// @dev The token fee is deducted from the amount, and the amount after the fee is locked or burned.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     bytes4 requestedFinalityConfig,
@@ -125,7 +130,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev Uses default finality and charges no token fee.
+  /// @dev No token fee is charged in this legacy method, so the full amount is locked or burned. Uses default finality.
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) public virtual returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
@@ -133,7 +138,13 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     return lockOrBurnOut;
   }
 
-  /// @notice Runs the outbound checks, then locks or burns the amount after the token fee.
+  /// @notice Validates the lock or burn input, then locks or burns the amount after the token fee. Validates
+  /// - RMN curse status
+  /// - if the sender is a valid onRamp
+  /// - the token, lane, pause, finality, token fee and rate limits, in the pool config manager
+  /// - if the pool serves the flavor of the token
+  /// - preflight checks hook (if configured)
+  /// @dev These checks are essential security checks. An override that skips one would allow for various exploits.
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @param tokenArgs Additional token arguments, passed to the hook.
@@ -183,10 +194,12 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
       (Pool.LockOrBurnOutV1({destTokenAddress: lane.remoteToken, destPoolData: lane.destPoolData}), destTokenAmount);
   }
 
-  /// @notice Moves the tokens out with the flavor of the token.
+  /// @notice Contains the specific lock or burn token logic for a pool.
+  /// @dev Overriding this method allows us to create pools with different lock or burn flavors without duplicating the
+  /// underlying logic.
   /// @param token The local token.
-  /// @param remoteChainSelector The destination chain.
-  /// @param amount The amount after the token fee.
+  /// @param remoteChainSelector The selector of the remote chain.
+  /// @param amount The amount of tokens to lock or burn, after the token fee.
   /// @param flavor The lock or burn flavor of the token. The caller checked that the pool serves it.
   /// @param lockOrBurnAddress The BurnToAddress target or the lock box, zero otherwise.
   function _lockOrBurn(
@@ -202,6 +215,13 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   // ================================================================
 
   /// @inheritdoc IPoolV2
+  /// @dev Validates the release or mint input for correctness on
+  /// - RMN curse status
+  /// - if the sender is a valid offRamp
+  /// - the token, lane, pause, source pool, source pool data and rate limits, in the pool config manager
+  /// - if the pool serves the flavor of the token
+  /// - postflight checks hook (if configured)
+  /// These checks are essential security checks. An override that skips one would allow for various exploits.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     bytes4 requestedFinalityConfig
@@ -238,18 +258,20 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV1
-  /// @dev Uses default finality.
+  /// @dev Calls IPoolV2.releaseOrMint with default finality.
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     return releaseOrMint(releaseOrMintIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
-  /// @notice Moves the tokens in with the flavor of the token.
+  /// @notice Contains the specific release or mint token logic for a pool.
+  /// @dev Overriding this method allows us to create pools with different release or mint flavors without duplicating
+  /// the underlying logic.
   /// @param token The local token.
-  /// @param receiver The receiver of the tokens.
-  /// @param amount The amount in local decimals.
-  /// @param remoteChainSelector The source chain.
+  /// @param receiver The address to receive the tokens.
+  /// @param amount The amount of tokens to release or mint, in local decimals.
+  /// @param remoteChainSelector The selector of the remote chain.
   /// @param flavor The lock or burn flavor of the token. The caller checked that the pool serves it.
   /// @param lockOrBurnAddress The BurnToAddress target or the lock box, zero otherwise.
   function _releaseOrMint(
@@ -289,17 +311,22 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(remoteChainSelector)))) revert CursedByRMN();
   }
 
-  /// @notice Reverts unless the caller is the OnRamp for the remote chain on the router.
+  /// @notice Checks whether the msg.sender is the permissioned onRamp for the given chain on the Router.
   /// @dev The pool does not check the lane. The pool config manager does, so a token without a lane reverts there.
-  /// @param remoteChainSelector The destination chain.
+  /// @dev This function is marked virtual as other pools may inherit from this contract, but do not receive calls from
+  /// the ramps directly, instead receiving them from a proxy contract. In that situation this function must be
+  /// overridden and the ramp-check removed and replaced with a different access-control scheme.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOnRamp(
     uint64 remoteChainSelector
   ) internal view virtual {
     if (msg.sender != s_router.getOnRamp(remoteChainSelector)) revert CallerIsNotARampOnRouter(msg.sender);
   }
 
-  /// @notice Reverts unless the caller is an OffRamp for the remote chain on the router.
-  /// @param remoteChainSelector The source chain.
+  /// @notice Checks whether the msg.sender is a permissioned offRamp for the given chain on the Router.
+  /// @dev The pool does not check the lane. The pool config manager does, so a token without a lane reverts there.
+  /// @dev This function is marked virtual for the same reason as _onlyOnRamp.
+  /// @param remoteChainSelector The remote chain selector.
   function _onlyOffRamp(
     uint64 remoteChainSelector
   ) internal view virtual {
@@ -372,6 +399,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
+  /// @dev Returns the resolved token transfer fee config for the token and destination chain.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
@@ -384,7 +412,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev Reverts if the token profile does not allow the requested finality.
+  /// @dev Reverts if the token profile does not allow the requested finality. If the fee config is disabled, returns
+  /// zeros with isEnabled false to signal the OnRamp to use FeeQuoter defaults.
   function getFee(
     address localToken,
     uint64 destChainSelector,
@@ -427,7 +456,6 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   // ================================================================
 
   /// @inheritdoc IMultiTokenPool
-  /// @dev The pool balance of a token holds only fees, because a send locks or burns the amount after the fee.
   function withdrawFeeTokens(
     address[] calldata feeTokens,
     address recipient
