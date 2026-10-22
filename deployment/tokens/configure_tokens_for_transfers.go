@@ -1044,23 +1044,22 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 	}
 
 	// On 2.0 lanes the OnRamp token network fee must be subtracted from the legacy fee. This only
-	// matters when there is a legacy fee to import: if the adapter cannot read the network fee, refuse
-	// rather than import the full legacy fee and reintroduce the double charge.
+	// matters when there is a legacy fee to import and the lane's OnRamp is actually 2.0: a 1.x OnRamp
+	// charges no token network fee, so its legacy fee is imported as-is. If a 2.0 OnRamp's adapter cannot
+	// read the fee, refuse rather than import the full legacy fee and reintroduce the double charge.
 	var networkFeeUSDCents uint32
-	if legacyTTFC.IsEnabled {
+	if legacyTTFC.IsEnabled && onRampRef.Version != nil && onRampRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
 		onRampReader, hasOnRampReader := feeAdapter.(fees.OnRampDestChainConfigReader)
-		if !hasOnRampReader && onRampRef.Version != nil && onRampRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
+		if !hasOnRampReader {
 			return nil, fmt.Errorf(
 				"fee adapter for OnRamp version %s cannot read the token network fee; refusing to import the legacy fee without subtracting it",
 				onRampRef.Version,
 			)
 		}
-		if hasOnRampReader {
-			if onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, onRampRef, localSelector, remoteSelector); err != nil {
-				return nil, fmt.Errorf("failed to read OnRamp dest chain config for chain selector %d and remote chain selector %d: %w", localSelector, remoteSelector, err)
-			} else {
-				networkFeeUSDCents = uint32(onRampCfg.TokenNetworkFeeUSDCents)
-			}
+		if onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, onRampRef, localSelector, remoteSelector); err != nil {
+			return nil, fmt.Errorf("failed to read OnRamp dest chain config for chain selector %d and remote chain selector %d: %w", localSelector, remoteSelector, err)
+		} else {
+			networkFeeUSDCents = uint32(onRampCfg.TokenNetworkFeeUSDCents)
 		}
 	}
 

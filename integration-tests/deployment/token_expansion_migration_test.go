@@ -39,6 +39,7 @@ import (
 
 	evmadpV1_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/adapters"
 	evmseqV1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmseqV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	testsetupV2_0_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/adapters"
@@ -606,10 +607,18 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		require.True(t, ok, "v2.0 fee adapter must implement OnRampDestChainConfigReader")
 		onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, onRampRef, selA, selB)
 		require.NoError(t, err)
-		importedFeeUSDCents := uint32(0)
+		// Assert the lane's OnRamp token network fee independently of the migration code, so the
+		// expected fee below is not derived solely from the code under test.
 		networkFeeUSDCents := uint32(onRampCfg.TokenNetworkFeeUSDCents)
+		require.Equal(t, uint32(evmseqV2_0_0.GetDefaultTokenFeeUSDCentsFor1_6Lane(selA, selB)), networkFeeUSDCents)
+
+		importedFeeUSDCents := uint32(0)
 		if legacyFee.MinFeeUSDCents > networkFeeUSDCents {
 			importedFeeUSDCents = legacyFee.MinFeeUSDCents - networkFeeUSDCents
+		} else {
+			// Clamp path: only reachable when the legacy fee is below the network fee.
+			require.Greater(t, networkFeeUSDCents, legacyFee.MinFeeUSDCents,
+				"clamp path requires the OnRamp network fee to exceed the legacy fee")
 		}
 
 		legacyTpCfg := tokensapi.TokenTransferFeeConfig{
