@@ -450,7 +450,7 @@ func GetAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, ac
 // commitment level (e.g. via Chain.Confirm) may not be finalized yet, in which case a plain read
 // at the finalized commitment reports the account as not found.
 func GetFinalizedAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, account solana.PublicKey, data any) error {
-	const attempts = 120          // ~30s at 250ms per attempt
+	const attempts = 120 // ~30s at 250ms per attempt
 	const retryDelay = 250 * time.Millisecond
 	var err error
 	for i := 0; i < attempts; i++ {
