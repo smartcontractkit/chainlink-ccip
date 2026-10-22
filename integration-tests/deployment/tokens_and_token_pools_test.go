@@ -12,7 +12,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -950,8 +949,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			routerProgramId := solana.PublicKeyFromBytes(routerAdd)
 			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
 
-			var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-			tokenAdminRegistryErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
+			_, tokenAdminRegistryErr := solcommon.GetTokenAdminRegistry(t.Context(), chain.Client, tokenAdminRegistryPDA, solchain.SolDefaultCommitment)
 			require.Error(t, tokenAdminRegistryErr)
 
 			// Verify that the PDA token pool has not been initialized
@@ -985,8 +983,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 			// Verify that a new admin was proposed for the specified token
-			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
-			tarErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			tokenAdminRegistryAccountAfter, tarErr := solcommon.GetTokenAdminRegistry(t.Context(), chain.Client, tokenAdminRegistryPDA, solchain.SolDefaultCommitment)
 			require.NoError(t, tarErr)
 			require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
 			require.Equal(t, externalAdmin, tokenAdminRegistryAccountAfter.PendingAdministrator)
@@ -1026,7 +1023,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			testhelpers.ProcessTimelockProposals(t, *env, output.MCMSTimelockProposals, false)
 
 			// Verify that a new admin was proposed for the specified token
-			tarErr = chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			tokenAdminRegistryAccountAfter, tarErr = solcommon.GetTokenAdminRegistry(t.Context(), chain.Client, tokenAdminRegistryPDA, solchain.SolDefaultCommitment)
 			require.NoError(t, tarErr)
 			require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccountAfter.Administrator)
 			require.Equal(t, newExternalAdmin.PublicKey(), tokenAdminRegistryAccountAfter.PendingAdministrator)
@@ -1076,8 +1073,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 			routerProgramId := solana.PublicKeyFromBytes(routerAdd)
 			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
 
-			var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-			tokenAdminRegistryErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
+			_, tokenAdminRegistryErr := solcommon.GetTokenAdminRegistry(t.Context(), chain.Client, tokenAdminRegistryPDA, solchain.SolDefaultCommitment)
 			require.Error(t, tokenAdminRegistryErr)
 
 			// Verify that the PDA token pool has been initialized
@@ -1247,8 +1243,7 @@ func TestTokensAndTokenPools(t *testing.T) {
 				"precondition: after manual registration the mint authority is the pool signer PDA")
 
 			// Verify that a new admin was proposed for the specified token
-			var tokenAdminRegistryAccountAfter ccip_common.TokenAdminRegistry
-			tarErr := chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tokenAdminRegistryAccountAfter)
+			tokenAdminRegistryAccountAfter, tarErr := solcommon.GetTokenAdminRegistry(t.Context(), chain.Client, tokenAdminRegistryPDA, solchain.SolDefaultCommitment)
 			require.NoError(t, tarErr)
 			require.Equal(t, timelockSigner, tokenAdminRegistryAccountAfter.Administrator)
 
@@ -1333,8 +1328,8 @@ func TestTokensAndTokenPools(t *testing.T) {
 
 			tokenMint := solana.MustPublicKeyFromBase58(tokenAddr.Address)
 			tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(tokenMint, routerProgramId)
-			var tar ccip_common.TokenAdminRegistry
-			require.NoError(t, chain.GetAccountDataBorshInto(t.Context(), tokenAdminRegistryPDA, &tar))
+			tar, err := solcommon.GetTokenAdminRegistry(t.Context(), chain.Client, tokenAdminRegistryPDA, solchain.SolDefaultCommitment)
+			require.NoError(t, err)
 			require.False(t, tar.LookupTable.IsZero(), "precondition: token pool lookup table must exist from ConfigureTokenForTransfers")
 
 			lutBefore, err := solcommon.GetAddressLookupTable(t.Context(), chain.Client, tar.LookupTable)

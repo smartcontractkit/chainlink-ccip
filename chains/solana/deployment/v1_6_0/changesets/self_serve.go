@@ -18,9 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/solutils"
 	lockrelease "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/lockrelease_token_pool"
 	solBurnMintTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
-	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_router"
 	solLockReleaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/lockrelease_token_pool"
+	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
@@ -192,9 +192,9 @@ func generateProposeTokenAdminRegistryAdministratorIx(e cldf.Environment, regist
 		return nil, fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w",
 			tokenMint.String(), routerState.routerProgramID.String(), err)
 	}
-	var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
+	tokenAdminRegistryAccount, err := solCommonUtil.GetTokenAdminRegistry(context.Background(), solChainState.chain.Client, tokenAdminRegistryPDA, cldfsolana.SolDefaultCommitment)
 	tokenAdminRegistryExists := false
-	if err := solChainState.chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+	if err == nil {
 		tokenAdminRegistryExists = true
 		if tokenAdminRegistryAccount.Administrator == registerTokenConfig.ProposedOwner || tokenAdminRegistryAccount.PendingAdministrator == registerTokenConfig.ProposedOwner {
 			e.Logger.Infow("Skipping Propose Token Admin Registry Administrator as it is already set")

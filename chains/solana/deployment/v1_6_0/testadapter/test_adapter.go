@@ -34,7 +34,6 @@ import (
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
 	tokenops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/test_ccip_receiver"
@@ -262,8 +261,7 @@ func (a *SVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		}
 
 		// Set the token pool's lookup table address
-		var tokenAdminRegistry ccip_common.TokenAdminRegistry
-		err = solcommon.GetAccountDataBorshInto(ctx, a.Client, tokenPool.AdminRegistryPDA, solconfig.DefaultCommitment, &tokenAdminRegistry)
+		tokenAdminRegistry, err := solcommon.GetTokenAdminRegistry(ctx, a.Client, tokenPool.AdminRegistryPDA, solconfig.DefaultCommitment)
 		if err != nil {
 			return 0, messageID, err
 		}

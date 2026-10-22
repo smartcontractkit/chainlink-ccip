@@ -10,7 +10,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -269,8 +268,8 @@ var ExtendTokenPoolLookupTable = operations.NewOperation(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to find token admin registry PDA: %w", err)
 		}
 
-		var tokenAdminRegistry ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(ctx, tokenAdminRegistryPDA, &tokenAdminRegistry); err != nil {
+		tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse token admin registry account at '%s': %w", tokenAdminRegistryPDA.String(), err)
 		}
 

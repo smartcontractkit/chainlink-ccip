@@ -10,11 +10,12 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldfproposalutils "github.com/smartcontractkit/chainlink-deployments-framework/engine/cld/mcms/proposalutils"
 
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	"github.com/smartcontractkit/mcms"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
-	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_router"
+	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared"
@@ -77,8 +78,8 @@ func (cfg RegisterTokenAdminRegistryConfig) Validate(e cldf.Environment, chainSt
 		if err != nil {
 			return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 		}
-		var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		_, err = solCommonUtil.GetTokenAdminRegistry(context.Background(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+		if err == nil {
 			if !registerTokenConfig.Override {
 				return fmt.Errorf("token admin registry already exists for (mint: %s, router: %s)", tokenPubKey.String(), routerProgramAddress.String())
 			}
@@ -281,8 +282,8 @@ func (cfg TransferAdminRoleTokenAdminRegistryConfig) Validate(e cldf.Environment
 		if err != nil {
 			return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 		}
-		var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		tokenAdminRegistryAccount, err := solCommonUtil.GetTokenAdminRegistry(context.Background(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+		if err != nil {
 			return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot transfer admin role", tokenPubKey.String(), routerProgramAddress.String())
 		}
 		currentAdmin := tokenAdminRegistryAccount.Administrator
@@ -345,8 +346,8 @@ func TransferAdminRoleTokenAdminRegistry(e cldf.Environment, cfg TransferAdminRo
 		tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 		newRegistryAdminPubKey := transferTokenAdminConfig.NewRegistryAdminPublicKey
 
-		var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		tokenAdminRegistryAccount, err := solCommonUtil.GetTokenAdminRegistry(context.Background(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get token admin registry account: %w", err)
 		}
 		currentAdmin := tokenAdminRegistryAccount.Administrator
@@ -428,8 +429,8 @@ func (cfg AcceptAdminRoleTokenAdminRegistryConfig) Validate(e cldf.Environment, 
 		if err != nil {
 			return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 		}
-		var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		tokenAdminRegistryAccount, err := solCommonUtil.GetTokenAdminRegistry(context.Background(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+		if err != nil {
 			return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot accept admin role", tokenPubKey.String(), routerProgramAddress.String())
 		}
 		// if pending admin is not the deployer key or timelock signer, we cannot accept the admin role
@@ -479,8 +480,8 @@ func AcceptAdminRoleTokenAdminRegistry(e cldf.Environment, cfg AcceptAdminRoleTo
 		if acceptAdminRoleTokenConfig.SkipRegistryCheck {
 			pendingAdmin = timelockSignerPDA
 		} else {
-			var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
-			if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+			tokenAdminRegistryAccount, err := solCommonUtil.GetTokenAdminRegistry(context.Background(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot accept admin role", tokenPubKey.String(), routerProgramAddress.String())
 			}
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
@@ -639,8 +640,8 @@ func (cfg SetPoolConfig) Validate(e cldf.Environment, chainState solanastateview
 		if err != nil {
 			return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 		}
-		var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+		tokenAdminRegistryAccount, err := solCommonUtil.GetTokenAdminRegistry(context.Background(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+		if err != nil {
 			return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot set pool", tokenPubKey.String(), routerProgramAddress.String())
 		}
 		if !tokenAdminRegistryAccount.Administrator.Equals(deployerKey) && !tokenAdminRegistryAccount.Administrator.Equals(timelockSignerPDA) {
@@ -695,8 +696,8 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 		if tokenConfig.SkipRegistryCheck {
 			currentAdmin = timelockSignerPDA
 		} else {
-			var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
-			if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+			tokenAdminRegistryAccount, err := solCommonUtil.GetTokenAdminRegistry(context.Background(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot set pool", tokenPubKey.String(), routerProgramAddress.String())
 			}
 			currentAdmin = tokenAdminRegistryAccount.Administrator

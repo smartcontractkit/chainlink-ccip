@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -310,8 +309,7 @@ var SetPool = operations.NewOperation(
 		// if there is no admin set, we assume the router authority is timelock
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		currentAdmin := GetAuthority(chain, input.Router)
-		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if tokenAdminRegistryAccount, err := common.GetTokenAdminRegistry(b.GetContext(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment); err == nil {
 			if !tokenAdminRegistryAccount.LookupTable.IsZero() {
 				b.Logger.Info("Token pool lookup table already set for this mint with the given admin:", tokenAdminRegistryAccount)
 				return sequences.OnChainOutput{}, nil
@@ -427,8 +425,7 @@ var UnregisterToken = operations.NewOperation(
 
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		currentAdmin := GetAuthority(chain, input.Router)
-		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if tokenAdminRegistryAccount, err := common.GetTokenAdminRegistry(b.GetContext(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment); err == nil {
 			if !tokenAdminRegistryAccount.Administrator.IsZero() {
 				currentAdmin = tokenAdminRegistryAccount.Administrator
 			}
@@ -490,8 +487,7 @@ var RegisterTokenAdminRegistry = operations.NewOperation(
 			input.Admin = ccipAdmin
 		}
 		var pendingAdmin solana.PublicKey
-		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if tokenAdminRegistryAccount, err := common.GetTokenAdminRegistry(b.GetContext(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment); err == nil {
 			if input.Admin == tokenAdminRegistryAccount.Administrator {
 				b.Logger.Info("Token admin registry already registered with the given admin:", tokenAdminRegistryAccount)
 				// Return without PendingSigner: nothing changed on-chain, so callers must not
@@ -643,8 +639,7 @@ var AcceptTokenAdminRegistry = operations.NewOperation(
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var pendingAdmin solana.PublicKey
 		var currentAdmin solana.PublicKey
-		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
+		if tokenAdminRegistryAccount, err := common.GetTokenAdminRegistry(b.GetContext(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment); err == nil {
 			// NOTE: only set pendingAdmin if the account exists / fetch succeeds
 			pendingAdmin = tokenAdminRegistryAccount.PendingAdministrator
 			currentAdmin = tokenAdminRegistryAccount.Administrator
@@ -727,16 +722,15 @@ var TransferTokenAdminRegistry = operations.NewOperation(
 		routerConfigPDA, _, _ := state.FindConfigPDA(input.Router)
 		tokenAdminRegistryPDA, _, _ := state.FindTokenAdminRegistryPDA(input.TokenMint, input.Router)
 		var currentAdmin solana.PublicKey
-		var tokenAdminRegistryAccount ccip_common.TokenAdminRegistry
-		if err := chain.GetAccountDataBorshInto(b.GetContext(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
-			currentAdmin = tokenAdminRegistryAccount.Administrator
-			if currentAdmin.IsZero() {
-				return TokenAdminRegistryOut{}, fmt.Errorf("no admin found for token admin registry")
-			}
-			b.Logger.Infof("Current token admin registry account: %+v", tokenAdminRegistryAccount)
-		} else {
+		tokenAdminRegistryAccount, err := common.GetTokenAdminRegistry(b.GetContext(), chain.Client, tokenAdminRegistryPDA, cldf_solana.SolDefaultCommitment)
+		if err != nil {
 			return TokenAdminRegistryOut{}, fmt.Errorf("failed to fetch token admin registry account: %w", err)
 		}
+		currentAdmin = tokenAdminRegistryAccount.Administrator
+		if currentAdmin.IsZero() {
+			return TokenAdminRegistryOut{}, fmt.Errorf("no admin found for token admin registry")
+		}
+		b.Logger.Infof("Current token admin registry account: %+v", tokenAdminRegistryAccount)
 		// we can only sign as either the deployer or timelock
 		// ccip admin should be timelock
 		ccipAdmin := GetAuthority(chain, input.Router)

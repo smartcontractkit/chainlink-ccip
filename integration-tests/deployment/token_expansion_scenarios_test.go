@@ -2894,8 +2894,7 @@ func TestSolanaCrossFamilyTokenExpansion_thirdPartyPendingTAR(t *testing.T) {
 	// Helper for fetching and decoding the TAR on chain state
 	fetchTAR := func(show bool) ccip_common.TokenAdminRegistry {
 		t.Helper()
-		var tarState ccip_common.TokenAdminRegistry
-		decodeErr := solChain.GetAccountDataBorshInto(t.Context(), tarPDA, &tarState)
+		tarState, decodeErr := solcommon.GetTokenAdminRegistry(t.Context(), solChain.Client, tarPDA, solchain.SolDefaultCommitment)
 		require.NoError(t, decodeErr)
 		if show {
 			t.Logf(

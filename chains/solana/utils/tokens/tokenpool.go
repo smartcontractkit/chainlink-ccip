@@ -9,7 +9,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -249,8 +248,7 @@ func ParseTokenLookupTableWithChain(ctx context.Context, client *rpc.Client, tok
 	tokenBillingConfig := token.Billing[chainSelector]
 	poolChainConfig := token.Chain[chainSelector]
 
-	tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+	tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment)
 	if err != nil {
 		return nil, nil, err
 	}

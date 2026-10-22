@@ -1,4 +1,4 @@
-package adapters
+package common
 
 import (
 	"bytes"
@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/ccip_common"
 )
 
-// TestDecodeTokenAdminRegistry covers the V1/V2 layout dispatch in
-// decodeTokenAdminRegistry. V1 accounts (169 bytes) predate the trailing
-// supports_auto_derivation bool and cannot be decoded by the v1.6.4 binding.
+// TestDecodeTokenAdminRegistry covers the V1/V2 layout dispatch in decodeTokenAdminRegistry.
+// V1 accounts (169 bytes) predate the trailing supports_auto_derivation bool and cannot be
+// decoded by the v1.6.4 binding.
 func TestDecodeTokenAdminRegistry(t *testing.T) {
 	t.Parallel()
 

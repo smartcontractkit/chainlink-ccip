@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/base_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/cctp_token_pool"
@@ -2641,8 +2640,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
@@ -2688,8 +2686,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -2787,8 +2784,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2809,8 +2805,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
@@ -2829,8 +2824,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2879,8 +2873,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2926,8 +2919,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -2977,8 +2969,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -2998,8 +2989,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, usdcPoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -3021,8 +3011,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, usdcPoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3044,8 +3033,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, usdcPoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, usdcPool.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, usdcPoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3115,8 +3103,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3138,8 +3125,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
-				tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+				tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 				require.NoError(t, err)
 				require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3159,8 +3145,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
-				tokenAdminRegistry = ccip_common.TokenAdminRegistry{}
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+				tokenAdminRegistry, err = common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 				require.NoError(t, err)
 				require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3205,8 +3190,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -3248,8 +3232,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction, ixAuth}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3269,8 +3252,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, true, tokenAdminRegistry.SupportsAutoDerivation)
 				})
@@ -3302,8 +3284,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3349,8 +3330,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
@@ -3400,8 +3380,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
@@ -3421,8 +3400,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.PendingAdministrator)
@@ -3448,8 +3426,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction, ixAuth}, legacyAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
-					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+					tokenAdminRegistry, err := common.GetTokenAdminRegistry(ctx, solanaGoClient, linkPool.AdminRegistryPDA, config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, legacyAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, uint8(2), tokenAdminRegistry.Version)
