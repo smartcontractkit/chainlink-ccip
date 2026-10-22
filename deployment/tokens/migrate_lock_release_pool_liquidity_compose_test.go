@@ -144,7 +144,7 @@ func TestRunLockReleaseLiquidityMigration_UnsupportedOldPool(t *testing.T) {
 		},
 		{
 			name:           "no adapter registered at the old pool's version",
-			oldPoolVersion: semver.MustParse("1.2.0"),
+			oldPoolVersion: semver.MustParse("1.6.0"), // not registered in this test's registry
 			expectedErr:    "does not support liquidity migration yet",
 		},
 		{
