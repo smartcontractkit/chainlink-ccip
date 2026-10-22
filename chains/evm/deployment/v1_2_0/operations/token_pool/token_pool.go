@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
@@ -138,12 +140,33 @@ func (c *TokenPoolContract) CurrentOffRampRateLimiterState(opts *bind.CallOpts, 
 	return *abi.ConvertType(out[0], new(TokenBucket)).(*TokenBucket), nil
 }
 
+func (c *TokenPoolContract) ApplyRampUpdates(opts *bind.TransactOpts, onRamps []RampUpdate, offRamps []RampUpdate) (*types.Transaction, error) {
+	return c.contract.Transact(opts, "applyRampUpdates", onRamps, offRamps)
+}
+
+type Config struct {
+	IsEnabled bool
+	Capacity  *big.Int
+	Rate      *big.Int
+}
+
+type RampUpdate struct {
+	Ramp              common.Address
+	Allowed           bool
+	RateLimiterConfig Config
+}
+
 type TokenBucket struct {
 	Tokens      *big.Int
 	LastUpdated uint32
 	IsEnabled   bool
 	Capacity    *big.Int
 	Rate        *big.Int
+}
+
+type ApplyRampUpdatesArgs struct {
+	OnRamps  []RampUpdate
+	OffRamps []RampUpdate
 }
 
 var GetToken = contract.NewRead(contract.ReadParams[struct{}, common.Address, *TokenPoolContract]{
@@ -231,5 +254,23 @@ var CurrentOffRampRateLimiterState = contract.NewRead(contract.ReadParams[common
 	NewContract:  NewTokenPoolContract,
 	CallContract: func(c *TokenPoolContract, opts *bind.CallOpts, args common.Address) (TokenBucket, error) {
 		return c.CurrentOffRampRateLimiterState(opts, args)
+	},
+})
+
+var ApplyRampUpdates = contract.NewWrite(contract.WriteParams[ApplyRampUpdatesArgs, *TokenPoolContract]{
+	Name:            "token-pool:apply-ramp-updates",
+	Version:         Version,
+	Description:     "Calls applyRampUpdates on the contract",
+	ContractType:    ContractType,
+	ContractABI:     TokenPoolABI,
+	NewContract:     NewTokenPoolContract,
+	IsAllowedCaller: contract.OnlyOwner[*TokenPoolContract, ApplyRampUpdatesArgs],
+	Validate:        func(ApplyRampUpdatesArgs) error { return nil },
+	CallContract: func(
+		c *TokenPoolContract,
+		opts *bind.TransactOpts,
+		args ApplyRampUpdatesArgs,
+	) (*types.Transaction, error) {
+		return c.ApplyRampUpdates(opts, args.OnRamps, args.OffRamps)
 	},
 })
