@@ -6,7 +6,7 @@ import {IPoolV2} from "./IPoolV2.sol";
 import {Pool} from "../libraries/Pool.sol";
 
 /// @notice Transfer validation and resolved configuration views for multi-token pools.
-/// @dev Lane configuration resolves through token, covering group chain, then group default records.
+/// @dev Lane configuration resolves through token, then policy x chain, then policy default records.
 /// Rate-limit consumption accepts calls only from the token's TokenAdminRegistry pool.
 /// Views can return values without token registration or a record for the token and chain.
 /// For example, the global pause applies to all tokens and chains.
@@ -165,9 +165,7 @@ interface IPoolConfigManager {
     bytes4 requestedFinalityConfig
   ) external view returns (LaneFee memory fee);
 
-  /// @notice Returns the resolved fee parameters for the requested finality.
-  /// @dev Never reverts. Unlike getFee, it does not check the requested finality against the token profile. Read
-  /// TokenConfig.allowedFinalityConfig to know whether a send with that finality would revert.
+  /// @notice Returns the resolved fee parameters for the requested finality. Batched version of getFee.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fee
@@ -211,7 +209,7 @@ interface IPoolConfigManager {
   ) external view returns (LaneVerification[] memory verifications);
 
   /// @notice Returns the token's resolved configuration.
-  /// @dev Returns the resolved value based on group setting / token override.
+  /// @dev Returns the resolved value based on policy setting / token override.
   /// @param localTokens The local tokens.
   /// @return configs The resolved token configurations, aligned with localTokens by index.
   function getTokenConfigBatch(
