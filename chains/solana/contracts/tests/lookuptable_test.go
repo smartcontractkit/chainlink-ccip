@@ -35,25 +35,18 @@ func TestSVMLookupTables(t *testing.T) {
 	}
 
 	loadLookupTable := func(k []solana.PublicKey) solana.PublicKey {
-		// create lookup table
-		slot, serr := c.GetSlot(ctx, rpc.CommitmentFinalized)
-		require.NoError(t, serr)
-		table, instruction, ierr := common.NewCreateLookupTableInstruction(
-			sender.PublicKey(),
-			sender.PublicKey(),
-			slot,
-		)
-		require.NoError(t, ierr)
-		testutils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentFinalized)
-
-		// add entries to lookup table
-		testutils.SendAndConfirm(ctx, t, c, []solana.Instruction{
-			common.NewExtendLookupTableInstruction(
-				table, sender.PublicKey(), sender.PublicKey(),
-				k,
-			),
-		}, sender, rpc.CommitmentFinalized)
-
+		// NOTE: the ALT program requires the derivation slot to be present in the
+		// slot-hashes sysvar of the bank that processes (and preflight-simulates) the
+		// instruction. common.SetupLookupTable handles this by deriving the table from
+		// the slot preceding the finalized slot. "not a recent slot" errors can still
+		// occur transiently when finalized lags behind the bank tip, so retry (see
+		// ccip_router_test.go for the same pattern).
+		var table solana.PublicKey
+		testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error {
+			var err error
+			table, err = common.SetupLookupTable(ctx, c, sender, k)
+			return err
+		})
 		return table
 	}
 
