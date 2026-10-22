@@ -77,6 +77,11 @@ interface IPoolConfigManager {
     bool hasConnection; // ──────────────────────────╮ True if a connection record applies to the token and remote chain.
     bool isOutboundPaused; //                        │ Whether outbound transfers are paused.
     bool isInboundPaused; //                         │ Whether inbound transfers are paused.
+    bool isGloballyPaused; //                        │ True if the global pause is on.
+    bool isTokenOutboundPaused; //                   │ True if the token is paused outbound.
+    bool isTokenInboundPaused; //                    │ True if the token is paused inbound.
+    bool isChainOutboundPaused; //                   │ True if the remote chain is paused outbound.
+    bool isChainInboundPaused; //                    │ True if the remote chain is paused inbound.
     bool omitSourceTokenAddressOnSend; //            │ True sends pool data without the source token.
     bool allowSourceTokenAddressMissingOnReceive; // │ True accepts pool data without the source token.
     uint32 destGasOverhead; //                       │ The destination token execution gas overhead.
@@ -95,6 +100,11 @@ interface IPoolConfigManager {
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
     address tokenIdentityMetadataProvider; // The token's ITokenIdentityMetadataProvider. Zero means none.
     uint64[] supportedChains; //            The remote chains covered by the token's resolved lanes.
+    bytes32 connectionPolicyName; //        The connection policy of the token. Zero if it has none.
+    bytes32 chainPolicyName; //             The chain policy of the token. Zero if it has none.
+    bytes32 rateLimitPolicyName; //         The rate limit policy of the token. Zero if it has none.
+    bytes32 feePolicyName; //               The fee policy of the token. Zero if it has none.
+    bytes32 securityPolicyName; //          The security policy of the token. Zero if it has none.
   }
 
   /// @notice Validates an outbound transfer, consumes its rate limit after the token fee and builds the pool data.
@@ -129,32 +139,9 @@ interface IPoolConfigManager {
     bytes4 requestedFinalityConfig
   ) external returns (ResolvedInboundTransfer memory transfer);
 
-  /// @notice Returns the resolved CCV list for a transfer direction.
-  /// @param localToken The local token.
-  /// @param remoteChainSelector The remote chain.
-  /// @param direction The direction of the transfer.
-  /// @return requiredCCVs The configured list, or empty if no lane exists.
-  function getRequiredCCVs(
-    address localToken,
-    uint64 remoteChainSelector,
-    IPoolV2.MessageDirection direction
-  ) external view returns (address[] memory requiredCCVs);
-
   /// @notice Returns the resolved fee parameters for the requested finality.
-  /// @param localToken The local token.
-  /// @param destChainSelector The destination chain.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @dev Reverts with FinalityCodec.InvalidRequestedFinality if the token profile does not allow the requested
-  /// finality, also for a token without a lane. getFee and getFeeBatch are the only PCM views that revert.
-  /// @return fee The resolved fee params, or zeros with isEnabled false if the fee record is disabled or the token
-  /// has no lane or chain record.
-  function getFee(
-    address localToken,
-    uint64 destChainSelector,
-    bytes4 requestedFinalityConfig
-  ) external view returns (LaneFee memory fee);
-
-  /// @notice Returns the resolved fee parameters for the requested finality. Batched version of getFee.
+  /// finality, also for a token without a lane. getFeeBatch is the only PCM view that reverts.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fee
