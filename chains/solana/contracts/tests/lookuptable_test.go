@@ -43,9 +43,9 @@ func TestSVMLookupTables(t *testing.T) {
 		// ccip_router_test.go for the same pattern).
 		var table solana.PublicKey
 		testutils.RetryIfErrContains(t, 5, "not a recent slot", func() error {
-			var err error
-			table, err = common.SetupLookupTable(ctx, c, sender, k)
-			return err
+			var setupErr error
+			table, setupErr = common.SetupLookupTable(ctx, c, sender, k)
+			return setupErr
 		})
 		return table
 	}
