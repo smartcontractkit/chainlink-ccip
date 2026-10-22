@@ -56,7 +56,7 @@ type OnRampDestChainConfig struct {
 // lane's OnRamp destination chain config. Note this reads the OnRamp contract, not the FeeQuoter.
 // Versions whose OnRamp has no readable destination chain config (e.g. pre-2.0 EVM) do not implement it.
 type OnRampDestChainConfigReader interface {
-	GetOnchainOnRampDestChainConfig(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src uint64, dst uint64) (OnRampDestChainConfig, error)
+	GetOnchainOnRampDestChainConfig(b cldf_ops.Bundle, chains cldf_chain.BlockChains, onRamp datastore.AddressRef, src uint64, dst uint64) (OnRampDestChainConfig, error)
 }
 
 // FeeAdapterRegistry maintains a registry of FeeAdapters for different chain families and versions.

@@ -1056,7 +1056,7 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 			)
 		}
 		if hasOnRampReader {
-			if onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector); err != nil {
+			if onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, onRampRef, localSelector, remoteSelector); err != nil {
 				return nil, fmt.Errorf("failed to read OnRamp dest chain config for chain selector %d and remote chain selector %d: %w", localSelector, remoteSelector, err)
 			} else {
 				networkFeeUSDCents = uint32(onRampCfg.TokenNetworkFeeUSDCents)

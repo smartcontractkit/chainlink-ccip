@@ -75,13 +75,13 @@ func TestFeesAdapter_GetOnchainOnRampDestChainConfig(t *testing.T) {
 	// the Router's OnRamp mapping is observed when resolving the fee adapter.
 	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 
-	feeAdapter, _, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
+	feeAdapter, onRampRef, _, err := fees.ResolveFeeAdapterAndOnRamp(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
 	require.NoError(t, err)
 
 	reader, ok := feeAdapter.(fees.OnRampDestChainConfigReader)
 	require.True(t, ok, "v2.0 fee adapter must implement OnRampDestChainConfigReader")
 
-	cfg, err := reader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
+	cfg, err := reader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, onRampRef, localSelector, remoteSelector)
 	require.NoError(t, err)
 	require.NotNil(t, cfg.Ref.Version)
 	require.True(t, cfg.Ref.Version.Equal(utils.Version_2_0_0), "expected v2.0 OnRamp, got %s", cfg.Ref.Version)

@@ -66,12 +66,10 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 	if err := a.validateOnRampRef(onRampRef); err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
 	}
-
 	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRampRef)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to convert OnRamp address ref to EVM address for src %d and dst %d: %w", src, dst, err)
 	}
-
 	chain, ok := chains.EVMChains()[src]
 	if !ok {
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", src)
@@ -127,17 +125,11 @@ func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) f
 	})
 }
 
-// GetOnchainOnRampDestChainConfig implements fees.OnRampDestChainConfigReader. It resolves the lane's
-// OnRamp and reads its destination chain config.
-func (a *FeesAdapter) GetOnchainOnRampDestChainConfig(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, src uint64, dst uint64) (fees.OnRampDestChainConfig, error) {
-	onRampRef, err := a.resolver.GetOnRampRef(b, chains, ds, src, dst)
-	if err != nil {
-		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to resolve OnRamp address ref for src %d and dst %d: %w", src, dst, err)
-	}
-	if err := a.validateOnRampRef(onRampRef); err != nil {
+func (a *FeesAdapter) GetOnchainOnRampDestChainConfig(b operations.Bundle, chains cldf_chain.BlockChains, onRamp datastore.AddressRef, src uint64, dst uint64) (fees.OnRampDestChainConfig, error) {
+	if err := a.validateOnRampRef(onRamp); err != nil {
 		return fees.OnRampDestChainConfig{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
 	}
-	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRampRef)
+	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRamp)
 	if err != nil {
 		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to convert OnRamp address ref to EVM address for src %d and dst %d: %w", src, dst, err)
 	}
@@ -165,7 +157,7 @@ func (a *FeesAdapter) GetOnchainOnRampDestChainConfig(b operations.Bundle, chain
 	}
 
 	return fees.OnRampDestChainConfig{
-		Ref:                     onRampRef,
+		Ref:                     onRamp,
 		TokenNetworkFeeUSDCents: report.Output.TokenNetworkFeeUSDCents,
 	}, nil
 }
