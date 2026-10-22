@@ -66,11 +66,13 @@ contract MultiTokenPoolSetup is BaseTest {
     config.isRegistered = true;
     config.localDecimals = DEFAULT_TOKEN_DECIMALS;
     config.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Burn;
+    return config;
   }
 
   function _defaultLaneConnection() internal view returns (IPoolConfigManager.LaneConnection memory connection) {
     connection.hasConnection = true;
     connection.remoteToken = abi.encode(s_remoteToken);
+    return connection;
   }
 
   function _defaultOutboundLane() internal view returns (IPoolConfigManager.OutboundLane memory lane) {
@@ -78,6 +80,7 @@ contract MultiTokenPoolSetup is BaseTest {
     lane.destPoolData = DEST_POOL_DATA;
     lane.localDecimals = DEFAULT_TOKEN_DECIMALS;
     lane.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Burn;
+    return lane;
   }
 
   function _defaultInboundTransfer(
@@ -85,6 +88,7 @@ contract MultiTokenPoolSetup is BaseTest {
   ) internal pure returns (IPoolConfigManager.ResolvedInboundTransfer memory transfer) {
     transfer.localAmount = localAmount;
     transfer.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Burn;
+    return transfer;
   }
 
   function _lockOrBurnIn(
