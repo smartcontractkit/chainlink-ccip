@@ -64,78 +64,87 @@ func (a *SolanaAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[
 			}
 
 			var result sequences.OnChainOutput
-			rtarOut, err := operations.ExecuteOperation(b, routerops.RegisterTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
-				Router:            solana.PublicKeyFromBytes(routerAddr),
-				TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
-				Admin:             tokenAdmin,
-				ExistingAddresses: addrs,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
-			}
-			result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
-			pendingSigner := rtarOut.Output.PendingSigner
 
-			// a chain without MCMS has no timelock signer, so nothing can match it
-			timelockSigner, err := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
-			hasTimelock := err == nil
-			if err != nil && !errors.Is(err, utils.ErrMCMSInstanceNotFound) {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer: %w", err)
-			}
-			tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
-			deployerPK := chain.DeployerKey.PublicKey()
-			routerPK := solana.PublicKeyFromBytes(routerAddr)
-
-			// If the proposed token admin is timelock or the deployer, then we can run Register + Accept
-			// in this sequence, but we need to be careful when orchestrating both of these operations as
-			// MCMS batch ops DON'T execute immediately. If the Register op creates any MCMS batches that
-			// modify the TAR, then reading the live on-chain state of the TAR in the Accept op will lead
-			// to bugs since it is operating on an incomplete snapshot. The switch statement below should
-			// account for this case and cover the non-batch case as well.
-			hasMCMSProposal := len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0
-			isTimelockPendingAdmin := hasTimelock && pendingSigner == timelockSigner
-			isDeployerPendingAdmin := pendingSigner == deployerPK
-			switch {
-			// Case 1: the RegisterTokenAdminRegistry changes are already confirmed on-chain and require
-			// no proposal - in this case either timelock or the deployer can immediately run the Accept
-			// op since there aren't any proposal instructions that need to be batched together with it.
-			case !hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
-				atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
+			// TEMPORARY HOTFIX (reverse-propagation only): skip the TokenAdminRegistry registration and
+			// admin handover. The on-chain admin-role instructions (Context<ModifyTokenAdminRegistry>)
+			// use Anchor's strict Account<TokenAdminRegistry> (V2, 170 bytes) and reject legacy V1 TAR
+			// accounts (169 bytes) with AccountDidNotDeserialize (3003). Reverse propagation only needs
+			// to add the new remote pool (below); the counterpart is already registered. Remove once the
+			// V1 TAR accounts are migrated on-chain (UpgradeTokenAdminRegistry).
+			if !input.SkipActivePoolSupportedChainsCheck {
+				rtarOut, err := operations.ExecuteOperation(b, routerops.RegisterTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
+					Router:            solana.PublicKeyFromBytes(routerAddr),
+					TokenMint:         solana.MustPublicKeyFromBase58(tokenAddr.Address),
+					Admin:             tokenAdmin,
 					ExistingAddresses: addrs,
-					TokenMint:         tokenMintPK,
-					Router:            routerPK,
-					Admin:             pendingSigner,
 				})
 				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to register token metadata: %w", err)
 				}
-				result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
-				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
-				result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
+				result.Addresses = append(result.Addresses, rtarOut.Output.Addresses...)
+				pendingSigner := rtarOut.Output.PendingSigner
 
-			// Case 2: the RegisterTokenAdminRegistry operation has MCMS batches and the proposed admin
-			// is timelock or deployer - in this case we bundle Register and Accept into the same MCMS batch.
-			case hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
-				atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
+				// a chain without MCMS has no timelock signer, so nothing can match it
+				timelockSigner, err := utils.GetTimelockSignerPDA(addrs, chain.Selector, common_utils.CLLQualifier)
+				hasTimelock := err == nil
+				if err != nil && !errors.Is(err, utils.ErrMCMSInstanceNotFound) {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve timelock signer: %w", err)
 				}
-				batchIxn := append(rtarOut.Output.ProposalInstructions, atarIxn)
-				batchOps, err := utils.BuildMCMSBatchOperation(
-					chain.Selector,
-					batchIxn,
-					routerPK.String(),
-					routerops.ContractType.String(),
-				)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to build combined MCMS batch for token admin register+accept: %w", err)
-				}
-				result.BatchOps = append(result.BatchOps, batchOps)
+				tokenMintPK := solana.MustPublicKeyFromBase58(tokenAddr.Address)
+				deployerPK := chain.DeployerKey.PublicKey()
+				routerPK := solana.PublicKeyFromBytes(routerAddr)
 
-			// Case 3: skip Accept only do Register
-			default:
-				b.Logger.Infof("Deferring token admin role acceptance to proposed admin (%s)", pendingSigner)
-				result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+				// If the proposed token admin is timelock or the deployer, then we can run Register + Accept
+				// in this sequence, but we need to be careful when orchestrating both of these operations as
+				// MCMS batch ops DON'T execute immediately. If the Register op creates any MCMS batches that
+				// modify the TAR, then reading the live on-chain state of the TAR in the Accept op will lead
+				// to bugs since it is operating on an incomplete snapshot. The switch statement below should
+				// account for this case and cover the non-batch case as well.
+				hasMCMSProposal := len(rtarOut.Output.ProposalInstructions) > 0 && len(rtarOut.Output.BatchOps) > 0
+				isTimelockPendingAdmin := hasTimelock && pendingSigner == timelockSigner
+				isDeployerPendingAdmin := pendingSigner == deployerPK
+				switch {
+				// Case 1: the RegisterTokenAdminRegistry changes are already confirmed on-chain and require
+				// no proposal - in this case either timelock or the deployer can immediately run the Accept
+				// op since there aren't any proposal instructions that need to be batched together with it.
+				case !hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
+					atarOut, err := operations.ExecuteOperation(b, routerops.AcceptTokenAdminRegistry, chains.SolanaChains()[chain.Selector], routerops.TokenAdminRegistryParams{
+						ExistingAddresses: addrs,
+						TokenMint:         tokenMintPK,
+						Router:            routerPK,
+						Admin:             pendingSigner,
+					})
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to accept token admin registry: %w", err)
+					}
+					result.Addresses = append(result.Addresses, atarOut.Output.Addresses...)
+					result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+					result.BatchOps = append(result.BatchOps, atarOut.Output.BatchOps...)
+
+				// Case 2: the RegisterTokenAdminRegistry operation has MCMS batches and the proposed admin
+				// is timelock or deployer - in this case we bundle Register and Accept into the same MCMS batch.
+				case hasMCMSProposal && (isTimelockPendingAdmin || isDeployerPendingAdmin):
+					atarIxn, err := routerops.BuildAcceptTokenAdminRegistrySolanaInstruction(routerPK, tokenMintPK, pendingSigner)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to build accept token admin registry instruction: %w", err)
+					}
+					batchIxn := append(rtarOut.Output.ProposalInstructions, atarIxn)
+					batchOps, err := utils.BuildMCMSBatchOperation(
+						chain.Selector,
+						batchIxn,
+						routerPK.String(),
+						routerops.ContractType.String(),
+					)
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to build combined MCMS batch for token admin register+accept: %w", err)
+					}
+					result.BatchOps = append(result.BatchOps, batchOps)
+
+				// Case 3: skip Accept only do Register
+				default:
+					b.Logger.Infof("Deferring token admin role acceptance to proposed admin (%s)", pendingSigner)
+					result.BatchOps = append(result.BatchOps, rtarOut.Output.BatchOps...)
+				}
 			}
 
 			b.Logger.Info("SVM Setting token pool:", input)
