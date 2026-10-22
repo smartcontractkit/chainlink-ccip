@@ -29,7 +29,7 @@ interface IPoolConfigManager {
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out.
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
     uint256 feeAmount; //                   The token fee. The pool keeps it and locks or burns the rest.
-    address hook; //                        The lane's IAdvancedPoolHooks, called preflight. Zero means no hook.
+    address hook; //                        The lane's IMultiTokenPoolHooks, called preflight. Zero means no hook.
   }
 
   /// @notice Resolved inbound transfer. The pool must validate its supported flavor.
@@ -178,7 +178,7 @@ interface IPoolConfigManager {
 
   /// @notice Returns the resolved hook and outbound and inbound CCV lists.
   /// @param lanes The token and remote chain lanes to query.
-  /// @return hooks The lane's IAdvancedPoolHooks per lane, aligned with lanes by index. Zero if no hook is configured
+  /// @return hooks The lane's IMultiTokenPoolHooks per lane, aligned with lanes by index. Zero if no hook is configured
   /// or no lane exists.
   /// @return outboundCCVs The configured outbound CCVs per lane, aligned with lanes by index. Empty if no lane exists.
   /// @return inboundCCVs The configured inbound CCVs per lane, aligned with lanes by index. Empty if no lane exists.
