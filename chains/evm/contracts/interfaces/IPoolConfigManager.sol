@@ -6,8 +6,7 @@ import {IPoolV2} from "./IPoolV2.sol";
 import {Pool} from "../libraries/Pool.sol";
 
 /// @notice Transfer validation and resolved configuration views for multi-token pools.
-/// @dev Lane configuration resolves through token, then policy x chain, then policy default records.
-/// Rate-limit consumption accepts calls only from the token's TokenAdminRegistry pool.
+/// @dev Rate-limit consumption accepts calls only from the token's TokenAdminRegistry pool.
 /// Views can return values without token registration or a record for the token and chain.
 /// For example, the global pause applies to all tokens and chains.
 interface IPoolConfigManager {
@@ -86,7 +85,7 @@ interface IPoolConfigManager {
     bool allowSourceTokenAddressMissingOnReceive; // │ True accepts pool data without the source token.
     uint32 destGasOverhead; //                       │ The destination token execution gas overhead.
     uint32 destBytesOverhead; // ────────────────────╯ The destination token data byte overhead.
-    bytes remoteToken; //                             The encoded remote token, or empty bytes if no lane exists.
+    bytes remoteToken; //                             The encoded remote token. Empty if it cannot be resolved.
     bytes[] remotePools; //                           The encoded trusted remote pools, or an empty list if none exist.
   }
 
@@ -108,9 +107,6 @@ interface IPoolConfigManager {
   }
 
   /// @notice Validates an outbound transfer, consumes its rate limit after the token fee and builds the pool data.
-  /// @dev Checks effective outbound pause, lane existence, requested finality and available rate-limit capacity.
-  /// Pool data with the source token also carries the metadata from the token's ITokenIdentityMetadataProvider, or
-  /// empty metadata if the token has none.
   /// @param localToken The local token that is being locked or burned.
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
@@ -127,10 +123,6 @@ interface IPoolConfigManager {
 
   /// @notice Checks the inbound lane, source token and token identity metadata, converts token transfer amount, and
   /// consumes inbound rate limit.
-  /// @dev Checks effective inbound pause, lane existence, source pool, source pool data, source-token identity, token
-  /// identity metadata and available rate-limit capacity. Source pool data without the source token is accepted only if
-  /// the lane allows it. The token's ITokenIdentityMetadataProvider, if any, gets the metadata of every transfer, also
-  /// empty metadata. A token without one ignores the metadata.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
   /// @return transfer The converted amount, token profile and postflight hook.
@@ -140,8 +132,8 @@ interface IPoolConfigManager {
   ) external returns (ResolvedInboundTransfer memory transfer);
 
   /// @notice Returns the resolved fee parameters for the requested finality.
-  /// @dev Reverts with FinalityCodec.InvalidRequestedFinality if the token profile does not allow the requested
-  /// finality, also for a token without a lane. getFeeBatch is the only PCM view that reverts.
+  /// @dev Reverts with FinalityCodec.InvalidRequestedFinality if the token does not allow the requested finality, also
+  /// for a token without a lane.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fee
@@ -187,7 +179,6 @@ interface IPoolConfigManager {
   ) external view returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs);
 
   /// @notice Returns the token's resolved configuration.
-  /// @dev Returns the resolved value based on policy setting / token override.
   /// @param localTokens The local tokens.
   /// @return configs The resolved token configurations, aligned with localTokens by index.
   function getTokenConfigBatch(

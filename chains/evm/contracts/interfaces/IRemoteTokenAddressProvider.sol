@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @notice Gives the remote token address of each token of a connection policy. A connection policy without a provider
-/// uses the local token address on every chain.
+/// @notice Gives the remote token address of each token of a connection policy.
 interface IRemoteTokenAddressProvider {
   /// @notice Returns the remote token address of a local token on a remote chain.
   /// @dev A wrong answer on send burns the amount, and the message can never succeed. For a token or chain that this
@@ -10,7 +9,7 @@ interface IRemoteTokenAddressProvider {
   /// On receive, the source token must equal the return value byte for byte.
   /// @param localToken The local token.
   /// @param remoteChainSelector The remote chain.
-  /// @return remoteToken The token on the remote chain. For an EVM chain, this is abi.encode(address). Not empty.
+  /// @return remoteToken The token on the remote chain. For an EVM chain, this is abi.encode(address).
   function getRemoteTokenAddress(
     address localToken,
     uint64 remoteChainSelector
