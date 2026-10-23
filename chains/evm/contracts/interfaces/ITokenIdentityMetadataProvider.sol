@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 /// @notice Gives the token identity metadata of a token on send, and checks it on receive. The default identity of a
 /// token is its address. Token identity metadata is extra identity data that the issuer defines, for example an ID that
 /// is the same on every chain. A multi-token pool sends it in the pool data.
-/// @dev The pool config manager calls both functions as views, so a provider cannot change state.
+/// @dev Both functions are called as views, so a provider cannot change state.
 interface ITokenIdentityMetadataProvider {
   /// @notice Returns the token identity metadata of a local token for a send.
   /// @dev A revert stops the send on this chain.
