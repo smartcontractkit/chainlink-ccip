@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IAdvancedPoolHooks} from "../../interfaces/IAdvancedPoolHooks.sol";
 import {IGetPoolConfigManager} from "../../interfaces/IGetPoolConfigManager.sol";
 import {IMultiTokenPool} from "../../interfaces/IMultiTokenPool.sol";
+import {IMultiTokenPoolHooks} from "../../interfaces/IMultiTokenPoolHooks.sol";
 import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolConfigManager} from "../../interfaces/IPoolConfigManager.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
@@ -42,9 +42,9 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   error CallerIsNotPoolConfigManager(address caller);
   error UnsupportedLockOrBurnFlavor(address token, IPoolConfigManager.LockOrBurnFlavor flavor);
 
-  event LockedOrBurned(uint64 indexed remoteChainSelector, address token, address sender, uint256 amount);
+  event LockedOrBurned(uint64 indexed remoteChainSelector, address indexed token, address sender, uint256 amount);
   event ReleasedOrMinted(
-    uint64 indexed remoteChainSelector, address token, address sender, address recipient, uint256 amount
+    uint64 indexed remoteChainSelector, address indexed token, address sender, address recipient, uint256 amount
   );
   event RouterSet(address oldRouter, address newRouter);
   event PoolConfigManagerSet(address oldPoolConfigManager, address newPoolConfigManager);
@@ -181,7 +181,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     destTokenAmount = lockOrBurnIn.amount - lane.feeAmount;
 
     if (lane.hook != address(0)) {
-      IAdvancedPoolHooks(lane.hook).preflightCheck(lockOrBurnIn, requestedFinalityConfig, tokenArgs, destTokenAmount);
+      IMultiTokenPoolHooks(lane.hook).preflightCheck(lockOrBurnIn, requestedFinalityConfig, tokenArgs, destTokenAmount);
     }
 
     _lockOrBurn(
@@ -243,7 +243,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     _checkFlavor(releaseOrMintIn.localToken, transfer.lockOrBurnFlavor);
 
     if (transfer.hook != address(0)) {
-      IAdvancedPoolHooks(transfer.hook).postflightCheck(releaseOrMintIn, transfer.localAmount, requestedFinalityConfig);
+      IMultiTokenPoolHooks(transfer.hook)
+        .postflightCheck(releaseOrMintIn, transfer.localAmount, requestedFinalityConfig);
     }
 
     _releaseOrMint(
@@ -404,7 +405,9 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     bytes calldata, // extraData
     IPoolV2.MessageDirection direction
   ) public view virtual returns (address[] memory requiredCCVs) {
-    return s_poolConfigManager.getRequiredCCVs(localToken, remoteChainSelector, direction);
+    (, address[][] memory outboundCCVs, address[][] memory inboundCCVs) =
+      s_poolConfigManager.getLaneVerificationBatch(_laneKeys(localToken, remoteChainSelector));
+    return direction == IPoolV2.MessageDirection.Outbound ? outboundCCVs[0] : inboundCCVs[0];
   }
 
   /// @inheritdoc IPoolV2
@@ -415,9 +418,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     bytes4, // requestedFinalityConfig
     bytes calldata // tokenArgs
   ) public view virtual returns (TokenTransferFeeConfig memory feeConfig) {
-    IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](1);
-    lanes[0] = IPoolConfigManager.LaneKey({localToken: localToken, remoteChainSelector: destChainSelector});
-    return s_poolConfigManager.getTokenTransferFeeConfigBatch(lanes)[0];
+    return s_poolConfigManager.getTokenTransferFeeConfigBatch(_laneKeys(localToken, destChainSelector))[0];
   }
 
   /// @inheritdoc IPoolV2
@@ -437,7 +438,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     returns (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled)
   {
     IPoolConfigManager.LaneFee memory fee =
-      s_poolConfigManager.getFee(localToken, destChainSelector, requestedFinalityConfig);
+      s_poolConfigManager.getFeeBatch(_laneKeys(localToken, destChainSelector), requestedFinalityConfig)[0];
     return (fee.feeUSDCents, fee.destGasOverhead, fee.destBytesOverhead, fee.tokenFeeBps, fee.isEnabled);
   }
 
@@ -455,9 +456,17 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
     address localToken,
     uint64 remoteChainSelector
   ) internal view virtual returns (IPoolConfigManager.LaneConnection memory) {
-    IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](1);
+    return s_poolConfigManager.getLaneConnectionBatch(_laneKeys(localToken, remoteChainSelector))[0];
+  }
+
+  /// @notice Returns a batch of one lane, for the pool config manager batch views.
+  function _laneKeys(
+    address localToken,
+    uint64 remoteChainSelector
+  ) internal pure virtual returns (IPoolConfigManager.LaneKey[] memory lanes) {
+    lanes = new IPoolConfigManager.LaneKey[](1);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: localToken, remoteChainSelector: remoteChainSelector});
-    return s_poolConfigManager.getLaneConnectionBatch(lanes)[0];
+    return lanes;
   }
 
   // ================================================================

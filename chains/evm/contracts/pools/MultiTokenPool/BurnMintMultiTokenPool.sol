@@ -74,9 +74,10 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
     address receiver,
     uint256 amount,
     uint64, // remoteChainSelector
-    IPoolConfigManager.LockOrBurnFlavor, // flavor
+    IPoolConfigManager.LockOrBurnFlavor flavor,
     address // lockOrBurnAddress
   ) internal virtual override {
+    if (flavor == IPoolConfigManager.LockOrBurnFlavor.Lock) revert UnsupportedLockOrBurnFlavor(token, flavor);
     IBurnMintERC20(token).mint(receiver, amount);
   }
 }

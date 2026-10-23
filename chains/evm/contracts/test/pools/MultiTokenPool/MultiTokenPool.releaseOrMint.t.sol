@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IAdvancedPoolHooks} from "../../../interfaces/IAdvancedPoolHooks.sol";
+import {IMultiTokenPoolHooks} from "../../../interfaces/IMultiTokenPoolHooks.sol";
 import {IPoolConfigManager} from "../../../interfaces/IPoolConfigManager.sol";
 
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
@@ -57,7 +57,7 @@ contract MultiTokenPool_releaseOrMint is MultiTokenPoolSetup {
     vm.expectCall(
       hook,
       abi.encodeCall(
-        IAdvancedPoolHooks.postflightCheck, (releaseOrMintIn, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG)
+        IMultiTokenPoolHooks.postflightCheck, (releaseOrMintIn, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG)
       )
     );
     s_pool.releaseOrMint(releaseOrMintIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);

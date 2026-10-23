@@ -16,7 +16,8 @@ contract MockPoolConfigManager is IPoolConfigManager {
   IPoolConfigManager.LaneConnection internal s_laneConnection;
   IPoolConfigManager.LaneFee internal s_laneFee;
   IPoolV2.TokenTransferFeeConfig internal s_feeConfig;
-  address[] internal s_requiredCCVs;
+  address[] internal s_outboundCCVs;
+  address[] internal s_inboundCCVs;
 
   bool internal s_lastChargeTokenFee;
   bytes4 internal s_lastRequestedFinalityConfig;
@@ -58,9 +59,11 @@ contract MockPoolConfigManager is IPoolConfigManager {
   }
 
   function setRequiredCCVs(
-    address[] memory requiredCCVs
+    address[] memory outboundCCVs,
+    address[] memory inboundCCVs
   ) external {
-    s_requiredCCVs = requiredCCVs;
+    s_outboundCCVs = outboundCCVs;
+    s_inboundCCVs = inboundCCVs;
   }
 
   function lastChargeTokenFee() external view returns (bool) {
@@ -89,22 +92,6 @@ contract MockPoolConfigManager is IPoolConfigManager {
   ) external returns (ResolvedInboundTransfer memory) {
     s_lastRequestedFinalityConfig = requestedFinalityConfig;
     return s_inboundTransfer;
-  }
-
-  function getRequiredCCVs(
-    address,
-    uint64,
-    IPoolV2.MessageDirection
-  ) external view returns (address[] memory) {
-    return s_requiredCCVs;
-  }
-
-  function getFee(
-    address,
-    uint64,
-    bytes4
-  ) external view returns (LaneFee memory) {
-    return s_laneFee;
   }
 
   function getFeeBatch(
@@ -146,10 +133,14 @@ contract MockPoolConfigManager is IPoolConfigManager {
 
   function getLaneVerificationBatch(
     LaneKey[] calldata lanes
-  ) external pure returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs) {
+  ) external view returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs) {
     hooks = new address[](lanes.length);
     outboundCCVs = new address[][](lanes.length);
     inboundCCVs = new address[][](lanes.length);
+    for (uint256 i = 0; i < lanes.length; ++i) {
+      outboundCCVs[i] = s_outboundCCVs;
+      inboundCCVs[i] = s_inboundCCVs;
+    }
     return (hooks, outboundCCVs, inboundCCVs);
   }
 

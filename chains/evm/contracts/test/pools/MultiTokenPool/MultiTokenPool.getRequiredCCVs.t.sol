@@ -7,17 +7,24 @@ import {MultiTokenPoolSetup} from "./MultiTokenPoolSetup.t.sol";
 
 contract MultiTokenPool_getRequiredCCVs is MultiTokenPoolSetup {
   function test_getRequiredCCVs() public {
-    address[] memory requiredCCVs = new address[](2);
-    requiredCCVs[0] = makeAddr("ccv1");
-    requiredCCVs[1] = makeAddr("ccv2");
-    s_poolConfigManager.setRequiredCCVs(requiredCCVs);
+    address[] memory outboundCCVs = new address[](2);
+    outboundCCVs[0] = makeAddr("outboundCCV1");
+    outboundCCVs[1] = makeAddr("outboundCCV2");
+    address[] memory inboundCCVs = new address[](1);
+    inboundCCVs[0] = makeAddr("inboundCCV");
+    s_poolConfigManager.setRequiredCCVs(outboundCCVs, inboundCCVs);
 
-    address[] memory returned = s_pool.getRequiredCCVs(
-      address(s_token), DEST_CHAIN_SELECTOR, 1e18, bytes4(0), "", IPoolV2.MessageDirection.Outbound
+    assertEq(
+      s_pool.getRequiredCCVs(
+        address(s_token), DEST_CHAIN_SELECTOR, 1e18, bytes4(0), "", IPoolV2.MessageDirection.Outbound
+      ),
+      outboundCCVs
     );
-
-    assertEq(returned.length, 2);
-    assertEq(returned[0], requiredCCVs[0]);
-    assertEq(returned[1], requiredCCVs[1]);
+    assertEq(
+      s_pool.getRequiredCCVs(
+        address(s_token), DEST_CHAIN_SELECTOR, 1e18, bytes4(0), "", IPoolV2.MessageDirection.Inbound
+      ),
+      inboundCCVs
+    );
   }
 }
