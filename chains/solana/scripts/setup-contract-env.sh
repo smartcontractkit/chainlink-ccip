@@ -36,7 +36,7 @@ check_command go    "https://go.dev/doc/install"              || exit 1
 CURRENT_RUST=$(rustc --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "none")
 if [[ "$CURRENT_RUST" != "$RUST_VERSION" ]]; then
     info "Installing Rust toolchain ${RUST_VERSION} (current: ${CURRENT_RUST})..."
-    rustup toolchain install "$RUST_VERSION" --component clippy rustfmt
+    rustup toolchain install "$RUST_VERSION" --component clippy,rustfmt
     # Set as override for the solana directory so it doesn't affect other projects
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     SOLANA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"

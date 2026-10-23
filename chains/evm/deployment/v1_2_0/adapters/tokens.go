@@ -65,13 +65,18 @@ var (
 //
 // # Scope
 //
-// Read-only. No v1.2.0 pool is deployed, re-pointed or reconfigured here:
+// Read-only apart from the lock-release liquidity migration source (see
+// migrate_lock_release_pool_liquidity.go). No v1.2.0 pool is deployed, re-pointed
+// or reconfigured here:
 //
 //   - no deploy sequence (a new v1.2.0 pool is never correct)
 //   - no rate limit writes. The per-ramp limiter is shared across every lane,
-//     so a per-lane write would silently retune all of them. The generated
-//     v1.2.0 operations package exposes no write operation at all.
+//     so a per-lane write would silently retune all of them.
 //   - no router or admin writes. Neither concept exists on the contract.
+//
+// The migration source's only writes temporarily register the timelock as an
+// extra offRamp with its own disabled limiter, release the liquidity to it, and
+// deregister it again; the proxy's ramp and limiter are never touched.
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }
@@ -101,29 +106,6 @@ func (t *TokenAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[t
 				"configuring transfers is not supported on v1.2.0 token pools (pool %s on chain %d): "+
 					"the pool is ramp-keyed and holds no per-chain lane config; configure the v1.5.0 proxy in front of it instead",
 				input.TokenPoolAddress, input.ChainSelector)
-		},
-	)
-}
-
-// MigrateLockReleasePoolLiquiditySequence is unsupported on v1.2.0.
-//
-// The migration source is resolved from the old pool's version, and a v1.2.0
-// lock-release pool exposes only addLiquidity/removeLiquidity/getProvidedLiquidity
-// with no rebalancer at all, so there is no rebalancer-based source to drive it.
-// This fails up front with an explanation instead.
-//
-// Use GetProvidedLiquidity to check whether a legacy pool still holds funds.
-func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
-	return cldf_ops.NewSequence(
-		"evm-v1.2.0-adapter:migrate-lock-release-pool-liquidity",
-		tp.Version,
-		"Unsupported: v1.2.0 lock-release pools have no rebalancer",
-		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, input tokensapi.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
-			return sequences.OnChainOutput{}, fmt.Errorf(
-				"lock-release liquidity migration is not supported on v1.2.0 pools (pool %s on chain %d): "+
-					"the contract has no rebalancer and exposes addLiquidity/removeLiquidity rather than "+
-					"provideLiquidity/withdrawLiquidity, so the shared v2.0.0 migration sequence cannot drive it",
-				input.OldPoolAddress, input.ChainSelector)
 		},
 	)
 }

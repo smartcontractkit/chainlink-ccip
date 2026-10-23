@@ -242,7 +242,7 @@ func (a *EVMTokenBase) ResolveTokenRef(b cldf_ops.Bundle, chains cldf_chain.Bloc
 // DeployTokenVerify) can obtain a valid adapter without importing a pool-version package.
 
 // MigrateLockReleasePoolLiquiditySequence returns nil: a pool version without its own liquidity
-// migration source (v1.5.0, v1.4.0) is rejected as an unsupported migration source.
+// migration source is rejected as an unsupported migration source.
 func (a *EVMTokenBase) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }
