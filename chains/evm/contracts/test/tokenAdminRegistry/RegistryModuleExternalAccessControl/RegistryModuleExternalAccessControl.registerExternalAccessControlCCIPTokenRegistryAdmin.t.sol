@@ -22,9 +22,9 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlCCIPTo
   function setUp() public override {
     super.setUp();
     s_defaultAdmin = makeAddr("defaultAdmin");
-    s_tokenRegistryAdminRole = s_registryModuleExternalAccessControl.CCIP_TOKEN_REGISTRY_ADMIN();
+    s_tokenRegistryAdminRole = s_registryModuleExternalAccessControl.CCIP_TOKEN_REGISTRY_ADMIN_ROLE();
 
-    // OWNER has CCIP_TOKEN_REGISTRY_ADMIN but not DEFAULT_ADMIN_ROLE. This shows that the new role works on its own.
+    // OWNER has CCIP_TOKEN_REGISTRY_ADMIN_ROLE but not DEFAULT_ADMIN_ROLE to test the role independently.
     s_registry = _deployRegistryWithTokenRegistryAdmin(OWNER);
     for (uint256 i = 0; i < 3; ++i) {
       s_tokens.push(address(new MockExternalAccessControlledToken(address(s_registry))));
@@ -32,7 +32,7 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlCCIPTo
   }
 
   /// @notice Deploys an AccessControl contract where s_defaultAdmin has DEFAULT_ADMIN_ROLE and tokenRegistryAdmin has
-  /// CCIP_TOKEN_REGISTRY_ADMIN. Leaves the prank set to OWNER.
+  /// CCIP_TOKEN_REGISTRY_ADMIN_ROLE. Leaves the prank set to OWNER.
   function _deployRegistryWithTokenRegistryAdmin(
     address tokenRegistryAdmin
   ) internal returns (MockExternalAccessControlRegistry) {
@@ -46,7 +46,9 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlCCIPTo
   function test_registerExternalAccessControlCCIPTokenRegistryAdmin() public {
     vm.expectCall(s_tokens[0], abi.encodeCall(IExternalAccessControlRegistry.ACCESS_CONTROLLED_REGISTRY, ()), 1);
     vm.expectCall(
-      address(s_registry), abi.encodeCall(AccessControl.hasRole, (keccak256("CCIP_TOKEN_REGISTRY_ADMIN"), OWNER)), 1
+      address(s_registry),
+      abi.encodeCall(AccessControl.hasRole, (keccak256("CCIP_TOKEN_REGISTRY_ADMIN_ROLE"), OWNER)),
+      1
     );
     vm.expectCall(
       address(s_tokenAdminRegistry), abi.encodeCall(TokenAdminRegistry.proposeAdministrator, (s_tokens[0], OWNER)), 1

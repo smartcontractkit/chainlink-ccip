@@ -18,9 +18,9 @@ contract RegistryModuleExternalAccessControl_registerAccessControlCCIPTokenRegis
   function setUp() public override {
     super.setUp();
     s_defaultAdmin = makeAddr("defaultAdmin");
-    s_tokenRegistryAdminRole = s_registryModuleExternalAccessControl.CCIP_TOKEN_REGISTRY_ADMIN();
+    s_tokenRegistryAdminRole = s_registryModuleExternalAccessControl.CCIP_TOKEN_REGISTRY_ADMIN_ROLE();
 
-    // OWNER has CCIP_TOKEN_REGISTRY_ADMIN but not DEFAULT_ADMIN_ROLE. This shows that the new role works on its own.
+    // OWNER has CCIP_TOKEN_REGISTRY_ADMIN_ROLE but not DEFAULT_ADMIN_ROLE to test the role independently.
     vm.startPrank(s_defaultAdmin);
     for (uint256 i = 0; i < 3; ++i) {
       CrossChainToken token = _deployToken(s_defaultAdmin, STRANGER);
@@ -32,7 +32,7 @@ contract RegistryModuleExternalAccessControl_registerAccessControlCCIPTokenRegis
 
   function test_registerAccessControlCCIPTokenRegistryAdmin() public {
     vm.expectCall(
-      s_tokens[0], abi.encodeCall(AccessControl.hasRole, (keccak256("CCIP_TOKEN_REGISTRY_ADMIN"), OWNER)), 1
+      s_tokens[0], abi.encodeCall(AccessControl.hasRole, (keccak256("CCIP_TOKEN_REGISTRY_ADMIN_ROLE"), OWNER)), 1
     );
     vm.expectCall(
       address(s_tokenAdminRegistry), abi.encodeCall(TokenAdminRegistry.proposeAdministrator, (s_tokens[0], OWNER)), 1
