@@ -23,9 +23,18 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 /// @dev The pool runs the checks that a pool config manager cannot skip: the RMN curse, the ramp caller and the lock or
 /// burn flavor. The pool config manager resolves the lane, builds and checks the pool data, including the source token
 /// and the token identity metadata, charges the token fee and consumes the rate limits.
-/// @dev A different decimals on different chains can reduce the number of tokens in circulation. The
-/// pool config manager rounds the converted amount down, so the destination can mint or release less than the source
-/// locked or burned. This is not a problem if the decimals are the same on both chains.
+/// @dev This pool supports different decimals on different chains but using this feature could impact the total number
+/// of tokens in circulation. Since all of the tokens are locked/burned on the source, and a rounded amount is
+/// minted/released on the destination, the number of tokens minted/released could be less than the number of tokens
+/// burned/locked. This is because the source chain does not know about the destination token decimals. This is not a
+/// problem if the decimals are the same on both chains.
+///
+/// Example:
+/// Assume there is a token with 6 decimals on chain A and 3 decimals on chain B.
+/// - 1.234567 tokens are burned on chain A.
+/// - 1.234    tokens are minted on chain B.
+/// When sending the 1.234 tokens back to chain A, you will receive 1.234000 tokens on chain A, effectively losing
+/// 0.000567 tokens.
 abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   error ZeroAddressInvalid();
   error CursedByRMN();
