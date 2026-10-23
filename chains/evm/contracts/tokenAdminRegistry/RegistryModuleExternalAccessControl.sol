@@ -28,6 +28,9 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
   string public constant override typeAndVersion = "RegistryModuleExternalAccessControl 2.1.0-dev";
   /// @notice The holder of this role can register itself as the pending admin of the token.
   /// @dev Registration requires this role's admin to be DEFAULT_ADMIN_ROLE as defined by the AccessControl contract.
+  /// This role can front-run a DEFAULT_ADMIN_ROLE's pending registration and accept the admin role first.
+  /// It is expected that CCIP_TOKEN_REGISTRY_ADMIN_ROLE and DEFAULT_ADMIN_ROLE are both controlled by the token owner
+  /// and the token owner has the ultimate control over who can register as the admin.
   /// When many tokens share one AccessControl contract, one grant covers all of them. Revoking the role does not
   /// cancel a pending registration.
   bytes32 public constant CCIP_TOKEN_REGISTRY_ADMIN_ROLE = keccak256("CCIP_TOKEN_REGISTRY_ADMIN_ROLE");
