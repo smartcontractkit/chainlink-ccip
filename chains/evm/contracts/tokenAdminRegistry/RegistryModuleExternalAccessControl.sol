@@ -20,15 +20,16 @@ import {AccessControl} from "@openzeppelin/contracts@5.3.0/access/AccessControl.
 contract RegistryModuleExternalAccessControl is ITypeAndVersion {
   error CanOnlySelfRegister(address admin, address token);
   error RequiredRoleNotFound(address msgSender, bytes32 role, address token);
+  error InvalidRoleAdmin(bytes32 role, bytes32 roleAdmin, address token);
   error AddressZero();
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
 
   string public constant override typeAndVersion = "RegistryModuleExternalAccessControl 2.1.0-dev";
   /// @notice The holder of this role can register itself as the pending admin of the token.
-  /// @dev In OZ AccessControl, only DEFAULT_ADMIN_ROLE can grant this role, unless the token sets another admin role
-  /// for it. When many tokens share one AccessControl contract, one grant covers all of them. Revoking the role does
-  /// not cancel a pending registration.
+  /// @dev Registration requires this role's admin to be DEFAULT_ADMIN_ROLE as defined by the AccessControl contract.
+  /// When many tokens share one AccessControl contract, one grant covers all of them. Revoking the role does not
+  /// cancel a pending registration.
   bytes32 public constant CCIP_TOKEN_REGISTRY_ADMIN_ROLE = keccak256("CCIP_TOKEN_REGISTRY_ADMIN_ROLE");
 
   ITokenAdminRegistry private immutable i_tokenAdminRegistry;
@@ -97,12 +98,13 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
   /// @notice Registers the admin of the tokens using the CCIP_TOKEN_REGISTRY_ADMIN_ROLE in each token's AccessControl.
   /// @param tokens The tokens to register the admin for.
   /// @dev The caller must have the CCIP_TOKEN_REGISTRY_ADMIN_ROLE in each token's AccessControl.
+  /// Its admin must be DEFAULT_ADMIN_ROLE as defined by that AccessControl contract.
   function registerAccessControlCCIPTokenRegistryAdmin(
     address[] calldata tokens
   ) external {
     for (uint256 i = 0; i < tokens.length; ++i) {
       address token = tokens[i];
-      _registerAccessControlRole(token, AccessControl(token), CCIP_TOKEN_REGISTRY_ADMIN_ROLE);
+      _registerAccessControlCCIPTokenRegistryAdmin(token, AccessControl(token));
     }
   }
 
@@ -110,15 +112,30 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
   /// AccessControl contracts.
   /// @param tokens The tokens to register the admin for.
   /// @dev The caller must have the CCIP_TOKEN_REGISTRY_ADMIN_ROLE on the contract returned by
-  /// `ACCESS_CONTROLLED_REGISTRY` for every token.
+  /// `ACCESS_CONTROLLED_REGISTRY` for every token. Its admin must be DEFAULT_ADMIN_ROLE as defined by that contract.
   function registerExternalAccessControlCCIPTokenRegistryAdmin(
     address[] calldata tokens
   ) external {
     for (uint256 i = 0; i < tokens.length; ++i) {
       address token = tokens[i];
       AccessControl accessControl = AccessControl(IExternalAccessControlRegistry(token).ACCESS_CONTROLLED_REGISTRY());
-      _registerAccessControlRole(token, accessControl, CCIP_TOKEN_REGISTRY_ADMIN_ROLE);
+      _registerAccessControlCCIPTokenRegistryAdmin(token, accessControl);
     }
+  }
+
+  /// @notice Registers the caller using a CCIP_TOKEN_REGISTRY_ADMIN_ROLE administered by DEFAULT_ADMIN_ROLE.
+  /// @param token The token to register the admin for.
+  /// @param accessControl The contract that holds the roles for the token.
+  function _registerAccessControlCCIPTokenRegistryAdmin(
+    address token,
+    AccessControl accessControl
+  ) private {
+    bytes32 roleAdmin = accessControl.getRoleAdmin(CCIP_TOKEN_REGISTRY_ADMIN_ROLE);
+    if (roleAdmin != accessControl.DEFAULT_ADMIN_ROLE()) {
+      revert InvalidRoleAdmin(CCIP_TOKEN_REGISTRY_ADMIN_ROLE, roleAdmin, token);
+    }
+
+    _registerAccessControlRole(token, accessControl, CCIP_TOKEN_REGISTRY_ADMIN_ROLE);
   }
 
   /// @notice Registers the admin of the token using a role of the given AccessControl contract.
