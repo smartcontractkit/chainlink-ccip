@@ -296,7 +296,7 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 			mutate: func(cfg *tokens.TokenExpansionInput) {
 				selector := chainSel
 				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
-					TokenPoolVersion: semver.MustParse("9.9.9"),
+					TokenPoolVersion: semver.MustParse("2.0.0"),
 					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
 						PoolType:                     "SiloedLockReleaseTokenPool",
 						UnsiloedLockBoxChainSelector: &selector,
@@ -326,7 +326,7 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 			mutate: func(cfg *tokens.TokenExpansionInput) {
 				selector := chainSel
 				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
-					TokenPoolVersion: semver.MustParse("9.9.9"),
+					TokenPoolVersion: semver.MustParse("2.0.0"),
 					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
 						PoolType:                     "SiloedLockReleaseTokenPool",
 						UnsiloedLockBoxChainSelector: &selector,
@@ -337,11 +337,26 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 			expectedErr: "does not appear in any lockBoxGroups entry",
 		},
 		{
+			name: "Failure - unsiloed lockbox selector on a pre-v2 pool",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				selector := chainSel
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("1.9.9"),
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						PoolType:                     "SiloedLockReleaseTokenPool",
+						UnsiloedLockBoxChainSelector: &selector,
+						LockBoxGroups:                [][]uint64{{chainSel}},
+					},
+				}
+			},
+			expectedErr: "unsiloedLockBoxChainSelector is only supported for v2.0.0 pools",
+		},
+		{
 			name: "Failure - unsiloed lockbox selector on a non-siloed pool",
 			mutate: func(cfg *tokens.TokenExpansionInput) {
 				selector := chainSel
 				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
-					TokenPoolVersion: semver.MustParse("9.9.9"),
+					TokenPoolVersion: semver.MustParse("2.0.0"),
 					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
 						PoolType:                     "LockReleaseTokenPool",
 						UnsiloedLockBoxChainSelector: &selector,

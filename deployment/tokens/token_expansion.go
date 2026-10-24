@@ -265,6 +265,16 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 							utils.SiloedLockReleaseTokenPool, deployTokenPoolInput.PoolType, selector,
 						)
 					}
+					// lockBoxGroups / UnsiloedLockBoxChainSelector are v2.0.0+ fields: a pre-v2 siloed
+					// pool deploys no ERC20LockBox, so resolveUnsiloedLockBoxAddress would fail after the
+					// pool is deployed.
+					if !adapterVersion.Equal(utils.Version_2_0_0) {
+						return fmt.Errorf(
+							"unsiloedLockBoxChainSelector is only supported for v2.0.0 pools, "+
+								"but version %s was given for chain selector %d",
+							adapterVersion, selector,
+						)
+					}
 					if len(deployTokenPoolInput.LockBoxGroups) == 0 {
 						return fmt.Errorf(
 							"unsiloedLockBoxChainSelector requires lockBoxGroups to be set for chain selector %d",
