@@ -405,7 +405,7 @@ MultiTokenPool_isSupportedToken:test_isSupportedToken_FalseWhenNotRegistered() (
 MultiTokenPool_lockOrBurn:test_lockOrBurn() (gas: 264060)
 MultiTokenPool_lockOrBurn:test_lockOrBurn_CallsPreflightHook() (gas: 286325)
 MultiTokenPool_lockOrBurn:test_lockOrBurn_ChargesTokenFee() (gas: 283509)
-MultiTokenPool_lockOrBurn:test_lockOrBurn_LegacyPathChargesNoFee() (gas: 267602)
+MultiTokenPool_lockOrBurn:test_lockOrBurn_LegacyPathChargesNoFee() (gas: 248083)
 MultiTokenPool_releaseOrMint:test_releaseOrMint() (gas: 132427)
 MultiTokenPool_releaseOrMint:test_releaseOrMint_CallsPostflightHook() (gas: 154649)
 MultiTokenPool_releaseOrMint:test_releaseOrMint_LegacyPathUsesDefaultFinality() (gas: 127790)

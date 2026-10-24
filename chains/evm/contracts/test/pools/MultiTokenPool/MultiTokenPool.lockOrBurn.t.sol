@@ -54,16 +54,16 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     uint256 amount = 20_000e18;
     deal(address(s_token), address(s_pool), amount);
 
-    IPoolConfigManager.OutboundLane memory lane = _defaultOutboundLane();
-    lane.feeAmount = amount / 20;
-    s_poolConfigManager.setOutboundLane(lane);
-
+    // The default lane has a zero fee, which the pool config manager returns when chargeTokenFee is false.
     vm.startPrank(s_allowedOnRamp);
+    vm.expectCall(address(s_token), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount));
     Pool.LockOrBurnOutV1 memory lockOrBurnOut = s_pool.lockOrBurn(_lockOrBurnIn(amount));
 
     assertEq(lockOrBurnOut.destTokenAddress, abi.encode(s_remoteToken));
     assertFalse(s_poolConfigManager.lastChargeTokenFee());
     assertEq(s_poolConfigManager.lastRequestedFinalityConfig(), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    // The full amount is burned and the pool keeps nothing.
+    assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
 
   function test_lockOrBurn_CallsPreflightHook() public {
