@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -20,6 +19,7 @@ import (
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
@@ -101,12 +101,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -132,11 +127,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	// 1.6 ref and failed with "unexpected OnRamp contract version".
 	// Reset cached executions so the mixed-lane OnRamp -> 2.0 FeeQuoter mapping is observed (the
 	// bundle cached the pre-upgrade FeeQuoter during the update).
-	e.OperationsBundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	const mixedLaneToken = "0x0000000000000000000000000000000000001234"
 	feeOut, err := fees.SetTokenTransferFee().Apply(*e, fees.SetTokenTransferFeeInput{
 		MCMS: NewDefaultInputForMCMS("Seed mixed-lane token fee"),
@@ -158,11 +149,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	testhelpers.ProcessTimelockProposals(t, *e, feeOut.MCMSTimelockProposals, false)
 
 	// Reset cached executions so the router's OnRamp mapping is observed.
-	e.OperationsBundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 
 	imported, err := tokensapi.LegacyFeesForAutoMigrate(
 		*e,
@@ -178,12 +165,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	require.Equal(t, uint32(100), importedFee, "a 1.x OnRamp has no token network fee, so the legacy fee is imported unchanged")
 
 	// do this to reset cached executions
-	bundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// downgrade back to 1.6.3 to make sure the changeset is reversible
 	for _, chainSel := range chains {
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
@@ -262,12 +244,7 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	currentFeeQuoterAddr := make(map[uint64]common.Address)
 	for _, chainSel := range chains {
 		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
@@ -297,12 +274,7 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	// do this to reset cached executions
-	bundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -373,12 +345,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	currentFeeQuoterAddr := make(map[uint64]common.Address)
 	for _, chainSel := range chains {
 		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
@@ -406,12 +373,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 		require.Equal(t, currentFeeQuoterAddr[chainSel], feeQAddrAfterChangesetRun, "FeeQuoter address on ramps should not change after update when ramps are not included in the changeset for chain selector %d", chainSel)
 	}
 	// do this to reset cached executions
-	bundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// now add the ramps
 	for _, chainSel := range chains {
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
