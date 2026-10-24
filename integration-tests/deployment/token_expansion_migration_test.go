@@ -484,7 +484,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
 
 	// Get fee adapter for chain A -> B.
-	_, onRampRef, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, selA, selB)
+	onRampAdapter, onRampRef, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, selA, selB)
 	require.NoError(t, err)
 
 	var legacyFee fees.TokenTransferFeeArgs
@@ -602,8 +602,8 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 
 		// On 2.0 lanes the migration imports the legacy fee minus the OnRamp token network fee so the
 		// total charged (network + pool) equals the legacy fee.
-		onRampReader, ok := feeAdapter.(fees.OnRampDestChainConfigReader)
-		require.True(t, ok, "v2.0 fee adapter must implement OnRampDestChainConfigReader")
+		onRampReader, ok := onRampAdapter.(fees.OnRampDestChainConfigReader)
+		require.True(t, ok, "OnRamp adapter must implement OnRampDestChainConfigReader")
 		onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, onRampRef, selA, selB)
 		require.NoError(t, err)
 
