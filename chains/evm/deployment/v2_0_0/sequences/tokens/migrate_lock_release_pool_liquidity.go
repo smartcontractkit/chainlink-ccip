@@ -71,6 +71,18 @@ var MigrateLockReleasePoolLiquiditySink = cldf_ops.NewSequence(
 		}
 		tokenAddr := tokenReport.Output
 
+		// The setPool step uses the caller-supplied TokenRef, which is not otherwise tied to the
+		// pools. Reject it here rather than registering the new pool against a token it does not
+		// manage.
+		if input.SetPoolConfig != nil {
+			if setPoolToken := common.HexToAddress(input.SetPoolConfig.TokenAddress); setPoolToken != tokenAddr {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"SetPoolConfig.TokenAddress %s does not match the token managed by the pools %s; the setPool call would register the new pool against the wrong token",
+					setPoolToken, tokenAddr,
+				)
+			}
+		}
+
 		// The resolved amounts must match the new pool's shape; otherwise the extracted liquidity would
 		// have no lockbox to land in.
 		if string(newTVReport.Output.Type) == utils.SiloedLockReleaseTokenPool.String() {

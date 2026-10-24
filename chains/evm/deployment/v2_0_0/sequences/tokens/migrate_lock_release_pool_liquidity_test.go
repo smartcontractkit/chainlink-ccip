@@ -2399,6 +2399,34 @@ func TestMigrateLockReleasePoolLiquidity_WithSetPoolConfig(t *testing.T) {
 	require.Equal(t, 0, totalLiquidity.Cmp(lockboxBal.Output), "Lockbox should hold all liquidity")
 }
 
+// TestMigrateLockReleasePoolLiquidity_SetPoolConfigRejectsMismatchedToken covers the sink's guard
+// against registering the new pool on the TAR for a token it does not manage. It fires before any
+// funding op, so a bare setup is enough - no TAR deployment required.
+func TestMigrateLockReleasePoolLiquidity_SetPoolConfigRejectsMismatchedToken(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	s := setupMigrationTest(t, chainSel, big.NewInt(5000))
+
+	otherToken := common.HexToAddress("0x000000000000000000000000000000000000dEaD")
+
+	_, err := operations.ExecuteSequence(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		tokens.MigrateLockReleasePoolLiquiditySink,
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: s.deployer.Hex(),
+			Amount:          big.NewInt(1000),
+			SetPoolConfig: &tokens_core.MigrationSetPoolConfig{
+				RegistryAddress: s.deployer.Hex(),
+				TokenAddress:    otherToken.Hex(),
+			},
+		},
+	)
+	require.ErrorContains(t, err, "does not match the token managed by the pools")
+}
+
 func TestMigrateLockReleasePoolLiquidity_DoesNotTamperWithAuthorizedCallers(t *testing.T) {
 	chainSel := uint64(5009297550715157269)
 	totalLiquidity := big.NewInt(5000)

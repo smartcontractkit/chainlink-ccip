@@ -11,15 +11,16 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type TokenExpansionInput struct {
@@ -234,9 +235,53 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 				}
 			}
 			// deploy token pool
-			if deployTokenPoolInput := input.DeployTokenPoolInput; deployTokenPoolInput != nil && deployTokenPoolInput.LiquidityMigrationAmount != nil {
-				if err := deployTokenPoolInput.LiquidityMigrationAmount.Validate(); err != nil {
-					return fmt.Errorf("invalid liquidity migration amount for chain selector %d: %w", selector, err)
+			if deployTokenPoolInput := input.DeployTokenPoolInput; deployTokenPoolInput != nil {
+				if deployTokenPoolInput.LiquidityMigrationAmount != nil {
+					if err := deployTokenPoolInput.LiquidityMigrationAmount.Validate(); err != nil {
+						return fmt.Errorf("invalid liquidity migration amount for chain selector %d: %w", selector, err)
+					}
+					if !utils.IsLockReleasePoolType(deployTokenPoolInput.PoolType) {
+						return fmt.Errorf(
+							"liquidityMigrationAmount is only supported for lock-release pools, "+
+								"but pool type %q was given for chain selector %d",
+							deployTokenPoolInput.PoolType, selector,
+						)
+					}
+					// adapterVersion is the version the pool is actually deployed at: apply overwrites
+					// DeployTokenPoolInput.TokenPoolVersion with input.TokenPoolVersion, so checking the
+					// nested field would be wrong. Only the v2.0.0 adapter can seed a lockbox.
+					if !adapterVersion.Equal(utils.Version_2_0_0) {
+						return fmt.Errorf(
+							"liquidityMigrationAmount is only supported for v2.0.0 pools, "+
+								"but version %s was given for chain selector %d",
+							adapterVersion, selector,
+						)
+					}
+				}
+				if deployTokenPoolInput.UnsiloedLockBoxChainSelector != nil {
+					if deployTokenPoolInput.PoolType != utils.SiloedLockReleaseTokenPool.String() {
+						return fmt.Errorf(
+							"unsiloedLockBoxChainSelector is only supported for %s pools, but pool type %q was given for chain selector %d",
+							utils.SiloedLockReleaseTokenPool, deployTokenPoolInput.PoolType, selector,
+						)
+					}
+					if len(deployTokenPoolInput.LockBoxGroups) == 0 {
+						return fmt.Errorf(
+							"unsiloedLockBoxChainSelector requires lockBoxGroups to be set for chain selector %d",
+							selector,
+						)
+					}
+					// The selector must name a chain in one of the groups; resolveUnsiloedLockBoxAddress
+					// checks this only after the pool and its lockboxes are deployed, so a typo would
+					// otherwise leave orphaned contracts on-chain.
+					if !slices.ContainsFunc(deployTokenPoolInput.LockBoxGroups, func(group []uint64) bool {
+						return slices.Contains(group, *deployTokenPoolInput.UnsiloedLockBoxChainSelector)
+					}) {
+						return fmt.Errorf(
+							"unsiloedLockBoxChainSelector %d does not appear in any lockBoxGroups entry for chain selector %d",
+							*deployTokenPoolInput.UnsiloedLockBoxChainSelector, selector,
+						)
+					}
 				}
 			}
 		}
