@@ -15,7 +15,7 @@ contract MultiTokenPoolHooksExternalBlocklist_setBlocklist is MultiTokenPoolHook
 
   function setUp() public virtual override {
     super.setUp();
-    _deployBlocklist(s_newBlocklist);
+    _mockBlocklist(s_newBlocklist);
   }
 
   function test_setBlocklist() public {
@@ -26,6 +26,7 @@ contract MultiTokenPoolHooksExternalBlocklist_setBlocklist is MultiTokenPoolHook
     assertEq(address(s_newBlocklist), address(s_hooks.getBlocklist()));
 
     // Only the new blocklist is called from now on.
+    vm.startPrank(s_pool);
     vm.expectCall(address(s_blocklist), abi.encodeWithSelector(IAddressBlocklist.isBlocked.selector), 0);
     vm.expectCall(address(s_newBlocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (s_sender)), 1);
     s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);

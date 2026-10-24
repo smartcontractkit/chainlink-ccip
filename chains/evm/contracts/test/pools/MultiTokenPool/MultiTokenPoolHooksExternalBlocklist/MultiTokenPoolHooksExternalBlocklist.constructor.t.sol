@@ -8,27 +8,24 @@ import {MultiTokenPoolHooks} from "../../../../pools/MultiTokenPool/MultiTokenPo
 import {
   MultiTokenPoolHooksExternalBlocklist
 } from "../../../../pools/MultiTokenPool/MultiTokenPoolHooksExternalBlocklist.sol";
-import {MockPolicyEngine} from "../../../mocks/MockPolicyEngine.sol";
 import {MultiTokenPoolHooksExternalBlocklistSetup} from "./MultiTokenPoolHooksExternalBlocklistSetup.t.sol";
 
 contract MultiTokenPoolHooksExternalBlocklist_constructor is MultiTokenPoolHooksExternalBlocklistSetup {
   function test_constructor() public {
-    MockPolicyEngine policyEngine = new MockPolicyEngine();
-
     vm.expectEmit();
     emit MultiTokenPoolHooks.AllowListAdd(s_sender);
     vm.expectEmit();
-    emit MultiTokenPoolHooks.PolicyEngineAttached(policyEngine);
+    emit MultiTokenPoolHooks.PolicyEngineAttached(s_policyEngine);
     vm.expectEmit();
     emit MultiTokenPoolHooksExternalBlocklist.BlocklistSet(IAddressBlocklist(address(0)), s_blocklist);
     MultiTokenPoolHooksExternalBlocklist hooks =
-      new MultiTokenPoolHooksExternalBlocklist(_arrayOf(s_sender), policyEngine, s_blocklist, _arrayOf(OWNER));
+      new MultiTokenPoolHooksExternalBlocklist(_arrayOf(s_sender), s_policyEngine, s_blocklist, _arrayOf(s_pool));
 
     assertEq("MultiTokenPoolHooksExternalBlocklist 2.1.0-dev", hooks.typeAndVersion());
     assertEq(address(s_blocklist), address(hooks.getBlocklist()));
     assertEq(_arrayOf(s_sender), hooks.getAllowList());
-    assertEq(address(policyEngine), address(hooks.getPolicyEngine()));
-    assertEq(_arrayOf(OWNER), hooks.getAllAuthorizedCallers());
+    assertEq(address(s_policyEngine), address(hooks.getPolicyEngine()));
+    assertEq(_arrayOf(s_pool), hooks.getAllAuthorizedCallers());
   }
 
   function test_constructor_NoBlocklist() public {
@@ -50,7 +47,7 @@ contract MultiTokenPoolHooksExternalBlocklist_constructor is MultiTokenPoolHooks
       abi.encodeWithSelector(MultiTokenPoolHooksExternalBlocklist.InvalidBlocklist.selector, blocklistWithoutCode)
     );
     new MultiTokenPoolHooksExternalBlocklist(
-      new address[](0), IPolicyEngine(address(0)), blocklistWithoutCode, _arrayOf(OWNER)
+      new address[](0), IPolicyEngine(address(0)), blocklistWithoutCode, _arrayOf(s_pool)
     );
   }
 }

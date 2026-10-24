@@ -9,8 +9,9 @@ import {MultiTokenPoolHooks} from "./MultiTokenPoolHooks.sol";
 
 /// @notice MultiTokenPoolHooks that also check the sender and the receiver of each transfer against an external
 /// address blocklist.
-/// @dev The blocklist only takes EVM addresses, so a Solana address is looked up by its low 160 bits. The blocklist
-/// has to list Solana addresses in that same form.
+/// @dev The blocklist only takes EVM addresses. A 32-byte remote address, such as a Solana, Aptos or Sui address, is
+/// looked up by its low 160 bits, so the blocklist has to list it in that form. Remote addresses that are neither 20
+/// nor 32 bytes long, such as TON addresses, are not checked.
 contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
   error InvalidBlocklist(IAddressBlocklist blocklist);
   error AddressBlocked(IAddressBlocklist blocklist, address account);
@@ -96,9 +97,9 @@ contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
   /// @notice Reverts if the local or the remote account is blocked.
   /// @dev The remote account is turned into an EVM address before the lookup:
   /// - 20 bytes are used as is.
-  /// - 32 bytes keep their low 160 bits. This is the usual bytes32 to address cast, so an ABI encoded EVM address comes
-  ///   out unchanged, and a Solana address comes out in the form the blocklist lists it in.
-  /// - Any other length cannot be turned into an EVM address and is not checked.
+  /// - 32 bytes keep their low 160 bits. This is the usual bytes32 to address cast, so an ABI encoded EVM address keeps
+  ///   its value.
+  /// - Other lengths have no EVM form and are not checked.
   /// @param localAccount The account on this chain.
   /// @param remoteAccount The account on the remote chain, as the ramp passes it to the pool.
   function _checkBlocklist(

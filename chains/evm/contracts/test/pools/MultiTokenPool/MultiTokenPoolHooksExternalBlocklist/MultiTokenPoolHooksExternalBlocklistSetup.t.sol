@@ -9,6 +9,7 @@ import {
   MultiTokenPoolHooksExternalBlocklist
 } from "../../../../pools/MultiTokenPool/MultiTokenPoolHooksExternalBlocklist.sol";
 import {BaseTest} from "../../../BaseTest.t.sol";
+import {MockPolicyEngine} from "../../../mocks/MockPolicyEngine.sol";
 
 contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
   /// @dev The SPL Token program ID TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA, used as a well-known Solana address.
@@ -19,6 +20,8 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
 
   MultiTokenPoolHooksExternalBlocklist internal s_hooks;
   IAddressBlocklist internal s_blocklist = IAddressBlocklist(makeAddr("blocklist"));
+  MockPolicyEngine internal s_policyEngine;
+  address internal s_pool = makeAddr("pool");
   address internal s_sender = makeAddr("sender");
   address internal s_receiver = makeAddr("receiver");
   Pool.LockOrBurnInV1 internal s_lockOrBurnIn;
@@ -26,13 +29,15 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
 
   function setUp() public virtual override {
     super.setUp();
-    _deployBlocklist(s_blocklist);
+    _mockBlocklist(s_blocklist);
+    s_policyEngine = new MockPolicyEngine();
+    // The pool is the only authorized caller, so the tests can tell the caller apart from the owner.
     s_hooks = new MultiTokenPoolHooksExternalBlocklist(
-      new address[](0), IPolicyEngine(address(0)), s_blocklist, _arrayOf(OWNER)
+      new address[](0), IPolicyEngine(address(0)), s_blocklist, _arrayOf(s_pool)
     );
 
-    // The OnRamp passes the receiver to the pool as the sender gave it, so an EVM receiver can be ABI encoded or 20
-    // raw bytes.
+    // The 2.0 OnRamp passes the receiver to the pool as the sender gave it, so an EVM receiver can be ABI encoded or
+    // 20 raw bytes.
     s_lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -54,7 +59,7 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
   }
 
   /// @dev Puts code at the blocklist address so the hooks accept it, and makes it report every address as not blocked.
-  function _deployBlocklist(
+  function _mockBlocklist(
     IAddressBlocklist blocklist
   ) internal {
     vm.etch(address(blocklist), hex"00");
@@ -68,14 +73,16 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
     vm.mockCall(address(s_blocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (account)), abi.encode(blocked));
   }
 
-  /// @dev Remote addresses that are neither 20 nor 32 bytes long, which the hooks do not check.
+  /// @dev Remote addresses that are neither 20 nor 32 bytes long, which the hooks do not check. 36 bytes is the length
+  /// of a TON address.
   function _remoteAddressesWithoutEVMForm() internal pure returns (bytes[] memory accounts) {
-    accounts = new bytes[](5);
+    accounts = new bytes[](6);
     accounts[0] = "";
     accounts[1] = new bytes(19);
     accounts[2] = new bytes(21);
     accounts[3] = new bytes(31);
     accounts[4] = new bytes(33);
+    accounts[5] = new bytes(36);
     return accounts;
   }
 }

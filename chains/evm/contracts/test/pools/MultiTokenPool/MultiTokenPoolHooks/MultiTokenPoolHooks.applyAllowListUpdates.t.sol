@@ -9,11 +9,6 @@ contract MultiTokenPoolHooks_applyAllowListUpdates is MultiTokenPoolHooksSetup {
   address internal s_newSender1 = makeAddr("newSender1");
   address internal s_newSender2 = makeAddr("newSender2");
 
-  function setUp() public virtual override {
-    super.setUp();
-    s_hooks = _deployHooksWithAllowList();
-  }
-
   function test_applyAllowListUpdates() public {
     address[] memory adds = new address[](2);
     adds[0] = s_newSender1;
@@ -23,13 +18,13 @@ contract MultiTokenPoolHooks_applyAllowListUpdates is MultiTokenPoolHooksSetup {
     emit MultiTokenPoolHooks.AllowListAdd(s_newSender1);
     vm.expectEmit();
     emit MultiTokenPoolHooks.AllowListAdd(s_newSender2);
-    s_hooks.applyAllowListUpdates(new address[](0), adds);
+    s_hooksWithAllowList.applyAllowListUpdates(new address[](0), adds);
 
     address[] memory expected = new address[](3);
     expected[0] = s_sender;
     expected[1] = s_newSender1;
     expected[2] = s_newSender2;
-    assertEq(expected, s_hooks.getAllowList());
+    assertEq(expected, s_hooksWithAllowList.getAllowList());
   }
 
   function test_applyAllowListUpdates_RemovesBeforeAdds() public {
@@ -46,12 +41,12 @@ contract MultiTokenPoolHooks_applyAllowListUpdates is MultiTokenPoolHooksSetup {
     emit MultiTokenPoolHooks.AllowListAdd(s_newSender1);
     vm.expectEmit();
     emit MultiTokenPoolHooks.AllowListAdd(s_sender);
-    s_hooks.applyAllowListUpdates(removes, adds);
+    s_hooksWithAllowList.applyAllowListUpdates(removes, adds);
 
     address[] memory expected = new address[](2);
     expected[0] = s_newSender1;
     expected[1] = s_sender;
-    assertEq(expected, s_hooks.getAllowList());
+    assertEq(expected, s_hooksWithAllowList.getAllowList());
   }
 
   function test_applyAllowListUpdates_SkipsZeroDuplicatesAndMissing() public {
@@ -64,32 +59,32 @@ contract MultiTokenPoolHooks_applyAllowListUpdates is MultiTokenPoolHooksSetup {
     adds[3] = s_newSender1;
 
     vm.recordLogs();
-    s_hooks.applyAllowListUpdates(removes, adds);
+    s_hooksWithAllowList.applyAllowListUpdates(removes, adds);
 
-    // The zero address, the existing sender and the duplicate are skipped, so only one address is added.
+    // Only the first add of s_newSender1 changes the list. Every other entry is skipped without an event.
     assertEq(1, vm.getRecordedLogs().length);
     address[] memory expected = new address[](2);
     expected[0] = s_sender;
     expected[1] = s_newSender1;
-    assertEq(expected, s_hooks.getAllowList());
+    assertEq(expected, s_hooksWithAllowList.getAllowList());
   }
 
   function test_applyAllowListUpdates_EmptyLists() public {
     vm.recordLogs();
-    s_hooks.applyAllowListUpdates(new address[](0), new address[](0));
+    s_hooksWithAllowList.applyAllowListUpdates(new address[](0), new address[](0));
 
     assertEq(0, vm.getRecordedLogs().length);
-    assertEq(_arrayOf(s_sender), s_hooks.getAllowList());
+    assertEq(_arrayOf(s_sender), s_hooksWithAllowList.getAllowList());
   }
 
   function test_applyAllowListUpdates_RemoveAll() public {
     vm.expectEmit();
     emit MultiTokenPoolHooks.AllowListRemove(s_sender);
-    s_hooks.applyAllowListUpdates(_arrayOf(s_sender), new address[](0));
+    s_hooksWithAllowList.applyAllowListUpdates(_arrayOf(s_sender), new address[](0));
 
-    assertEq(0, s_hooks.getAllowList().length);
+    assertEq(0, s_hooksWithAllowList.getAllowList().length);
     // Removing every sender does not turn the allowlist off, so nobody can send until a sender is added again.
-    assertTrue(s_hooks.getAllowListEnabled());
+    assertTrue(s_hooksWithAllowList.getAllowListEnabled());
   }
 
   // Reverts
@@ -98,13 +93,11 @@ contract MultiTokenPoolHooks_applyAllowListUpdates is MultiTokenPoolHooksSetup {
     vm.startPrank(STRANGER);
 
     vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
-    s_hooks.applyAllowListUpdates(new address[](0), _arrayOf(s_newSender1));
+    s_hooksWithAllowList.applyAllowListUpdates(new address[](0), _arrayOf(s_newSender1));
   }
 
   function test_applyAllowListUpdates_RevertWhen_AllowListNotEnabled() public {
-    MultiTokenPoolHooks hooks = new MultiTokenPoolHooks(new address[](0), s_policyEngine, _arrayOf(OWNER));
-
     vm.expectRevert(MultiTokenPoolHooks.AllowListNotEnabled.selector);
-    hooks.applyAllowListUpdates(new address[](0), _arrayOf(s_newSender1));
+    s_hooks.applyAllowListUpdates(new address[](0), _arrayOf(s_newSender1));
   }
 }

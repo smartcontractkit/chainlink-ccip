@@ -18,14 +18,14 @@ contract MultiTokenPoolHooks_constructor is MultiTokenPoolHooksSetup {
     emit MultiTokenPoolHooks.AllowListAdd(STRANGER);
     vm.expectEmit();
     emit MultiTokenPoolHooks.PolicyEngineAttached(s_policyEngine);
-    MultiTokenPoolHooks hooks = new MultiTokenPoolHooks(allowlist, s_policyEngine, _arrayOf(OWNER));
+    MultiTokenPoolHooks hooks = new MultiTokenPoolHooks(allowlist, s_policyEngine, _arrayOf(s_pool));
 
     assertEq("MultiTokenPoolHooks 2.1.0-dev", hooks.typeAndVersion());
     assertTrue(hooks.getAllowListEnabled());
     assertEq(allowlist, hooks.getAllowList());
     assertEq(address(s_policyEngine), address(hooks.getPolicyEngine()));
     assertTrue(s_policyEngine.isAttached(address(hooks)));
-    assertEq(_arrayOf(OWNER), hooks.getAllAuthorizedCallers());
+    assertEq(_arrayOf(s_pool), hooks.getAllAuthorizedCallers());
   }
 
   function test_constructor_NoAllowListAndNoPolicyEngine() public {

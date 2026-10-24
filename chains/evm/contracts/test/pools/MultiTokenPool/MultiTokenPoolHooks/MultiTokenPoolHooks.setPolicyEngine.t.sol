@@ -89,4 +89,12 @@ contract MultiTokenPoolHooks_setPolicyEngine is MultiTokenPoolHooksSetup {
     );
     s_hooks.setPolicyEngine(s_policyEngine);
   }
+
+  function test_setPolicyEngine_RevertWhen_NewPolicyEngineAttachReverts() public {
+    bytes memory revertData = hex"deadbeef";
+    vm.mockCallRevert(address(s_policyEngine), abi.encodeWithSelector(IPolicyEngine.attach.selector), revertData);
+
+    vm.expectRevert(revertData);
+    s_hooks.setPolicyEngine(s_policyEngine);
+  }
 }

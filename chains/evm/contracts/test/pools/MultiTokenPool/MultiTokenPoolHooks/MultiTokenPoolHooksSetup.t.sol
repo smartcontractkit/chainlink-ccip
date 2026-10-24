@@ -10,7 +10,9 @@ import {MockPolicyEngine} from "../../../mocks/MockPolicyEngine.sol";
 
 contract MultiTokenPoolHooksSetup is BaseTest {
   MultiTokenPoolHooks internal s_hooks;
+  MultiTokenPoolHooks internal s_hooksWithAllowList;
   MockPolicyEngine internal s_policyEngine;
+  address internal s_pool = makeAddr("pool");
   address internal s_sender = makeAddr("sender");
   address internal s_receiver = makeAddr("receiver");
   Pool.LockOrBurnInV1 internal s_lockOrBurnIn;
@@ -19,7 +21,9 @@ contract MultiTokenPoolHooksSetup is BaseTest {
   function setUp() public virtual override {
     super.setUp();
     s_policyEngine = new MockPolicyEngine();
-    s_hooks = new MultiTokenPoolHooks(new address[](0), IPolicyEngine(address(0)), _arrayOf(OWNER));
+    // The pool is the only authorized caller, so the tests can tell the caller apart from the owner.
+    s_hooks = new MultiTokenPoolHooks(new address[](0), IPolicyEngine(address(0)), _arrayOf(s_pool));
+    s_hooksWithAllowList = new MultiTokenPoolHooks(_arrayOf(s_sender), IPolicyEngine(address(0)), _arrayOf(s_pool));
 
     s_lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
@@ -38,10 +42,5 @@ contract MultiTokenPoolHooksSetup is BaseTest {
       sourcePoolData: "",
       offchainTokenData: ""
     });
-  }
-
-  /// @dev Deploys hooks that only allow s_sender to send, without a policy engine.
-  function _deployHooksWithAllowList() internal returns (MultiTokenPoolHooks) {
-    return new MultiTokenPoolHooks(_arrayOf(s_sender), IPolicyEngine(address(0)), _arrayOf(OWNER));
   }
 }
