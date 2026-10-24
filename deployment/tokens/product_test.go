@@ -187,7 +187,9 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 	// Register a mock adapter for the chain family/version the cases below resolve against.
 	registry := tokens.GetTokenAdapterRegistry()
 	registry.RegisterTokenAdapter("evm", semver.MustParse("9.9.9"), &productTest_MockTokenAdapter{})
-	registry.RegisterTokenAdapter("evm", semver.MustParse("1.5.1"), &productTest_MockTokenAdapter{})
+	// Use a version below 2.0.0 that no other test claims: RegisterTokenAdapter is first-wins, and
+	// TestAutoMigrate_V2TargetRequired owns evm/1.5.1.
+	registry.RegisterTokenAdapter("evm", semver.MustParse("1.9.9"), &productTest_MockTokenAdapter{})
 
 	baseInput := func() tokens.TokenExpansionInput {
 		return tokens.TokenExpansionInput{
@@ -277,7 +279,7 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 			name: "Failure - liquidity migration on a pre-v2 pool",
 			mutate: func(cfg *tokens.TokenExpansionInput) {
 				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
-					TokenPoolVersion: semver.MustParse("1.5.1"),
+					TokenPoolVersion: semver.MustParse("1.9.9"),
 					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
 						PoolType: "LockReleaseTokenPool",
 						LiquidityMigrationAmount: &tokens.LockReleasePoolLiquidityMigrationAmount{
@@ -288,6 +290,21 @@ func TestTokenExpansion_VerifyPreconditions(t *testing.T) {
 				}
 			},
 			expectedErr: "liquidityMigrationAmount is only supported for v2.0.0 pools",
+		},
+		{
+			name: "Failure - unsiloed lockbox selector not in any group",
+			mutate: func(cfg *tokens.TokenExpansionInput) {
+				selector := chainSel
+				cfg.TokenExpansionInputPerChain[chainSel] = tokens.TokenExpansionInputPerChain{
+					TokenPoolVersion: semver.MustParse("9.9.9"),
+					DeployTokenPoolInput: &tokens.DeployTokenPoolInput{
+						PoolType:                     "SiloedLockReleaseTokenPool",
+						UnsiloedLockBoxChainSelector: &selector,
+						LockBoxGroups:                [][]uint64{{chainSel + 1}},
+					},
+				}
+			},
+			expectedErr: "does not appear in any lockBoxGroups entry",
 		},
 		{
 			name: "Failure - unsiloed lockbox selector on a non-siloed pool",

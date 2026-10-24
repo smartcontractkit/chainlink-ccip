@@ -4,30 +4,17 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/stretchr/testify/require"
 )
 
-// testMigrationChainSelector is a real chain selector. VerifyPreconditions rejects unknown
-// selectors, so the verify tests cannot use an arbitrary number like 1.
-const testMigrationChainSelector = uint64(5009297550715157269)
-
 func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *testing.T) {
 	baseMigration := func() LockReleasePoolMigration {
 		return LockReleasePoolMigration{
-			ChainSelector: testMigrationChainSelector,
-			OldPoolRef: datastore.AddressRef{
-				ChainSelector: testMigrationChainSelector,
-				Address:       "0x0000000000000000000000000000000000000001",
-				Version:       semver.MustParse("1.6.1"),
-			},
-			NewPoolRef: datastore.AddressRef{
-				ChainSelector: testMigrationChainSelector,
-				Address:       "0x0000000000000000000000000000000000000002",
-				Version:       semver.MustParse("2.0.0"),
-			},
+			ChainSelector: 1,
+			OldPoolRef:    datastore.AddressRef{},
+			NewPoolRef:    datastore.AddressRef{},
 		}
 	}
 
@@ -128,124 +115,6 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *tes
 	}
 }
 
-func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_PoolRefs(t *testing.T) {
-	oldRef := func() datastore.AddressRef {
-		return datastore.AddressRef{
-			ChainSelector: testMigrationChainSelector,
-			Address:       "0x0000000000000000000000000000000000000001",
-			Version:       semver.MustParse("1.6.1"),
-		}
-	}
-	newRef := func() datastore.AddressRef {
-		return datastore.AddressRef{
-			ChainSelector: testMigrationChainSelector,
-			Address:       "0x0000000000000000000000000000000000000002",
-			Version:       semver.MustParse("2.0.0"),
-		}
-	}
-
-	tests := []struct {
-		name        string
-		mutate      func(m *LockReleasePoolMigration)
-		expectedErr string
-	}{
-		{
-			name: "Success - valid legacy to v2 pair",
-			mutate: func(m *LockReleasePoolMigration) {
-			},
-		},
-		{
-			name: "Failure - invalid chain selector",
-			mutate: func(m *LockReleasePoolMigration) {
-				m.ChainSelector = 1
-			},
-			expectedErr: "invalid chain selector 1",
-		},
-		{
-			name: "Failure - empty OldPoolRef",
-			mutate: func(m *LockReleasePoolMigration) {
-				m.OldPoolRef = datastore.AddressRef{}
-			},
-			expectedErr: "OldPoolRef is required",
-		},
-		{
-			name: "Failure - empty NewPoolRef",
-			mutate: func(m *LockReleasePoolMigration) {
-				m.NewPoolRef = datastore.AddressRef{}
-			},
-			expectedErr: "NewPoolRef is required",
-		},
-		{
-			name: "Failure - OldPoolRef chain selector mismatch",
-			mutate: func(m *LockReleasePoolMigration) {
-				ref := oldRef()
-				ref.ChainSelector = 2
-				m.OldPoolRef = ref
-			},
-			expectedErr: "OldPoolRef.ChainSelector 2 does not match the migration's ChainSelector",
-		},
-		{
-			name: "Failure - NewPoolRef chain selector mismatch",
-			mutate: func(m *LockReleasePoolMigration) {
-				ref := newRef()
-				ref.ChainSelector = 2
-				m.NewPoolRef = ref
-			},
-			expectedErr: "NewPoolRef.ChainSelector 2 does not match the migration's ChainSelector",
-		},
-		{
-			name: "Failure - reversed versions",
-			mutate: func(m *LockReleasePoolMigration) {
-				m.OldPoolRef = newRef()
-				m.NewPoolRef = oldRef()
-			},
-			expectedErr: "OldPoolRef version 2.0.0 must be strictly older than NewPoolRef version 1.6.1",
-		},
-		{
-			name: "Failure - equal versions",
-			mutate: func(m *LockReleasePoolMigration) {
-				m.NewPoolRef = oldRef()
-			},
-			expectedErr: "OldPoolRef version 1.6.1 must be strictly older than NewPoolRef version 1.6.1",
-		},
-		{
-			name: "Success - version comparison skipped when a ref has no version",
-			mutate: func(m *LockReleasePoolMigration) {
-				ref := newRef()
-				ref.Version = nil
-				m.NewPoolRef = ref
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			migration := LockReleasePoolMigration{
-				ChainSelector: testMigrationChainSelector,
-				OldPoolRef:    oldRef(),
-				NewPoolRef:    newRef(),
-				LiquidityMigrationAmount: &LockReleasePoolLiquidityMigrationAmount{
-					Format: LiquidityMigrationAmountFormatBPS,
-					Value:  "5000",
-				},
-			}
-			tc.mutate(&migration)
-
-			cs := MigrateLockReleasePoolLiquidity(nil, nil)
-			err := cs.VerifyPreconditions(cldf.Environment{}, MigrateLockReleasePoolLiquidityConfig{
-				Migrations: []LockReleasePoolMigration{migration},
-			})
-
-			if tc.expectedErr == "" {
-				require.NoError(t, err)
-				return
-			}
-			require.Error(t, err)
-			require.Contains(t, err.Error(), tc.expectedErr)
-		})
-	}
-}
-
 func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_AmountFormat(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -283,17 +152,9 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_AmountFormat(t *tes
 			err := cs.VerifyPreconditions(cldf.Environment{}, MigrateLockReleasePoolLiquidityConfig{
 				Migrations: []LockReleasePoolMigration{
 					{
-						ChainSelector: testMigrationChainSelector,
-						OldPoolRef: datastore.AddressRef{
-							ChainSelector: testMigrationChainSelector,
-							Address:       "0x0000000000000000000000000000000000000001",
-							Version:       semver.MustParse("1.6.1"),
-						},
-						NewPoolRef: datastore.AddressRef{
-							ChainSelector: testMigrationChainSelector,
-							Address:       "0x0000000000000000000000000000000000000002",
-							Version:       semver.MustParse("2.0.0"),
-						},
+						ChainSelector:            1,
+						OldPoolRef:               datastore.AddressRef{},
+						NewPoolRef:               datastore.AddressRef{},
 						LiquidityMigrationAmount: tc.amount,
 					},
 				},

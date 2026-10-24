@@ -271,6 +271,17 @@ func tokenExpansionVerify() func(cldf.Environment, TokenExpansionInput) error {
 							selector,
 						)
 					}
+					// The selector must name a chain in one of the groups; resolveUnsiloedLockBoxAddress
+					// checks this only after the pool and its lockboxes are deployed, so a typo would
+					// otherwise leave orphaned contracts on-chain.
+					if !slices.ContainsFunc(deployTokenPoolInput.LockBoxGroups, func(group []uint64) bool {
+						return slices.Contains(group, *deployTokenPoolInput.UnsiloedLockBoxChainSelector)
+					}) {
+						return fmt.Errorf(
+							"unsiloedLockBoxChainSelector %d does not appear in any lockBoxGroups entry for chain selector %d",
+							*deployTokenPoolInput.UnsiloedLockBoxChainSelector, selector,
+						)
+					}
 				}
 			}
 		}

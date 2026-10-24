@@ -41,13 +41,11 @@ func TestTPRL_VerifyPreconditions_RemoteOutbounds(t *testing.T) {
 			MCMS: mcms.Input{},
 			Configs: map[uint64]tokensapi.TPRLConfig{
 				sel: {
-					TokenPoolRef: datastore.AddressRef{ChainSelector: sel, Type: "TokenPool"},
 					RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
 						dst: ro,
 					},
 				},
 				dst: {
-					TokenPoolRef: datastore.AddressRef{ChainSelector: dst, Type: "TokenPool"},
 					RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{
 						sel: ro,
 					},
@@ -930,18 +928,12 @@ func TestTPRL_OutboundOnly_Verify(t *testing.T) {
 		},
 	}
 
-	// Every config, including a refs-only counterpart, needs a TokenPoolRef: apply resolves it to
-	// read the pool's decimals for the on-chain inbound validation.
-	poolRef := func(sel uint64) datastore.AddressRef {
-		return datastore.AddressRef{ChainSelector: sel, Type: "TokenPool"}
-	}
-
 	t.Run("passes_without_counterpart_remote_outbounds", func(t *testing.T) {
 		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
 			MCMS: mcms.Input{},
 			Configs: map[uint64]tokensapi.TPRLConfig{
-				selA: {TokenPoolRef: poolRef(selA), RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
-				selB: {TokenPoolRef: poolRef(selB)}, // refs-only config — RemoteOutbounds[selA] intentionally absent
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
+				selB: {}, // refs-only config — RemoteOutbounds[selA] intentionally absent
 			},
 		})
 		require.NoError(t, err)
@@ -951,7 +943,7 @@ func TestTPRL_OutboundOnly_Verify(t *testing.T) {
 		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
 			MCMS: mcms.Input{},
 			Configs: map[uint64]tokensapi.TPRLConfig{
-				selA: {TokenPoolRef: poolRef(selA), RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
 			},
 		})
 		require.Error(t, err)
@@ -963,8 +955,8 @@ func TestTPRL_OutboundOnly_Verify(t *testing.T) {
 		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
 			MCMS: mcms.Input{},
 			Configs: map[uint64]tokensapi.TPRLConfig{
-				selA: {TokenPoolRef: poolRef(selA), RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: emptyOutboundOnly}},
-				selB: {TokenPoolRef: poolRef(selB)},
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: emptyOutboundOnly}},
+				selB: {},
 			},
 		})
 		require.Error(t, err)
@@ -978,8 +970,8 @@ func TestTPRL_OutboundOnly_Verify(t *testing.T) {
 		err := cs.VerifyPreconditions(*env, tokensapi.TPRLInput{
 			MCMS: mcms.Input{},
 			Configs: map[uint64]tokensapi.TPRLConfig{
-				selA: {TokenPoolRef: poolRef(selA), RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
-				selB: {TokenPoolRef: poolRef(selB), RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selA: {
+				selA: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selB: validOutbound}},
+				selB: {RemoteOutbounds: map[uint64]tokensapi.RemoteOutbounds{selA: {
 					Outbounds: []tokensapi.RateLimitConfig{
 						{RateLimit: tokensapi.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 200, Rate: 20}, FastFinality: false},
 					},

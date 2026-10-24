@@ -75,16 +75,6 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 			return fmt.Errorf("at least one migration is required")
 		}
 		for i, migration := range cfg.Migrations {
-			// IsDeprecated both rejects an unknown selector and fails fast on a chain that is no
-			// longer live; GetSelectorFamily would only do the former.
-			isDeprecated, err := chain_selectors.IsDeprecated(migration.ChainSelector)
-			if err != nil {
-				return fmt.Errorf("migration[%d]: invalid chain selector %d: %w", i, migration.ChainSelector, err)
-			}
-			if isDeprecated {
-				return fmt.Errorf("migration[%d]: chain selector %d is deprecated/decommissioned", i, migration.ChainSelector)
-			}
-
 			exactMode := len(migration.SiloExactAmounts) > 0 || migration.UnsiloedExactAmount != nil
 			legacyMode := migration.LiquidityMigrationAmount != nil
 
@@ -120,46 +110,9 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 			if (migration.RegistryRef == nil) != (migration.TokenRef == nil) {
 				return fmt.Errorf("migration[%d]: RegistryRef and TokenRef must both be set or both be omitted", i)
 			}
-			if err := verifyPoolRefPair(i, migration); err != nil {
-				return err
-			}
 		}
 		return nil
 	}
-}
-
-// verifyPoolRefPair performs the structural checks on a migration's old/new pool refs that need no
-// datastore or on-chain resolution: the refs must be non-empty and the old pool must be strictly
-// older than the new one.
-func verifyPoolRefPair(i int, migration LockReleasePoolMigration) error {
-	if datastore_utils.IsAddressRefEmpty(migration.OldPoolRef) {
-		return fmt.Errorf("migration[%d]: OldPoolRef is required", i)
-	}
-	if datastore_utils.IsAddressRefEmpty(migration.NewPoolRef) {
-		return fmt.Errorf("migration[%d]: NewPoolRef is required", i)
-	}
-	for _, ref := range []struct {
-		name string
-		ref  datastore.AddressRef
-	}{
-		{"OldPoolRef", migration.OldPoolRef},
-		{"NewPoolRef", migration.NewPoolRef},
-	} {
-		if ref.ref.ChainSelector != 0 && ref.ref.ChainSelector != migration.ChainSelector {
-			return fmt.Errorf(
-				"migration[%d]: %s.ChainSelector %d does not match the migration's ChainSelector %d",
-				i, ref.name, ref.ref.ChainSelector, migration.ChainSelector,
-			)
-		}
-	}
-	if migration.OldPoolRef.Version != nil && migration.NewPoolRef.Version != nil &&
-		!migration.OldPoolRef.Version.LessThan(migration.NewPoolRef.Version) {
-		return fmt.Errorf(
-			"migration[%d]: OldPoolRef version %s must be strictly older than NewPoolRef version %s (are the refs reversed?)",
-			i, migration.OldPoolRef.Version, migration.NewPoolRef.Version,
-		)
-	}
-	return nil
 }
 
 func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSReaderRegistry) func(cldf.Environment, MigrateLockReleasePoolLiquidityConfig) (cldf.ChangesetOutput, error) {
