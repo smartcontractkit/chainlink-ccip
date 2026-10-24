@@ -790,7 +790,7 @@ func ApplyTokenTransferFeeConfigOnFeeQuoter(
 	fullSrcTokenRef datastore.AddressRef,
 	partial PartialTokenTransferFeeConfig,
 ) ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
-	feeAdapter, onRampRef, fqRef, err := fees.ResolveFeeAdapterAndOnRamp(b, chains, ds, src, dst)
+	onRampAdapter, _, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(b, chains, ds, src, dst)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
@@ -810,12 +810,10 @@ func ApplyTokenTransferFeeConfigOnFeeQuoter(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current on-chain token transfer fee config for chain selector %d and remote chain selector %d: %w", src, dst, err)
 	}
-	defaultConfig := fees.DefaultTokenTransferFeeConfig(
-		feeAdapter,
-		onRampRef,
-		src,
-		dst,
-	)
+
+	// The default depends on the OnRamp version, not the FeeQuoter version, so resolve it from the
+	// OnRamp adapter (a 2.0 OnRamp zeroes the FeeQuoter fee; a 1.x OnRamp keeps the 1.x lane default).
+	defaultConfig := onRampAdapter.GetDefaultTokenTransferFeeConfig(src, dst)
 
 	// Resolution strategy:
 	// (1) If on-chain config is enabled, merge it with the user's provided config (giving precedence to user's config)
@@ -1029,7 +1027,7 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 		}
 	}
 
-	feeAdapter, onRampRef, fqRef, err := fees.ResolveFeeAdapterAndOnRamp(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
+	_, onRampRef, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w",

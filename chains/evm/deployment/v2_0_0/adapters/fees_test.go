@@ -21,9 +21,10 @@ import (
 )
 
 // TestFeesAdapter_GetDefaultTokenTransferFeeConfig_NoUnrequestedFee guards against the CCIP 2.0 double
-// fee on the FeeQuoter path: the OnRamp already charges the lane's token network fee, so the default
+// fee on the FeeQuoter path: a 2.0 OnRamp already charges the lane's token network fee, so the default
 // FeeQuoter token transfer fee must be zero. The worst case is an Ethereum destination, where the old
-// 1.x default was 150c.
+// 1.x default was 150c. Callers resolve this adapter from the OnRamp version, so a 1.x OnRamp keeps the
+// shared 1.x lane default instead.
 func TestFeesAdapter_GetDefaultTokenTransferFeeConfig_NoUnrequestedFee(t *testing.T) {
 	adapter := adapters.NewFeesAdapter(nil)
 
@@ -75,7 +76,7 @@ func TestFeesAdapter_GetOnchainOnRampDestChainConfig(t *testing.T) {
 	// the Router's OnRamp mapping is observed when resolving the fee adapter.
 	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 
-	feeAdapter, onRampRef, _, err := fees.ResolveFeeAdapterAndOnRamp(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
+	_, onRampRef, feeAdapter, _, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
 	require.NoError(t, err)
 
 	reader, ok := feeAdapter.(fees.OnRampDestChainConfigReader)

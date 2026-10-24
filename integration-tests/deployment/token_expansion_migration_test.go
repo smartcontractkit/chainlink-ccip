@@ -485,7 +485,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
 
 	// Get fee adapter for chain A -> B.
-	feeAdapter, onRampRef, fqRef, err := fees.ResolveFeeAdapterAndOnRamp(e.OperationsBundle, e.BlockChains, e.DataStore, selA, selB)
+	_, onRampRef, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, selA, selB)
 	require.NoError(t, err)
 
 	var legacyFee fees.TokenTransferFeeArgs

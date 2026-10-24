@@ -29,6 +29,13 @@ type FeeResolver interface {
 }
 
 // FeeAdapter defines the interface for fee adapters.
+//
+// NOTE: GetDefaultTokenTransferFeeConfig returns the default token transfer fee for this adapter's CCIP
+// version. On a 2.0 OnRamp the lane's token network fee carries the charge, so the 2.0 adapter returns
+// a zero FeeQuoter fee; on a 1.x OnRamp there is no token network fee, so it returns the shared 1.x lane
+// default. Callers must invoke this on the adapter resolved from the OnRamp version, not the FeeQuoter
+// version: on a mixed lane (e.g. 1.6 OnRamp + 2.0 FeeQuoter) those differ and only the OnRamp adapter
+// gives the correct answer.
 type FeeAdapter interface {
 	GetFeeContractRef(b cldf_ops.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRamp datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error)
 
