@@ -249,18 +249,18 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 						ixGrowWithDuplicates, allowlistConfigDupErr := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, allowlistConfigDupErr)
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrowWithDuplicates, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key already existed in the allowlist"})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrowWithDuplicates, Program: poolProgram}}, admin, rpc.CommitmentFinalized, []string{"Key already existed in the allowlist"})
 
 						ixGrow, allowlistConfigErr := tokenpool.NewConfigureAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, false, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, allowlistConfigErr)
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrow, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixGrow, Program: poolProgram}}, admin, rpc.CommitmentFinalized)
 
 						ixShrink, removeAllowlistErr := tokenpool.NewRemoveFromAllowListInstruction([]solana.PublicKey{a.PublicKey(), b.PublicKey()}, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, removeAllowlistErr)
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentFinalized)
 
 						// Shrinking fails now as the entries do not exist anymore
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentConfirmed, []string{"Key did not exist in the allowlist"})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: ixShrink, Program: poolProgram}}, admin, rpc.CommitmentFinalized, []string{"Key did not exist in the allowlist"})
 					})
 
 					t.Run("Cannot re-initialize the state version", func(t *testing.T) {
@@ -274,7 +274,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
 							&tokens.TokenInstruction{Instruction: ix, Program: poolProgram},
-						}, admin, rpc.CommitmentConfirmed, []string{"Invalid state version"})
+						}, admin, rpc.CommitmentFinalized, []string{"Invalid state version"})
 					})
 
 					t.Run("lockOrBurn", func(t *testing.T) {
@@ -388,14 +388,14 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							approveIx,
 							&tokens.TokenInstruction{Instruction: setRebalancerIx, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: provideIx, Program: poolProgram},
-						}, admin, rpc.CommitmentConfirmed, []string{"Liquidity not accepted"})
+						}, admin, rpc.CommitmentFinalized, []string{"Liquidity not accepted"})
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 							approveIx,
 							&tokens.TokenInstruction{Instruction: acceptIx, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: setRebalancerIx, Program: poolProgram},
 							&tokens.TokenInstruction{Instruction: provideIx, Program: poolProgram},
-						}, admin, rpc.CommitmentConfirmed)
+						}, admin, rpc.CommitmentFinalized)
 
 						require.Equal(t, "0", getBalance(tokenPool.User[admin.PublicKey()]))
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(poolTokenAccount))
@@ -405,7 +405,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
 							&tokens.TokenInstruction{Instruction: withdrawIx, Program: poolProgram},
-						}, admin, rpc.CommitmentConfirmed)
+						}, admin, rpc.CommitmentFinalized)
 
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(tokenPool.User[admin.PublicKey()]))
 						require.Equal(t, "0", getBalance(poolTokenAccount))
