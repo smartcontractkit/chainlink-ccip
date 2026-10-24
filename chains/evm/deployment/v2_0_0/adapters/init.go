@@ -106,6 +106,11 @@ func init() {
 			},
 		),
 	)
+
+	ccvadapters.GetGasUpdateAdapterRegistry().RegisterGasUpdateAdapter(
+		chainsel.FamilyEVM,
+		&GlamsterdamGasAdapter{},
+	)
 }
 
 func registerContractVerificationMetadata(v *semver.Version) {
