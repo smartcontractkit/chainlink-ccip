@@ -1027,7 +1027,7 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 		}
 	}
 
-	_, onRampRef, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
+	onRampAdapter, onRampRef, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, localSelector, remoteSelector)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to resolve fee adapter for chain selector %d and remote chain selector %d: %w",
@@ -1049,10 +1049,10 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 	// read the fee, refuse rather than import the full legacy fee and reintroduce the double charge.
 	var networkFeeUSDCents uint32
 	if legacyTTFC.IsEnabled && onRampRef.Version != nil && onRampRef.Version.GreaterThanEqual(utils.Version_2_0_0) {
-		onRampReader, hasOnRampReader := feeAdapter.(fees.OnRampDestChainConfigReader)
+		onRampReader, hasOnRampReader := onRampAdapter.(fees.OnRampDestChainConfigReader)
 		if !hasOnRampReader {
 			return nil, fmt.Errorf(
-				"fee adapter for OnRamp version %s cannot read the token network fee; refusing to import the legacy fee without subtracting it",
+				"OnRamp adapter for version %s cannot read the token network fee; refusing to import the legacy fee without subtracting it",
 				onRampRef.Version,
 			)
 		}
@@ -1063,9 +1063,16 @@ func LegacyFeesForAutoMigrate[R any, CCV any](
 		}
 	}
 
-	// Import the legacy fee minus the OnRamp network fee so the total charged (network + pool) equals
-	// the legacy fee. A legacy fee below the network fee cannot be represented (the pool fee can't be
-	// negative), so it is clamped to zero and surfaced for review.
+	// Import the legacy per-token fee minus the OnRamp's token network fee so the total charged stays
+	// equal to the legacy fee. Let L be the legacy per-token fee (`legacyTTFC.MinFeeUSDCents`) and N the
+	// OnRamp token network fee (`networkFeeUSDCents`) — the flat lane fee a 2.0 OnRamp adds on top of the
+	// pool/FeeQuoter fee:
+	//
+	//   - L > N: import L - N, so the total charged is (L - N) + N = L.
+	//   - 0 < L < N: L - N would be negative, and the pool fee cannot be negative, so clamp to 0 and log
+	//     it. The total charged becomes N, which is above the legacy fee.
+	//   - L == 0: import 0 unchanged. The OnRamp still charges N, so the total charged becomes N; that is
+	//     the OnRamp network fee applying on its own, not a clamp of the import, so it is not logged.
 	importedFeeUSDCents := uint32(0)
 	if legacyTTFC.MinFeeUSDCents > 0 {
 		switch {
