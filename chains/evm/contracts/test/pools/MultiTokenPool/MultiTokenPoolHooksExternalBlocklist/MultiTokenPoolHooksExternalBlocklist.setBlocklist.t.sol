@@ -25,7 +25,7 @@ contract MultiTokenPoolHooksExternalBlocklist_setBlocklist is MultiTokenPoolHook
 
     assertEq(address(s_newBlocklist), address(s_hooks.getBlocklist()));
 
-    // The checks query the new blocklist and no longer the old one.
+    // Only the new blocklist is called from now on.
     vm.expectCall(address(s_blocklist), abi.encodeWithSelector(IAddressBlocklist.isBlocked.selector), 0);
     vm.expectCall(address(s_newBlocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (s_sender)), 1);
     s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);

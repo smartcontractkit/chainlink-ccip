@@ -66,7 +66,7 @@ contract MultiTokenPoolHooks_applyAllowListUpdates is MultiTokenPoolHooksSetup {
     vm.recordLogs();
     s_hooks.applyAllowListUpdates(removes, adds);
 
-    // Only the first add of s_newSender1 changes the list.
+    // The zero address, the existing sender and the duplicate are skipped, so only one address is added.
     assertEq(1, vm.getRecordedLogs().length);
     address[] memory expected = new address[](2);
     expected[0] = s_sender;
@@ -88,7 +88,7 @@ contract MultiTokenPoolHooks_applyAllowListUpdates is MultiTokenPoolHooksSetup {
     s_hooks.applyAllowListUpdates(_arrayOf(s_sender), new address[](0));
 
     assertEq(0, s_hooks.getAllowList().length);
-    // An empty list does not disable the allowlist, so no sender can send.
+    // Removing every sender does not turn the allowlist off, so nobody can send until a sender is added again.
     assertTrue(s_hooks.getAllowListEnabled());
   }
 

@@ -11,11 +11,10 @@ import {
 import {BaseTest} from "../../../BaseTest.t.sol";
 
 contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
-  /// @dev The SPL Token program ID, TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA, as the 32 raw bytes that CCIP carries
-  /// for a Solana account.
+  /// @dev The SPL Token program ID TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA, used as a well-known Solana address.
   bytes32 internal constant SOLANA_ACCOUNT = 0x06ddf6e1d765a193d9cbe146ceeb79ac1cb485ed5f5b37913a8cf5857eff00a9;
-  /// @dev The low 160 bits of SOLANA_ACCOUNT, computed offchain from its base58 form. A blocklist lists the Solana
-  /// account as this address.
+  /// @dev The low 160 bits of SOLANA_ACCOUNT, decoded offchain from the base58 address. This is how the blocklist
+  /// lists that Solana address.
   address internal constant SOLANA_ACCOUNT_AS_ADDRESS = 0xCeeB79AC1cB485eD5F5b37913a8cf5857eff00A9;
 
   MultiTokenPoolHooksExternalBlocklist internal s_hooks;
@@ -32,8 +31,8 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
       new address[](0), IPolicyEngine(address(0)), s_blocklist, _arrayOf(OWNER)
     );
 
-    // The 2.0 OnRamp passes the token receiver as the caller gave it. An EVM receiver is 20 bytes or 32 bytes with
-    // left padding.
+    // The OnRamp passes the receiver to the pool as the sender gave it, so an EVM receiver can be ABI encoded or 20
+    // raw bytes.
     s_lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),
       remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -41,7 +40,7 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
       amount: 1e18,
       localToken: makeAddr("token")
     });
-    // An EVM OnRamp writes the sender as abi.encode(address), so an EVM sender reaches the OffRamp as 32 bytes.
+    // EVM OnRamps ABI encode the sender, so it arrives as 32 bytes.
     s_releaseOrMintIn = Pool.ReleaseOrMintInV1({
       originalSender: abi.encode(s_sender),
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -54,7 +53,7 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
     });
   }
 
-  /// @dev Gives the blocklist code, so the hooks accept it, and blocks no address.
+  /// @dev Puts code at the blocklist address so the hooks accept it, and makes it report every address as not blocked.
   function _deployBlocklist(
     IAddressBlocklist blocklist
   ) internal {
@@ -69,7 +68,7 @@ contract MultiTokenPoolHooksExternalBlocklistSetup is BaseTest {
     vm.mockCall(address(s_blocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (account)), abi.encode(blocked));
   }
 
-  /// @dev Remote addresses that have no EVM form. The hooks check only the local address for them.
+  /// @dev Remote addresses that are neither 20 nor 32 bytes long, which the hooks do not check.
   function _remoteAddressesWithoutEVMForm() internal pure returns (bytes[] memory accounts) {
     accounts = new bytes[](5);
     accounts[0] = "";

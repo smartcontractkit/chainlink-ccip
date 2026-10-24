@@ -43,7 +43,7 @@ contract MultiTokenPoolHooks_constructor is MultiTokenPoolHooksSetup {
     MultiTokenPoolHooks hooks =
       new MultiTokenPoolHooks(_arrayOf(address(0)), IPolicyEngine(address(0)), new address[](0));
 
-    // Any non-empty list enables the allowlist, and the zero address is skipped, so no sender can send.
+    // A list with only the zero address still enables the allowlist, but leaves it empty, so nobody can send.
     assertTrue(hooks.getAllowListEnabled());
     assertEq(0, hooks.getAllowList().length);
   }

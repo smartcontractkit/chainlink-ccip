@@ -41,7 +41,7 @@ contract MultiTokenPoolHooksExternalBlocklist_postflightCheck is MultiTokenPoolH
 
     for (uint256 i = 0; i < senders.length; ++i) {
       s_releaseOrMintIn.originalSender = senders[i];
-      // Every address but the receiver is blocked, so a call for the sender would revert.
+      // Every address except the receiver is blocked, so checking the sender would revert.
       s_hooks.postflightCheck(s_releaseOrMintIn, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     }
   }
@@ -74,7 +74,7 @@ contract MultiTokenPoolHooksExternalBlocklist_postflightCheck is MultiTokenPoolH
     bytes32 sender
   ) public {
     s_releaseOrMintIn.originalSender = abi.encodePacked(sender);
-    // The low 20 bytes, moved to the top so that bytes20 takes them.
+    // bytes20 keeps the leading bytes, so shift the low 20 bytes to the front first.
     address expectedAddress = address(bytes20(sender << 96));
 
     vm.expectCall(address(s_blocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (expectedAddress)));

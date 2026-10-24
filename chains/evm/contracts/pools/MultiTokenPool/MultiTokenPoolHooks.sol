@@ -10,11 +10,10 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-/// @notice The hooks of the lanes of multi-token pools: a sender allowlist and policy engine runs. Both work the same as
-/// in AdvancedPoolHooks.
-/// @dev The pool config manager gives the CCVs of each lane, so these hooks have no CCV config. Each pool that serves a
-/// token on a lane that uses these hooks must be an authorized caller. All tokens and lanes that use these hooks share
-/// the allowlist and the policy engine.
+/// @notice Pool hooks for multi-token pools, with a sender allowlist and policy engine runs.
+/// @dev This is AdvancedPoolHooks without the CCV config, as multi-token pools get their CCVs from the pool config
+/// manager. One instance can serve many tokens and lanes, and they all share its allowlist and policy engine. Every
+/// pool that calls these hooks must be an authorized caller.
 contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -27,23 +26,25 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
   event PolicyEngineAttached(IPolicyEngine indexed policyEngine);
   event PolicyEngineDetachFailed(IPolicyEngine indexed policyEngine, bytes reason);
 
-  /// @dev The allowlist can only be enabled at deployment, which keeps the check cheap on the hot path.
+  /// @dev The immutable flag that indicates if the allowlist is access-controlled.
   bool private immutable i_allowlistEnabled;
 
-  /// @dev The original senders that can send tokens. Only used when i_allowlistEnabled is true.
+  /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
+  /// Only takes effect if i_allowlistEnabled is true.
   EnumerableSet.AddressSet private s_allowlist;
 
-  /// @dev Zero disables the policy engine runs.
+  /// @dev The policy engine to use. Value of 0 disables policy engine checks.
   IPolicyEngine private s_policyEngine;
 
-  /// @param allowlist The original senders that can send tokens. An empty list disables the allowlist for good.
-  /// @param policyEngine The policy engine to attach. Zero disables the policy engine runs.
-  /// @param authorizedCallers The pools that can call the hooks.
+  /// @param allowlist The addresses allowed to send tokens. An empty list disables the allowlist permanently.
+  /// @param policyEngine The policy engine to attach. Zero disables policy engine checks.
+  /// @param authorizedCallers The pools allowed to call the hooks.
   constructor(
     address[] memory allowlist,
     IPolicyEngine policyEngine,
     address[] memory authorizedCallers
   ) AuthorizedCallers(authorizedCallers) {
+    // Allowlist can be set as enabled or disabled at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
     if (i_allowlistEnabled) {
       _applyAllowListUpdates(new address[](0), allowlist);
@@ -56,7 +57,7 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
   }
 
   /// @inheritdoc IMultiTokenPoolHooks
-  /// @dev Checks the original sender against the allowlist, then runs the policy engine with tokenArgs as context.
+  /// @dev Performs allowlist check and policy engine validation for outbound transfers.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     bytes4, // requestedFinalityConfig
@@ -75,7 +76,7 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
   }
 
   /// @inheritdoc IMultiTokenPoolHooks
-  /// @dev Runs the policy engine with offchainTokenData as context. The allowlist only applies on send.
+  /// @dev Performs policy engine validation for inbound transfers.
   function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256, // localAmount
@@ -97,30 +98,29 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
   // │                          Allowlist                           │
   // ================================================================
 
-  /// @notice Reverts if the allowlist is enabled and does not hold the sender.
-  /// @param sender The original sender to check.
+  /// @notice Checks if the sender is allowed to perform an operation.
+  /// @param sender The address to check.
   function checkAllowList(
     address sender
   ) public view virtual {
     if (i_allowlistEnabled && !s_allowlist.contains(sender)) revert SenderNotAllowed(sender);
   }
 
-  /// @notice Returns whether the allowlist is enabled.
-  /// @return allowlistEnabled True if the allowlist is enabled.
+  /// @notice Gets whether the allowlist functionality is enabled.
+  /// @return allowlistEnabled True if enabled, false if not.
   function getAllowListEnabled() public view virtual returns (bool allowlistEnabled) {
     return i_allowlistEnabled;
   }
 
-  /// @notice Returns the original senders that can send tokens.
-  /// @return allowlist The allowed senders.
+  /// @notice Gets the allowed addresses.
+  /// @return allowlist The allowed addresses.
   function getAllowList() public view virtual returns (address[] memory allowlist) {
     return s_allowlist.values();
   }
 
-  /// @notice Removes and adds original senders on the allowlist. Removals run first.
-  /// @dev Zero addresses in adds are skipped. An address that is already in the target state emits no event.
-  /// @param removes The senders to remove.
-  /// @param adds The senders to add.
+  /// @notice Apply updates to the allow list.
+  /// @param removes The addresses to be removed.
+  /// @param adds The addresses to be added.
   function applyAllowListUpdates(
     address[] calldata removes,
     address[] calldata adds
@@ -128,7 +128,9 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
     _applyAllowListUpdates(removes, adds);
   }
 
-  /// @dev Shared by the constructor and applyAllowListUpdates.
+  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
+  /// @param removes The addresses to be removed.
+  /// @param adds The addresses to be added.
   function _applyAllowListUpdates(
     address[] memory removes,
     address[] memory adds
@@ -156,26 +158,26 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
   // │                       Policy Engine                          │
   // ================================================================
 
-  /// @notice Detaches the old policy engine and attaches the new one.
-  /// @dev Reverts if the detach of the old policy engine reverts.
-  /// @param newPolicyEngine The new policy engine. Zero disables the policy engine runs.
+  /// @notice Sets a new policy engine.
+  /// @param newPolicyEngine The address of the new policy engine.
   function setPolicyEngine(
     IPolicyEngine newPolicyEngine
   ) public virtual onlyOwner {
     _setPolicyEngine(newPolicyEngine, false);
   }
 
-  /// @notice Detaches the old policy engine and attaches the new one, also when the detach reverts.
-  /// @dev Use this to replace an old policy engine whose detach reverts.
-  /// @param newPolicyEngine The new policy engine. Zero disables the policy engine runs.
+  /// @notice Sets a new policy engine while tolerating a pre-existing policy engine's detach reverting.
+  /// @dev Use this to force update an old policy engine whose detach() reverts.
+  /// @param newPolicyEngine The address of the new policy engine.
   function setPolicyEngineAllowFailedDetach(
     IPolicyEngine newPolicyEngine
   ) public virtual onlyOwner {
     _setPolicyEngine(newPolicyEngine, true);
   }
 
-  /// @param newPolicyEngine The new policy engine. Zero disables the policy engine runs.
-  /// @param allowFailedDetach True to continue when the detach of the old policy engine reverts. False to revert.
+  /// @notice Internal function to set and attach to a policy engine.
+  /// @param newPolicyEngine The address of the new policy engine, or address(0) to disable.
+  /// @param allowFailedDetach Whether to continue if the old policy engine's detach reverts.
   function _setPolicyEngine(
     IPolicyEngine newPolicyEngine,
     bool allowFailedDetach
@@ -184,7 +186,7 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
     if (address(newPolicyEngine) == address(oldPolicyEngine)) return;
 
     if (address(oldPolicyEngine) != address(0)) {
-      // A detach that reverts must not stop the owner from replacing the policy engine.
+      // Guarding detach reverts to offer escape hatch from adversarial policy engine instances.
       try oldPolicyEngine.detach() {}
       catch (bytes memory err) {
         if (!allowFailedDetach) revert PolicyEngineDetachReverted(oldPolicyEngine, err);
@@ -200,8 +202,8 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
     emit PolicyEngineAttached(newPolicyEngine);
   }
 
-  /// @notice Returns the policy engine.
-  /// @return policyEngine The policy engine. Zero means the policy engine runs are disabled.
+  /// @notice Gets the current policy engine address.
+  /// @return policyEngine The address of the policy engine.
   function getPolicyEngine() public view virtual returns (IPolicyEngine policyEngine) {
     return s_policyEngine;
   }

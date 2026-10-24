@@ -40,7 +40,7 @@ contract MultiTokenPoolHooksSetup is BaseTest {
     });
   }
 
-  /// @dev Hooks with an allowlist that holds only the sender, and no policy engine.
+  /// @dev Deploys hooks that only allow s_sender to send, without a policy engine.
   function _deployHooksWithAllowList() internal returns (MultiTokenPoolHooks) {
     return new MultiTokenPoolHooks(_arrayOf(s_sender), IPolicyEngine(address(0)), _arrayOf(OWNER));
   }

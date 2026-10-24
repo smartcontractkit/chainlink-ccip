@@ -32,7 +32,7 @@ contract MultiTokenPoolHooks_postflightCheck is MultiTokenPoolHooksSetup {
     s_hooks.postflightCheck(s_releaseOrMintIn, localAmount, requestedFinalityConfig);
 
     IPolicyEngine.Payload memory payload = s_policyEngine.getLastPayload();
-    // The selector matches IAdvancedPoolHooks, so one policy engine extractor serves both kinds of hooks.
+    // Same selector as IAdvancedPoolHooks, so the existing AdvancedPoolHooksExtractor can decode the payload.
     assertEq(IAdvancedPoolHooks.postflightCheck.selector, payload.selector);
     assertEq(OWNER, payload.sender);
     assertEq(abi.encode(s_releaseOrMintIn, localAmount, requestedFinalityConfig), payload.data);

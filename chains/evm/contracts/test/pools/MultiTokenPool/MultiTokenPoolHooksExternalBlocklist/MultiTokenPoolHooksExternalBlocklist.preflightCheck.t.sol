@@ -42,7 +42,7 @@ contract MultiTokenPoolHooksExternalBlocklist_preflightCheck is MultiTokenPoolHo
 
     for (uint256 i = 0; i < receivers.length; ++i) {
       s_lockOrBurnIn.receiver = receivers[i];
-      // Every address but the sender is blocked, so a call for the receiver would revert.
+      // Every address except the sender is blocked, so checking the receiver would revert.
       s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);
     }
   }
@@ -76,7 +76,7 @@ contract MultiTokenPoolHooksExternalBlocklist_preflightCheck is MultiTokenPoolHo
     bytes32 receiver
   ) public {
     s_lockOrBurnIn.receiver = abi.encodePacked(receiver);
-    // The low 20 bytes, moved to the top so that bytes20 takes them.
+    // bytes20 keeps the leading bytes, so shift the low 20 bytes to the front first.
     address expectedAddress = address(bytes20(receiver << 96));
 
     vm.expectCall(address(s_blocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (expectedAddress)));
@@ -149,7 +149,7 @@ contract MultiTokenPoolHooksExternalBlocklist_preflightCheck is MultiTokenPoolHo
   function test_preflightCheck_RevertWhen_BlocklistReturnsInvalidData() public {
     vm.mockCall(address(s_blocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (s_sender)), hex"01");
 
-    // The answer is shorter than one ABI word, so decoding it reverts without data.
+    // A single byte is too short to decode as a bool, so the call reverts without a reason.
     vm.expectRevert(bytes(""));
     s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);
   }
