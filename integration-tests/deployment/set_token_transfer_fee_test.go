@@ -557,6 +557,24 @@ func TestGetDefaultChainAgnosticTokenTransferFeeConfig(t *testing.T) {
 			want: 150,
 		},
 		{
+			name: "ethereum source to non-evm non-solana destination uses the ethereum source default",
+			src:  chainsel.ETHEREUM_MAINNET.Selector,
+			dst:  chainsel.APTOS_MAINNET.Selector,
+			want: 50,
+		},
+		{
+			name: "non-evm source to ethereum destination uses the ethereum destination default",
+			src:  chainsel.APTOS_MAINNET.Selector,
+			dst:  chainsel.ETHEREUM_MAINNET.Selector,
+			want: 150,
+		},
+		{
+			name: "ethereum to ethereum (testnets) uses the ethereum destination default",
+			src:  chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+			dst:  chainsel.ETHEREUM_TESTNET_HOODI.Selector,
+			want: 150,
+		},
+		{
 			name: "baseline default",
 			src:  chainsel.TEST_90000001.Selector,
 			dst:  chainsel.TEST_90000002.Selector,

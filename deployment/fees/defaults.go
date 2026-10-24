@@ -11,8 +11,7 @@ import (
 )
 
 func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overrides ...func(*TokenTransferFeeArgs)) TokenTransferFeeArgs {
-	srcFam, srcFamErr := chainsel.GetSelectorFamily(src)
-	dstFam, dstFamErr := chainsel.GetSelectorFamily(dst)
+	dstFam, _ := chainsel.GetSelectorFamily(dst)
 
 	isEth := func(sel uint64) bool {
 		return sel == chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector ||
@@ -20,35 +19,23 @@ func GetDefaultChainAgnosticTokenTransferFeeConfig(src uint64, dst uint64, overr
 			sel == chainsel.ETHEREUM_MAINNET.Selector
 	}
 
-	minFeeUSDCents := uint32(25)
-	if src != dst && srcFamErr == nil && dstFamErr == nil {
-		switch {
-		case srcFam == chainsel.FamilyEVM && dstFam == chainsel.FamilySolana:
-			if isEth(src) {
-				minFeeUSDCents = 60
-			} else {
-				minFeeUSDCents = 35
-			}
-		case srcFam == chainsel.FamilySolana && dstFam == chainsel.FamilyEVM:
-			if isEth(dst) {
-				minFeeUSDCents = 150
-			}
-		case srcFam == chainsel.FamilyEVM && dstFam == chainsel.FamilyEVM:
-			if isEth(src) {
-				minFeeUSDCents = 50
-			}
-			if isEth(dst) {
-				minFeeUSDCents = 150
-			}
-		case dstFam == chainsel.FamilySolana:
-			minFeeUSDCents = 35
-		case dstFam == chainsel.FamilyEVM:
-			if isEth(dst) {
-				minFeeUSDCents = 150
-			} else {
-				minFeeUSDCents = 25
-			}
-		}
+	var minFeeUSDCents uint32
+	switch {
+	case dstFam == chainsel.FamilySolana && isEth(src):
+		// Bridging from Ethereum to Solana
+		minFeeUSDCents = 60
+	case dstFam == chainsel.FamilySolana:
+		// Bridging from anywhere else to Solana
+		minFeeUSDCents = 35
+	case isEth(dst):
+		// Bridging towards Ethereum
+		minFeeUSDCents = 150
+	case isEth(src):
+		// Bridging from Ethereum
+		minFeeUSDCents = 50
+	default:
+		// Baseline
+		minFeeUSDCents = 25
 	}
 
 	cfg := TokenTransferFeeArgs{
