@@ -504,9 +504,7 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 
 // TestGetDefaultChainAgnosticTokenTransferFeeConfig pins the shared 1.x lane default values. The
 // integration tests compare the on-chain result against this same helper, so without an explicit table
-// a wrong value (e.g. a reordered rule, or a dropped testnet-Ethereum case) would still pass. It also
-// guards parity with chains/evm GetDefaultTokenFeeUSDCentsFor1_6Lane, which counts Sepolia and Hoodi
-// as Ethereum.
+// a wrong value (e.g. a reordered rule, or a dropped testnet-Ethereum case) would still pass.
 func TestGetDefaultChainAgnosticTokenTransferFeeConfig(t *testing.T) {
 	tests := []struct {
 		name string
