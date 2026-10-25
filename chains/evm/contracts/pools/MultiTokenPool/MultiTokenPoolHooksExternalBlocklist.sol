@@ -7,18 +7,16 @@ import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngi
 import {Pool} from "../../libraries/Pool.sol";
 import {MultiTokenPoolHooks} from "./MultiTokenPoolHooks.sol";
 
-/// @notice MultiTokenPoolHooks that also check the sender and the receiver of each transfer against an external
-/// address blocklist.
+/// @notice MultiTokenPoolHooks that also check the sender and the receiver against an external address blocklist.
 /// @dev The blocklist only takes EVM addresses. A 32-byte remote address, such as a Solana, Aptos or Sui address, is
-/// looked up by its low 160 bits, so the blocklist has to list it in that form. Remote addresses that are neither 20
-/// nor 32 bytes long, such as TON addresses, are not checked.
+/// looked up by its low 160 bits.
 contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
   error InvalidBlocklist(IAddressBlocklist blocklist);
   error AddressBlocked(IAddressBlocklist blocklist, address account);
 
   event BlocklistSet(IAddressBlocklist indexed oldBlocklist, IAddressBlocklist indexed newBlocklist);
 
-  /// @dev The blocklist to check against. Value of 0 disables blocklist checks.
+  /// @dev The blocklist to check against. 0 address skips blocklist checks.
   IAddressBlocklist private s_blocklist;
 
   /// @param allowlist The addresses allowed to send tokens. An empty list disables the allowlist permanently.
@@ -42,7 +40,7 @@ contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
   /// @dev Also checks the sender and the receiver against the blocklist.
   /// When sending to Solana, the receiver is usually a wallet, and the tokens go to that wallet's associated token
   /// account. The sender can also pass a token account as the receiver. That token account is then checked instead of
-  /// the wallet that owns it, so blocking a Solana wallet does not stop transfers sent directly to its token accounts.
+  /// the wallet that owns it.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     bytes4 requestedFinalityConfig,
