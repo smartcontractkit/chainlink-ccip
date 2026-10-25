@@ -50,12 +50,12 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   event PoolConfigManagerSet(address oldPoolConfigManager, address newPoolConfigManager);
 
   /// @dev The address of the RMN proxy.
-  address internal immutable i_rmnProxy;
+  address private immutable i_rmnProxy;
 
   /// @dev The address of the router.
-  IRouter internal s_router;
+  IRouter private s_router;
   /// @dev The pool config manager that holds the config of every token of this pool.
-  IPoolConfigManager internal s_poolConfigManager;
+  IPoolConfigManager private s_poolConfigManager;
 
   constructor(
     address rmnProxy,
@@ -323,9 +323,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
 
   /// @notice Checks whether the msg.sender is the permissioned onRamp for the given chain on the Router.
   /// @dev The pool does not check the lane. The pool config manager does, so a token without a lane reverts there.
-  /// @dev This function is marked virtual as other pools may inherit from this contract, but do not receive calls from
-  /// the ramps directly, instead receiving them from a proxy contract. In that situation this function must be
-  /// overridden and the ramp-check removed and replaced with a different access-control scheme.
+  /// The pool config manager accepts validate calls only from the token's TokenAdminRegistry pool, so the ramps must
+  /// call this pool directly.
   /// @param remoteChainSelector The remote chain selector.
   function _onlyOnRamp(
     uint64 remoteChainSelector
@@ -335,7 +334,6 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
 
   /// @notice Checks whether the msg.sender is a permissioned offRamp for the given chain on the Router.
   /// @dev The pool does not check the lane. The pool config manager does, so a token without a lane reverts there.
-  /// @dev This function is marked virtual for the same reason as _onlyOnRamp.
   /// @param remoteChainSelector The remote chain selector.
   function _onlyOffRamp(
     uint64 remoteChainSelector
@@ -367,7 +365,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV1
   /// @dev Always reverts. A multi-token pool has no lane without a local token.
   function isSupportedChain(
-    uint64
+    uint64 // remoteChainSelector
   ) public pure virtual returns (bool) {
     revert LocalTokenRequired();
   }
@@ -383,7 +381,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   /// @inheritdoc IPoolV2
   /// @dev Always reverts. A multi-token pool has no remote token without a local token.
   function getRemoteToken(
-    uint64
+    uint64 // remoteChainSelector
   ) public pure virtual returns (bytes memory) {
     revert LocalTokenRequired();
   }
