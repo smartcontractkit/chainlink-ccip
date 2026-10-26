@@ -17,12 +17,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
-var _ fees.FeeAdapter = (*FeesAdapter)(nil)
+var (
+	_ fees.FeeAdapter                  = (*FeesAdapter)(nil)
+	_ fees.OnRampDestChainConfigReader = (*FeesAdapter)(nil)
+)
 
 type FeesAdapter struct {
 	resolver v1_0_0.EVMFeeResolver
@@ -47,19 +51,25 @@ func (a *FeesAdapter) validateFeeRef(feeRef datastore.AddressRef) error {
 	return nil
 }
 
-func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
+func (a *FeesAdapter) validateOnRampRef(onRampRef datastore.AddressRef) error {
 	if onRampRef.Type.String() != onramp.ContractType.String() {
-		return datastore.AddressRef{}, fmt.Errorf("unexpected contract type for OnRamp address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), onramp.ContractType)
+		return fmt.Errorf("unexpected contract type for OnRamp address ref: got %s, want %s", onRampRef.Type.String(), onramp.ContractType)
 	}
-	if !onRampRef.Version.Equal(utils.Version_2_0_0) {
-		return datastore.AddressRef{}, fmt.Errorf("unexpected OnRamp contract version for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Version, utils.Version_2_0_0)
+	if onRampRef.Version == nil || !onRampRef.Version.Equal(utils.Version_2_0_0) {
+		return fmt.Errorf("unexpected OnRamp contract version: got %s, want %s", onRampRef.Version, utils.Version_2_0_0)
 	}
 
+	return nil
+}
+
+func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.BlockChains, ds datastore.DataStore, onRampRef datastore.AddressRef, src uint64, dst uint64) (datastore.AddressRef, error) {
+	if err := a.validateOnRampRef(onRampRef); err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
+	}
 	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRampRef)
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to convert OnRamp address ref to EVM address for src %d and dst %d: %w", src, dst, err)
 	}
-
 	chain, ok := chains.EVMChains()[src]
 	if !ok {
 		return datastore.AddressRef{}, fmt.Errorf("chain with selector %d not defined", src)
@@ -107,7 +117,58 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 }
 
 func (a *FeesAdapter) GetDefaultTokenTransferFeeConfig(src uint64, dst uint64) fees.TokenTransferFeeArgs {
-	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst)
+	// NOTE: the V1 and V2 fee models differ, so the correct default depends on the OnRamp version.
+	//   - On a 2.0 OnRamp the lane's token network fee is charged on top of whatever the FeeQuoter (or a V2
+	//     token pool) charges. To avoid double charging the token, the FeeQuoter fee must default to zero.
+	//   - On a 1.x OnRamp there is no token network fee, so the fee contract is the only charge and must
+	//     default to a sensible non-zero value.
+	//
+	// This function does NOT have access to the OnRamp version. It therefore always applies the 2.0 rule
+	// (zeroing minFeeUSDCents), which is only correct when the lane actually uses a 2.0 OnRamp. Callers must
+	// therefore resolve the adapter from the OnRamp version (via fees.ResolveOnRampAndFeeQuoter), not the
+	// FeeQuoter version: a 1.x OnRamp then gets the 1.x adapter, which returns the shared 1.x lane default.
+	// On a mixed lane (1.x OnRamp + 2.0 FeeQuoter) the two versions differ, and resolving from the FeeQuoter
+	// version would wrongly zero the fee.
+	return fees.GetDefaultChainAgnosticTokenTransferFeeConfig(src, dst, func(cfg *fees.TokenTransferFeeArgs) {
+		cfg.MinFeeUSDCents = 0
+	})
+}
+
+func (a *FeesAdapter) GetOnchainOnRampDestChainConfig(b operations.Bundle, chains cldf_chain.BlockChains, onRamp datastore.AddressRef, src uint64, dst uint64) (fees.OnRampDestChainConfig, error) {
+	if err := a.validateOnRampRef(onRamp); err != nil {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("invalid OnRamp address ref for src %d and dst %d: %w", src, dst, err)
+	}
+	onRampAddr, err := datastore_utils_evm.ToEVMAddress(onRamp)
+	if err != nil {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to convert OnRamp address ref to EVM address for src %d and dst %d: %w", src, dst, err)
+	}
+	chain, ok := chains.EVMChains()[src]
+	if !ok {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("chain with selector %d not defined", src)
+	}
+
+	// The OnRamp's dest chain config is mutable on-chain state, so we use WithForceExecute to
+	// bypass the operation report cache. This ensures a cached invocation from earlier in the
+	// bundle (e.g. before lane configuration) is not reused.
+	report, err := operations.ExecuteOperation(
+		b,
+		onramp.GetDestChainConfig,
+		chain,
+		contract.FunctionInput[uint64]{
+			ChainSelector: src,
+			Address:       onRampAddr,
+			Args:          dst,
+		},
+		operations.WithForceExecute[contract.FunctionInput[uint64], cldf_evm.Chain](),
+	)
+	if err != nil {
+		return fees.OnRampDestChainConfig{}, fmt.Errorf("failed to execute GetDestChainConfig operation for OnRamp at %s on chain selector %d with dst %d: %w", onRampAddr.Hex(), src, dst, err)
+	}
+
+	return fees.OnRampDestChainConfig{
+		Ref:                     onRamp,
+		TokenNetworkFeeUSDCents: report.Output.TokenNetworkFeeUSDCents,
+	}, nil
 }
 
 func (a *FeesAdapter) GetOnchainTokenTransferFeeConfig(b operations.Bundle, chains cldf_chain.BlockChains, feeRef datastore.AddressRef, src uint64, dst uint64, address string) (fees.TokenTransferFeeArgs, error) {
