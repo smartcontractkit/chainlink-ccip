@@ -11,7 +11,9 @@ import {MultiTokenPoolSetup} from "./MultiTokenPoolSetup.t.sol";
 
 contract MultiTokenPool_releaseOrMint is MultiTokenPoolSetup {
   function test_releaseOrMint() public {
-    uint256 amount = 20_000e18;
+    uint256 sourceAmount = 20_000e18;
+    // The pool config manager converts the amount to local decimals.
+    uint256 amount = 20_000e6;
 
     IPoolConfigManager.ResolvedInboundTransfer memory transfer = _defaultInboundTransfer(amount);
     s_poolConfigManager.setInboundTransfer(transfer);
@@ -26,10 +28,11 @@ contract MultiTokenPool_releaseOrMint is MultiTokenPoolSetup {
     emit MultiTokenPool.ReleasedOrMinted(DEST_CHAIN_SELECTOR, address(s_token), s_allowedOffRamp, s_receiver, amount);
 
     Pool.ReleaseOrMintOutV1 memory releaseOrMintOut =
-      s_pool.releaseOrMint(_releaseOrMintIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+      s_pool.releaseOrMint(_releaseOrMintIn(sourceAmount), FinalityCodec._encodeBlockDepth(5));
 
     assertEq(releaseOrMintOut.destinationAmount, amount);
     assertEq(s_token.balanceOf(s_receiver), amount);
+    assertEq(s_poolConfigManager.lastRequestedFinalityConfig(), FinalityCodec._encodeBlockDepth(5));
   }
 
   function test_releaseOrMint_LegacyPathUsesDefaultFinality() public {
@@ -43,7 +46,9 @@ contract MultiTokenPool_releaseOrMint is MultiTokenPoolSetup {
   }
 
   function test_releaseOrMint_CallsPostflightHook() public {
-    uint256 amount = 20_000e18;
+    uint256 sourceAmount = 20_000e18;
+    uint256 amount = 20_000e6;
+    bytes4 finality = FinalityCodec._encodeBlockDepth(5);
     address hook = makeAddr("hook");
     vm.etch(hook, bytes("fake bytecode"));
 
@@ -51,16 +56,12 @@ contract MultiTokenPool_releaseOrMint is MultiTokenPoolSetup {
     transfer.hook = hook;
     s_poolConfigManager.setInboundTransfer(transfer);
 
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _releaseOrMintIn(amount);
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = _releaseOrMintIn(sourceAmount);
 
     vm.startPrank(s_allowedOffRamp);
-    vm.expectCall(
-      hook,
-      abi.encodeCall(
-        IMultiTokenPoolHooks.postflightCheck, (releaseOrMintIn, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG)
-      )
-    );
-    s_pool.releaseOrMint(releaseOrMintIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    // The hook gets the amount in local decimals and the requested finality.
+    vm.expectCall(hook, abi.encodeCall(IMultiTokenPoolHooks.postflightCheck, (releaseOrMintIn, amount, finality)));
+    s_pool.releaseOrMint(releaseOrMintIn, finality);
   }
 
   function test_releaseOrMint_RevertWhen_CursedByRMN() public {

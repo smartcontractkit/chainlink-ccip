@@ -24,9 +24,10 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     emit MultiTokenPool.LockedOrBurned(DEST_CHAIN_SELECTOR, address(s_token), s_allowedOnRamp, amount);
 
     (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) =
-      s_pool.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
+      s_pool.lockOrBurn(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "");
 
     assertEq(destTokenAmount, amount);
+    assertEq(s_poolConfigManager.lastRequestedFinalityConfig(), FinalityCodec._encodeBlockDepth(5));
     assertEq(lockOrBurnOut.destTokenAddress, abi.encode(s_remoteToken));
     assertEq(lockOrBurnOut.destPoolData, DEST_POOL_DATA);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
@@ -42,6 +43,9 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     s_poolConfigManager.setOutboundLane(lane);
 
     vm.startPrank(s_allowedOnRamp);
+    vm.expectCall(address(s_token), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount - feeAmount));
+    vm.expectEmit();
+    emit MultiTokenPool.LockedOrBurned(DEST_CHAIN_SELECTOR, address(s_token), s_allowedOnRamp, amount - feeAmount);
     (, uint256 destTokenAmount) = s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
     assertEq(destTokenAmount, amount - feeAmount);
@@ -68,24 +72,25 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
 
   function test_lockOrBurn_CallsPreflightHook() public {
     uint256 amount = 20_000e18;
+    uint256 feeAmount = amount / 20;
+    bytes4 finality = FinalityCodec._encodeBlockDepth(5);
     deal(address(s_token), address(s_pool), amount);
 
     address hook = makeAddr("hook");
     vm.etch(hook, bytes("fake bytecode"));
     IPoolConfigManager.OutboundLane memory lane = _defaultOutboundLane();
     lane.hook = hook;
+    lane.feeAmount = feeAmount;
     s_poolConfigManager.setOutboundLane(lane);
 
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _lockOrBurnIn(amount);
 
     vm.startPrank(s_allowedOnRamp);
+    // The hook gets the requested finality and the amount after the token fee.
     vm.expectCall(
-      hook,
-      abi.encodeCall(
-        IMultiTokenPoolHooks.preflightCheck, (lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "args", amount)
-      )
+      hook, abi.encodeCall(IMultiTokenPoolHooks.preflightCheck, (lockOrBurnIn, finality, "args", amount - feeAmount))
     );
-    s_pool.lockOrBurn(lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "args");
+    s_pool.lockOrBurn(lockOrBurnIn, finality, "args");
   }
 
   function test_lockOrBurn_RevertWhen_CursedByRMN() public {
