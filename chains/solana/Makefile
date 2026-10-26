@@ -50,7 +50,7 @@ format:
 .PHONY: go-tests
 go-tests:
 	# -timeout: the default 10m is not enough now that tests wait for finalized commitment
-	go test -v ./... -timeout 45m -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+	go test -v ./... -timeout 90m -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
 .PHONY: ccip-router-contracts-go-tests
 ccip-router-contracts-go-tests:
