@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IAdditionalPoolDataProvider} from "../../interfaces/IAdditionalPoolDataProvider.sol";
-import {ITokenWithUID} from "../../interfaces/ITokenWithUID.sol";
-import {ITokenWithUIDFactory} from "../../interfaces/ITokenWithUIDFactory.sol";
+import {IHasUID} from "../../interfaces/IHasUID.sol";
+import {IResolveTokenAddressFromUID} from "../../interfaces/IResolveTokenAddressFromUID.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 /// @notice Sends the UID of a factory token as the additional pool data, and checks the UID on the destination chain.
@@ -17,18 +17,18 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 ///   provider.
 /// The provider has no config other than the factory. So one instance can serve every token of the factory.
 contract FactoryTokenWithUIDPoolDataProvider is IAdditionalPoolDataProvider, ITypeAndVersion {
-  error InvalidTokenFactory(ITokenWithUIDFactory tokenFactory);
+  error InvalidTokenFactory(IResolveTokenAddressFromUID tokenFactory);
   error TokenNotFromFactory(address localToken, bytes32 uid);
 
   /// @dev The length of abi.encode(bytes32 uid).
   uint256 private constant UID_POOL_DATA_LENGTH = 32;
 
   /// @dev The factory that maps each UID to its token on this chain.
-  ITokenWithUIDFactory private immutable i_tokenFactory;
+  IResolveTokenAddressFromUID private immutable i_tokenFactory;
 
   /// @param tokenFactory The factory that deploys the tokens on this chain.
   constructor(
-    ITokenWithUIDFactory tokenFactory
+    IResolveTokenAddressFromUID tokenFactory
   ) {
     // Calling tokenAddress on an address without code reverts, which would stop every transfer.
     if (address(tokenFactory).code.length == 0) revert InvalidTokenFactory(tokenFactory);
@@ -45,7 +45,7 @@ contract FactoryTokenWithUIDPoolDataProvider is IAdditionalPoolDataProvider, ITy
     address localToken,
     uint64 // remoteChainSelector
   ) public view virtual returns (bytes memory additionalPoolData) {
-    bytes32 uid = ITokenWithUID(localToken).uid();
+    bytes32 uid = IHasUID(localToken).uid();
     if (i_tokenFactory.tokenAddress(uid) != localToken) revert TokenNotFromFactory(localToken, uid);
     return abi.encode(uid);
   }
@@ -65,7 +65,7 @@ contract FactoryTokenWithUIDPoolDataProvider is IAdditionalPoolDataProvider, ITy
 
   /// @notice Returns the token factory.
   /// @return tokenFactory The factory that maps each UID to its token on this chain.
-  function getTokenFactory() public view virtual returns (ITokenWithUIDFactory tokenFactory) {
+  function getTokenFactory() public view virtual returns (IResolveTokenAddressFromUID tokenFactory) {
     return i_tokenFactory;
   }
 }

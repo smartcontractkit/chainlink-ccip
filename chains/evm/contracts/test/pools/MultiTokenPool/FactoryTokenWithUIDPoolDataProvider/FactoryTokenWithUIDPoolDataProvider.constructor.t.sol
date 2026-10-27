@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {ITokenWithUIDFactory} from "../../../../interfaces/ITokenWithUIDFactory.sol";
+import {IResolveTokenAddressFromUID} from "../../../../interfaces/IResolveTokenAddressFromUID.sol";
 
 import {
   FactoryTokenWithUIDPoolDataProvider
@@ -19,7 +19,7 @@ contract FactoryTokenWithUIDPoolDataProvider_constructor is FactoryTokenWithUIDP
   // Reverts
 
   function test_constructor_RevertWhen_InvalidTokenFactory() public {
-    ITokenWithUIDFactory factoryWithoutCode = ITokenWithUIDFactory(makeAddr("factoryWithoutCode"));
+    IResolveTokenAddressFromUID factoryWithoutCode = IResolveTokenAddressFromUID(makeAddr("factoryWithoutCode"));
 
     vm.expectRevert(
       abi.encodeWithSelector(FactoryTokenWithUIDPoolDataProvider.InvalidTokenFactory.selector, factoryWithoutCode)
@@ -31,6 +31,6 @@ contract FactoryTokenWithUIDPoolDataProvider_constructor is FactoryTokenWithUIDP
     vm.expectRevert(
       abi.encodeWithSelector(FactoryTokenWithUIDPoolDataProvider.InvalidTokenFactory.selector, address(0))
     );
-    new FactoryTokenWithUIDPoolDataProvider(ITokenWithUIDFactory(address(0)));
+    new FactoryTokenWithUIDPoolDataProvider(IResolveTokenAddressFromUID(address(0)));
   }
 }

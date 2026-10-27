@@ -2,11 +2,11 @@
 // solhint-disable one-contract-per-file
 pragma solidity ^0.8.24;
 
-import {ITokenWithUID} from "../../interfaces/ITokenWithUID.sol";
-import {ITokenWithUIDFactory} from "../../interfaces/ITokenWithUIDFactory.sol";
+import {IHasUID} from "../../interfaces/IHasUID.sol";
+import {IResolveTokenAddressFromUID} from "../../interfaces/IResolveTokenAddressFromUID.sol";
 
 /// @notice A token with a fixed UID. It can also be deployed outside a factory.
-contract MockTokenWithUID is ITokenWithUID {
+contract MockTokenWithUID is IHasUID {
   bytes32 private immutable i_uid;
 
   constructor(
@@ -15,14 +15,14 @@ contract MockTokenWithUID is ITokenWithUID {
     i_uid = tokenUid;
   }
 
-  /// @inheritdoc ITokenWithUID
+  /// @inheritdoc IHasUID
   function uid() external view returns (bytes32) {
     return i_uid;
   }
 }
 
 /// @notice A token factory that deploys one MockTokenWithUID for each UID.
-contract MockTokenWithUIDFactory is ITokenWithUIDFactory {
+contract MockTokenWithUIDFactory is IResolveTokenAddressFromUID {
   error TokenAlreadyDeployed(bytes32 uid);
 
   mapping(bytes32 uid => address token) private s_tokens;
@@ -39,7 +39,7 @@ contract MockTokenWithUIDFactory is ITokenWithUIDFactory {
     return token;
   }
 
-  /// @inheritdoc ITokenWithUIDFactory
+  /// @inheritdoc IResolveTokenAddressFromUID
   function tokenAddress(
     bytes32 uid
   ) external view returns (address) {
