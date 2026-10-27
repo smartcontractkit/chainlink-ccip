@@ -135,7 +135,7 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 				// Version inference part 3: the fee quoter adapter is used to configure the fees
 				dstSettings := map[string]*TokenTransferFeeArgs{}
 				for _, feeCfg := range dst.Settings {
-					args, shouldApply, err := inferTokenTransferFeeArgs(feeQuoterAdp, e, feeQuoterRef, src.Selector, dst.Selector, feeCfg)
+					args, shouldApply, err := inferTokenTransferFeeArgs(e, onRampAdp, feeQuoterAdp, feeQuoterRef, src.Selector, dst.Selector, feeCfg)
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to infer token transfer fee args for token %s: %w", feeCfg.Address, err)
 					}
@@ -189,9 +189,9 @@ func makeApply(feeRegistry *FeeAdapterRegistry, mcmsRegistry *changesets.MCMSRea
 	}
 }
 
-func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, fq datastore.AddressRef, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
+func inferTokenTransferFeeArgs(e cldf.Environment, onRampAdapter FeeAdapter, fqAdapter FeeAdapter, fq datastore.AddressRef, src uint64, dst uint64, cfg TokenTransferFee) (*TokenTransferFeeArgs, bool, error) {
 	e.Logger.Infof("Inferring token transfer fee config for src %d, dst %d, and token %s", src, dst, cfg.Address)
-	onchainCfg, err := adapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fq, src, dst, cfg.Address)
+	onchainCfg, err := fqAdapter.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, fq, src, dst, cfg.Address)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get on-chain token transfer fee config for src %d, dst %d, and token %s: %w", src, dst, cfg.Address, err)
 	}
@@ -211,8 +211,12 @@ func inferTokenTransferFeeArgs(adapter FeeAdapter, e cldf.Environment, fq datast
 		fallbacks = onchainCfg
 		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is already set on-chain; using on-chain values as defaults: %+v", src, dst, cfg.Address, fallbacks)
 	} else {
-		fallbacks = adapter.GetDefaultTokenTransferFeeConfig(src, dst)
-		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using adapter defaults: %+v", src, dst, cfg.Address, fallbacks)
+		// NOTE: the default depends on the OnRamp version, not the FeeQuoter version: a 2.0 OnRamp charges
+		// the lane's token network fee on top, so the FeeQuoter default must be zero, whereas a 1.x OnRamp
+		// has no token network fee and the FeeQuoter is the only charge. Resolving the default from the OnRamp
+		// adapter keeps that version-specific knowledge in the adapter.
+		fallbacks = onRampAdapter.GetDefaultTokenTransferFeeConfig(src, dst)
+		e.Logger.Infof("Token transfer fee config for src %d, dst %d, and token %s is not set on-chain; using OnRamp-version defaults: %+v", src, dst, cfg.Address, fallbacks)
 	}
 
 	resolved := cfg.FeeArgs.Resolve(fallbacks)

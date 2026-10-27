@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -20,12 +19,15 @@ import (
 	fq163ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	fqops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/fee_quoter"
+	testsetup "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/offramp"
 	deployops "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fees"
 	lanesapi "github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testhelpers"
+	tokensapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	common_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -99,12 +101,7 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -122,13 +119,53 @@ func TestUpdateToFeeQuoter_2_0(t *testing.T) {
 	for _, chainSel := range chains {
 		fqUpgradeValidation(t, e, chainSel, chains, true, true)
 	}
-	// do this to reset cached executions
-	bundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
+
+	// The lane is now mixed: a 1.6 OnRamp whose FeeQuoter is 2.0 (as EVM->Solana lanes are in
+	// production). Seed an enabled per-token fee on the 2.0 FeeQuoter and verify the legacy-fee
+	// migration imports it unchanged: a 1.x OnRamp charges no token network fee, so nothing is
+	// subtracted. Before the OnRamp-version gate was added, the migration read the OnRamp fee with the
+	// 1.6 ref and failed with "unexpected OnRamp contract version".
+	// Reset cached executions so the mixed-lane OnRamp -> 2.0 FeeQuoter mapping is observed (the
+	// bundle cached the pre-upgrade FeeQuoter during the update).
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	const mixedLaneToken = "0x0000000000000000000000000000000000001234"
+	feeOut, err := fees.SetTokenTransferFee().Apply(*e, fees.SetTokenTransferFeeInput{
+		MCMS: NewDefaultInputForMCMS("Seed mixed-lane token fee"),
+		Args: []fees.TokenTransferFeeForSrc{{
+			Selector: chain_selectors.ETHEREUM_MAINNET.Selector,
+			Settings: []fees.TokenTransferFeeForDst{{
+				Selector: chain_selectors.AVALANCHE_MAINNET.Selector,
+				Settings: []fees.TokenTransferFee{{
+					Address: mixedLaneToken,
+					FeeArgs: fees.UnresolvedTokenTransferFeeArgs{
+						MinFeeUSDCents: common_utils.NewOptional(uint32(100)),
+						IsEnabled:      common_utils.NewOptional(true),
+					},
+				}},
+			}},
+		}},
+	})
+	require.NoError(t, err, "Failed to seed the mixed-lane token fee")
+	testhelpers.ProcessTimelockProposals(t, *e, feeOut.MCMSTimelockProposals, false)
+
+	// Reset cached executions so the router's OnRamp mapping is observed.
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+
+	imported, err := tokensapi.LegacyFeesForAutoMigrate(
+		*e,
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+		chain_selectors.AVALANCHE_MAINNET.Selector,
+		mixedLaneToken,
+		tokensapi.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{},
 	)
-	e.OperationsBundle = bundle
+	require.NoError(t, err, "legacy fee migration must not fail on a mixed-version lane")
+	require.NotNil(t, imported)
+	importedFee, ok := imported.DefaultFinalityFeeUSDCents.Get()
+	require.True(t, ok)
+	require.Equal(t, uint32(100), importedFee, "a 1.x OnRamp has no token network fee, so the legacy fee is imported unchanged")
+
+	// do this to reset cached executions
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// downgrade back to 1.6.3 to make sure the changeset is reversible
 	for _, chainSel := range chains {
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{
@@ -207,12 +244,7 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	currentFeeQuoterAddr := make(map[uint64]common.Address)
 	for _, chainSel := range chains {
 		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
@@ -242,12 +274,7 @@ func TestUpdateToFeeQuoter_2_0_WithZeroPriceReturnsError(t *testing.T) {
 	DeployMCMS(t, e, chain_selectors.ETHEREUM_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	DeployMCMS(t, e, chain_selectors.AVALANCHE_MAINNET.Selector, []string{common_utils.CLLQualifier})
 	// do this to reset cached executions
-	bundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// now update to FeeQuoter 2.0.0
 	fqUpdateChangeset := deployops.UpdateFeeQuoterChangeset()
 	out, err = fqUpdateChangeset.Apply(*e, deployops.UpdateFeeQuoterInput{
@@ -318,12 +345,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to apply ConnectChains changeset")
 	// do this to reset cached executions
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	currentFeeQuoterAddr := make(map[uint64]common.Address)
 	for _, chainSel := range chains {
 		currentFeeQuoterAddr[chainSel] = getFeeQuoterFromRamps(t, e, chainSel)
@@ -351,12 +373,7 @@ func TestUpdateToFeeQuoter_2_0_WithoutRamps(t *testing.T) {
 		require.Equal(t, currentFeeQuoterAddr[chainSel], feeQAddrAfterChangesetRun, "FeeQuoter address on ramps should not change after update when ramps are not included in the changeset for chain selector %d", chainSel)
 	}
 	// do this to reset cached executions
-	bundle = operations.NewBundle(
-		func() context.Context { return context.Background() },
-		e.Logger,
-		operations.NewMemoryReporter(),
-	)
-	e.OperationsBundle = bundle
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
 	// now add the ramps
 	for _, chainSel := range chains {
 		fqInput[chainSel] = deployops.UpdateFeeQuoterInputPerChain{

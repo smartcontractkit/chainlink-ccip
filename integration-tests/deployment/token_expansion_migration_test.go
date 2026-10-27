@@ -115,6 +115,9 @@ type autoMigrateUpgradeOpts struct {
 	feeOverrideCfg    *tokensapi.PartialTokenTransferFeeConfig
 	explicitRemote    bool
 	skipLegacyFeeSeed bool
+	// legacyMinFeeUSDCents overrides the seeded legacy per-token fee (default 100). Set below the
+	// lane's OnRamp network fee to exercise the clamp-to-zero path.
+	legacyMinFeeUSDCents uint32
 	// legacyPoolType overrides the legacy pool type legacyPairSpecFor picks for the version. Used
 	// to start a v1.5.0 upgrade from the plain BurnMintTokenPool instead of the *AndProxy pool.
 	legacyPoolType deployment.ContractType
@@ -218,6 +221,11 @@ func TestTokenExpansionMigration_AutoMigrate(t *testing.T) {
 					DefaultFinalityFeeUSDCents: cciputils.NewOptional(uint32(99)),
 				},
 			},
+		},
+		{
+			name:           "v1_6_1_to_v2_0_0/legacy_fee_below_network_fee",
+			oldPoolVersion: cciputils.Version_1_6_1,
+			autoMigrateOpt: &autoMigrateUpgradeOpts{legacyMinFeeUSDCents: 10},
 		},
 	}
 	for _, tc := range cases {
@@ -476,7 +484,7 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 	e.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(e.OperationsBundle)
 
 	// Get fee adapter for chain A -> B.
-	feeAdapter, fqRef, err := fees.ResolveFeeAdapter(e.OperationsBundle, e.BlockChains, e.DataStore, selA, selB)
+	onRampAdapter, onRampRef, feeAdapter, fqRef, err := fees.ResolveOnRampAndFeeQuoter(e.OperationsBundle, e.BlockChains, e.DataStore, selA, selB)
 	require.NoError(t, err)
 
 	var legacyFee fees.TokenTransferFeeArgs
@@ -485,10 +493,14 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		require.NoError(t, err)
 		require.False(t, legacyFee.IsEnabled, "legacy lane fees should be disabled before upgrade")
 	} else {
+		legacyMinFeeUSDCents := uint32(100)
+		if opts != nil && opts.legacyMinFeeUSDCents != 0 {
+			legacyMinFeeUSDCents = opts.legacyMinFeeUSDCents
+		}
 		partialFee := fees.UnresolvedTokenTransferFeeArgs{
 			DestBytesOverhead: cciputils.NewOptional(uint32(150_000)),
 			DestGasOverhead:   cciputils.NewOptional(uint32(50_000)),
-			MinFeeUSDCents:    cciputils.NewOptional(uint32(17)),
+			MinFeeUSDCents:    cciputils.NewOptional(legacyMinFeeUSDCents),
 			IsEnabled:         cciputils.NewOptional(true),
 		}
 
@@ -587,10 +599,29 @@ func runAutoMigrateUpgrade(t *testing.T, oldPoolVersion *semver.Version, opts *a
 		if opts != nil && opts.feeOverrideCfg != nil {
 			yamlPartial = *opts.feeOverrideCfg
 		}
+
+		// On 2.0 lanes the migration imports the legacy fee minus the OnRamp token network fee so the
+		// total charged (network + pool) equals the legacy fee.
+		onRampReader, ok := onRampAdapter.(fees.OnRampDestChainConfigReader)
+		require.True(t, ok, "OnRamp adapter must implement OnRampDestChainConfigReader")
+		onRampCfg, err := onRampReader.GetOnchainOnRampDestChainConfig(e.OperationsBundle, e.BlockChains, onRampRef, selA, selB)
+		require.NoError(t, err)
+
+		networkFeeUSDCents := uint32(onRampCfg.TokenNetworkFeeUSDCents)
+		importedFeeUSDCents := uint32(0)
+		switch {
+		case legacyFee.MinFeeUSDCents > networkFeeUSDCents:
+			importedFeeUSDCents = legacyFee.MinFeeUSDCents - networkFeeUSDCents
+		case opts != nil && opts.legacyMinFeeUSDCents != 0:
+			// Clamp case: the seeded legacy fee must actually be below the network fee.
+			require.Less(t, legacyFee.MinFeeUSDCents, networkFeeUSDCents,
+				"clamp case requires the legacy fee to be below the OnRamp network fee")
+		}
+
 		legacyTpCfg := tokensapi.TokenTransferFeeConfig{
 			DestGasOverhead:               legacyFee.DestGasOverhead,
 			DestBytesOverhead:             legacyFee.DestBytesOverhead,
-			DefaultFinalityFeeUSDCents:    legacyFee.MinFeeUSDCents,
+			DefaultFinalityFeeUSDCents:    importedFeeUSDCents,
 			CustomFinalityFeeUSDCents:     0,
 			DefaultFinalityTransferFeeBps: legacyFee.DeciBps,
 			CustomFinalityTransferFeeBps:  0,
