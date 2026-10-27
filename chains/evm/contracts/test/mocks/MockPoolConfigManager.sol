@@ -132,7 +132,8 @@ contract MockPoolConfigManager is IPoolConfigManager {
   }
 
   function getLaneVerificationBatch(
-    LaneKey[] calldata lanes
+    LaneKey[] calldata lanes,
+    bytes4
   ) external view returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs) {
     hooks = new address[](lanes.length);
     outboundCCVs = new address[][](lanes.length);

@@ -132,6 +132,7 @@ compileContract pools/AdvancedPoolHooks
 compileContract pools/extractors/AdvancedPoolHooksExtractor
 compileContract pools/MultiTokenPool/MultiTokenPoolHooks
 compileContract pools/MultiTokenPool/MultiTokenPoolHooksExternalBlocklist
+compileContract pools/MultiTokenPool/FactoryTokenWithUIDPoolDataProvider
 
 compileContract tokens/CrossChainToken
 

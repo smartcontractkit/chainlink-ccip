@@ -394,17 +394,17 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev The CCV lists do not depend on the amount, the finality or the extra data.
+  /// @dev The CCV lists do not depend on the amount or the extra data.
   function getRequiredCCVs(
     address localToken,
     uint64 remoteChainSelector,
     uint256, // sourceAmount
-    bytes4, // requestedFinalityConfig
+    bytes4 requestedFinalityConfig,
     bytes calldata, // extraData
     IPoolV2.MessageDirection direction
   ) public view virtual returns (address[] memory requiredCCVs) {
     (, address[][] memory outboundCCVs, address[][] memory inboundCCVs) =
-      s_poolConfigManager.getLaneVerificationBatch(_laneKeys(localToken, remoteChainSelector));
+      s_poolConfigManager.getLaneVerificationBatch(_laneKeys(localToken, remoteChainSelector), requestedFinalityConfig);
     return direction == IPoolV2.MessageDirection.Outbound ? outboundCCVs[0] : inboundCCVs[0];
   }
 
