@@ -45,9 +45,9 @@ var (
 //
 // Scope: BurnMintTokenPoolAndProxy, LockReleaseTokenPoolAndProxy, and the plain (non-proxy)
 // BurnMintTokenPool and LockReleaseTokenPool. All four are driven through the shared
-// TokenPoolAndProxy base ops, whose surface they share with byte-identical signatures, so
-// nothing here branches on pool type. (The plain pools lack only getPreviousPool, which nothing
-// here calls.) Because the adapter is registered by version alone, an existing plain v1.5.0 pool
+// TokenPoolAndProxy base ops, whose surface they share with byte-identical signatures, so pool
+// configuration never branches on pool type. (The plain pools lack only getPreviousPool; the
+// liquidity migration source checks the on-chain type before calling it.) Because the adapter is registered by version alone, an existing plain v1.5.0 pool
 // resolves here during auto-migrate discovery just like an *AndProxy one does, which is what
 // gives both an upgrade path to v2.0.0. The remaining v1.5.0 pool contracts
 // (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool) have generated
@@ -55,6 +55,8 @@ var (
 //
 // It is also the lock-release liquidity migration source for v1.5.0 pools, plain and *AndProxy (see
 // migrate_lock_release_pool_liquidity.go): both share the lock-release selectors the v1.5.0 bindings call.
+// When an *AndProxy's liquidity sits in its previous pool, the source delegates to that pool's own
+// source (v1.4.0 or v1.2.0).
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }

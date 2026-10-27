@@ -76,7 +76,9 @@ var (
 //
 // The migration source's only writes temporarily register the timelock as an
 // extra offRamp with its own disabled limiter, release the liquidity to it, and
-// deregister it again; the proxy's ramp and limiter are never touched.
+// deregister it again; the proxy's ramp and limiter are never touched. It runs
+// directly, or delegated from the v1.5.0 source when the operator names the
+// proxy in front of the pool.
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }
