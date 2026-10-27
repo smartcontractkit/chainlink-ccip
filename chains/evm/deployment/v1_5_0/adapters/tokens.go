@@ -47,9 +47,10 @@ var (
 // BurnMintTokenPool and LockReleaseTokenPool. All four are driven through the shared
 // TokenPoolAndProxy base ops, whose surface they share with byte-identical signatures, so pool
 // configuration never branches on pool type. (The plain pools lack only getPreviousPool; the
-// liquidity migration source checks the on-chain type before calling it.) Because the adapter is registered by version alone, an existing plain v1.5.0 pool
-// resolves here during auto-migrate discovery just like an *AndProxy one does, which is what
-// gives both an upgrade path to v2.0.0. The remaining v1.5.0 pool contracts
+// liquidity migration source checks the on-chain type before calling it.) Because the adapter
+// is registered by version alone, an existing plain v1.5.0 pool resolves here during
+// auto-migrate discovery just like an *AndProxy one does, which is what gives both an upgrade
+// path to v2.0.0. The remaining v1.5.0 pool contracts
 // (BurnWithFromMintTokenPoolAndProxy and BurnWithFromMintRebasingTokenPool) have generated
 // bindings but no deployed footprint, and the deploy sequence rejects them.
 //

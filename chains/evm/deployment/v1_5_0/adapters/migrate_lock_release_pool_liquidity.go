@@ -30,9 +30,12 @@ import (
 //     withdraw, restore), whether or not a previous pool is set;
 //   - only the previous pool holds a balance: the migration is delegated to the source of the
 //     previous pool's on-chain version (v1.4.0 or v1.2.0), which runs its own checks against it;
-//   - both hold a balance (e.g. the previous pool was set after the proxy had locked tokens): the
-//     amount inputs are ambiguous, so the migration fails. A previous pool that is itself an
-//     *AndProxy also fails, before any balance decides the holder.
+//   - both hold a balance (e.g. the previous pool was set after the proxy had locked tokens, or
+//     someone transferred tokens to the proxy): the amount inputs are ambiguous, so the migration
+//     fails. Naming the proxy keeps failing until one balance is zero; to recover, name the
+//     previous pool directly, migrate its entire balance, execute that proposal, then rerun naming
+//     the proxy. A previous pool that is itself an *AndProxy also fails, before any balance
+//     decides the holder.
 //
 // getPreviousPool() is only called on the *AndProxy type; it does not exist on a plain pool.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -102,9 +105,11 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 			case oldPoolBalance.Sign() > 0 && previousBalance.Sign() > 0:
 				// Routing is all-or-nothing on getPreviousPool(), so at most one holder is expected.
 				// With both funded, an Amount or BasisPoints input has no single balance to apply to.
+				// Naming the proxy always lands here while both are funded, so the error spells out the
+				// order that clears it.
 				return sequences.OnChainOutput{}, fmt.Errorf(
-					"liquidity is split between proxy %s (%s) and its previous pool %s (%s); migrate each pool separately by pointing the old pool at it directly",
-					oldPool, oldPoolBalance, previous, previousBalance)
+					"liquidity is split between proxy %s (%s) and its previous pool %s (%s); first migrate the previous pool's entire balance by naming %s as the old pool and execute that proposal, then rerun naming the proxy",
+					oldPool, oldPoolBalance, previous, previousBalance, previous)
 			case oldPoolBalance.Sign() > 0:
 				return t.migrateV150Holder(b, evmChain, input, oldPool, oldPoolBalance)
 			case previousBalance.Sign() > 0:
