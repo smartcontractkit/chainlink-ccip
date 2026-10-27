@@ -6,17 +6,15 @@ import {IPoolV2} from "./IPoolV2.sol";
 import {Pool} from "../libraries/Pool.sol";
 
 /// @notice Transfer validation and resolved configuration views for multi-token pools.
-/// @dev Rate-limit consumption accepts calls only from the token's TokenAdminRegistry pool.
-/// Views can return values without token registration or a record for the token and chain.
-/// For example, the global pause applies to all tokens and chains.
+/// @dev Rate-limit consumption is restricted to authorized callers.
 interface IPoolConfigManager {
-  /// @notice The token operation used on send. Burn flavors mint on receive; Lock uses a lock box in both directions.
+  /// @notice The token operation used on send. Burn flavors mint on receive; Lock releases tokens on receive.
   enum LockOrBurnFlavor {
-    Burn, //          burn(amount), as in BurnMintTokenPool.
-    BurnFrom, //      burnFrom(address(this), amount), as in BurnFromMintTokenPool.
-    BurnWithFrom, //  burn(address(this), amount), as in BurnWithFromMintTokenPool.
-    BurnToAddress, // Transfer to an address that can never move the tokens, as in BurnToAddressMintTokenPool.
-    Lock //           ILockBox.deposit and ILockBox.withdraw, as in LockReleaseTokenPool.
+    Burn, //          burn(amount).
+    BurnFrom, //      burnFrom(address(this), amount).
+    BurnWithFrom, //  burn(address(this), amount).
+    BurnToAddress, // Transfer to an address that can never move the tokens.
+    Lock //           Lock tokens on send and release them on receive.
   }
 
   /// @notice Resolved outbound configuration, pool data and token fee for a transfer.
@@ -27,11 +25,11 @@ interface IPoolConfigManager {
     uint8 localDecimals; // ──────────────╮ The decimals of the local token.
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out.
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
-    uint256 feeAmount; //                   The token fee. The pool keeps it and locks or burns the rest.
+    uint256 feeAmount; //                   The token fee, in local token units.
     address hook; //                        The lane's IMultiTokenPoolHooks, called preflight. Zero means no hook.
   }
 
-  /// @notice Resolved inbound transfer. The pool must validate its supported flavor.
+  /// @notice Resolved inbound transfer configuration.
   struct ResolvedInboundTransfer {
     uint256 localAmount; //                 The local token amount to be used for the inbound transfer.
     LockOrBurnFlavor lockOrBurnFlavor; // ╮ The token's type, used to decide if release or mint during inbound.
@@ -39,7 +37,7 @@ interface IPoolConfigManager {
     address hook; //                        The postflight hook to call. Zero means no hook.
   }
 
-  /// @notice Token bucket state in local token units, with the ABI layout of RateLimiter.TokenBucket.
+  /// @notice Token bucket state in local token units.
   struct TokenBucket {
     uint128 tokens; // ────╮ The tokens in the bucket at this block.
     uint32 lastUpdated; // │ The time of the last refill, in seconds.
@@ -60,7 +58,7 @@ interface IPoolConfigManager {
     uint32 destGasOverhead; // ──╮ The destination token execution gas overhead.
     uint32 destBytesOverhead; // │ The destination token data byte overhead.
     uint16 tokenFeeBps; //       │ The fee deducted from the transferred asset, in basis points.
-    bool isEnabled; // ──────────╯ Whether the pool fee is enabled. False requests FeeQuoter fallback.
+    bool isEnabled; // ──────────╯ Whether pool fees are enabled. False requests default fees.
   }
 
   /// @notice Current buckets for both finality classes for one token and remote chain.
@@ -71,9 +69,9 @@ interface IPoolConfigManager {
     TokenBucket fastFinalityInbound; //  The inbound FTF bucket.
   }
 
-  /// @notice Resolved connection and chain records and effective pause state for one token and remote chain.
+  /// @notice Resolved connection and effective pause state for one token and remote chain.
   struct LaneConnection {
-    bool hasConnection; // ──────────────────────────╮ True if a connection record applies to the token and remote chain.
+    bool hasConnection; // ──────────────────────────╮ True if the token has a connection to the remote chain.
     bool isOutboundPaused; //                        │ Whether outbound transfers are paused.
     bool isInboundPaused; //                         │ Whether inbound transfers are paused.
     bool isGloballyPaused; //                        │ True if the global pause is on.
@@ -111,7 +109,7 @@ interface IPoolConfigManager {
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @param chargeTokenFee False for the V1 path, which charges no token fee.
+  /// @param chargeTokenFee Whether to deduct a token fee from the transfer amount.
   /// @return lane The resolved outbound configuration, pool data, token fee and hook to call before moving tokens.
   function validateLockOrBurn(
     address localToken,
@@ -132,12 +130,11 @@ interface IPoolConfigManager {
   ) external returns (ResolvedInboundTransfer memory transfer);
 
   /// @notice Returns the resolved fee parameters for the requested finality.
-  /// @dev Reverts with FinalityCodec.InvalidRequestedFinality if the token does not allow the requested finality, also
-  /// for a token without a lane.
+  /// @dev Reverts if a token does not allow the requested finality, even when it has no lane.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fee
-  /// record is disabled, return zeros with isEnabled false.
+  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fees
+  /// are disabled, return zeros with isEnabled false.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -159,9 +156,7 @@ interface IPoolConfigManager {
     LaneKey[] calldata lanes
   ) external view returns (LaneRateLimiterState[] memory states);
 
-  /// @notice Returns the resolved connection and chain records and the effective pause state.
-  /// @dev A direction is paused if the global pause, token pause or chain pause applies to it.
-  /// Pause flags do not depend on token registration or connection records.
+  /// @notice Returns the resolved connections and effective pause state.
   /// @param lanes The token and remote chain lanes to query.
   /// @return connections The connection state per lane, aligned with lanes by index.
   function getLaneConnectionBatch(

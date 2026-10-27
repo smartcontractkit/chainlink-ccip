@@ -6,7 +6,7 @@ import {IPoolV1V2} from "./IPoolV1V2.sol";
 
 /// @notice Shared interface for CCIP pools that serve multiple tokens.
 /// @dev The inherited isSupportedChain(uint64) and getRemoteToken(uint64) views revert with LocalTokenRequired.
-/// Use the overloads that take the local token. Batch views live on the pool config manager.
+/// Use the overloads that take the local token.
 interface IMultiTokenPool is IPoolV1V2, IGetPoolConfigManager {
   error LocalTokenRequired();
 
@@ -28,7 +28,7 @@ interface IMultiTokenPool is IPoolV1V2, IGetPoolConfigManager {
     uint64 remoteChainSelector
   ) external view returns (bytes memory remoteToken);
 
-  /// @notice Returns the token decimals stored by the pool config manager.
+  /// @notice Returns the decimals of the local token.
   /// @param localToken The local token.
   /// @return decimals The configured decimals, or zero if the token is not registered.
   function getTokenDecimals(
@@ -36,12 +36,7 @@ interface IMultiTokenPool is IPoolV1V2, IGetPoolConfigManager {
   ) external view returns (uint8 decimals);
 
   /// @notice Withdraws accrued fee token balances to the provided `recipient`.
-  /// @dev Only callable by the pool config manager.
-  /// @dev FeeTokenHandler will revert if `recipient` is zero address.
-  /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
-  /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
-  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract
-  /// balance is safe and clears only accrued fees.
+  /// @dev Only callable by authorized callers. Reverts if the recipient is the zero address.
   /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
   /// @param recipient The address to withdraw the fee tokens to.
   function withdrawFeeTokens(
