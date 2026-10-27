@@ -26,16 +26,16 @@ import (
 // A plain pool always holds its own liquidity. A LockReleaseTokenPoolAndProxy routes every
 // lock/release through its previous pool when getPreviousPool() is set, so the liquidity may sit in
 // either contract:
+//   - the previous pool holds a balance: the migration is delegated to the source of the previous
+//     pool's on-chain version (v1.4.0 or v1.2.0), which runs its own checks against it. This holds
+//     even when the proxy also has a balance (e.g. the previous pool was set after the proxy had
+//     locked tokens, or someone transferred tokens to the proxy); the amount inputs apply to the
+//     previous pool's balance only, and once it is drained, rerunning the same input migrates the
+//     proxy's balance;
 //   - only the proxy holds a balance: it is extracted with the v1.5.0 bindings (rebalancer take-over,
-//     withdraw, restore), whether or not a previous pool is set;
-//   - only the previous pool holds a balance: the migration is delegated to the source of the
-//     previous pool's on-chain version (v1.4.0 or v1.2.0), which runs its own checks against it;
-//   - both hold a balance (e.g. the previous pool was set after the proxy had locked tokens, or
-//     someone transferred tokens to the proxy): the amount inputs are ambiguous, so the migration
-//     fails. Naming the proxy keeps failing until one balance is zero; to recover, name the
-//     previous pool directly, migrate its entire balance, execute that proposal, then rerun naming
-//     the proxy. A previous pool that is itself an *AndProxy also fails, before any balance
-//     decides the holder.
+//     withdraw, restore), whether or not a previous pool is set.
+//
+// A previous pool that is itself an *AndProxy fails before any balance decides the holder.
 //
 // getPreviousPool() is only called on the *AndProxy type; it does not exist on a plain pool.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -102,18 +102,13 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 			}
 
 			switch {
-			case oldPoolBalance.Sign() > 0 && previousBalance.Sign() > 0:
-				// Routing is all-or-nothing on getPreviousPool(), so at most one holder is expected.
-				// With both funded, an Amount or BasisPoints input has no single balance to apply to.
-				// Naming the proxy always lands here while both are funded, so the error spells out the
-				// order that clears it.
-				return sequences.OnChainOutput{}, fmt.Errorf(
-					"liquidity is split between proxy %s (%s) and its previous pool %s (%s); first migrate the previous pool's entire balance by naming %s as the old pool and execute that proposal, then rerun naming the proxy",
-					oldPool, oldPoolBalance, previous, previousBalance, previous)
+			case previousBalance.Sign() > 0:
+				// The previous pool takes priority even when the proxy also holds a balance; the amount
+				// inputs apply to the previous pool's balance alone. Once it is drained, rerunning the
+				// same input lands on the proxy.
+				return delegateToPreviousPool(b, chains, input, oldPool, previous, previousVersion, previousType)
 			case oldPoolBalance.Sign() > 0:
 				return t.migrateV150Holder(b, evmChain, input, oldPool, oldPoolBalance)
-			case previousBalance.Sign() > 0:
-				return delegateToPreviousPool(b, chains, input, oldPool, previous, previousVersion, previousType)
 			default:
 				return sequences.OnChainOutput{}, fmt.Errorf(
 					"neither proxy %s nor its previous pool %s holds any liquidity to migrate", oldPool, previous)

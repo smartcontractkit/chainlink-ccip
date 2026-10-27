@@ -27,10 +27,10 @@ type LockReleasePoolMigration struct {
 	// v1.4.0, v1.5.0, v1.5.1, v1.6.1 and v1.6.2, LockReleaseTokenPoolAndProxy v1.5.0, and
 	// SiloedLockReleaseTokenPool v1.6.1 and v1.6.2. Other versions fail with an explicit "unsupported"
 	// error. A LockReleaseTokenPoolAndProxy may front a previous pool (getPreviousPool) that holds the
-	// liquidity instead; naming the proxy migrates from whichever of the two holds it, and fails if
-	// both do. Naming the previous pool directly also works, and is how a split is resolved: migrate
-	// the previous pool's entire balance, execute that proposal, then name the proxy. Required
-	// because in step-2 migrations, the TAR already points to the new pool.
+	// liquidity instead; naming the proxy migrates the previous pool's balance first and the proxy's
+	// own balance once the previous pool is drained, so a run that leaves both funded is followed by
+	// a rerun with the same input. Naming the previous pool directly also works. Required because in
+	// step-2 migrations, the TAR already points to the new pool.
 	OldPoolRef datastore.AddressRef
 	// NewPoolRef is a reference to the new v2.0 LockReleaseTokenPool (with lockbox) to migrate to.
 	NewPoolRef datastore.AddressRef

@@ -355,19 +355,6 @@ func TestMigrateLockReleasePoolLiquidity_ProxyPreconditions(t *testing.T) {
 		expectedErr       string
 	}{
 		{
-			name:         "Split",
-			previousKind: oldPoolV1_4_0, previousLiquidity: 10000, proxyLiquidity: 1,
-			input:       full,
-			expectedErr: "liquidity is split between proxy",
-		},
-		{
-			// A dust balance on the proxy is enough to block it; the error must name the recovery.
-			name:         "SplitByDust",
-			previousKind: oldPoolV1_2_0, previousLiquidity: 10000, proxyLiquidity: 1,
-			input:       full,
-			expectedErr: "first migrate the previous pool's entire balance",
-		},
-		{
 			name:         "NoLiquidity",
 			previousKind: oldPoolV1_4_0,
 			input:        full,
@@ -472,34 +459,54 @@ func sendTx(t *testing.T, chain evm.Chain) func(*types.Transaction, error) {
 	}
 }
 
-// TestMigrateLockReleasePoolLiquidity_ProxySplitRecovery follows the recovery the split error names:
-// migrate the previous pool's entire balance by naming it directly, execute that proposal, then rerun
-// naming the proxy, which now migrates the proxy's own balance.
-func TestMigrateLockReleasePoolLiquidity_ProxySplitRecovery(t *testing.T) {
-	previousLiquidity, proxyLiquidity := big.NewInt(10000), big.NewInt(1)
-	f := setupProxyFixture(t, oldPoolV1_4_0, previousLiquidity, proxyLiquidity)
-	f.transferToTimelock(t, f.proxy)
-	f.transferToTimelock(t, f.previousOwnable(t, oldPoolV1_4_0))
+// TestMigrateLockReleasePoolLiquidity_ProxyBothFunded migrates a proxy whose previous pool and the
+// proxy itself both hold liquidity. The first run delegates to the previous pool and applies the
+// amount input to its balance alone, leaving the proxy untouched; rerunning the same input once that
+// proposal is executed migrates the proxy's own balance.
+func TestMigrateLockReleasePoolLiquidity_ProxyBothFunded(t *testing.T) {
+	cases := []struct {
+		name         string
+		previousKind oldPoolKind
+		sourceID     string
+	}{
+		{name: "V1_4_0", previousKind: oldPoolV1_4_0, sourceID: v140SourceID},
+		{name: "V1_2_0", previousKind: oldPoolV1_2_0, sourceID: v120SourceID},
+	}
 
-	bps10000 := uint16(10000)
-	full := tokens_core.MigrateLockReleasePoolLiquidityInput{BasisPoints: &bps10000}
-	_, _, err := f.migrate(t, full)
-	require.ErrorContains(t, err, "naming "+f.oldPoolAddr.Hex()+" as the old pool")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// A dust balance on the proxy, the shape a stray transfer leaves behind.
+			previousLiquidity, proxyLiquidity := big.NewInt(10000), big.NewInt(1)
+			f := setupProxyFixture(t, tc.previousKind, previousLiquidity, proxyLiquidity)
+			f.transferToTimelock(t, f.proxy)
+			f.transferToTimelock(t, f.previousOwnable(t, tc.previousKind))
 
-	previousInput := f.input(full)
-	previousInput.OldPoolAddress = f.oldPoolAddr.Hex()
-	report, err := migrateLockReleasePoolLiquidity(testsetup.BundleWithFreshReporter(f.env.OperationsBundle), f.env.BlockChains, previousInput)
-	require.NoError(t, err)
-	executeBatchOpsAs(t, f.chain, f.timelockKey, report.BatchOps)
-	require.Equal(t, 0, big.NewInt(0).Cmp(f.balanceOf(t, f.oldPoolAddr)), "previous pool must be drained")
+			bps10000 := uint16(10000)
+			full := tokens_core.MigrateLockReleasePoolLiquidityInput{BasisPoints: &bps10000}
 
-	report, ran, err := f.migrate(t, full)
-	require.NoError(t, err)
-	require.NotContains(t, ran, v140SourceID, "with the previous pool drained, the proxy migrates its own balance")
-	executeBatchOpsAs(t, f.chain, f.timelockKey, report.BatchOps)
+			report, ran, err := f.migrate(t, full)
+			require.NoError(t, err)
+			require.Contains(t, ran, tc.sourceID, "a funded previous pool takes priority over the proxy")
+			require.Len(t, report.BatchOps, 1)
+			require.Equal(t, f.oldPoolAddr, common.HexToAddress(report.BatchOps[0].Transactions[0].To), "the source must target the previous pool")
+			executeBatchOpsAs(t, f.chain, f.timelockKey, report.BatchOps)
 
-	require.Equal(t, 0, big.NewInt(0).Cmp(f.balanceOf(t, f.proxyAddr)), "proxy must be drained")
-	total := new(big.Int).Add(previousLiquidity, proxyLiquidity)
-	require.Equal(t, 0, total.Cmp(f.balanceOf(t, f.lockBoxAddr)), "lockbox should hold both balances")
-	f.requireProxyUnchanged(t)
+			require.Equal(t, 0, big.NewInt(0).Cmp(f.balanceOf(t, f.oldPoolAddr)), "previous pool must be drained")
+			require.Equal(t, 0, proxyLiquidity.Cmp(f.balanceOf(t, f.proxyAddr)), "the first run must leave the proxy's balance alone")
+			require.Equal(t, 0, previousLiquidity.Cmp(f.balanceOf(t, f.lockBoxAddr)), "basis points apply to the previous pool's balance only")
+
+			report, ran, err = f.migrate(t, full)
+			require.NoError(t, err)
+			require.NotContains(t, ran, tc.sourceID, "with the previous pool drained, the proxy migrates its own balance")
+			require.Len(t, report.BatchOps, 1)
+			require.Equal(t, f.proxyAddr, common.HexToAddress(report.BatchOps[0].Transactions[0].To), "the rerun must target the proxy")
+			executeBatchOpsAs(t, f.chain, f.timelockKey, report.BatchOps)
+
+			require.Equal(t, 0, big.NewInt(0).Cmp(f.balanceOf(t, f.proxyAddr)), "proxy must be drained")
+			total := new(big.Int).Add(previousLiquidity, proxyLiquidity)
+			require.Equal(t, 0, total.Cmp(f.balanceOf(t, f.lockBoxAddr)), "lockbox should hold both balances")
+			require.Equal(t, 0, big.NewInt(0).Cmp(f.balanceOf(t, f.timelock)), "no liquidity may be left in the timelock")
+			f.requireProxyUnchanged(t)
+		})
+	}
 }

@@ -56,8 +56,8 @@ var (
 //
 // It is also the lock-release liquidity migration source for v1.5.0 pools, plain and *AndProxy (see
 // migrate_lock_release_pool_liquidity.go): both share the lock-release selectors the v1.5.0 bindings call.
-// When an *AndProxy's liquidity sits in its previous pool, the source delegates to that pool's own
-// source (v1.4.0 or v1.2.0).
+// When an *AndProxy's previous pool holds liquidity, the source delegates to that pool's own source
+// (v1.4.0 or v1.2.0) first, and migrates the proxy's own balance once the previous pool is drained.
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }
