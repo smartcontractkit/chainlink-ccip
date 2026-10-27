@@ -12,7 +12,8 @@ import {MultiTokenPoolHooks} from "./MultiTokenPoolHooks.sol";
 /// looked up by its low 160 bits.
 contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
   error InvalidBlocklist(IAddressBlocklist blocklist);
-  error AddressBlocked(IAddressBlocklist blocklist, address account);
+  error LocalAddressBlocked(IAddressBlocklist blocklist, address account);
+  error RemoteAddressBlocked(IAddressBlocklist blocklist, bytes account);
 
   event BlocklistSet(IAddressBlocklist indexed oldBlocklist, IAddressBlocklist indexed newBlocklist);
 
@@ -107,7 +108,7 @@ contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
     IAddressBlocklist blocklist = s_blocklist;
     if (address(blocklist) == address(0)) return;
 
-    if (blocklist.isBlocked(localAccount)) revert AddressBlocked(blocklist, localAccount);
+    if (blocklist.isBlocked(localAccount)) revert LocalAddressBlocked(blocklist, localAccount);
 
     address remoteAddress;
     if (remoteAccount.length == 20) {
@@ -118,6 +119,6 @@ contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
       return;
     }
 
-    if (blocklist.isBlocked(remoteAddress)) revert AddressBlocked(blocklist, remoteAddress);
+    if (blocklist.isBlocked(remoteAddress)) revert RemoteAddressBlocked(blocklist, remoteAccount);
   }
 }

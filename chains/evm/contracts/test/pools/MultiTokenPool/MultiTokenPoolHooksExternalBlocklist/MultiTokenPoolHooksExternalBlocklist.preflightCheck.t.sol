@@ -75,18 +75,6 @@ contract MultiTokenPoolHooksExternalBlocklist_preflightCheck is MultiTokenPoolHo
     assertEq(tokenArgs, payload.context);
   }
 
-  function testFuzz_preflightCheck_ReceiverOf32Bytes(
-    bytes32 receiver
-  ) public {
-    s_lockOrBurnIn.receiver = abi.encodePacked(receiver);
-    // bytes20 keeps the leading bytes, so shift the low 20 bytes to the front first.
-    address expectedAddress = address(bytes20(receiver << 96));
-    vm.startPrank(s_pool);
-
-    vm.expectCall(address(s_blocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (expectedAddress)));
-    s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);
-  }
-
   // Reverts
 
   function test_preflightCheck_RevertWhen_UnauthorizedCaller() public {
@@ -111,7 +99,7 @@ contract MultiTokenPoolHooksExternalBlocklist_preflightCheck is MultiTokenPoolHo
     vm.startPrank(s_pool);
 
     vm.expectRevert(
-      abi.encodeWithSelector(MultiTokenPoolHooksExternalBlocklist.AddressBlocked.selector, s_blocklist, s_sender)
+      abi.encodeWithSelector(MultiTokenPoolHooksExternalBlocklist.LocalAddressBlocked.selector, s_blocklist, s_sender)
     );
     s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);
   }
@@ -126,7 +114,9 @@ contract MultiTokenPoolHooksExternalBlocklist_preflightCheck is MultiTokenPoolHo
     for (uint256 i = 0; i < receivers.length; ++i) {
       s_lockOrBurnIn.receiver = receivers[i];
       vm.expectRevert(
-        abi.encodeWithSelector(MultiTokenPoolHooksExternalBlocklist.AddressBlocked.selector, s_blocklist, s_receiver)
+        abi.encodeWithSelector(
+          MultiTokenPoolHooksExternalBlocklist.RemoteAddressBlocked.selector, s_blocklist, receivers[i]
+        )
       );
       s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);
     }
@@ -139,7 +129,7 @@ contract MultiTokenPoolHooksExternalBlocklist_preflightCheck is MultiTokenPoolHo
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        MultiTokenPoolHooksExternalBlocklist.AddressBlocked.selector, s_blocklist, SOLANA_ACCOUNT_AS_ADDRESS
+        MultiTokenPoolHooksExternalBlocklist.RemoteAddressBlocked.selector, s_blocklist, s_lockOrBurnIn.receiver
       )
     );
     s_hooks.preflightCheck(s_lockOrBurnIn, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", 1e18);

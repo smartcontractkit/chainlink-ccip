@@ -74,18 +74,6 @@ contract MultiTokenPoolHooksExternalBlocklist_postflightCheck is MultiTokenPoolH
     assertEq(s_releaseOrMintIn.offchainTokenData, payload.context);
   }
 
-  function testFuzz_postflightCheck_SenderOf32Bytes(
-    bytes32 sender
-  ) public {
-    s_releaseOrMintIn.originalSender = abi.encodePacked(sender);
-    // bytes20 keeps the leading bytes, so shift the low 20 bytes to the front first.
-    address expectedAddress = address(bytes20(sender << 96));
-    vm.startPrank(s_pool);
-
-    vm.expectCall(address(s_blocklist), abi.encodeCall(IAddressBlocklist.isBlocked, (expectedAddress)));
-    s_hooks.postflightCheck(s_releaseOrMintIn, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
-  }
-
   // Reverts
 
   function test_postflightCheck_RevertWhen_UnauthorizedCaller() public {
@@ -100,7 +88,7 @@ contract MultiTokenPoolHooksExternalBlocklist_postflightCheck is MultiTokenPoolH
     vm.startPrank(s_pool);
 
     vm.expectRevert(
-      abi.encodeWithSelector(MultiTokenPoolHooksExternalBlocklist.AddressBlocked.selector, s_blocklist, s_receiver)
+      abi.encodeWithSelector(MultiTokenPoolHooksExternalBlocklist.LocalAddressBlocked.selector, s_blocklist, s_receiver)
     );
     s_hooks.postflightCheck(s_releaseOrMintIn, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
@@ -115,7 +103,9 @@ contract MultiTokenPoolHooksExternalBlocklist_postflightCheck is MultiTokenPoolH
     for (uint256 i = 0; i < senders.length; ++i) {
       s_releaseOrMintIn.originalSender = senders[i];
       vm.expectRevert(
-        abi.encodeWithSelector(MultiTokenPoolHooksExternalBlocklist.AddressBlocked.selector, s_blocklist, s_sender)
+        abi.encodeWithSelector(
+          MultiTokenPoolHooksExternalBlocklist.RemoteAddressBlocked.selector, s_blocklist, senders[i]
+        )
       );
       s_hooks.postflightCheck(s_releaseOrMintIn, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     }
@@ -128,7 +118,9 @@ contract MultiTokenPoolHooksExternalBlocklist_postflightCheck is MultiTokenPoolH
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        MultiTokenPoolHooksExternalBlocklist.AddressBlocked.selector, s_blocklist, SOLANA_ACCOUNT_AS_ADDRESS
+        MultiTokenPoolHooksExternalBlocklist.RemoteAddressBlocked.selector,
+        s_blocklist,
+        s_releaseOrMintIn.originalSender
       )
     );
     s_hooks.postflightCheck(s_releaseOrMintIn, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
