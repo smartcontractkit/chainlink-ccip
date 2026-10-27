@@ -1325,3 +1325,27 @@ func TestAutoMigrate_V2TargetRequired(t *testing.T) {
 	// pre-V2, so auto-migration is a no-op (there is no V2 pool to migrate to).
 	require.Zero(t, mockAdapter.getSupportedChainsCalls, "discovery should not run without a v2.0.0+ migration target")
 }
+
+// TestGetDefaultChainAgnosticTokenTransferFeeConfig_NoUnrequestedFee guards against the CCIP 2.0 double
+// fee: the OnRamp already charges the lane's token network fee (tokenNetworkFeeUSDCents), so the default
+// V2 pool fee must be zero. The worst case is an Ethereum destination, where the old 1.x default was 150c.
+func TestGetDefaultChainAgnosticTokenTransferFeeConfig_NoUnrequestedFee(t *testing.T) {
+	cfg := tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(12345, chain_selectors.ETHEREUM_MAINNET.Selector)
+	require.Equal(t, uint32(0), cfg.DefaultFinalityFeeUSDCents)
+	require.Equal(t, uint32(0), cfg.CustomFinalityFeeUSDCents)
+	require.True(t, cfg.IsEnabled)
+	require.NotZero(t, cfg.DestGasOverhead, "v2 pools reject an enabled config with zero dest gas overhead")
+	require.NotZero(t, cfg.DestBytesOverhead)
+
+	// Explicit overrides still win, e.g. an agreed fee share with an asset issuer.
+	cfg = tokens.GetDefaultChainAgnosticTokenTransferFeeConfig(
+		12345,
+		chain_selectors.ETHEREUM_MAINNET.Selector,
+		func(c *tokens.TokenTransferFeeConfig) {
+			c.DefaultFinalityFeeUSDCents = 500
+			c.CustomFinalityFeeUSDCents = 500
+		},
+	)
+	require.Equal(t, uint32(500), cfg.DefaultFinalityFeeUSDCents)
+	require.Equal(t, uint32(500), cfg.CustomFinalityFeeUSDCents)
+}

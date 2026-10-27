@@ -3,10 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "../libraries/Pool.sol";
 
-/// @notice The checks that a MultiTokenPool runs on the hooks of a lane.
-/// @dev The validation functions have the same selectors and calldata as IAdvancedPoolHooks. So
-/// AdvancedPoolHooksExtractor decodes the policy engine payloads of both, and one policy engine can serve both kinds of
-/// hooks.
+/// @notice Validation hooks for transfers through multi-token pools.
 interface IMultiTokenPoolHooks {
   /// @notice Preflight check before the lock or burn operation.
   /// @param lockOrBurnIn The lock or burn input parameters.

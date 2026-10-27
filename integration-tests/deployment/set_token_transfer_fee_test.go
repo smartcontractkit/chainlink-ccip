@@ -385,7 +385,10 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	// Confirm that the config was correctly set on the source
 	srcCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, srcFQ, src, dst, srcTokenAddress)
 	require.NoError(t, err)
-	srcSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(src, dst)
+	// Mixed lane (1.6 OnRamp + 2.0 FeeQuoter): no token network fee, so the 1.x lane default applies.
+	// The default must be resolved from the OnRamp adapter, not the FeeQuoter adapter.
+	srcSensibleDefaults := evmFeesAdapterV1_6_0.GetDefaultTokenTransferFeeConfig(src, dst)
+	require.NotZero(t, srcSensibleDefaults.MinFeeUSDCents)
 	require.Equal(t, srcCfg.DestBytesOverhead, srcSensibleDefaults.DestBytesOverhead)
 	require.Equal(t, srcCfg.DestGasOverhead, uint32(150_000))
 	require.Equal(t, srcCfg.MinFeeUSDCents, srcSensibleDefaults.MinFeeUSDCents)
@@ -394,7 +397,10 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	// Confirm that the config was correctly set on the destination
 	dstCfg, err := evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
-	dstSensibleDefaults := evmFeesAdapterV2_0_0.GetDefaultTokenTransferFeeConfig(dst, src)
+	// Mixed lane (1.6 OnRamp + 2.0 FeeQuoter): no token network fee, so the 1.x lane default applies.
+	// The default must be resolved from the OnRamp adapter, not the FeeQuoter adapter.
+	dstSensibleDefaults := evmFeesAdapterV1_6_0.GetDefaultTokenTransferFeeConfig(dst, src)
+	require.NotZero(t, dstSensibleDefaults.MinFeeUSDCents)
 	require.Equal(t, dstCfg.DestBytesOverhead, dstSensibleDefaults.DestBytesOverhead)
 	require.Equal(t, dstCfg.DestGasOverhead, uint32(150_000))
 	require.Equal(t, dstCfg.MinFeeUSDCents, dstSensibleDefaults.MinFeeUSDCents)
@@ -494,4 +500,90 @@ func TestSetTokenTransferFeeV2_0_0(t *testing.T) {
 	dstCfg, err = evmFeesAdapterV2_0_0.GetOnchainTokenTransferFeeConfig(e.OperationsBundle, e.BlockChains, dstFQ, dst, src, dstTokenAddress)
 	require.NoError(t, err)
 	require.False(t, dstCfg.IsEnabled)
+}
+
+// TestGetDefaultChainAgnosticTokenTransferFeeConfig pins the shared 1.x lane default values. The
+// integration tests compare the on-chain result against this same helper, so without an explicit table
+// a wrong value (e.g. a reordered rule, or a dropped testnet-Ethereum case) would still pass.
+func TestGetDefaultChainAgnosticTokenTransferFeeConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		src  uint64
+		dst  uint64
+		want uint32
+	}{
+		{
+			name: "ethereum source to solana destination uses the highest solana default",
+			src:  chainsel.ETHEREUM_MAINNET.Selector,
+			dst:  chainsel.SOLANA_DEVNET.Selector,
+			want: 60,
+		},
+		{
+			name: "sepolia source to solana destination follows the ethereum rule",
+			src:  chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+			dst:  chainsel.SOLANA_DEVNET.Selector,
+			want: 60,
+		},
+		{
+			name: "hoodi source to solana destination follows the ethereum rule",
+			src:  chainsel.ETHEREUM_TESTNET_HOODI.Selector,
+			dst:  chainsel.SOLANA_DEVNET.Selector,
+			want: 60,
+		},
+		{
+			name: "non-ethereum source to solana destination uses the solana default",
+			src:  chainsel.TEST_90000001.Selector,
+			dst:  chainsel.SOLANA_DEVNET.Selector,
+			want: 35,
+		},
+		{
+			name: "ethereum source to non-ethereum destination uses the ethereum source default",
+			src:  chainsel.ETHEREUM_MAINNET.Selector,
+			dst:  chainsel.TEST_90000001.Selector,
+			want: 50,
+		},
+		{
+			name: "ethereum destination uses the ethereum destination default",
+			src:  chainsel.TEST_90000001.Selector,
+			dst:  chainsel.ETHEREUM_MAINNET.Selector,
+			want: 150,
+		},
+		{
+			name: "sepolia destination follows the ethereum rule",
+			src:  chainsel.TEST_90000001.Selector,
+			dst:  chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+			want: 150,
+		},
+		{
+			name: "ethereum source to non-evm non-solana destination uses the ethereum source default",
+			src:  chainsel.ETHEREUM_MAINNET.Selector,
+			dst:  chainsel.APTOS_MAINNET.Selector,
+			want: 50,
+		},
+		{
+			name: "non-evm source to ethereum destination uses the ethereum destination default",
+			src:  chainsel.APTOS_MAINNET.Selector,
+			dst:  chainsel.ETHEREUM_MAINNET.Selector,
+			want: 150,
+		},
+		{
+			name: "ethereum to ethereum (testnets) uses the ethereum destination default",
+			src:  chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+			dst:  chainsel.ETHEREUM_TESTNET_HOODI.Selector,
+			want: 150,
+		},
+		{
+			name: "baseline default",
+			src:  chainsel.TEST_90000001.Selector,
+			dst:  chainsel.TEST_90000002.Selector,
+			want: 25,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := fees.GetDefaultChainAgnosticTokenTransferFeeConfig(tt.src, tt.dst)
+			require.Equal(t, tt.want, cfg.MinFeeUSDCents)
+		})
+	}
 }
