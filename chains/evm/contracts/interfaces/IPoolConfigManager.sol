@@ -109,6 +109,7 @@ interface IPoolConfigManager {
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param tokenArgs The token arguments of the message. The sender chooses them.
   /// @param chargeTokenFee Whether to deduct a token fee from the transfer amount.
   /// @return lane The resolved outbound configuration, pool data, token fee and hook to call before moving tokens.
   function validateLockOrBurn(
@@ -116,11 +117,12 @@ interface IPoolConfigManager {
     uint64 remoteChainSelector,
     uint256 amount,
     bytes4 requestedFinalityConfig,
+    bytes calldata tokenArgs,
     bool chargeTokenFee
   ) external returns (OutboundLane memory lane);
 
-  /// @notice Checks the inbound lane, source token and additional pool data, converts token transfer amount, and
-  /// consumes inbound rate limit.
+  /// @notice Checks the inbound lane, the source token and the additional pool data. Converts the amount to local
+  /// decimals, and consumes the inbound rate limit.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
   /// @return transfer The converted amount, token profile and postflight hook.

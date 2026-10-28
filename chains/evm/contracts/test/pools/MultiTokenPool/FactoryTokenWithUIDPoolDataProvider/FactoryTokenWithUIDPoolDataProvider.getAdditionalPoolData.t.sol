@@ -10,8 +10,21 @@ import {FactoryTokenWithUIDPoolDataProviderSetup} from "./FactoryTokenWithUIDPoo
 
 contract FactoryTokenWithUIDPoolDataProvider_getAdditionalPoolData is FactoryTokenWithUIDPoolDataProviderSetup {
   function test_getAdditionalPoolData() public view {
-    assertEq(abi.encode(UID), s_provider.getAdditionalPoolData(s_token, DEST_CHAIN_SELECTOR));
-    assertEq(abi.encode(OTHER_UID), s_provider.getAdditionalPoolData(s_otherToken, DEST_CHAIN_SELECTOR));
+    assertEq(abi.encode(UID), s_provider.getAdditionalPoolData(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, ""));
+    assertEq(
+      abi.encode(OTHER_UID), s_provider.getAdditionalPoolData(s_otherToken, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "")
+    );
+  }
+
+  /// @dev The UID belongs to the token, so the finality and the token args do not change it.
+  function testFuzz_getAdditionalPoolData_IgnoresFinalityAndTokenArgs(
+    bytes4 requestedFinalityConfig,
+    bytes calldata tokenArgs
+  ) public view {
+    assertEq(
+      abi.encode(UID),
+      s_provider.getAdditionalPoolData(s_token, DEST_CHAIN_SELECTOR, requestedFinalityConfig, tokenArgs)
+    );
   }
 
   // Reverts
@@ -22,7 +35,7 @@ contract FactoryTokenWithUIDPoolDataProvider_getAdditionalPoolData is FactoryTok
     vm.expectRevert(
       abi.encodeWithSelector(FactoryTokenWithUIDPoolDataProvider.TokenNotFromFactory.selector, token, UNKNOWN_UID)
     );
-    s_provider.getAdditionalPoolData(token, DEST_CHAIN_SELECTOR);
+    s_provider.getAdditionalPoolData(token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
   }
 
   /// @dev The token has the UID of s_token, but the factory returns s_token for that UID.
@@ -32,7 +45,7 @@ contract FactoryTokenWithUIDPoolDataProvider_getAdditionalPoolData is FactoryTok
     vm.expectRevert(
       abi.encodeWithSelector(FactoryTokenWithUIDPoolDataProvider.TokenNotFromFactory.selector, token, UID)
     );
-    s_provider.getAdditionalPoolData(token, DEST_CHAIN_SELECTOR);
+    s_provider.getAdditionalPoolData(token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
   }
 
   /// @dev A plain ERC20 has no uid function, so the call to uid() reverts without a reason.
@@ -50,6 +63,6 @@ contract FactoryTokenWithUIDPoolDataProvider_getAdditionalPoolData is FactoryTok
     );
 
     vm.expectRevert(bytes(""));
-    s_provider.getAdditionalPoolData(address(token), DEST_CHAIN_SELECTOR);
+    s_provider.getAdditionalPoolData(address(token), DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
   }
 }

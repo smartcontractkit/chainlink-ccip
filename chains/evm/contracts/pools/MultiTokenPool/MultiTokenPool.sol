@@ -21,8 +21,8 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 /// place for holding many tokens and token specific logic that may execute as tokens move across the bridge. All token
 /// and lane config lives in the pool config manager, which the pool calls through IPoolConfigManager.
 /// @dev The pool runs the checks that a pool config manager cannot skip: the RMN curse, the ramp caller and the lock or
-/// burn flavor. The pool config manager resolves the lane, builds and checks the pool data, including the source token
-/// and the token identity metadata, charges the token fee and consumes the rate limits.
+/// burn flavor. The pool config manager resolves the lane. It builds and checks the pool data, which includes the
+/// source token and the additional pool data. It also charges the token fee and consumes the rate limits.
 /// @dev This pool supports different decimals on different chains but using this feature could impact the total number
 /// of tokens in circulation. Since all of the tokens are locked/burned on the source, and a rounded amount is
 /// minted/released on the destination, the number of tokens minted/released could be less than the number of tokens
@@ -156,7 +156,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   /// @dev These checks are essential security checks. An override that skips one would allow for various exploits.
   /// @param lockOrBurnIn The original lock or burn request.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @param tokenArgs Additional token arguments, passed to the hook.
+  /// @param tokenArgs Additional token arguments, passed to the pool config manager and the hook.
   /// @param chargeTokenFee False for the V1 path, which charges no token fee.
   /// @return lockOrBurnOut The remote token and the pool data.
   /// @return destTokenAmount The amount after the token fee.
@@ -174,6 +174,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
       lockOrBurnIn.remoteChainSelector,
       lockOrBurnIn.amount,
       requestedFinalityConfig,
+      tokenArgs,
       chargeTokenFee
     );
     _checkFlavor(lockOrBurnIn.localToken, lane.lockOrBurnFlavor);

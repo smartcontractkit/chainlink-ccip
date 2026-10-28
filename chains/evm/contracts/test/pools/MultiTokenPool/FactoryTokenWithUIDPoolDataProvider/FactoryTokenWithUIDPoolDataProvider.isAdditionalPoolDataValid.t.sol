@@ -9,8 +9,12 @@ import {FactoryTokenWithUIDPoolDataProviderSetup} from "./FactoryTokenWithUIDPoo
 
 contract FactoryTokenWithUIDPoolDataProvider_isAdditionalPoolDataValid is FactoryTokenWithUIDPoolDataProviderSetup {
   function test_isAdditionalPoolDataValid() public view {
-    assertTrue(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, abi.encode(UID)));
-    assertTrue(s_provider.isAdditionalPoolDataValid(s_otherToken, SOURCE_CHAIN_SELECTOR, abi.encode(OTHER_UID)));
+    assertTrue(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, abi.encode(UID)));
+    assertTrue(
+      s_provider.isAdditionalPoolDataValid(
+        s_otherToken, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, abi.encode(OTHER_UID)
+      )
+    );
   }
 
   /// @dev The source chain has its own factory, so the token with the same UID has another address there.
@@ -18,27 +22,55 @@ contract FactoryTokenWithUIDPoolDataProvider_isAdditionalPoolDataValid is Factor
     MockTokenWithUIDFactory sourceTokenFactory = new MockTokenWithUIDFactory();
     address sourceToken = sourceTokenFactory.deploy(UID);
     FactoryTokenWithUIDPoolDataProvider sourceProvider = new FactoryTokenWithUIDPoolDataProvider(sourceTokenFactory);
-    bytes memory additionalPoolData = sourceProvider.getAdditionalPoolData(sourceToken, DEST_CHAIN_SELECTOR);
+    bytes memory additionalPoolData =
+      sourceProvider.getAdditionalPoolData(sourceToken, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
 
     assertNotEq(sourceToken, s_token);
-    assertTrue(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, additionalPoolData));
-    assertFalse(s_provider.isAdditionalPoolDataValid(s_otherToken, SOURCE_CHAIN_SELECTOR, additionalPoolData));
+    assertTrue(
+      s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, additionalPoolData)
+    );
+    assertFalse(
+      s_provider.isAdditionalPoolDataValid(s_otherToken, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, additionalPoolData)
+    );
+  }
+
+  function testFuzz_isAdditionalPoolDataValid_IgnoresFinality(
+    bytes4 requestedFinalityConfig
+  ) public view {
+    assertTrue(
+      s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, requestedFinalityConfig, abi.encode(UID))
+    );
+    assertFalse(
+      s_provider.isAdditionalPoolDataValid(
+        s_token, SOURCE_CHAIN_SELECTOR, requestedFinalityConfig, abi.encode(OTHER_UID)
+      )
+    );
   }
 
   function test_isAdditionalPoolDataValid_UIDOfOtherToken() public view {
-    assertFalse(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, abi.encode(OTHER_UID)));
-    assertFalse(s_provider.isAdditionalPoolDataValid(s_otherToken, SOURCE_CHAIN_SELECTOR, abi.encode(UID)));
+    assertFalse(
+      s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, abi.encode(OTHER_UID))
+    );
+    assertFalse(
+      s_provider.isAdditionalPoolDataValid(s_otherToken, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, abi.encode(UID))
+    );
   }
 
   function test_isAdditionalPoolDataValid_UIDWithoutToken() public view {
-    assertFalse(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, abi.encode(UNKNOWN_UID)));
+    assertFalse(
+      s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, abi.encode(UNKNOWN_UID))
+    );
     // The factory returns zero for a UID without a token. A zero local token must not match it.
-    assertFalse(s_provider.isAdditionalPoolDataValid(address(0), SOURCE_CHAIN_SELECTOR, abi.encode(UNKNOWN_UID)));
+    assertFalse(
+      s_provider.isAdditionalPoolDataValid(
+        address(0), SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, abi.encode(UNKNOWN_UID)
+      )
+    );
   }
 
   /// @dev A source pool that does not send the UID gives empty data.
   function test_isAdditionalPoolDataValid_EmptyData() public view {
-    assertFalse(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, ""));
+    assertFalse(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, ""));
   }
 
   /// @dev Each case starts with the UID of s_token, so only the length makes it invalid.
@@ -50,7 +82,9 @@ contract FactoryTokenWithUIDPoolDataProvider_isAdditionalPoolDataValid is Factor
     additionalPoolData[3] = abi.encodePacked(UID, abi.encode(UID));
 
     for (uint256 i = 0; i < additionalPoolData.length; ++i) {
-      assertFalse(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, additionalPoolData[i]));
+      assertFalse(
+        s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, additionalPoolData[i])
+      );
     }
   }
 
@@ -59,6 +93,8 @@ contract FactoryTokenWithUIDPoolDataProvider_isAdditionalPoolDataValid is Factor
   ) public view {
     vm.assume(additionalPoolData.length != 32);
 
-    assertFalse(s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, additionalPoolData));
+    assertFalse(
+      s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, additionalPoolData)
+    );
   }
 }

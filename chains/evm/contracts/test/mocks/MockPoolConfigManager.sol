@@ -7,8 +7,8 @@ import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 
-/// @dev A pool config manager with settable return values. Records the finality and fee flag of the last validate
-/// call. Batch views repeat the set value for each queried lane or token.
+/// @dev A pool config manager with settable return values. Records the finality, token args and fee flag of the last
+/// validate call. Batch views repeat the set value for each queried lane or token.
 contract MockPoolConfigManager is IPoolConfigManager {
   IPoolConfigManager.OutboundLane internal s_outboundLane;
   IPoolConfigManager.ResolvedInboundTransfer internal s_inboundTransfer;
@@ -21,6 +21,7 @@ contract MockPoolConfigManager is IPoolConfigManager {
 
   bool internal s_lastChargeTokenFee;
   bytes4 internal s_lastRequestedFinalityConfig;
+  bytes internal s_lastTokenArgs;
 
   function setOutboundLane(
     IPoolConfigManager.OutboundLane memory lane
@@ -74,15 +75,21 @@ contract MockPoolConfigManager is IPoolConfigManager {
     return s_lastRequestedFinalityConfig;
   }
 
+  function lastTokenArgs() external view returns (bytes memory) {
+    return s_lastTokenArgs;
+  }
+
   function validateLockOrBurn(
     address,
     uint64,
     uint256,
     bytes4 requestedFinalityConfig,
+    bytes calldata tokenArgs,
     bool chargeTokenFee
   ) external returns (OutboundLane memory) {
     s_lastChargeTokenFee = chargeTokenFee;
     s_lastRequestedFinalityConfig = requestedFinalityConfig;
+    s_lastTokenArgs = tokenArgs;
     return s_outboundLane;
   }
 

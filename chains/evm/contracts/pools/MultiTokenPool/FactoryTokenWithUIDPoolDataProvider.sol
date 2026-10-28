@@ -43,7 +43,9 @@ contract FactoryTokenWithUIDPoolDataProvider is IAdditionalPoolDataProvider, ITy
   /// @dev Returns abi.encode(bytes32 uid). Reverts if the factory does not return the local token for its UID.
   function getAdditionalPoolData(
     address localToken,
-    uint64 // remoteChainSelector
+    uint64, // remoteChainSelector
+    bytes4, // requestedFinalityConfig
+    bytes calldata // tokenArgs
   ) public view virtual returns (bytes memory additionalPoolData) {
     bytes32 uid = IHasUID(localToken).uid();
     if (i_tokenFactory.tokenAddress(uid) != localToken) revert TokenNotFromFactory(localToken, uid);
@@ -55,6 +57,7 @@ contract FactoryTokenWithUIDPoolDataProvider is IAdditionalPoolDataProvider, ITy
   function isAdditionalPoolDataValid(
     address localToken,
     uint64, // remoteChainSelector
+    bytes4, // requestedFinalityConfig
     bytes calldata additionalPoolData
   ) public view virtual returns (bool isValid) {
     if (additionalPoolData.length != UID_POOL_DATA_LENGTH) return false;
