@@ -247,7 +247,9 @@ func tokenBalance(b cldf_ops.Bundle, evmChain evm.Chain, token, holder common.Ad
 		ChainSelector: evmChain.Selector,
 		Address:       token,
 		Args:          holder,
-	})
+	},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[common.Address], evm.Chain](),
+	)
 	if err != nil {
 		return nil, err
 	}
