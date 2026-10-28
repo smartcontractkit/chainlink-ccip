@@ -277,6 +277,9 @@ type migrationTestSetup struct {
 	oldPoolAddr common.Address
 	newPoolAddr common.Address
 	lockBoxAddr common.Address
+	// rmnProxyAddr and routerAddr are the chain's RMN proxy and router, for deploying further pools.
+	rmnProxyAddr common.Address
+	routerAddr   common.Address
 }
 
 // oldPoolKind selects which legacy lock-release pool the migration test starts from.
@@ -287,7 +290,8 @@ const (
 	oldPoolV1_6_1 oldPoolKind = iota
 	// oldPoolV1_5_0AndProxy is the v1.5.0 LockReleaseTokenPoolAndProxy - one contract that is its
 	// own proxy. It shares the lock-release selectors with the plain v1.5.0 pool, so the v1.5.0
-	// source migrates it too.
+	// source migrates it too. It has no previous pool, so it holds its own liquidity; proxies that
+	// front a previous pool are covered in migrate_lock_release_pool_liquidity_proxy_test.go.
 	oldPoolV1_5_0AndProxy
 	// oldPoolV1_5_0 is the plain (non-proxy) v1.5.0 LockReleaseTokenPool. Same constructor and
 	// lock-release surface as oldPoolV1_5_0AndProxy, minus the legacy-proxy previous-pool hook.
@@ -538,13 +542,15 @@ func setupMigrationTestWithOldPool(t *testing.T, chainSel uint64, liquidityAmoun
 	require.Equal(t, 0, liquidityAmount.Cmp(balReport.Output), "Old pool should hold the minted tokens")
 
 	return migrationTestSetup{
-		env:         e,
-		chainSel:    chainSel,
-		deployer:    deployer,
-		tokenAddr:   tokenAddr,
-		oldPoolAddr: oldPoolAddr,
-		newPoolAddr: newPoolAddr,
-		lockBoxAddr: lockBoxAddr,
+		env:          e,
+		chainSel:     chainSel,
+		deployer:     deployer,
+		tokenAddr:    tokenAddr,
+		oldPoolAddr:  oldPoolAddr,
+		newPoolAddr:  newPoolAddr,
+		lockBoxAddr:  lockBoxAddr,
+		rmnProxyAddr: rmnProxyAddr,
+		routerAddr:   routerAddr,
 	}
 }
 

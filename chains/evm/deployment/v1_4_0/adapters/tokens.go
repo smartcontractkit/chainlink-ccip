@@ -73,7 +73,8 @@ var (
 // byte-identical signatures, so nothing here branches on pool type.
 //
 // It is also the lock-release liquidity migration source for v1.4.0 pools (see
-// migrate_lock_release_pool_liquidity.go).
+// migrate_lock_release_pool_liquidity.go), run directly or delegated from the
+// v1.5.0 source when the operator names the proxy in front of the pool.
 type TokenAdapter struct {
 	evm1_0_0.EVMPoolAdapter
 }
