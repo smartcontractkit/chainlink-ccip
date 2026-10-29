@@ -5,6 +5,7 @@ import {IPoolConfigManager} from "../../../interfaces/IPoolConfigManager.sol";
 import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
 import {PolicyConfig} from "../../../libraries/PolicyConfig.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -43,6 +44,14 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimiter.Config defaultFinalityConfig,
     RateLimiter.Config fastFinalityConfig
   );
+  event InlineSecurityConfigSet(
+    address indexed localToken,
+    uint64 indexed remoteChainSelector,
+    address[] outboundCCVs,
+    address[] inboundCCVs,
+    address hook
+  );
+  event InlineSecurityConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
 
   /// @notice The state of one token in this store.
   struct TokenState {
@@ -73,8 +82,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Security config describing the verification and hook requirements for a lane.
-  /// @dev Each CCV list has the shape of an AdvancedPoolHooks list. An address(0) entry stands for the default CCVs
-  /// of the ramps. A list has no duplicate.
+  /// @dev An address(0) entry stands for the default CCVs of the ramps. A list has at most one entry per CCV.
   struct SecurityConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
@@ -192,7 +200,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Returns the inline security records of a token, in the shape of the setter. Never reverts.
+  /// @notice Returns the inline security records of a token.
   /// @dev A token without an inline record on a chain has no entry.
   /// @param localToken The local token.
   /// @return inlineConfigs The inline security records of the token.
@@ -291,7 +299,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// would re-grant the tokens that transfers consumed since it read the other direction.
   /// @dev Only callable by an authorized pool config manager. The record must exist, so a caller creates it with
   /// applyInlineRateLimitConfigUpdates first. Each set refills the two buckets of the direction, also with the same
-  /// values, the same as TokenPool. Each config follows the checks of RateLimiter.
+  /// values. Each config follows the checks of RateLimiter.
   /// @param directionConfigsToSet The direction records to set.
   function applyInlineRateLimitDirectionUpdates(
     InlineRateLimitDirectionArgs[] calldata directionConfigsToSet
@@ -324,5 +332,67 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     } else if (config.rate != 0 || config.capacity != 0) {
       revert RateLimiter.DisabledNonZeroRateLimit(config);
     }
+  }
+
+  // ================================================================
+  // │                           Security                           │
+  // ================================================================
+
+  /// @notice Removes and sets inline security records. A set writes every value of the record, so it replaces the
+  /// record.
+  /// @dev Only callable by an authorized pool config manager. The removals run first, then the sets. Each set runs the
+  /// checks of CCVConfigValidation on both CCV lists.
+  /// @param inlineConfigsToRemove The inline records to remove.
+  /// @param inlineConfigsToSet The inline records to set.
+  function applyInlineSecurityConfigUpdates(
+    IPoolConfigManager.LaneKey[] calldata inlineConfigsToRemove,
+    InlineSecurityConfigArgs[] calldata inlineConfigsToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < inlineConfigsToRemove.length; ++i) {
+      address localToken = inlineConfigsToRemove[i].localToken;
+      uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
+      PolicyConfig._removeInlineRecord(s_inlineSecurityChains[localToken], localToken, remoteChainSelector);
+      delete s_inlineSecurityConfigs[localToken][remoteChainSelector];
+      emit InlineSecurityConfigRemoved(localToken, remoteChainSelector);
+    }
+
+    for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
+      InlineSecurityConfigArgs calldata args = inlineConfigsToSet[i];
+      _validateSecurityConfig(args.outboundCCVs, args.inboundCCVs);
+      PolicyConfig._setInlineRecord(
+        s_tokens, s_inlineSecurityChains[args.localToken], args.localToken, args.remoteChainSelector
+      );
+      _setSecurityConfig(
+        s_inlineSecurityConfigs[args.localToken][args.remoteChainSelector],
+        args.outboundCCVs,
+        args.inboundCCVs,
+        args.hook
+      );
+      emit InlineSecurityConfigSet(
+        args.localToken, args.remoteChainSelector, args.outboundCCVs, args.inboundCCVs, args.hook
+      );
+    }
+  }
+
+  /// @dev A CCV list must not have a duplicate.
+  function _validateSecurityConfig(
+    address[] calldata outboundCCVs,
+    address[] calldata inboundCCVs
+  ) private pure {
+    CCVConfigValidation._assertNoDuplicates(outboundCCVs);
+    CCVConfigValidation._assertNoDuplicates(inboundCCVs);
+  }
+
+  /// @dev Any address is accepted for the hook. A MultiTokenPoolHooks must list every pool
+  /// that serves a token of its lanes as an authorized caller.
+  function _setSecurityConfig(
+    SecurityConfig storage securityConfig,
+    address[] calldata outboundCCVs,
+    address[] calldata inboundCCVs,
+    address hook
+  ) private {
+    securityConfig.outboundCCVs = outboundCCVs;
+    securityConfig.inboundCCVs = inboundCCVs;
+    securityConfig.hook = hook;
   }
 }
