@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {PolicyConfig} from "../../../libraries/PolicyConfig.sol";
 import {PolicyConfigHelper} from "../../helpers/PolicyConfigHelper.sol";
 import {Test} from "forge-std/Test.sol";
 
@@ -18,13 +17,5 @@ contract PolicyConfigSetup is Test {
     s_helper = new PolicyConfigHelper();
     s_token = makeAddr("token");
     s_helper.registerToken(s_token);
-  }
-
-  function _assertLevel(
-    PolicyConfig.RecordLevel expected,
-    bytes32 policyName,
-    uint64 remoteChainSelector
-  ) internal view {
-    assertEq(uint8(expected), uint8(s_helper.resolvePolicyRecordLevel(policyName, remoteChainSelector)));
   }
 }

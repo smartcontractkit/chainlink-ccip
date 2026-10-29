@@ -36,6 +36,23 @@ contract PolicyConfig__setPolicyRecord is PolicyConfigSetup {
     assertEq(PolicyConfig.DEFAULT_CHAIN_SELECTOR, policyChainSelectors[1]);
   }
 
+  function test__setPolicyRecord_MultiplePolicies() public {
+    s_helper.setPolicyRecord(POLICY, CHAIN_SELECTOR);
+    s_helper.setPolicyRecord(OTHER_POLICY, OTHER_CHAIN_SELECTOR);
+
+    bytes32[] memory policyNames = s_helper.getPolicyNames();
+    assertEq(2, policyNames.length);
+    assertEq(POLICY, policyNames[0]);
+    assertEq(OTHER_POLICY, policyNames[1]);
+    // Each policy has only its own record.
+    uint256[] memory policyChainSelectors = s_helper.getPolicyChainSelectors(POLICY);
+    assertEq(1, policyChainSelectors.length);
+    assertEq(CHAIN_SELECTOR, policyChainSelectors[0]);
+    policyChainSelectors = s_helper.getPolicyChainSelectors(OTHER_POLICY);
+    assertEq(1, policyChainSelectors.length);
+    assertEq(OTHER_CHAIN_SELECTOR, policyChainSelectors[0]);
+  }
+
   // Reverts
 
   function test__setPolicyRecord_RevertWhen_ZeroPolicyNameNotAllowed() public {

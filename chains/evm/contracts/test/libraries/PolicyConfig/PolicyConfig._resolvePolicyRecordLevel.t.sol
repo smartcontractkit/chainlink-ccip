@@ -43,4 +43,12 @@ contract PolicyConfig__resolvePolicyRecordLevel is PolicyConfigSetup {
 
     _assertLevel(PolicyConfig.RecordLevel.PolicyDefault, POLICY, remoteChainSelector);
   }
+
+  function _assertLevel(
+    PolicyConfig.RecordLevel expected,
+    bytes32 policyName,
+    uint64 remoteChainSelector
+  ) internal view {
+    assertEq(uint8(expected), uint8(s_helper.resolvePolicyRecordLevel(policyName, remoteChainSelector)));
+  }
 }
