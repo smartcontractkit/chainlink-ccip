@@ -66,6 +66,15 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     address hook
   );
   event InlineSecurityConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
+  event SecurityPolicyConfigSet(
+    bytes32 indexed policyName,
+    uint64 indexed remoteChainSelector,
+    address[] outboundCCVs,
+    address[] inboundCCVs,
+    address hook
+  );
+  event SecurityPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
+  event SecurityPolicyRemoved(bytes32 indexed policyName);
 
   /// @notice The state of one token in this store.
   struct TokenState {
@@ -119,6 +128,15 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   struct InlineSecurityConfigArgs {
     address localToken; // A registered token.
     uint64 remoteChainSelector; // Remote chain selector.
+    address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain. No duplicate.
+    address[] inboundCCVs; // CCVs required for incoming messages from the remote chain. No duplicate.
+    address hook; // Address of the IMultiTokenPoolHooks contract of the lane. Zero means no hook.
+  }
+
+  /// @notice A security policy record to set.
+  struct SecurityPolicyConfigArgs {
+    bytes32 policyName; // The security policy. Not zero.
+    uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain. No duplicate.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain. No duplicate.
     address hook; // Address of the IMultiTokenPoolHooks contract of the lane. Zero means no hook.
@@ -288,9 +306,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// To change one direction of an existing record, use applyInlineRateLimitDirectionUpdates. A set refills every
   /// bucket of the record, so it cannot change one direction: the pass-through write would refill the other direction
   /// and re-grant the tokens that transfers consumed since the caller read it.
-  /// @dev Only callable by an authorized pool config manager. The removals run first, then the sets. A set needs a
-  /// record that does not exist, so a removal and a set of the same lane in one call replaces the record. Each config
-  /// follows the checks of RateLimiter. A removal deletes the buckets of the record.
+  /// @dev The removals run first, then the sets. A set needs a record that does not exist, so a removal and a set of
+  /// the same lane in one call replaces the record. Each config follows the checks of RateLimiter. A removal deletes
+  /// the buckets of the record.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to create.
   function applyInlineRateLimitConfigUpdates(
@@ -344,9 +362,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// direction are set together, so the direction is never left with a stale FTF config. This writes only the two
   /// buckets of the direction, so a rate limit manager can raise one direction without refilling the other, which
   /// would re-grant the tokens that transfers consumed since it read the other direction.
-  /// @dev Only callable by an authorized pool config manager. The record must exist, so a caller creates it with
-  /// applyInlineRateLimitConfigUpdates first. Each set refills the two buckets of the direction, also with the same
-  /// values. Each config follows the checks of RateLimiter.
+  /// @dev The record must exist, so a caller creates it with applyInlineRateLimitConfigUpdates first. Each set refills
+  /// the two buckets of the direction, also with the same values. Each config follows the checks of RateLimiter.
   /// @param directionConfigsToSet The direction records to set.
   function applyInlineRateLimitDirectionUpdates(
     InlineRateLimitDirectionArgs[] calldata directionConfigsToSet
@@ -371,13 +388,12 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Removes and sets rate limit policy records, and removes rate limit policies. Each set writes all four
   /// configs of the record.
-  /// @dev Only callable by an authorized pool config manager. The record removals run first, then the policy removals,
-  /// then the record sets. The first record set under a new name creates the policy and fixes its decimals, which stay
-  /// fixed until the policy is removed. A record removal keeps the policy. A policy removal needs a policy without
-  /// tokens and without records. Chain selector zero names the policy default record. Each config follows the checks of
-  /// RateLimiter. A set changes no bucket. A bucket of a token that uses a policy record copies the config of its
-  /// record on its next use, when the config of the bucket differs, which refills the bucket. After a removal of a
-  /// policy record, the buckets of its tokens keep their state.
+  /// @dev The record removals run first, then the policy removals, then the record sets. The first record set under a
+  /// new name creates the policy and fixes its decimals, which stay fixed until the policy is removed. A record removal
+  /// keeps the policy. A policy removal needs a policy without tokens and without records. Chain selector zero names
+  /// the policy default record. Each config follows the checks of RateLimiter. A set changes no bucket. A bucket of a
+  /// token that uses a policy record copies the config of its record on its next use, when the config of the bucket
+  /// differs, which refills the bucket. After a removal of a policy record, the buckets of its tokens keep their state.
   /// @param policyConfigsToRemove The policy records to remove.
   /// @param policiesToRemove The policies to remove.
   /// @param policyConfigsToSet The policy records to set.
@@ -443,8 +459,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Sets the rate limit policy of tokens. A token uses the records of its new policy at once.
-  /// @dev Only callable by an authorized pool config manager. A set needs a registered token and a policy that exists.
-  /// The policy must have the decimals of the token, because a policy rate limit is a raw amount in local token units.
+  /// @dev A set needs a registered token and a policy that exists. The policy must have the decimals of the token,
+  /// because a policy rate limit is a raw amount in local token units.
   /// @param tokenPoliciesToSet The rate limit policy of each token. Zero removes the token from its policy.
   function applyTokenRateLimitPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
@@ -486,8 +502,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Removes and sets inline security records. A set writes every value of the record, so it replaces the
   /// record.
-  /// @dev Only callable by an authorized pool config manager. The removals run first, then the sets. Each set runs the
-  /// checks of CCVConfigValidation on both CCV lists.
+  /// @dev The removals run first, then the sets. Each set runs the checks of CCVConfigValidation on both CCV lists.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineSecurityConfigUpdates(
@@ -516,6 +531,50 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       );
       emit InlineSecurityConfigSet(
         args.localToken, args.remoteChainSelector, args.outboundCCVs, args.inboundCCVs, args.hook
+      );
+    }
+  }
+
+  /// @notice Removes and sets security policy records, and removes security policies. A set writes every value of the
+  /// record, so it replaces the record.
+  /// @dev The record removals run first, then the policy removals, then the record sets. The first record set under a
+  /// new name creates the policy. A record removal keeps the policy. A policy removal needs a policy without tokens
+  /// and without records. Chain selector zero names the policy default record. Each set runs the checks of
+  /// CCVConfigValidation on both CCV lists.
+  /// @param policyConfigsToRemove The policy records to remove.
+  /// @param policiesToRemove The policies to remove.
+  /// @param policyConfigsToSet The policy records to set.
+  function applySecurityPolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata policyConfigsToRemove,
+    bytes32[] calldata policiesToRemove,
+    SecurityPolicyConfigArgs[] calldata policyConfigsToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < policyConfigsToRemove.length; ++i) {
+      bytes32 policyName = policyConfigsToRemove[i].policyName;
+      uint64 remoteChainSelector = policyConfigsToRemove[i].remoteChainSelector;
+      PolicyConfig._removePolicyRecord(s_securityPolicies, policyName, remoteChainSelector);
+      delete s_policySecurityConfigs[policyName][remoteChainSelector];
+      emit SecurityPolicyConfigRemoved(policyName, remoteChainSelector);
+    }
+
+    for (uint256 i = 0; i < policiesToRemove.length; ++i) {
+      bytes32 policyName = policiesToRemove[i];
+      PolicyConfig._removePolicy(s_securityPolicies, policyName);
+      emit SecurityPolicyRemoved(policyName);
+    }
+
+    for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
+      SecurityPolicyConfigArgs calldata args = policyConfigsToSet[i];
+      _validateSecurityConfig(args.outboundCCVs, args.inboundCCVs);
+      PolicyConfig._setPolicyRecord(s_securityPolicies, args.policyName, args.remoteChainSelector);
+      _setSecurityConfig(
+        s_policySecurityConfigs[args.policyName][args.remoteChainSelector],
+        args.outboundCCVs,
+        args.inboundCCVs,
+        args.hook
+      );
+      emit SecurityPolicyConfigSet(
+        args.policyName, args.remoteChainSelector, args.outboundCCVs, args.inboundCCVs, args.hook
       );
     }
   }
