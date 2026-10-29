@@ -26,6 +26,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using RateLimiter for RateLimiter.TokenBucket;
 
   error InlineRateLimitRecordExists(address localToken, uint64 remoteChainSelector);
+  error InvalidRateLimitPolicyDecimals(bytes32 policyName, uint8 expected, uint8 actual);
   error RateLimitRecordNotFound(address localToken, uint64 remoteChainSelector);
 
   event InlineRateLimitConfigSet(
@@ -44,6 +45,19 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimiter.Config defaultFinalityConfig,
     RateLimiter.Config fastFinalityConfig
   );
+  event RateLimitPolicyConfigSet(
+    bytes32 indexed policyName,
+    uint64 indexed remoteChainSelector,
+    uint8 localDecimals,
+    RateLimiter.Config outboundRateLimiterConfig,
+    RateLimiter.Config inboundRateLimiterConfig,
+    RateLimiter.Config fastFinalityOutboundRateLimiterConfig,
+    RateLimiter.Config fastFinalityInboundRateLimiterConfig
+  );
+  event RateLimitPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
+  /// @dev Also stands for the removal of the decimals of the policy.
+  event RateLimitPolicyRemoved(bytes32 indexed policyName);
+  event TokenRateLimitPolicySet(address indexed localToken, bytes32 indexed policyName);
   event InlineSecurityConfigSet(
     address indexed localToken,
     uint64 indexed remoteChainSelector,
@@ -79,6 +93,18 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     IPoolV2.MessageDirection direction; // The direction to set.
     RateLimiter.Config defaultFinalityConfig; // The limit for default finality.
     RateLimiter.Config fastFinalityConfig; // The limit for FTF. Disabled means FTF uses the default bucket.
+  }
+
+  /// @notice A rate limit policy record to set. Amounts are in local token units. While an FTF config is disabled, an
+  /// FTF transfer in its direction uses the default finality bucket of the same record.
+  struct RateLimitPolicyConfigArgs {
+    bytes32 policyName; // The rate limit policy. Not zero.
+    uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
+    uint8 localDecimals; // The decimals of the policy. The first record of the policy fixes them.
+    RateLimiter.Config outboundRateLimiterConfig; // The outbound limit for default finality.
+    RateLimiter.Config inboundRateLimiterConfig; // The inbound limit for default finality.
+    RateLimiter.Config fastFinalityOutboundRateLimiterConfig; // The outbound limit for FTF.
+    RateLimiter.Config fastFinalityInboundRateLimiterConfig; // The inbound limit for FTF.
   }
 
   /// @notice Security config describing the verification and hook requirements for a lane.
@@ -340,6 +366,105 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       emit InlineRateLimitDirectionSet(
         args.localToken, args.remoteChainSelector, args.direction, args.defaultFinalityConfig, args.fastFinalityConfig
       );
+    }
+  }
+
+  /// @notice Removes and sets rate limit policy records, and removes rate limit policies. Each set writes all four
+  /// configs of the record.
+  /// @dev Only callable by an authorized pool config manager. The record removals run first, then the policy removals,
+  /// then the record sets. The first record set under a new name creates the policy and fixes its decimals, which stay
+  /// fixed until the policy is removed. A record removal keeps the policy. A policy removal needs a policy without
+  /// tokens and without records. Chain selector zero names the policy default record. Each config follows the checks of
+  /// RateLimiter. A set changes no bucket. A bucket of a token that uses a policy record copies the config of its
+  /// record on its next use, when the config of the bucket differs, which refills the bucket. After a removal of a
+  /// policy record, the buckets of its tokens keep their state.
+  /// @param policyConfigsToRemove The policy records to remove.
+  /// @param policiesToRemove The policies to remove.
+  /// @param policyConfigsToSet The policy records to set.
+  function applyRateLimitPolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata policyConfigsToRemove,
+    bytes32[] calldata policiesToRemove,
+    RateLimitPolicyConfigArgs[] calldata policyConfigsToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < policyConfigsToRemove.length; ++i) {
+      bytes32 policyName = policyConfigsToRemove[i].policyName;
+      uint64 remoteChainSelector = policyConfigsToRemove[i].remoteChainSelector;
+      PolicyConfig._removePolicyRecord(s_rateLimitPolicies, policyName, remoteChainSelector);
+      mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.Config config)) storage
+        recordConfigs = s_policyRateLimitConfigs[policyName][remoteChainSelector];
+      delete recordConfigs[false][IPoolV2.MessageDirection.Outbound];
+      delete recordConfigs[false][IPoolV2.MessageDirection.Inbound];
+      delete recordConfigs[true][IPoolV2.MessageDirection.Outbound];
+      delete recordConfigs[true][IPoolV2.MessageDirection.Inbound];
+      emit RateLimitPolicyConfigRemoved(policyName, remoteChainSelector);
+    }
+
+    for (uint256 i = 0; i < policiesToRemove.length; ++i) {
+      bytes32 policyName = policiesToRemove[i];
+      PolicyConfig._removePolicy(s_rateLimitPolicies, policyName);
+      delete s_rateLimitPolicyDecimals[policyName];
+      emit RateLimitPolicyRemoved(policyName);
+    }
+
+    for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
+      RateLimitPolicyConfigArgs calldata args = policyConfigsToSet[i];
+      // isNewPolicy is read before _setPolicyRecord, which adds the name of a new policy.
+      bool isNewPolicy = !s_rateLimitPolicies.policyNames.contains(args.policyName);
+      if (!isNewPolicy && s_rateLimitPolicyDecimals[args.policyName] != args.localDecimals) {
+        revert InvalidRateLimitPolicyDecimals(
+          args.policyName, s_rateLimitPolicyDecimals[args.policyName], args.localDecimals
+        );
+      }
+      _validateRateLimitConfig(args.outboundRateLimiterConfig);
+      _validateRateLimitConfig(args.inboundRateLimiterConfig);
+      _validateRateLimitConfig(args.fastFinalityOutboundRateLimiterConfig);
+      _validateRateLimitConfig(args.fastFinalityInboundRateLimiterConfig);
+
+      PolicyConfig._setPolicyRecord(s_rateLimitPolicies, args.policyName, args.remoteChainSelector);
+      if (isNewPolicy) {
+        s_rateLimitPolicyDecimals[args.policyName] = args.localDecimals;
+      }
+      mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.Config config)) storage
+        recordConfigs = s_policyRateLimitConfigs[args.policyName][args.remoteChainSelector];
+      recordConfigs[false][IPoolV2.MessageDirection.Outbound] = args.outboundRateLimiterConfig;
+      recordConfigs[false][IPoolV2.MessageDirection.Inbound] = args.inboundRateLimiterConfig;
+      recordConfigs[true][IPoolV2.MessageDirection.Outbound] = args.fastFinalityOutboundRateLimiterConfig;
+      recordConfigs[true][IPoolV2.MessageDirection.Inbound] = args.fastFinalityInboundRateLimiterConfig;
+      emit RateLimitPolicyConfigSet(
+        args.policyName,
+        args.remoteChainSelector,
+        args.localDecimals,
+        args.outboundRateLimiterConfig,
+        args.inboundRateLimiterConfig,
+        args.fastFinalityOutboundRateLimiterConfig,
+        args.fastFinalityInboundRateLimiterConfig
+      );
+    }
+  }
+
+  /// @notice Sets the rate limit policy of tokens. A token uses the records of its new policy at once.
+  /// @dev Only callable by an authorized pool config manager. A set needs a registered token and a policy that exists.
+  /// The policy must have the decimals of the token, because a policy rate limit is a raw amount in local token units.
+  /// @param tokenPoliciesToSet The rate limit policy of each token. Zero removes the token from its policy.
+  function applyTokenRateLimitPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
+      address localToken = tokenPoliciesToSet[i].localToken;
+      bytes32 policyName = tokenPoliciesToSet[i].policyName;
+      if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+      TokenState storage tokenState = s_tokenStates[localToken];
+      // The existence check runs first, because a policy that does not exist has zero decimals.
+      if (policyName != bytes32(0)) {
+        if (!s_rateLimitPolicies.policyNames.contains(policyName)) revert PolicyConfig.PolicyNotFound(policyName);
+        uint8 policyDecimals = s_rateLimitPolicyDecimals[policyName];
+        if (policyDecimals != tokenState.localDecimals) {
+          revert InvalidRateLimitPolicyDecimals(policyName, policyDecimals, tokenState.localDecimals);
+        }
+      }
+      PolicyConfig._moveToken(s_rateLimitPolicies, tokenState.rateLimitPolicyName, policyName);
+      tokenState.rateLimitPolicyName = policyName;
+      emit TokenRateLimitPolicySet(localToken, policyName);
     }
   }
 
