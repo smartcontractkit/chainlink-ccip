@@ -13,22 +13,35 @@ contract PolicyConfig__moveToken is PolicyConfigSetup {
   }
 
   function test__moveToken() public {
-    assertTrue(s_helper.moveToken(POLICY, OTHER_POLICY));
+    assertEq(1, s_helper.getTokenCount(POLICY));
+
+    s_helper.moveToken(POLICY, OTHER_POLICY);
     assertEq(0, s_helper.getTokenCount(POLICY));
     assertEq(1, s_helper.getTokenCount(OTHER_POLICY));
 
     // A move to zero takes the token out of its policy.
-    assertTrue(s_helper.moveToken(OTHER_POLICY, bytes32(0)));
+    s_helper.moveToken(OTHER_POLICY, bytes32(0));
     assertEq(0, s_helper.getTokenCount(OTHER_POLICY));
   }
 
   function test__moveToken_SamePolicy() public {
-    assertTrue(s_helper.moveToken(POLICY, POLICY));
+    s_helper.moveToken(POLICY, POLICY);
     assertEq(1, s_helper.getTokenCount(POLICY));
   }
 
-  function test__moveToken_NewPolicyNotFound() public {
-    assertFalse(s_helper.moveToken(POLICY, "UNKNOWN_POLICY"));
+  function test__moveToken_MultipleTokens() public {
+    s_helper.moveToken(bytes32(0), POLICY);
+    assertEq(2, s_helper.getTokenCount(POLICY));
+
+    s_helper.moveToken(POLICY, OTHER_POLICY);
     assertEq(1, s_helper.getTokenCount(POLICY));
+    assertEq(1, s_helper.getTokenCount(OTHER_POLICY));
+  }
+
+  // Reverts
+
+  function test__moveToken_RevertWhen_PolicyNotFound() public {
+    vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, bytes32("UNKNOWN_POLICY")));
+    s_helper.moveToken(POLICY, "UNKNOWN_POLICY");
   }
 }

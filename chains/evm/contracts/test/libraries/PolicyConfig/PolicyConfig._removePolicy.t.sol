@@ -13,7 +13,7 @@ contract PolicyConfig__removePolicy is PolicyConfigSetup {
   function test__removePolicy() public {
     s_helper.removePolicyRecord(POLICY, CHAIN_SELECTOR);
 
-    assertTrue(s_helper.removePolicy(POLICY));
+    s_helper.removePolicy(POLICY);
     assertEq(0, s_helper.getPolicyNames().length);
 
     // A removed name can be used again, and it starts as a new policy.
@@ -25,17 +25,41 @@ contract PolicyConfig__removePolicy is PolicyConfigSetup {
     assertEq(0, s_helper.getTokenCount(POLICY));
   }
 
-  function test__removePolicy_PolicyNotFound() public {
-    assertFalse(s_helper.removePolicy(OTHER_POLICY));
-    assertFalse(s_helper.removePolicy(bytes32(0)));
+  function test__removePolicy_AfterLastTokenLeaves() public {
+    s_helper.moveToken(bytes32(0), POLICY);
+    s_helper.moveToken(POLICY, bytes32(0));
+    s_helper.removePolicyRecord(POLICY, CHAIN_SELECTOR);
 
-    assertEq(1, s_helper.getPolicyNames().length);
+    s_helper.removePolicy(POLICY);
+    assertEq(0, s_helper.getPolicyNames().length);
+  }
+
+  function test__removePolicy_KeepsOtherPolicies() public {
+    s_helper.setPolicyRecord(OTHER_POLICY, CHAIN_SELECTOR);
+    s_helper.removePolicyRecord(POLICY, CHAIN_SELECTOR);
+
+    s_helper.removePolicy(POLICY);
+
+    bytes32[] memory policyNames = s_helper.getPolicyNames();
+    assertEq(1, policyNames.length);
+    assertEq(OTHER_POLICY, policyNames[0]);
   }
 
   // Reverts
 
+  function test__removePolicy_RevertWhen_PolicyNotFound() public {
+    vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, OTHER_POLICY));
+    s_helper.removePolicy(OTHER_POLICY);
+
+    vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, bytes32(0)));
+    s_helper.removePolicy(bytes32(0));
+  }
+
   function test__removePolicy_RevertWhen_PolicyInUse() public {
+    // The policy stays in use while one of its two tokens is left.
     s_helper.moveToken(bytes32(0), POLICY);
+    s_helper.moveToken(bytes32(0), POLICY);
+    s_helper.moveToken(POLICY, bytes32(0));
     s_helper.removePolicyRecord(POLICY, CHAIN_SELECTOR);
 
     vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyInUse.selector, POLICY));

@@ -20,6 +20,16 @@ contract PolicyConfig__setInlineRecord is PolicyConfigSetup {
     assertEq(1, s_helper.getInlineChainSelectors(s_token).length);
   }
 
+  function test__setInlineRecord_MultipleChains() public {
+    s_helper.setInlineRecord(s_token, CHAIN_SELECTOR);
+    s_helper.setInlineRecord(s_token, OTHER_CHAIN_SELECTOR);
+
+    uint256[] memory inlineChainSelectors = s_helper.getInlineChainSelectors(s_token);
+    assertEq(2, inlineChainSelectors.length);
+    assertEq(CHAIN_SELECTOR, inlineChainSelectors[0]);
+    assertEq(OTHER_CHAIN_SELECTOR, inlineChainSelectors[1]);
+  }
+
   // Reverts
 
   function test__setInlineRecord_RevertWhen_LocalTokenNotRegistered() public {

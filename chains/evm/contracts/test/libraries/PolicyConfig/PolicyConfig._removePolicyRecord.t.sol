@@ -20,6 +20,16 @@ contract PolicyConfig__removePolicyRecord is PolicyConfigSetup {
     assertEq(POLICY, policyNames[0]);
   }
 
+  function test__removePolicyRecord_KeepsOtherRecords() public {
+    s_helper.setPolicyRecord(POLICY, OTHER_CHAIN_SELECTOR);
+
+    s_helper.removePolicyRecord(POLICY, CHAIN_SELECTOR);
+
+    uint256[] memory policyChainSelectors = s_helper.getPolicyChainSelectors(POLICY);
+    assertEq(1, policyChainSelectors.length);
+    assertEq(OTHER_CHAIN_SELECTOR, policyChainSelectors[0]);
+  }
+
   // Reverts
 
   function test__removePolicyRecord_RevertWhen_PolicyRecordNotFound() public {

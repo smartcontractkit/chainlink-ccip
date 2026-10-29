@@ -14,7 +14,7 @@ contract PolicyConfigHelper {
 
   PolicyConfig.Policies private s_policies;
   EnumerableSet.AddressSet private s_tokens;
-  mapping(address localToken => EnumerableSet.UintSet) private s_inlineChainSelectors;
+  mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineChainSelectors;
 
   function registerToken(
     address localToken
@@ -26,7 +26,8 @@ contract PolicyConfigHelper {
     bytes32 policyName,
     uint64 remoteChainSelector
   ) external view returns (PolicyConfig.RecordLevel) {
-    return PolicyConfig._resolvePolicyRecordLevel(s_policies.remoteChainSelectors[policyName], remoteChainSelector);
+    return
+      PolicyConfig._resolvePolicyRecordLevel(s_policies.policies[policyName].remoteChainSelectors, remoteChainSelector);
   }
 
   function setPolicyRecord(
@@ -45,8 +46,8 @@ contract PolicyConfigHelper {
 
   function removePolicy(
     bytes32 policyName
-  ) external returns (bool) {
-    return PolicyConfig._removePolicy(s_policies, policyName);
+  ) external {
+    PolicyConfig._removePolicy(s_policies, policyName);
   }
 
   function setInlineRecord(
@@ -66,8 +67,8 @@ contract PolicyConfigHelper {
   function moveToken(
     bytes32 oldPolicyName,
     bytes32 newPolicyName
-  ) external returns (bool) {
-    return PolicyConfig._moveToken(s_policies, oldPolicyName, newPolicyName);
+  ) external {
+    PolicyConfig._moveToken(s_policies, oldPolicyName, newPolicyName);
   }
 
   function getPolicyNames() external view returns (bytes32[] memory) {
@@ -77,13 +78,13 @@ contract PolicyConfigHelper {
   function getPolicyChainSelectors(
     bytes32 policyName
   ) external view returns (uint256[] memory) {
-    return s_policies.remoteChainSelectors[policyName].values();
+    return s_policies.policies[policyName].remoteChainSelectors.values();
   }
 
   function getTokenCount(
     bytes32 policyName
   ) external view returns (uint32) {
-    return s_policies.tokenCounts[policyName];
+    return s_policies.policies[policyName].tokenCount;
   }
 
   function getInlineChainSelectors(
