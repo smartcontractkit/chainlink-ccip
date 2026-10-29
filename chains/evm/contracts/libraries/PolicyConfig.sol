@@ -93,7 +93,7 @@ library PolicyConfig {
     return RecordLevel.None;
   }
 
-  /// @notice Adds a record to a policy, or updates the record if it exists.
+  /// @notice Adds a record to a policy, or keeps the record if it exists.
   /// @param s_policies The policies of the policy type.
   /// @param policyName The name of the policy.
   /// @param remoteChainSelector The chain of the record. Zero names the default record.
@@ -147,7 +147,7 @@ library PolicyConfig {
     s_policies.policyNames.remove(policyName);
   }
 
-  /// @notice Adds an inline record to a token, or updates the record if it exists.
+  /// @notice Adds an inline record to a token, or keeps the record if it exists.
   /// @dev There are no defaults for inline records, chain selector zero is rejected.
   /// @param s_tokens The registered tokens.
   /// @param s_inlineChainSelectors The chains of the inline records of the token.
