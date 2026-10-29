@@ -30,9 +30,12 @@ contract PolicyConfig__moveToken is PolicyConfigSetup {
   }
 
   function test__moveToken_MultipleTokens() public {
+    // _moveToken takes only policy names, not a token. setUp moved the first token into POLICY.
+    // This call moves a second token into POLICY.
     s_helper.moveToken(bytes32(0), POLICY);
     assertEq(2, s_helper.getTokenCount(POLICY));
 
+    // One of the two tokens moves from POLICY to OTHER_POLICY.
     s_helper.moveToken(POLICY, OTHER_POLICY);
     assertEq(1, s_helper.getTokenCount(POLICY));
     assertEq(1, s_helper.getTokenCount(OTHER_POLICY));
@@ -41,7 +44,18 @@ contract PolicyConfig__moveToken is PolicyConfigSetup {
   // Reverts
 
   function test__moveToken_RevertWhen_PolicyNotFound() public {
+    // The new policy does not exist.
     vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, bytes32("UNKNOWN_POLICY")));
     s_helper.moveToken(POLICY, "UNKNOWN_POLICY");
+
+    // The old policy does not exist.
+    vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, bytes32("UNKNOWN_POLICY")));
+    s_helper.moveToken("UNKNOWN_POLICY", POLICY);
+  }
+
+  function test__moveToken_RevertWhen_PolicyHasNoTokens() public {
+    // OTHER_POLICY exists, but no token uses it.
+    vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyHasNoTokens.selector, OTHER_POLICY));
+    s_helper.moveToken(OTHER_POLICY, POLICY);
   }
 }
