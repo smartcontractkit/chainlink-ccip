@@ -36,53 +36,47 @@ library PolicyConfig {
     PolicyDefault // The default record of the token's policy.
   }
 
-  /// @notice Identifies one policy record.
+  /// @notice Specifies one policy record.
   struct PolicyRecordKey {
     bytes32 policyName; // The name of the policy.
     uint64 remoteChainSelector; // The remote chain selector, zero for the default record.
   }
 
-  /// @notice The profile of one token. Setting it registers a new token without policies, or replaces the profile of a
-  /// registered token.
+  /// @notice The profile of one token, independent of policies.
   struct TokenProfileArgs {
     address localToken; // ──────────────────────────────────╮ The local token.
     uint8 localDecimals; //                                  │ Checked against decimals(). Fixed while registered.
-    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the token out.
+    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ Specifies token's burn flavor, or to use lock/release.
     bytes4 allowedFinalityConfig; // ────────────────────────╯ The allowed FTF finality. Zero allows default only.
     address lockOrBurnAddress; // The burn address for BurnToAddress, the lock box for Lock, zero otherwise.
     address additionalPoolDataProvider; // The IAdditionalPoolDataProvider of the token, zero for none.
   }
 
-  /// @notice The policy of one policy type for one token.
+  /// @notice Specifies a token's policy for one policy type.
   struct TokenPolicyArgs {
     address localToken; // A registered token.
     bytes32 policyName; // The name of the policy. Zero removes the token from its current policy.
   }
 
-  /// @notice The state of one policy. A policy exists from the time its first record is set until it is removed. It can
-  /// exist without records.
-  /// @dev A store must deregister only a token without a policy. Otherwise the token count of the policy stays above
-  /// zero, and the policy can never be removed.
+  /// @notice The state of one policy instance.
+  /// @dev A policy cannot be removed if there are any tokens using it.
   struct Policy {
     EnumerableSet.UintSet remoteChainSelectors; // The chains of the policy records. Zero names the default record.
     uint32 tokenCount; // The number of tokens that use the policy.
   }
 
-  /// @notice The policies of one policy type. Zero is never a policy name, so a token without a policy never finds a
-  /// policy record.
+  /// @notice The policy registry of one policy type. Zero is never a policy name.
   struct Policies {
     EnumerableSet.Bytes32Set policyNames; // The names of all policies, including policies that no token uses.
     mapping(bytes32 policyName => Policy policy) policies; // The state of each policy.
   }
 
-  /// @notice Returns the level of the policy record that serves a chain. A record for the chain is used before the
-  /// default record.
-  /// @dev The caller checks the inline record of the token first, as an inline record overrides the policy. Chain
-  /// selector zero never resolves to a record, as no lane uses it.
-  /// @param s_policyChainSelectors The chains of the records of the token's policy. For a token without a policy, the
-  /// empty set of policy name zero.
+  /// @notice Helper function that returns the level of the policy record that serves a chain.
+  /// A chain-specific record takes higher precedence over the default record.
+  /// @dev The caller checks the inline record of the token first, as an inline record overrides the policy.
+  /// @param s_policyChainSelectors The chains of the records of the token's policy.
   /// @param remoteChainSelector The remote chain selector.
-  /// @return The level of the policy record. It is never Inline.
+  /// @return The level of the policy record.
   function _resolvePolicyRecordLevel(
     EnumerableSet.UintSet storage s_policyChainSelectors,
     uint64 remoteChainSelector
@@ -99,10 +93,7 @@ library PolicyConfig {
     return RecordLevel.None;
   }
 
-  /// @notice Adds a record to a policy, or keeps the record if it exists. The first record that is set under a new name
-  /// creates the policy.
-  /// @dev The caller writes the values of the record. For a policy type without default records, the caller must reject
-  /// chain selector zero.
+  /// @notice Adds a record to a policy, or updates the record if it exists.
   /// @param s_policies The policies of the policy type.
   /// @param policyName The name of the policy.
   /// @param remoteChainSelector The chain of the record. Zero names the default record.
@@ -156,9 +147,8 @@ library PolicyConfig {
     s_policies.policyNames.remove(policyName);
   }
 
-  /// @notice Adds an inline record to a token, or keeps the record if it exists.
-  /// @dev The caller writes the values of the record. There is no inline default record, so chain selector zero is
-  /// rejected.
+  /// @notice Adds an inline record to a token, or updates the record if it exists.
+  /// @dev There are no defaults for inline records, chain selector zero is rejected.
   /// @param s_tokens The registered tokens.
   /// @param s_inlineChainSelectors The chains of the inline records of the token.
   /// @param localToken The token.
@@ -180,7 +170,6 @@ library PolicyConfig {
   }
 
   /// @notice Removes an inline record from a token.
-  /// @dev The caller deletes the values of the record.
   /// @param s_inlineChainSelectors The chains of the inline records of the token.
   /// @param localToken The token.
   /// @param remoteChainSelector The chain of the record.
@@ -194,9 +183,8 @@ library PolicyConfig {
     }
   }
 
-  /// @notice Updates the token counts when a token changes from its old policy to its new policy. A zero policy name
-  /// means that the token has no policy.
-  /// @dev The caller checks that the token is registered. The caller then stores the new policy name for the token.
+  /// @notice Updates the token counts when a token changes from its old policy to its new policy.
+  /// A zero policy name means that the token has no policy.
   /// @param s_policies The policies of the policy type.
   /// @param oldPolicyName The current policy of the token, as the caller stores it.
   /// @param newPolicyName The new policy of the token.
@@ -213,10 +201,10 @@ library PolicyConfig {
     }
 
     if (oldPolicyName != bytes32(0)) {
-      --s_policies.policies[oldPolicyName].tokenCount;
+      s_policies.policies[oldPolicyName].tokenCount -= 1;
     }
     if (newPolicyName != bytes32(0)) {
-      ++s_policies.policies[newPolicyName].tokenCount;
+      s_policies.policies[newPolicyName].tokenCount += 1;
     }
   }
 }
