@@ -20,6 +20,7 @@ library PolicyConfig {
   error PolicyRecordNotFound(bytes32 policyName, uint64 remoteChainSelector);
   error PolicyInUse(bytes32 policyName);
   error PolicyHasRecords(bytes32 policyName);
+  error PolicyHasNoTokens(bytes32 policyName);
   error LocalTokenNotRegistered(address localToken);
   error ZeroChainSelectorNotAllowed();
   error InlineRecordNotFound(address localToken, uint64 remoteChainSelector);
@@ -186,8 +187,9 @@ library PolicyConfig {
   /// @notice Updates the token counts when a token changes from its old policy to its new policy.
   /// A zero policy name means that the token has no policy.
   /// @param s_policies The policies of the policy type.
-  /// @param oldPolicyName The current policy of the token, as the caller stores it.
-  /// @param newPolicyName The new policy of the token.
+  /// @param oldPolicyName The current policy of the token, as the caller stores it. It must exist and have at least
+  /// one token.
+  /// @param newPolicyName The new policy of the token. It must exist.
   function _moveToken(
     Policies storage s_policies,
     bytes32 oldPolicyName,
@@ -195,6 +197,14 @@ library PolicyConfig {
   ) internal {
     if (oldPolicyName == newPolicyName) {
       return;
+    }
+    if (oldPolicyName != bytes32(0)) {
+      if (!s_policies.policyNames.contains(oldPolicyName)) {
+        revert PolicyNotFound(oldPolicyName);
+      }
+      if (s_policies.policies[oldPolicyName].tokenCount == 0) {
+        revert PolicyHasNoTokens(oldPolicyName);
+      }
     }
     if (newPolicyName != bytes32(0) && !s_policies.policyNames.contains(newPolicyName)) {
       revert PolicyNotFound(newPolicyName);
