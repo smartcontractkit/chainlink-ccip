@@ -5472,7 +5472,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("When sending a valid CCIP message and paying in native SOL, it bills the same amount that getFee previously returned and it's accumulated as Wrapped SOL", func(t *testing.T) {
 			getLamports := func(account solana.PublicKey) uint64 {
-				out, err := solanaGoClient.GetBalance(ctx, account, rpc.CommitmentConfirmed)
+				out, err := solanaGoClient.GetBalance(ctx, account, rpc.CommitmentFinalized)
 				require.NoError(t, err)
 				return out.Value
 			}
@@ -5875,7 +5875,7 @@ func TestCCIPRouter(t *testing.T) {
 			approveLinkIx, err := tokens.TokenApproveChecked(1e9, 9, link22.program, link22.userATA, link22.mint, senderPDA, user.PublicKey(), nil)
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferSolIx, wsolATAIx, approveLinkIx, link22ATAIx, initIx, evmDestChainIx, svmDestChainIx, token0ATAIx, token1ATAIx}, user, rpc.CommitmentConfirmed)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferSolIx, wsolATAIx, approveLinkIx, link22ATAIx, initIx, evmDestChainIx, svmDestChainIx, token0ATAIx, token1ATAIx}, user, rpc.CommitmentFinalized)
 		})
 
 		feeConfig := []struct {
@@ -6851,7 +6851,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						instruction, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
-						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentFinalized, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
 						commitEvent := common.EventCommitReportAccepted{}
 						require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
@@ -6944,7 +6944,7 @@ func TestCCIPRouter(t *testing.T) {
 						instruction, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
 
-						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentFinalized, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 						commitEvent := common.EventCommitReportAccepted{}
 						require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
 
@@ -7373,7 +7373,7 @@ func TestCCIPRouter(t *testing.T) {
 
 							instruction, err := raw.ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, []string{testcase.ExpectedError}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+							testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentFinalized, offrampLookupTable, []string{testcase.ExpectedError}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 						})
 					}
 				})
@@ -10581,7 +10581,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			t.Run("Execution report pre-buffering", func(t *testing.T) {
 				getLamports := func(account solana.PublicKey) uint64 {
-					out, err := solanaGoClient.GetBalance(ctx, account, rpc.CommitmentConfirmed)
+					out, err := solanaGoClient.GetBalance(ctx, account, rpc.CommitmentFinalized)
 					require.NoError(t, err)
 					return out.Value
 				}

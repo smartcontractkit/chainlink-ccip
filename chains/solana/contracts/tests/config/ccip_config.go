@@ -12,7 +12,7 @@ import (
 
 var (
 	PrintEvents       = true
-	DefaultCommitment = rpc.CommitmentConfirmed
+	DefaultCommitment = rpc.CommitmentFinalized
 
 	// program ids
 	CcipRouterProgram          = GetProgramID("ccip_router")
