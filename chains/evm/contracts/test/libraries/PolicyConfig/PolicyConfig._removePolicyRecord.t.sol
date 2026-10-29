@@ -13,7 +13,7 @@ contract PolicyConfig__removePolicyRecord is PolicyConfigSetup {
   function test__removePolicyRecord() public {
     s_helper.removePolicyRecord(POLICY, CHAIN_SELECTOR);
 
-    assertEq(0, s_helper.getPolicyChains(POLICY).length);
+    assertEq(0, s_helper.getPolicyChainSelectors(POLICY).length);
     // The policy stays when it has no records left.
     bytes32[] memory policyNames = s_helper.getPolicyNames();
     assertEq(1, policyNames.length);

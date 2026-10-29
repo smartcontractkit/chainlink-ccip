@@ -12,9 +12,9 @@ contract PolicyConfig__setPolicyRecord is PolicyConfigSetup {
     bytes32[] memory policyNames = s_helper.getPolicyNames();
     assertEq(1, policyNames.length);
     assertEq(POLICY, policyNames[0]);
-    uint256[] memory policyChains = s_helper.getPolicyChains(POLICY);
-    assertEq(1, policyChains.length);
-    assertEq(CHAIN_SELECTOR, policyChains[0]);
+    uint256[] memory policyChainSelectors = s_helper.getPolicyChainSelectors(POLICY);
+    assertEq(1, policyChainSelectors.length);
+    assertEq(CHAIN_SELECTOR, policyChainSelectors[0]);
     assertEq(0, s_helper.getTokenCount(POLICY));
   }
 
@@ -23,17 +23,17 @@ contract PolicyConfig__setPolicyRecord is PolicyConfigSetup {
     s_helper.setPolicyRecord(POLICY, CHAIN_SELECTOR);
 
     assertEq(1, s_helper.getPolicyNames().length);
-    assertEq(1, s_helper.getPolicyChains(POLICY).length);
+    assertEq(1, s_helper.getPolicyChainSelectors(POLICY).length);
   }
 
   function test__setPolicyRecord_DefaultRecord() public {
     s_helper.setPolicyRecord(POLICY, CHAIN_SELECTOR);
     s_helper.setPolicyRecord(POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
 
-    uint256[] memory policyChains = s_helper.getPolicyChains(POLICY);
-    assertEq(2, policyChains.length);
-    assertEq(CHAIN_SELECTOR, policyChains[0]);
-    assertEq(PolicyConfig.DEFAULT_CHAIN_SELECTOR, policyChains[1]);
+    uint256[] memory policyChainSelectors = s_helper.getPolicyChainSelectors(POLICY);
+    assertEq(2, policyChainSelectors.length);
+    assertEq(CHAIN_SELECTOR, policyChainSelectors[0]);
+    assertEq(PolicyConfig.DEFAULT_CHAIN_SELECTOR, policyChainSelectors[1]);
   }
 
   // Reverts

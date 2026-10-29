@@ -13,7 +13,7 @@ contract PolicyConfig__removeInlineRecord is PolicyConfigSetup {
   function test__removeInlineRecord() public {
     s_helper.removeInlineRecord(s_token, CHAIN_SELECTOR);
 
-    assertEq(0, s_helper.getInlineChains(s_token).length);
+    assertEq(0, s_helper.getInlineChainSelectors(s_token).length);
   }
 
   // Reverts

@@ -5,8 +5,8 @@ import {PolicyConfig} from "../../libraries/PolicyConfig.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-/// @notice Exposes `PolicyConfig` internal functions for unit tests. It holds the policies of one type, the registered
-/// tokens and the inline chains of each token, the same as a policy store.
+/// @notice Exposes `PolicyConfig` internal functions for unit tests. It holds the policies of one policy type, the
+/// registered tokens and the inline chains of each token, the same as a policy store.
 contract PolicyConfigHelper {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -14,7 +14,7 @@ contract PolicyConfigHelper {
 
   PolicyConfig.Policies private s_policies;
   EnumerableSet.AddressSet private s_tokens;
-  mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineChains;
+  mapping(address localToken => EnumerableSet.UintSet) private s_inlineChainSelectors;
 
   function registerToken(
     address localToken
@@ -26,8 +26,7 @@ contract PolicyConfigHelper {
     bytes32 policyName,
     uint64 remoteChainSelector
   ) external view returns (PolicyConfig.RecordLevel) {
-    return
-      PolicyConfig._resolvePolicyRecordLevel(s_policies.byName[policyName].remoteChainSelectors, remoteChainSelector);
+    return PolicyConfig._resolvePolicyRecordLevel(s_policies.remoteChainSelectors[policyName], remoteChainSelector);
   }
 
   function setPolicyRecord(
@@ -46,7 +45,7 @@ contract PolicyConfigHelper {
 
   function removePolicy(
     bytes32 policyName
-  ) external returns (bool isPolicyFound) {
+  ) external returns (bool) {
     return PolicyConfig._removePolicy(s_policies, policyName);
   }
 
@@ -54,42 +53,42 @@ contract PolicyConfigHelper {
     address localToken,
     uint64 remoteChainSelector
   ) external {
-    PolicyConfig._setInlineRecord(s_tokens, s_inlineChains[localToken], localToken, remoteChainSelector);
+    PolicyConfig._setInlineRecord(s_tokens, s_inlineChainSelectors[localToken], localToken, remoteChainSelector);
   }
 
   function removeInlineRecord(
     address localToken,
     uint64 remoteChainSelector
   ) external {
-    PolicyConfig._removeInlineRecord(s_inlineChains[localToken], localToken, remoteChainSelector);
+    PolicyConfig._removeInlineRecord(s_inlineChainSelectors[localToken], localToken, remoteChainSelector);
   }
 
   function moveToken(
     bytes32 oldPolicyName,
     bytes32 newPolicyName
-  ) external returns (bool isNewPolicyFound) {
+  ) external returns (bool) {
     return PolicyConfig._moveToken(s_policies, oldPolicyName, newPolicyName);
   }
 
-  function getPolicyNames() external view returns (bytes32[] memory policyNames) {
-    return s_policies.names.values();
+  function getPolicyNames() external view returns (bytes32[] memory) {
+    return s_policies.policyNames.values();
   }
 
-  function getPolicyChains(
+  function getPolicyChainSelectors(
     bytes32 policyName
-  ) external view returns (uint256[] memory remoteChainSelectors) {
-    return s_policies.byName[policyName].remoteChainSelectors.values();
+  ) external view returns (uint256[] memory) {
+    return s_policies.remoteChainSelectors[policyName].values();
   }
 
   function getTokenCount(
     bytes32 policyName
-  ) external view returns (uint32 tokenCount) {
-    return s_policies.byName[policyName].tokenCount;
+  ) external view returns (uint32) {
+    return s_policies.tokenCounts[policyName];
   }
 
-  function getInlineChains(
+  function getInlineChainSelectors(
     address localToken
-  ) external view returns (uint256[] memory remoteChainSelectors) {
-    return s_inlineChains[localToken].values();
+  ) external view returns (uint256[] memory) {
+    return s_inlineChainSelectors[localToken].values();
   }
 }

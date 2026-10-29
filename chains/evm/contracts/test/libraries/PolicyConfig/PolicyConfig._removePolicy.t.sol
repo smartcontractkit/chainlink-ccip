@@ -19,9 +19,9 @@ contract PolicyConfig__removePolicy is PolicyConfigSetup {
     // A removed name can be used again, and it starts as a new policy.
     s_helper.setPolicyRecord(POLICY, OTHER_CHAIN_SELECTOR);
     assertEq(1, s_helper.getPolicyNames().length);
-    uint256[] memory policyChains = s_helper.getPolicyChains(POLICY);
-    assertEq(1, policyChains.length);
-    assertEq(OTHER_CHAIN_SELECTOR, policyChains[0]);
+    uint256[] memory policyChainSelectors = s_helper.getPolicyChainSelectors(POLICY);
+    assertEq(1, policyChainSelectors.length);
+    assertEq(OTHER_CHAIN_SELECTOR, policyChainSelectors[0]);
     assertEq(0, s_helper.getTokenCount(POLICY));
   }
 
