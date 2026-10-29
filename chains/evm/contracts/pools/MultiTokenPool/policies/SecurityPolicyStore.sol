@@ -152,10 +152,31 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// policy exists from the set of its first record until its removal, and it can exist without records.
   PolicyConfig.Policies private s_rateLimitPolicies;
 
+  /// @notice The decimals of each rate limit policy. Every token of the policy has these decimals.
+  /// @dev The first record of the policy fixes them, and they stay fixed until the policy is removed. Amounts are in
+  /// local token units, so a shared rate limit means the same amount for every token of the policy.
+  mapping(bytes32 policyName => uint8 localDecimals) private s_rateLimitPolicyDecimals;
+
+  /// @notice The rate limit config of each policy record, per remote chain, finality class and direction.
+  /// @dev A policy record keeps its config here, unlike an inline record, which keeps it in the buckets of its token.
+  /// A transfer copies the config of a policy record into the bucket of its token on use, when the bucket holds
+  /// another config, which refills the bucket.
+  mapping(
+    bytes32 policyName
+      => mapping(
+      uint64 remoteChainSelector
+        => mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.Config config))
+    )
+  ) private s_policyRateLimitConfigs;
+
   /// @notice The security policies. Each policy is a named set of security records.
   /// @dev A policy name is never zero, so a token without a security policy never resolves to a policy record. A
   /// policy exists from the set of its first record until its removal, and it can exist without records.
   PolicyConfig.Policies private s_securityPolicies;
+
+  /// @notice The security record of each policy, per remote chain. Zero names the policy default record.
+  mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => SecurityConfig securityConfig)) private
+    s_policySecurityConfigs;
 
   constructor(
     address[] memory authorizedCallers
