@@ -25,9 +25,14 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   error ZeroAddressInvalid();
   error TokenHasConfig(address localToken);
-  error InvalidTransferFeeBps(uint256 bps);
-  error DisabledNonZeroFeeConfig(FeeConfig feeConfig);
-  error InvalidDestOverheads(uint64 remoteChainSelector, uint32 destGasOverhead, uint32 destBytesOverhead);
+  error InvalidFeePolicyConfig(bytes32 policyName, uint64 remoteChainSelector, FeeConfig feeConfig);
+  error InvalidInlineFeeConfig(address localToken, uint64 remoteChainSelector, FeeConfig feeConfig);
+  error InvalidDestOverheadPolicyConfig(
+    bytes32 policyName, uint64 remoteChainSelector, DestOverheadConfig destOverheadConfig
+  );
+  error InvalidInlineDestOverheadConfig(
+    address localToken, uint64 remoteChainSelector, DestOverheadConfig destOverheadConfig
+  );
   error FeeRecordNotFound(address localToken, uint64 remoteChainSelector);
   error DestOverheadRecordNotFound(address localToken, uint64 remoteChainSelector);
   error HasLanesLengthMismatch(uint256 lanesLength, uint256 hasLanesLength);
@@ -621,7 +626,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
         fastFinalityTransferFeeBps: args.fastFinalityTransferFeeBps,
         isEnabled: args.isEnabled
       });
-      _validateFeeConfig(feeConfig);
+      if (!_isValidFeeConfig(feeConfig)) {
+        revert InvalidFeePolicyConfig(args.policyName, args.remoteChainSelector, feeConfig);
+      }
 
       PolicyConfig._setPolicyRecord(s_feePolicies, args.policyName, args.remoteChainSelector);
       s_policyFeeConfigs[args.policyName][args.remoteChainSelector] = feeConfig;
@@ -655,7 +662,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
         fastFinalityTransferFeeBps: args.fastFinalityTransferFeeBps,
         isEnabled: args.isEnabled
       });
-      _validateFeeConfig(feeConfig);
+      if (!_isValidFeeConfig(feeConfig)) {
+        revert InvalidInlineFeeConfig(args.localToken, args.remoteChainSelector, feeConfig);
+      }
 
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineFeeChains[args.localToken], args.localToken, args.remoteChainSelector
@@ -665,26 +674,17 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev An enabled config gets the basis point checks of TokenPool.applyTokenTransferFeeConfigUpdates. A disabled
-  /// config must be zero in every field, so that no fee value stays hidden in storage.
-  function _validateFeeConfig(
+  /// @dev Returns true if the fee config is valid. An enabled config needs each fee in basis points below BPS_DIVIDER,
+  /// the same as in TokenPool.applyTokenTransferFeeConfigUpdates. A disabled config must be zero in every field, so
+  /// that no fee value stays hidden in storage.
+  function _isValidFeeConfig(
     FeeConfig memory feeConfig
-  ) private pure {
+  ) private pure returns (bool) {
     if (!feeConfig.isEnabled) {
-      if (
-        feeConfig.finalityFeeUSDCents != 0 || feeConfig.fastFinalityFeeUSDCents != 0
-          || feeConfig.finalityTransferFeeBps != 0 || feeConfig.fastFinalityTransferFeeBps != 0
-      ) {
-        revert DisabledNonZeroFeeConfig(feeConfig);
-      }
-      return;
+      return feeConfig.finalityFeeUSDCents == 0 && feeConfig.fastFinalityFeeUSDCents == 0
+        && feeConfig.finalityTransferFeeBps == 0 && feeConfig.fastFinalityTransferFeeBps == 0;
     }
-    if (feeConfig.finalityTransferFeeBps >= BPS_DIVIDER) {
-      revert InvalidTransferFeeBps(feeConfig.finalityTransferFeeBps);
-    }
-    if (feeConfig.fastFinalityTransferFeeBps >= BPS_DIVIDER) {
-      revert InvalidTransferFeeBps(feeConfig.fastFinalityTransferFeeBps);
-    }
+    return feeConfig.finalityTransferFeeBps < BPS_DIVIDER && feeConfig.fastFinalityTransferFeeBps < BPS_DIVIDER;
   }
 
   // ================================================================
@@ -722,7 +722,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       DestOverheadPolicyConfigArgs calldata args = policyConfigsToSet[i];
       DestOverheadConfig memory destOverheadConfig =
         DestOverheadConfig({destGasOverhead: args.destGasOverhead, destBytesOverhead: args.destBytesOverhead});
-      _validateDestOverheadConfig(args.remoteChainSelector, destOverheadConfig);
+      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
+        revert InvalidDestOverheadPolicyConfig(args.policyName, args.remoteChainSelector, destOverheadConfig);
+      }
 
       PolicyConfig._setPolicyRecord(s_destOverheadPolicies, args.policyName, args.remoteChainSelector);
       s_policyDestOverheadConfigs[args.policyName][args.remoteChainSelector] = destOverheadConfig;
@@ -751,7 +753,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       InlineDestOverheadConfigArgs calldata args = inlineConfigsToSet[i];
       DestOverheadConfig memory destOverheadConfig =
         DestOverheadConfig({destGasOverhead: args.destGasOverhead, destBytesOverhead: args.destBytesOverhead});
-      _validateDestOverheadConfig(args.remoteChainSelector, destOverheadConfig);
+      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
+        revert InvalidInlineDestOverheadConfig(args.localToken, args.remoteChainSelector, destOverheadConfig);
+      }
 
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineDestOverheadChains[args.localToken], args.localToken, args.remoteChainSelector
@@ -761,16 +765,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev The gas overhead must be above zero, the same as in TokenPool.applyTokenTransferFeeConfigUpdates. The bytes
-  /// overhead must be at least MIN_DEST_BYTES_OVERHEAD.
-  function _validateDestOverheadConfig(
-    uint64 remoteChainSelector,
+  /// @dev Returns true if the destination overhead config is valid. The gas overhead must be above zero, the same as in
+  /// TokenPool.applyTokenTransferFeeConfigUpdates. The bytes overhead must be at least MIN_DEST_BYTES_OVERHEAD.
+  function _isValidDestOverheadConfig(
     DestOverheadConfig memory destOverheadConfig
-  ) private pure {
-    if (destOverheadConfig.destGasOverhead == 0 || destOverheadConfig.destBytesOverhead < MIN_DEST_BYTES_OVERHEAD) {
-      revert InvalidDestOverheads(
-        remoteChainSelector, destOverheadConfig.destGasOverhead, destOverheadConfig.destBytesOverhead
-      );
-    }
+  ) private pure returns (bool) {
+    return destOverheadConfig.destGasOverhead != 0 && destOverheadConfig.destBytesOverhead >= MIN_DEST_BYTES_OVERHEAD;
   }
 }

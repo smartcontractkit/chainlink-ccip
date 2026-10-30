@@ -132,36 +132,30 @@ contract FeePolicyStore_applyDestOverheadPolicyConfigUpdates is FeePolicyStoreSe
 
   // Reverts
 
-  function test_applyDestOverheadPolicyConfigUpdates_RevertWhen_InvalidDestOverheads() public {
-    FeePolicyStore.DestOverheadConfig memory destOverheadConfig = _getDestOverheadConfig();
-    destOverheadConfig.destGasOverhead = 0;
-    FeePolicyStore.DestOverheadPolicyConfigArgs[] memory policyConfigs =
-      _getDestOverheadPolicyConfigArgs(DEST_OVERHEAD_POLICY, DEST_CHAIN_SELECTOR, destOverheadConfig);
+  function test_applyDestOverheadPolicyConfigUpdates_RevertWhen_InvalidDestOverheadPolicyConfig() public {
+    // A zero gas overhead, and a bytes overhead below the minimum.
+    FeePolicyStore.DestOverheadConfig[] memory invalidConfigs = new FeePolicyStore.DestOverheadConfig[](2);
+    invalidConfigs[0] = _getDestOverheadConfig();
+    invalidConfigs[0].destGasOverhead = 0;
+    invalidConfigs[1] = _getDestOverheadConfig();
+    invalidConfigs[1].destBytesOverhead = MIN_DEST_BYTES_OVERHEAD - 1;
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        FeePolicyStore.InvalidDestOverheads.selector, DEST_CHAIN_SELECTOR, 0, MIN_DEST_BYTES_OVERHEAD
-      )
-    );
-    s_feeStore.applyDestOverheadPolicyConfigUpdates(
-      new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
-    );
+    for (uint256 i = 0; i < invalidConfigs.length; ++i) {
+      FeePolicyStore.DestOverheadPolicyConfigArgs[] memory policyConfigs =
+        _getDestOverheadPolicyConfigArgs(DEST_OVERHEAD_POLICY, DEST_CHAIN_SELECTOR, invalidConfigs[i]);
 
-    destOverheadConfig = _getDestOverheadConfig();
-    destOverheadConfig.destBytesOverhead = MIN_DEST_BYTES_OVERHEAD - 1;
-    policyConfigs = _getDestOverheadPolicyConfigArgs(DEST_OVERHEAD_POLICY, DEST_CHAIN_SELECTOR, destOverheadConfig);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        FeePolicyStore.InvalidDestOverheads.selector,
-        DEST_CHAIN_SELECTOR,
-        DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        MIN_DEST_BYTES_OVERHEAD - 1
-      )
-    );
-    s_feeStore.applyDestOverheadPolicyConfigUpdates(
-      new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
-    );
+      vm.expectRevert(
+        abi.encodeWithSelector(
+          FeePolicyStore.InvalidDestOverheadPolicyConfig.selector,
+          DEST_OVERHEAD_POLICY,
+          DEST_CHAIN_SELECTOR,
+          invalidConfigs[i]
+        )
+      );
+      s_feeStore.applyDestOverheadPolicyConfigUpdates(
+        new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
+      );
+    }
   }
 
   function test_applyDestOverheadPolicyConfigUpdates_RevertWhen_ZeroPolicyNameNotAllowed() public {

@@ -133,37 +133,30 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
 
   // Reverts
 
-  function test_applyFeePolicyConfigUpdates_RevertWhen_DisabledNonZeroFeeConfig() public {
-    // Each fee field of a disabled config must be zero.
-    for (uint256 i = 0; i < 4; ++i) {
-      FeePolicyStore.FeeConfig memory feeConfig;
-      if (i == 0) feeConfig.finalityFeeUSDCents = 1;
-      if (i == 1) feeConfig.fastFinalityFeeUSDCents = 1;
-      if (i == 2) feeConfig.finalityTransferFeeBps = 1;
-      if (i == 3) feeConfig.fastFinalityTransferFeeBps = 1;
-      FeePolicyStore.FeePolicyConfigArgs[] memory policyConfigs =
-        _getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, feeConfig);
+  function test_applyFeePolicyConfigUpdates_RevertWhen_InvalidFeePolicyConfig() public {
+    // A disabled config must be zero in every fee field. An enabled config needs each fee in basis points below
+    // BPS_DIVIDER.
+    FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](6);
+    invalidFeeConfigs[0].finalityFeeUSDCents = 1;
+    invalidFeeConfigs[1].fastFinalityFeeUSDCents = 1;
+    invalidFeeConfigs[2].finalityTransferFeeBps = 1;
+    invalidFeeConfigs[3].fastFinalityTransferFeeBps = 1;
+    invalidFeeConfigs[4] = _getFeeConfig();
+    invalidFeeConfigs[4].finalityTransferFeeBps = uint16(BPS_DIVIDER);
+    invalidFeeConfigs[5] = _getFeeConfig();
+    invalidFeeConfigs[5].fastFinalityTransferFeeBps = uint16(BPS_DIVIDER);
 
-      vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.DisabledNonZeroFeeConfig.selector, feeConfig));
+    for (uint256 i = 0; i < invalidFeeConfigs.length; ++i) {
+      FeePolicyStore.FeePolicyConfigArgs[] memory policyConfigs =
+        _getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, invalidFeeConfigs[i]);
+
+      vm.expectRevert(
+        abi.encodeWithSelector(
+          FeePolicyStore.InvalidFeePolicyConfig.selector, FEE_POLICY, DEST_CHAIN_SELECTOR, invalidFeeConfigs[i]
+        )
+      );
       s_feeStore.applyFeePolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs);
     }
-  }
-
-  function test_applyFeePolicyConfigUpdates_RevertWhen_InvalidTransferFeeBps() public {
-    FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig();
-    feeConfig.finalityTransferFeeBps = uint16(BPS_DIVIDER);
-    FeePolicyStore.FeePolicyConfigArgs[] memory policyConfigs =
-      _getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, feeConfig);
-
-    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.InvalidTransferFeeBps.selector, BPS_DIVIDER));
-    s_feeStore.applyFeePolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs);
-
-    feeConfig = _getFeeConfig();
-    feeConfig.fastFinalityTransferFeeBps = uint16(BPS_DIVIDER);
-    policyConfigs = _getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, feeConfig);
-
-    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.InvalidTransferFeeBps.selector, BPS_DIVIDER));
-    s_feeStore.applyFeePolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs);
   }
 
   function test_applyFeePolicyConfigUpdates_RevertWhen_ZeroPolicyNameNotAllowed() public {

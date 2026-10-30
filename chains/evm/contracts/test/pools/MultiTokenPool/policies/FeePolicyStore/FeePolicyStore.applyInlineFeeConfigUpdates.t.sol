@@ -64,24 +64,25 @@ contract FeePolicyStore_applyInlineFeeConfigUpdates is FeePolicyStoreSetup {
 
   // Reverts
 
-  function test_applyInlineFeeConfigUpdates_RevertWhen_DisabledNonZeroFeeConfig() public {
-    FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig();
-    feeConfig.isEnabled = false;
-    FeePolicyStore.InlineFeeConfigArgs[] memory inlineConfigs =
-      _getInlineFeeConfigArgs(s_token, DEST_CHAIN_SELECTOR, feeConfig);
+  function test_applyInlineFeeConfigUpdates_RevertWhen_InvalidInlineFeeConfig() public {
+    // A disabled config with a fee, and an enabled config with a fee in basis points at BPS_DIVIDER.
+    FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](2);
+    invalidFeeConfigs[0] = _getFeeConfig();
+    invalidFeeConfigs[0].isEnabled = false;
+    invalidFeeConfigs[1] = _getFeeConfig();
+    invalidFeeConfigs[1].finalityTransferFeeBps = uint16(BPS_DIVIDER);
 
-    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.DisabledNonZeroFeeConfig.selector, feeConfig));
-    s_feeStore.applyInlineFeeConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
-  }
+    for (uint256 i = 0; i < invalidFeeConfigs.length; ++i) {
+      FeePolicyStore.InlineFeeConfigArgs[] memory inlineConfigs =
+        _getInlineFeeConfigArgs(s_token, DEST_CHAIN_SELECTOR, invalidFeeConfigs[i]);
 
-  function test_applyInlineFeeConfigUpdates_RevertWhen_InvalidTransferFeeBps() public {
-    FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig();
-    feeConfig.finalityTransferFeeBps = uint16(BPS_DIVIDER);
-    FeePolicyStore.InlineFeeConfigArgs[] memory inlineConfigs =
-      _getInlineFeeConfigArgs(s_token, DEST_CHAIN_SELECTOR, feeConfig);
-
-    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.InvalidTransferFeeBps.selector, BPS_DIVIDER));
-    s_feeStore.applyInlineFeeConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
+      vm.expectRevert(
+        abi.encodeWithSelector(
+          FeePolicyStore.InvalidInlineFeeConfig.selector, s_token, DEST_CHAIN_SELECTOR, invalidFeeConfigs[i]
+        )
+      );
+      s_feeStore.applyInlineFeeConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
+    }
   }
 
   function test_applyInlineFeeConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {

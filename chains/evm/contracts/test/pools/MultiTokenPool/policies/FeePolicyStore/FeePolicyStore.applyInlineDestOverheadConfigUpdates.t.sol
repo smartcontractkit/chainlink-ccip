@@ -71,32 +71,25 @@ contract FeePolicyStore_applyInlineDestOverheadConfigUpdates is FeePolicyStoreSe
 
   // Reverts
 
-  function test_applyInlineDestOverheadConfigUpdates_RevertWhen_InvalidDestOverheads() public {
-    FeePolicyStore.DestOverheadConfig memory destOverheadConfig = _getDestOverheadConfig();
-    destOverheadConfig.destGasOverhead = 0;
-    FeePolicyStore.InlineDestOverheadConfigArgs[] memory inlineConfigs =
-      _getInlineDestOverheadConfigArgs(s_token, DEST_CHAIN_SELECTOR, destOverheadConfig);
+  function test_applyInlineDestOverheadConfigUpdates_RevertWhen_InvalidInlineDestOverheadConfig() public {
+    // A zero gas overhead, and a bytes overhead below the minimum.
+    FeePolicyStore.DestOverheadConfig[] memory invalidConfigs = new FeePolicyStore.DestOverheadConfig[](2);
+    invalidConfigs[0] = _getDestOverheadConfig();
+    invalidConfigs[0].destGasOverhead = 0;
+    invalidConfigs[1] = _getDestOverheadConfig();
+    invalidConfigs[1].destBytesOverhead = MIN_DEST_BYTES_OVERHEAD - 1;
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        FeePolicyStore.InvalidDestOverheads.selector, DEST_CHAIN_SELECTOR, 0, MIN_DEST_BYTES_OVERHEAD
-      )
-    );
-    s_feeStore.applyInlineDestOverheadConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
+    for (uint256 i = 0; i < invalidConfigs.length; ++i) {
+      FeePolicyStore.InlineDestOverheadConfigArgs[] memory inlineConfigs =
+        _getInlineDestOverheadConfigArgs(s_token, DEST_CHAIN_SELECTOR, invalidConfigs[i]);
 
-    destOverheadConfig = _getDestOverheadConfig();
-    destOverheadConfig.destBytesOverhead = MIN_DEST_BYTES_OVERHEAD - 1;
-    inlineConfigs = _getInlineDestOverheadConfigArgs(s_token, DEST_CHAIN_SELECTOR, destOverheadConfig);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        FeePolicyStore.InvalidDestOverheads.selector,
-        DEST_CHAIN_SELECTOR,
-        DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        MIN_DEST_BYTES_OVERHEAD - 1
-      )
-    );
-    s_feeStore.applyInlineDestOverheadConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
+      vm.expectRevert(
+        abi.encodeWithSelector(
+          FeePolicyStore.InvalidInlineDestOverheadConfig.selector, s_token, DEST_CHAIN_SELECTOR, invalidConfigs[i]
+        )
+      );
+      s_feeStore.applyInlineDestOverheadConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
+    }
   }
 
   function test_applyInlineDestOverheadConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {
