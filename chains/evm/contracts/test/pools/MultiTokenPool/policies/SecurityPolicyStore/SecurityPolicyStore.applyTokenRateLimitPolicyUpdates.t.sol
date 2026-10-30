@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
-import {RateLimiter} from "../../../../../libraries/RateLimiter.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
 

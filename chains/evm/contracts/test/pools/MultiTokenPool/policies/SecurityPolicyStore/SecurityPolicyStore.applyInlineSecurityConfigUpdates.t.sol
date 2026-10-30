@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
-
 import {CCVConfigValidation} from "../../../../../libraries/CCVConfigValidation.sol";
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";

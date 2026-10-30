@@ -77,11 +77,13 @@ contract SecurityPolicyStoreSetup is BaseTest {
   ) internal pure returns (IPoolConfigManager.LaneKey[] memory lanes) {
     lanes = new IPoolConfigManager.LaneKey[](1);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: localToken, remoteChainSelector: remoteChainSelector});
+    return lanes;
   }
 
   function _trueArrayOf() internal pure returns (bool[] memory flags) {
     flags = new bool[](1);
     flags[0] = true;
+    return flags;
   }
 
   function _ccvsOf(
@@ -91,6 +93,7 @@ contract SecurityPolicyStoreSetup is BaseTest {
     ccvs = new address[](2);
     ccvs[0] = firstCCV;
     ccvs[1] = secondCCV;
+    return ccvs;
   }
 
   // ================================================================
@@ -257,7 +260,7 @@ contract SecurityPolicyStoreSetup is BaseTest {
     for (uint256 i = 0; i < configs.length; ++i) {
       if (configs[i].remoteChainSelector == remoteChainSelector) return configs[i];
     }
-    revert("inline rate limit record not found");
+    revert("inline record not found");
   }
 
   /// @dev Checks that a bucket is full and holds the config.

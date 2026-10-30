@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
 import {IPoolV2} from "../../../../../interfaces/IPoolV2.sol";
 
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
@@ -204,7 +203,7 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     for (uint256 i = 0; i < records.length; ++i) {
       if (records[i].remoteChainSelector == remoteChainSelector) return records[i];
     }
-    revert("rate limit policy record not found");
+    revert("policy record not found");
   }
 
   /// @dev Gives each of the four configs its own capacity.
@@ -229,5 +228,6 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
   ) internal pure returns (bytes32[] memory arr) {
     arr = new bytes32[](1);
     arr[0] = value;
+    return arr;
   }
 }
