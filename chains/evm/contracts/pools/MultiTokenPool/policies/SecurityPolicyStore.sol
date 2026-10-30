@@ -25,7 +25,10 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
 
+  error ZeroAddressInvalid();
+  error InvalidDecimalArgs(uint8 expected, uint8 actual);
   error InvalidRateLimitPolicyDecimals(bytes32 policyName, uint8 expected, uint8 actual);
+  error TokenHasConfig(address localToken);
   error RateLimitRecordNotFound(address localToken, uint64 remoteChainSelector);
 
   event InlineRateLimitConfigSet(
@@ -64,7 +67,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimiter.Config defaultFinalityConfig,
     RateLimiter.Config fastFinalityConfig
   );
+  /// @dev A set of a new token also registers it.
+  event TokenProfileSet(address indexed localToken, uint8 localDecimals);
+  event TokenRemoved(address indexed localToken);
   event TokenRateLimitPolicySet(address indexed localToken, bytes32 indexed policyName);
+  event TokenSecurityPolicySet(address indexed localToken, bytes32 indexed policyName);
   event InlineSecurityConfigSet(
     address indexed localToken,
     uint64 indexed remoteChainSelector,
@@ -93,8 +100,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @notice An inline rate limit record to set and to read. Amounts are in local token units. While an FTF config is
   /// disabled, an FTF transfer in its direction uses the default finality bucket of the same record.
   struct InlineRateLimitConfigArgs {
-    address localToken; // A registered token.
-    uint64 remoteChainSelector; // Remote chain selector.
+    address localToken; // ────────╮ A registered token.
+    uint64 remoteChainSelector; // ╯ The remote chain selector.
     RateLimiter.Config outboundRateLimiterConfig; // The outbound limit for default finality.
     RateLimiter.Config inboundRateLimiterConfig; // The inbound limit for default finality.
     RateLimiter.Config fastFinalityOutboundRateLimiterConfig; // The outbound limit for FTF.
@@ -104,8 +111,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @notice One direction of an inline rate limit record to update. Both finality classes of the direction are set
   /// together, so the direction is never left with a stale FTF config.
   struct InlineRateLimitDirectionArgs {
-    address localToken; // A registered token.
-    uint64 remoteChainSelector; // Remote chain selector.
+    address localToken; // ────────╮ A registered token.
+    uint64 remoteChainSelector; // ╯ The remote chain. Not zero.
     IPoolV2.MessageDirection direction; // The direction to update.
     RateLimiter.Config defaultFinalityConfig; // The limit for default finality.
     RateLimiter.Config fastFinalityConfig; // The limit for FTF. Disabled means FTF uses the default bucket.
@@ -115,8 +122,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// disabled, an FTF transfer in its direction uses the default finality bucket of the same record.
   struct RateLimitPolicyConfigArgs {
     bytes32 policyName; // The rate limit policy. Not zero.
-    uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
-    uint8 localDecimals; // The decimals of the policy. The first record of the policy fixes them.
+    uint64 remoteChainSelector; // ─╮ The remote chain. Zero names the policy default record.
+    uint8 localDecimals; // ────────╯ The decimals of the policy. The first record of the policy fixes them.
     RateLimiter.Config outboundRateLimiterConfig; // The outbound limit for default finality.
     RateLimiter.Config inboundRateLimiterConfig; // The inbound limit for default finality.
     RateLimiter.Config fastFinalityOutboundRateLimiterConfig; // The outbound limit for FTF.
@@ -127,8 +134,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// together, so the direction is never left with a stale FTF config.
   struct RateLimitPolicyDirectionArgs {
     bytes32 policyName; // The rate limit policy. Not zero.
-    uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
-    IPoolV2.MessageDirection direction; // The direction to update.
+    uint64 remoteChainSelector; // ─────────╮ The remote chain. Zero names the policy default record.
+    IPoolV2.MessageDirection direction; // ─╯ The direction to update.
     RateLimiter.Config defaultFinalityConfig; // The limit for default finality.
     RateLimiter.Config fastFinalityConfig; // The limit for FTF. Disabled means FTF uses the default bucket.
   }
@@ -143,8 +150,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice An inline security record to set and to read.
   struct InlineSecurityConfigArgs {
-    address localToken; // A registered token.
-    uint64 remoteChainSelector; // Remote chain selector.
+    address localToken; // ────────╮ A registered token.
+    uint64 remoteChainSelector; // ╯ The remote chain. Not zero.
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain. No duplicate.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain. No duplicate.
     address hook; // Address of the IMultiTokenPoolHooks contract of the lane. Zero means no hook.
@@ -251,6 +258,49 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                        Stored views                          │
   // ================================================================
 
+  /// @notice Returns the state of a token in this store. Never reverts.
+  /// @param localToken The local token.
+  /// @return isRegistered True if the token is registered in this store.
+  /// @return localDecimals The decimals of the token. They stay after a deregistration.
+  /// @return rateLimitPolicyName The rate limit policy of the token. Zero if it has none.
+  /// @return securityPolicyName The security policy of the token. Zero if it has none.
+  function getTokenPolicies(
+    address localToken
+  )
+    external
+    view
+    returns (bool isRegistered, uint8 localDecimals, bytes32 rateLimitPolicyName, bytes32 securityPolicyName)
+  {
+    TokenState memory tokenState = s_tokenStates[localToken];
+    return (
+      s_tokens.contains(localToken),
+      tokenState.localDecimals,
+      tokenState.rateLimitPolicyName,
+      tokenState.securityPolicyName
+    );
+  }
+
+  /// @notice Returns the rate limit and security policies of each token. Never reverts. The pool config manager
+  /// adds them to IPoolConfigManager.getTokenConfigBatch.
+  /// @dev A token that is not registered has no policy, because a deregistration needs a token without a policy, and a
+  /// token policy set needs a registered token.
+  /// @param localTokens The local tokens.
+  /// @return rateLimitPolicyNames The rate limit policy per token, aligned with localTokens by index. Zero if it has
+  /// none.
+  /// @return securityPolicyNames The security policy per token, aligned with localTokens by index. Zero if it has none.
+  function getTokenPolicyNamesBatch(
+    address[] calldata localTokens
+  ) external view returns (bytes32[] memory rateLimitPolicyNames, bytes32[] memory securityPolicyNames) {
+    rateLimitPolicyNames = new bytes32[](localTokens.length);
+    securityPolicyNames = new bytes32[](localTokens.length);
+    for (uint256 i = 0; i < localTokens.length; ++i) {
+      TokenState storage tokenState = s_tokenStates[localTokens[i]];
+      rateLimitPolicyNames[i] = tokenState.rateLimitPolicyName;
+      securityPolicyNames[i] = tokenState.securityPolicyName;
+    }
+    return (rateLimitPolicyNames, securityPolicyNames);
+  }
+
   /// @notice Returns the inline rate limit records of a token. Never reverts.
   /// @dev A token without an inline record on a chain has no entry. An inline record keeps its config in the buckets of
   /// the token, so this reads the buckets.
@@ -313,6 +363,96 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) private view returns (RateLimiter.Config memory) {
     RateLimiter.TokenBucket storage bucket = s_tokenBuckets[localToken][remoteChainSelector][fastFinality][direction];
     return RateLimiter.Config({isEnabled: bucket.isEnabled, capacity: bucket.capacity, rate: bucket.rate});
+  }
+
+  // ================================================================
+  // │                           Tokens                             │
+  // ================================================================
+
+  /// @notice Deregisters tokens, then sets the profile of tokens. A set of a new token registers it with no policy.
+  /// All three stores apply the same call in one transaction.
+  /// @dev This store keeps only the decimals of the profile. The connection store checks the decimals of a new token
+  /// against the token in the same transaction, so this store copies the decimals of a new token without a check. A set
+  /// of a registered token needs the stored decimals, the same rule as in the connection store. So a caller that writes
+  /// only this store cannot change the decimals of a registered token. A deregistration needs a token without a policy
+  /// and without an inline record of a type of this store. A deregistered token can be registered again, also with other
+  /// decimals.
+  /// @param tokensToRemove The registered tokens to deregister.
+  /// @param profilesToSet The tokens to register or to update.
+  function applyTokenProfileUpdates(
+    address[] calldata tokensToRemove,
+    PolicyConfig.TokenProfileArgs[] calldata profilesToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < tokensToRemove.length; ++i) {
+      address localToken = tokensToRemove[i];
+      if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+      TokenState storage tokenState = s_tokenStates[localToken];
+      if (
+        tokenState.rateLimitPolicyName != bytes32(0) || tokenState.securityPolicyName != bytes32(0)
+          || s_inlineRateLimitChains[localToken].length() != 0 || s_inlineSecurityChains[localToken].length() != 0
+      ) {
+        revert TokenHasConfig(localToken);
+      }
+      s_tokens.remove(localToken);
+      emit TokenRemoved(localToken);
+    }
+
+    for (uint256 i = 0; i < profilesToSet.length; ++i) {
+      PolicyConfig.TokenProfileArgs calldata args = profilesToSet[i];
+      address localToken = args.localToken;
+      if (localToken == address(0)) revert ZeroAddressInvalid();
+      TokenState storage tokenState = s_tokenStates[localToken];
+      if (s_tokens.contains(localToken) && tokenState.localDecimals != args.localDecimals) {
+        revert InvalidDecimalArgs(tokenState.localDecimals, args.localDecimals);
+      }
+
+      s_tokens.add(localToken);
+      tokenState.localDecimals = args.localDecimals;
+      emit TokenProfileSet(localToken, args.localDecimals);
+    }
+  }
+
+  /// @notice Sets the rate limit policy of tokens. A token uses the records of its new policy at once.
+  /// @dev A set needs a registered token and a policy that exists. The policy must have the decimals of the token,
+  /// because a policy rate limit is a raw amount in local token units.
+  /// @param tokenPoliciesToSet The rate limit policy of each token. Zero removes the token from its policy.
+  function applyTokenRateLimitPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
+      address localToken = tokenPoliciesToSet[i].localToken;
+      bytes32 policyName = tokenPoliciesToSet[i].policyName;
+      if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+      TokenState storage tokenState = s_tokenStates[localToken];
+      // The existence check runs first, because a policy that does not exist has zero decimals.
+      if (policyName != bytes32(0)) {
+        if (!s_rateLimitPolicies.policyNames.contains(policyName)) revert PolicyConfig.PolicyNotFound(policyName);
+        uint8 policyDecimals = s_rateLimitPolicyDecimals[policyName];
+        if (policyDecimals != tokenState.localDecimals) {
+          revert InvalidRateLimitPolicyDecimals(policyName, policyDecimals, tokenState.localDecimals);
+        }
+      }
+      PolicyConfig._moveToken(s_rateLimitPolicies, tokenState.rateLimitPolicyName, policyName);
+      tokenState.rateLimitPolicyName = policyName;
+      emit TokenRateLimitPolicySet(localToken, policyName);
+    }
+  }
+
+  /// @notice Sets the security policy of tokens. A token uses the records of its new policy at once.
+  /// @dev A set needs a registered token and a policy that exists.
+  /// @param tokenPoliciesToSet The security policy of each token. Zero removes the token from its policy.
+  function applyTokenSecurityPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
+      address localToken = tokenPoliciesToSet[i].localToken;
+      bytes32 policyName = tokenPoliciesToSet[i].policyName;
+      if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+      TokenState storage tokenState = s_tokenStates[localToken];
+      PolicyConfig._moveToken(s_securityPolicies, tokenState.securityPolicyName, policyName);
+      tokenState.securityPolicyName = policyName;
+      emit TokenSecurityPolicySet(localToken, policyName);
+    }
   }
 
   // ================================================================
@@ -505,32 +645,6 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
         args.defaultFinalityConfig,
         args.fastFinalityConfig
       );
-    }
-  }
-
-  /// @notice Sets the rate limit policy of tokens. A token uses the records of its new policy at once.
-  /// @dev A set needs a registered token and a policy that exists. The policy must have the decimals of the token,
-  /// because a policy rate limit is a raw amount in local token units.
-  /// @param tokenPoliciesToSet The rate limit policy of each token. Zero removes the token from its policy.
-  function applyTokenRateLimitPolicyUpdates(
-    PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
-  ) external onlyAuthorizedCallers {
-    for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
-      address localToken = tokenPoliciesToSet[i].localToken;
-      bytes32 policyName = tokenPoliciesToSet[i].policyName;
-      if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
-      TokenState storage tokenState = s_tokenStates[localToken];
-      // The existence check runs first, because a policy that does not exist has zero decimals.
-      if (policyName != bytes32(0)) {
-        if (!s_rateLimitPolicies.policyNames.contains(policyName)) revert PolicyConfig.PolicyNotFound(policyName);
-        uint8 policyDecimals = s_rateLimitPolicyDecimals[policyName];
-        if (policyDecimals != tokenState.localDecimals) {
-          revert InvalidRateLimitPolicyDecimals(policyName, policyDecimals, tokenState.localDecimals);
-        }
-      }
-      PolicyConfig._moveToken(s_rateLimitPolicies, tokenState.rateLimitPolicyName, policyName);
-      tokenState.rateLimitPolicyName = policyName;
-      emit TokenRateLimitPolicySet(localToken, policyName);
     }
   }
 
