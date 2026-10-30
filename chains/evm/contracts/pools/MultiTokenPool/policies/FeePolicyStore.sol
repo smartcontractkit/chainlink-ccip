@@ -55,44 +55,6 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   );
   event InlineDestOverheadConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
 
-  /// @dev FeeConfig with its policy record key.
-  struct FeePolicyConfigArgs {
-    bytes32 policyName; // The fee policy. Not zero.
-    uint64 remoteChainSelector; // ───────╮ The remote chain. Zero names the policy default record.
-    uint32 finalityFeeUSDCents; //        │ Fee for a transfer with default finality, in multiples of 0.01 USD.
-    uint32 fastFinalityFeeUSDCents; //    │ Fee for an FTF transfer, in multiples of 0.01 USD.
-    uint16 finalityTransferFeeBps; //     │ Token fee for a transfer with default finality, in basis points.
-    uint16 fastFinalityTransferFeeBps; // │ Token fee for an FTF transfer, in basis points.
-    bool isEnabled; // ───────────────────╯ False makes the OnRamp use the FeeQuoter.
-  }
-
-  /// @dev FeeConfig with its token and chain.
-  struct InlineFeeConfigArgs {
-    address localToken; // ───────────────╮ A registered token.
-    uint64 remoteChainSelector; //        │ The remote chain. Not zero.
-    uint32 finalityFeeUSDCents; // ───────╯ Fee for a transfer with default finality, in multiples of 0.01 USD.
-    uint32 fastFinalityFeeUSDCents; // ───╮ Fee for an FTF transfer, in multiples of 0.01 USD.
-    uint16 finalityTransferFeeBps; //     │ Token fee for a transfer with default finality, in basis points.
-    uint16 fastFinalityTransferFeeBps; // │ Token fee for an FTF transfer, in basis points.
-    bool isEnabled; // ───────────────────╯ False makes the OnRamp use the FeeQuoter.
-  }
-
-  /// @dev DestOverheadConfig with its policy record key.
-  struct DestOverheadPolicyConfigArgs {
-    bytes32 policyName; // The dest overhead policy. Not zero.
-    uint64 remoteChainSelector; // ─╮ The remote chain. Zero names the policy default record.
-    uint32 destGasOverhead; //      │ Gas for releaseOrMint on the destination chain. Not zero.
-    uint32 destBytesOverhead; // ───╯ Data availability bytes of the pool data. At least 192.
-  }
-
-  /// @dev DestOverheadConfig with its token and chain.
-  struct InlineDestOverheadConfigArgs {
-    address localToken; // ─────────╮ A registered token.
-    uint64 remoteChainSelector; //  │ The remote chain. Not zero.
-    uint32 destGasOverhead; // ─────╯ Gas for releaseOrMint on the destination chain. Not zero.
-    uint32 destBytesOverhead; // Data availability bytes of the pool data. At least 192.
-  }
-
   /// @dev The values of a fee record.
   struct FeeConfig {
     uint32 finalityFeeUSDCents; // ───────╮ Fee for a transfer with default finality, in multiples of 0.01 USD.
@@ -104,8 +66,36 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev The values of a dest overhead record.
   struct DestOverheadConfig {
-    uint32 destGasOverhead; // ──╮ Gas for releaseOrMint on the destination chain.
-    uint32 destBytesOverhead; // ╯ Data availability bytes of the pool data.
+    uint32 destGasOverhead; // ──╮ Gas for releaseOrMint on the destination chain. Not zero.
+    uint32 destBytesOverhead; // ╯ Data availability bytes of the pool data. At least 192.
+  }
+
+  /// @dev FeeConfig with its policy record key.
+  struct FeePolicyConfigArgs {
+    bytes32 policyName; // The fee policy. Not zero.
+    uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
+    FeeConfig feeConfig; // The values of the record.
+  }
+
+  /// @dev FeeConfig with its token and chain.
+  struct InlineFeeConfigArgs {
+    address localToken; // ─────────╮ A registered token.
+    uint64 remoteChainSelector; // ─╯ The remote chain. Not zero.
+    FeeConfig feeConfig; //           The values of the record.
+  }
+
+  /// @dev DestOverheadConfig with its policy record key.
+  struct DestOverheadPolicyConfigArgs {
+    bytes32 policyName; // The dest overhead policy. Not zero.
+    uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
+    DestOverheadConfig destOverheadConfig; // The values of the record.
+  }
+
+  /// @dev DestOverheadConfig with its token and chain.
+  struct InlineDestOverheadConfigArgs {
+    address localToken; // ─────────╮ A registered token.
+    uint64 remoteChainSelector; // ─╯ The remote chain. Not zero.
+    DestOverheadConfig destOverheadConfig; // The values of the record.
   }
 
   /// @dev The policies of a token. Zero means no policy.
@@ -126,17 +116,18 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   mapping(address localToken => TokenState tokenState) private s_tokenStates;
 
   PolicyConfig.Policies private s_feePolicies;
-  /// @dev Chain selector zero holds the policy default record.
+  /// @dev Fee policy record details. Chain selector zero holds the policy default.
   mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_policyFeeConfigs;
-  /// @dev An inline record exists exactly when its chain is in the set of its token.
+
+  /// @dev An inline fee record exists when a token x chain is in the set.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineFeeChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_inlineFeeConfigs;
 
   PolicyConfig.Policies private s_destOverheadPolicies;
-  /// @dev Chain selector zero holds the policy default record.
+  /// @dev Overheads policy record details. Chain selector zero holds the policy default.
   mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
     s_policyDestOverheadConfigs;
-  /// @dev An inline record exists exactly when its chain is in the set of its token.
+  /// @dev An inline overhead record exists when a token x chain is in the set.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineDestOverheadChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
     s_inlineDestOverheadConfigs;
@@ -155,8 +146,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // ================================================================
 
   /// @notice Returns the token fee of a lockOrBurn.
-  /// @dev Reverts if the token has no fee record or no dest overhead record for the chain. The connection store checks
-  /// the requested finality before this call.
+  /// @dev Reverts if the token has no fee record or no dest overhead record for the chain.
   /// @param localToken The local token.
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
@@ -404,15 +394,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     policyConfigs = new FeePolicyConfigArgs[](remoteChainSelectors.length);
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
-      FeeConfig storage feeConfig = s_policyFeeConfigs[policyName][remoteChainSelector];
       policyConfigs[i] = FeePolicyConfigArgs({
         policyName: policyName,
         remoteChainSelector: remoteChainSelector,
-        finalityFeeUSDCents: feeConfig.finalityFeeUSDCents,
-        fastFinalityFeeUSDCents: feeConfig.fastFinalityFeeUSDCents,
-        finalityTransferFeeBps: feeConfig.finalityTransferFeeBps,
-        fastFinalityTransferFeeBps: feeConfig.fastFinalityTransferFeeBps,
-        isEnabled: feeConfig.isEnabled
+        feeConfig: s_policyFeeConfigs[policyName][remoteChainSelector]
       });
     }
     return (policy.tokenCount, policyConfigs);
@@ -428,15 +413,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     inlineConfigs = new InlineFeeConfigArgs[](remoteChainSelectors.length);
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
-      FeeConfig storage feeConfig = s_inlineFeeConfigs[localToken][remoteChainSelector];
       inlineConfigs[i] = InlineFeeConfigArgs({
         localToken: localToken,
         remoteChainSelector: remoteChainSelector,
-        finalityFeeUSDCents: feeConfig.finalityFeeUSDCents,
-        fastFinalityFeeUSDCents: feeConfig.fastFinalityFeeUSDCents,
-        finalityTransferFeeBps: feeConfig.finalityTransferFeeBps,
-        fastFinalityTransferFeeBps: feeConfig.fastFinalityTransferFeeBps,
-        isEnabled: feeConfig.isEnabled
+        feeConfig: s_inlineFeeConfigs[localToken][remoteChainSelector]
       });
     }
     return inlineConfigs;
@@ -454,12 +434,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     policyConfigs = new DestOverheadPolicyConfigArgs[](remoteChainSelectors.length);
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
-      DestOverheadConfig storage destOverheadConfig = s_policyDestOverheadConfigs[policyName][remoteChainSelector];
       policyConfigs[i] = DestOverheadPolicyConfigArgs({
         policyName: policyName,
         remoteChainSelector: remoteChainSelector,
-        destGasOverhead: destOverheadConfig.destGasOverhead,
-        destBytesOverhead: destOverheadConfig.destBytesOverhead
+        destOverheadConfig: s_policyDestOverheadConfigs[policyName][remoteChainSelector]
       });
     }
     return (policy.tokenCount, policyConfigs);
@@ -475,12 +453,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     inlineConfigs = new InlineDestOverheadConfigArgs[](remoteChainSelectors.length);
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
-      DestOverheadConfig storage destOverheadConfig = s_inlineDestOverheadConfigs[localToken][remoteChainSelector];
       inlineConfigs[i] = InlineDestOverheadConfigArgs({
         localToken: localToken,
         remoteChainSelector: remoteChainSelector,
-        destGasOverhead: destOverheadConfig.destGasOverhead,
-        destBytesOverhead: destOverheadConfig.destBytesOverhead
+        destOverheadConfig: s_inlineDestOverheadConfigs[localToken][remoteChainSelector]
       });
     }
     return inlineConfigs;
@@ -589,20 +565,13 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
       FeePolicyConfigArgs calldata args = policyConfigsToSet[i];
-      FeeConfig memory feeConfig = FeeConfig({
-        finalityFeeUSDCents: args.finalityFeeUSDCents,
-        fastFinalityFeeUSDCents: args.fastFinalityFeeUSDCents,
-        finalityTransferFeeBps: args.finalityTransferFeeBps,
-        fastFinalityTransferFeeBps: args.fastFinalityTransferFeeBps,
-        isEnabled: args.isEnabled
-      });
-      if (!_isValidFeeConfig(feeConfig)) {
-        revert InvalidFeePolicyConfig(args.policyName, args.remoteChainSelector, feeConfig);
+      if (!_isValidFeeConfig(args.feeConfig)) {
+        revert InvalidFeePolicyConfig(args.policyName, args.remoteChainSelector, args.feeConfig);
       }
 
       PolicyConfig._setPolicyRecord(s_feePolicies, args.policyName, args.remoteChainSelector);
-      s_policyFeeConfigs[args.policyName][args.remoteChainSelector] = feeConfig;
-      emit FeePolicyConfigSet(args.policyName, args.remoteChainSelector, feeConfig);
+      s_policyFeeConfigs[args.policyName][args.remoteChainSelector] = args.feeConfig;
+      emit FeePolicyConfigSet(args.policyName, args.remoteChainSelector, args.feeConfig);
     }
   }
 
@@ -624,29 +593,22 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
       InlineFeeConfigArgs calldata args = inlineConfigsToSet[i];
-      FeeConfig memory feeConfig = FeeConfig({
-        finalityFeeUSDCents: args.finalityFeeUSDCents,
-        fastFinalityFeeUSDCents: args.fastFinalityFeeUSDCents,
-        finalityTransferFeeBps: args.finalityTransferFeeBps,
-        fastFinalityTransferFeeBps: args.fastFinalityTransferFeeBps,
-        isEnabled: args.isEnabled
-      });
-      if (!_isValidFeeConfig(feeConfig)) {
-        revert InvalidInlineFeeConfig(args.localToken, args.remoteChainSelector, feeConfig);
+      if (!_isValidFeeConfig(args.feeConfig)) {
+        revert InvalidInlineFeeConfig(args.localToken, args.remoteChainSelector, args.feeConfig);
       }
 
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineFeeChains[args.localToken], args.localToken, args.remoteChainSelector
       );
-      s_inlineFeeConfigs[args.localToken][args.remoteChainSelector] = feeConfig;
-      emit InlineFeeConfigSet(args.localToken, args.remoteChainSelector, feeConfig);
+      s_inlineFeeConfigs[args.localToken][args.remoteChainSelector] = args.feeConfig;
+      emit InlineFeeConfigSet(args.localToken, args.remoteChainSelector, args.feeConfig);
     }
   }
 
   /// @dev Each bps fee must be below BPS_DIVIDER, the same as TokenPool. A disabled config must be all zero, so no fee
   /// value stays hidden in storage.
   function _isValidFeeConfig(
-    FeeConfig memory feeConfig
+    FeeConfig calldata feeConfig
   ) private pure returns (bool) {
     if (!feeConfig.isEnabled) {
       return feeConfig.finalityFeeUSDCents == 0 && feeConfig.fastFinalityFeeUSDCents == 0
@@ -687,15 +649,13 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
       DestOverheadPolicyConfigArgs calldata args = policyConfigsToSet[i];
-      DestOverheadConfig memory destOverheadConfig =
-        DestOverheadConfig({destGasOverhead: args.destGasOverhead, destBytesOverhead: args.destBytesOverhead});
-      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
-        revert InvalidDestOverheadPolicyConfig(args.policyName, args.remoteChainSelector, destOverheadConfig);
+      if (!_isValidDestOverheadConfig(args.destOverheadConfig)) {
+        revert InvalidDestOverheadPolicyConfig(args.policyName, args.remoteChainSelector, args.destOverheadConfig);
       }
 
       PolicyConfig._setPolicyRecord(s_destOverheadPolicies, args.policyName, args.remoteChainSelector);
-      s_policyDestOverheadConfigs[args.policyName][args.remoteChainSelector] = destOverheadConfig;
-      emit DestOverheadPolicyConfigSet(args.policyName, args.remoteChainSelector, destOverheadConfig);
+      s_policyDestOverheadConfigs[args.policyName][args.remoteChainSelector] = args.destOverheadConfig;
+      emit DestOverheadPolicyConfigSet(args.policyName, args.remoteChainSelector, args.destOverheadConfig);
     }
   }
 
@@ -717,24 +677,22 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
       InlineDestOverheadConfigArgs calldata args = inlineConfigsToSet[i];
-      DestOverheadConfig memory destOverheadConfig =
-        DestOverheadConfig({destGasOverhead: args.destGasOverhead, destBytesOverhead: args.destBytesOverhead});
-      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
-        revert InvalidInlineDestOverheadConfig(args.localToken, args.remoteChainSelector, destOverheadConfig);
+      if (!_isValidDestOverheadConfig(args.destOverheadConfig)) {
+        revert InvalidInlineDestOverheadConfig(args.localToken, args.remoteChainSelector, args.destOverheadConfig);
       }
 
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineDestOverheadChains[args.localToken], args.localToken, args.remoteChainSelector
       );
-      s_inlineDestOverheadConfigs[args.localToken][args.remoteChainSelector] = destOverheadConfig;
-      emit InlineDestOverheadConfigSet(args.localToken, args.remoteChainSelector, destOverheadConfig);
+      s_inlineDestOverheadConfigs[args.localToken][args.remoteChainSelector] = args.destOverheadConfig;
+      emit InlineDestOverheadConfigSet(args.localToken, args.remoteChainSelector, args.destOverheadConfig);
     }
   }
 
   /// @dev The gas overhead must be non-zero, the same as TokenPool. The bytes overhead must be at least
   /// MIN_DEST_BYTES_OVERHEAD.
   function _isValidDestOverheadConfig(
-    DestOverheadConfig memory destOverheadConfig
+    DestOverheadConfig calldata destOverheadConfig
   ) private pure returns (bool) {
     return destOverheadConfig.destGasOverhead != 0 && destOverheadConfig.destBytesOverhead >= MIN_DEST_BYTES_OVERHEAD;
   }

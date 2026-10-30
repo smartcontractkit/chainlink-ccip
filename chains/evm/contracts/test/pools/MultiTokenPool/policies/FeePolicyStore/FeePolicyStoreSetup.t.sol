@@ -83,13 +83,7 @@ contract FeePolicyStoreSetup is BaseTest {
   ) internal pure returns (FeePolicyStore.FeePolicyConfigArgs[] memory policyConfigs) {
     policyConfigs = new FeePolicyStore.FeePolicyConfigArgs[](1);
     policyConfigs[0] = FeePolicyStore.FeePolicyConfigArgs({
-      policyName: policyName,
-      remoteChainSelector: remoteChainSelector,
-      finalityFeeUSDCents: feeConfig.finalityFeeUSDCents,
-      fastFinalityFeeUSDCents: feeConfig.fastFinalityFeeUSDCents,
-      finalityTransferFeeBps: feeConfig.finalityTransferFeeBps,
-      fastFinalityTransferFeeBps: feeConfig.fastFinalityTransferFeeBps,
-      isEnabled: feeConfig.isEnabled
+      policyName: policyName, remoteChainSelector: remoteChainSelector, feeConfig: feeConfig
     });
     return policyConfigs;
   }
@@ -101,13 +95,7 @@ contract FeePolicyStoreSetup is BaseTest {
   ) internal pure returns (FeePolicyStore.InlineFeeConfigArgs[] memory inlineConfigs) {
     inlineConfigs = new FeePolicyStore.InlineFeeConfigArgs[](1);
     inlineConfigs[0] = FeePolicyStore.InlineFeeConfigArgs({
-      localToken: localToken,
-      remoteChainSelector: remoteChainSelector,
-      finalityFeeUSDCents: feeConfig.finalityFeeUSDCents,
-      fastFinalityFeeUSDCents: feeConfig.fastFinalityFeeUSDCents,
-      finalityTransferFeeBps: feeConfig.finalityTransferFeeBps,
-      fastFinalityTransferFeeBps: feeConfig.fastFinalityTransferFeeBps,
-      isEnabled: feeConfig.isEnabled
+      localToken: localToken, remoteChainSelector: remoteChainSelector, feeConfig: feeConfig
     });
     return inlineConfigs;
   }
@@ -119,10 +107,7 @@ contract FeePolicyStoreSetup is BaseTest {
   ) internal pure returns (FeePolicyStore.DestOverheadPolicyConfigArgs[] memory policyConfigs) {
     policyConfigs = new FeePolicyStore.DestOverheadPolicyConfigArgs[](1);
     policyConfigs[0] = FeePolicyStore.DestOverheadPolicyConfigArgs({
-      policyName: policyName,
-      remoteChainSelector: remoteChainSelector,
-      destGasOverhead: destOverheadConfig.destGasOverhead,
-      destBytesOverhead: destOverheadConfig.destBytesOverhead
+      policyName: policyName, remoteChainSelector: remoteChainSelector, destOverheadConfig: destOverheadConfig
     });
     return policyConfigs;
   }
@@ -134,10 +119,7 @@ contract FeePolicyStoreSetup is BaseTest {
   ) internal pure returns (FeePolicyStore.InlineDestOverheadConfigArgs[] memory inlineConfigs) {
     inlineConfigs = new FeePolicyStore.InlineDestOverheadConfigArgs[](1);
     inlineConfigs[0] = FeePolicyStore.InlineDestOverheadConfigArgs({
-      localToken: localToken,
-      remoteChainSelector: remoteChainSelector,
-      destGasOverhead: destOverheadConfig.destGasOverhead,
-      destBytesOverhead: destOverheadConfig.destBytesOverhead
+      localToken: localToken, remoteChainSelector: remoteChainSelector, destOverheadConfig: destOverheadConfig
     });
     return inlineConfigs;
   }
