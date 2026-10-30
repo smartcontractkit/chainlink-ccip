@@ -165,10 +165,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       return 0;
     }
 
-    uint16 transferFeeBps = requestedFinalityConfig == FinalityCodec.WAIT_FOR_FINALITY_FLAG
-      ? feeConfig.finalityTransferFeeBps
-      : feeConfig.fastFinalityTransferFeeBps;
-    return (amount * transferFeeBps) / BPS_DIVIDER;
+    if (requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG) {
+      return (amount * feeConfig.fastFinalityTransferFeeBps) / BPS_DIVIDER;
+    }
+    return (amount * feeConfig.finalityTransferFeeBps) / BPS_DIVIDER;
   }
 
   /// @notice Reverts if the token has no fee record or no dest overhead record for the chain.
@@ -559,19 +559,20 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
 
     for (uint256 i = 0; i < policiesToRemove.length; ++i) {
-      PolicyConfig._removePolicy(s_feePolicies, policiesToRemove[i]);
-      emit FeePolicyRemoved(policiesToRemove[i]);
+      bytes32 policyName = policiesToRemove[i];
+      PolicyConfig._removePolicy(s_feePolicies, policyName);
+      emit FeePolicyRemoved(policyName);
     }
 
     for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
-      FeePolicyConfigArgs calldata args = policyConfigsToSet[i];
-      if (!_isValidFeeConfig(args.feeConfig)) {
-        revert InvalidFeePolicyConfig(args.policyName, args.remoteChainSelector, args.feeConfig);
-      }
+      bytes32 policyName = policyConfigsToSet[i].policyName;
+      uint64 remoteChainSelector = policyConfigsToSet[i].remoteChainSelector;
+      FeeConfig calldata feeConfig = policyConfigsToSet[i].feeConfig;
+      if (!_isValidFeeConfig(feeConfig)) revert InvalidFeePolicyConfig(policyName, remoteChainSelector, feeConfig);
 
-      PolicyConfig._setPolicyRecord(s_feePolicies, args.policyName, args.remoteChainSelector);
-      s_policyFeeConfigs[args.policyName][args.remoteChainSelector] = args.feeConfig;
-      emit FeePolicyConfigSet(args.policyName, args.remoteChainSelector, args.feeConfig);
+      PolicyConfig._setPolicyRecord(s_feePolicies, policyName, remoteChainSelector);
+      s_policyFeeConfigs[policyName][remoteChainSelector] = feeConfig;
+      emit FeePolicyConfigSet(policyName, remoteChainSelector, feeConfig);
     }
   }
 
@@ -592,16 +593,14 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
 
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
-      InlineFeeConfigArgs calldata args = inlineConfigsToSet[i];
-      if (!_isValidFeeConfig(args.feeConfig)) {
-        revert InvalidInlineFeeConfig(args.localToken, args.remoteChainSelector, args.feeConfig);
-      }
+      address localToken = inlineConfigsToSet[i].localToken;
+      uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
+      FeeConfig calldata feeConfig = inlineConfigsToSet[i].feeConfig;
+      if (!_isValidFeeConfig(feeConfig)) revert InvalidInlineFeeConfig(localToken, remoteChainSelector, feeConfig);
 
-      PolicyConfig._setInlineRecord(
-        s_tokens, s_inlineFeeChains[args.localToken], args.localToken, args.remoteChainSelector
-      );
-      s_inlineFeeConfigs[args.localToken][args.remoteChainSelector] = args.feeConfig;
-      emit InlineFeeConfigSet(args.localToken, args.remoteChainSelector, args.feeConfig);
+      PolicyConfig._setInlineRecord(s_tokens, s_inlineFeeChains[localToken], localToken, remoteChainSelector);
+      s_inlineFeeConfigs[localToken][remoteChainSelector] = feeConfig;
+      emit InlineFeeConfigSet(localToken, remoteChainSelector, feeConfig);
     }
   }
 
@@ -643,19 +642,22 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
 
     for (uint256 i = 0; i < policiesToRemove.length; ++i) {
-      PolicyConfig._removePolicy(s_destOverheadPolicies, policiesToRemove[i]);
-      emit DestOverheadPolicyRemoved(policiesToRemove[i]);
+      bytes32 policyName = policiesToRemove[i];
+      PolicyConfig._removePolicy(s_destOverheadPolicies, policyName);
+      emit DestOverheadPolicyRemoved(policyName);
     }
 
     for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
-      DestOverheadPolicyConfigArgs calldata args = policyConfigsToSet[i];
-      if (!_isValidDestOverheadConfig(args.destOverheadConfig)) {
-        revert InvalidDestOverheadPolicyConfig(args.policyName, args.remoteChainSelector, args.destOverheadConfig);
+      bytes32 policyName = policyConfigsToSet[i].policyName;
+      uint64 remoteChainSelector = policyConfigsToSet[i].remoteChainSelector;
+      DestOverheadConfig calldata destOverheadConfig = policyConfigsToSet[i].destOverheadConfig;
+      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
+        revert InvalidDestOverheadPolicyConfig(policyName, remoteChainSelector, destOverheadConfig);
       }
 
-      PolicyConfig._setPolicyRecord(s_destOverheadPolicies, args.policyName, args.remoteChainSelector);
-      s_policyDestOverheadConfigs[args.policyName][args.remoteChainSelector] = args.destOverheadConfig;
-      emit DestOverheadPolicyConfigSet(args.policyName, args.remoteChainSelector, args.destOverheadConfig);
+      PolicyConfig._setPolicyRecord(s_destOverheadPolicies, policyName, remoteChainSelector);
+      s_policyDestOverheadConfigs[policyName][remoteChainSelector] = destOverheadConfig;
+      emit DestOverheadPolicyConfigSet(policyName, remoteChainSelector, destOverheadConfig);
     }
   }
 
@@ -676,16 +678,16 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
 
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
-      InlineDestOverheadConfigArgs calldata args = inlineConfigsToSet[i];
-      if (!_isValidDestOverheadConfig(args.destOverheadConfig)) {
-        revert InvalidInlineDestOverheadConfig(args.localToken, args.remoteChainSelector, args.destOverheadConfig);
+      address localToken = inlineConfigsToSet[i].localToken;
+      uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
+      DestOverheadConfig calldata destOverheadConfig = inlineConfigsToSet[i].destOverheadConfig;
+      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
+        revert InvalidInlineDestOverheadConfig(localToken, remoteChainSelector, destOverheadConfig);
       }
 
-      PolicyConfig._setInlineRecord(
-        s_tokens, s_inlineDestOverheadChains[args.localToken], args.localToken, args.remoteChainSelector
-      );
-      s_inlineDestOverheadConfigs[args.localToken][args.remoteChainSelector] = args.destOverheadConfig;
-      emit InlineDestOverheadConfigSet(args.localToken, args.remoteChainSelector, args.destOverheadConfig);
+      PolicyConfig._setInlineRecord(s_tokens, s_inlineDestOverheadChains[localToken], localToken, remoteChainSelector);
+      s_inlineDestOverheadConfigs[localToken][remoteChainSelector] = destOverheadConfig;
+      emit InlineDestOverheadConfigSet(localToken, remoteChainSelector, destOverheadConfig);
     }
   }
 
