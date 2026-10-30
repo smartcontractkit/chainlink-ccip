@@ -1,4 +1,4 @@
-package changesets
+package adapters
 
 import (
 	"testing"
@@ -12,6 +12,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 )
 
+// TestClassifyUsedFeeQuoter is a regression test for resolving the FeeQuoter a v1.6 OnRamp is
+// actually wired to (not necessarily the datastore's FeeQuoter 1.6.0): a chain whose FeeQuoter was
+// upgraded in place to 2.0.0 must be recognized as "handled by the v2.0 changeset instead", not
+// silently read/written with the v1.6 ABI.
 func TestClassifyUsedFeeQuoter(t *testing.T) {
 	const sel = uint64(42)
 	fq160 := common.HexToAddress("0x1111111111111111111111111111111111111111")
