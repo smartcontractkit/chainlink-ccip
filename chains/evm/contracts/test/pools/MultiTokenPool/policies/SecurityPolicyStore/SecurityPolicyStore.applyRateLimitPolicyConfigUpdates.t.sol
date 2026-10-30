@@ -50,10 +50,10 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
 
     SecurityPolicyStore.RateLimitPolicyConfigArgs memory record =
       _getRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR);
-    assertEq(7 * CAPACITY, record.inboundRateLimiterConfig.capacity);
-    assertEq(8 * CAPACITY, record.fastFinalityInboundRateLimiterConfig.capacity);
-    assertEq(CAPACITY, record.outboundRateLimiterConfig.capacity);
-    assertEq(CAPACITY + 2, record.fastFinalityOutboundRateLimiterConfig.capacity);
+    assertEq(7 * CAPACITY, record.rateLimitConfig.inbound.capacity);
+    assertEq(8 * CAPACITY, record.rateLimitConfig.fastFinalityInbound.capacity);
+    assertEq(CAPACITY, record.rateLimitConfig.outbound.capacity);
+    assertEq(CAPACITY + 2, record.rateLimitConfig.fastFinalityOutbound.capacity);
   }
 
   /// @notice A bucket copies a new config of its policy record on its next use, and the copy refills the bucket. A set
@@ -146,7 +146,7 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     SecurityPolicyStore.RateLimitPolicyConfigArgs[] memory policyConfigs =
       new SecurityPolicyStore.RateLimitPolicyConfigArgs[](1);
     policyConfigs[0] = _getPolicyConfigArgs(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, CAPACITY);
-    policyConfigs[0].fastFinalityOutboundRateLimiterConfig = invalidRateConfig;
+    policyConfigs[0].rateLimitConfig.fastFinalityOutbound = invalidRateConfig;
 
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, invalidRateConfig));
     _applyRateLimitPolicyConfigUpdates(policyConfigs);
@@ -216,10 +216,12 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
       policyName: policyName,
       remoteChainSelector: remoteChainSelector,
       localDecimals: DEFAULT_TOKEN_DECIMALS,
-      outboundRateLimiterConfig: _getRateLimitConfig(capacity),
-      inboundRateLimiterConfig: _getRateLimitConfig(capacity + 1),
-      fastFinalityOutboundRateLimiterConfig: _getRateLimitConfig(capacity + 2),
-      fastFinalityInboundRateLimiterConfig: _getRateLimitConfig(capacity + 3)
+      rateLimitConfig: SecurityPolicyStore.RateLimitConfig({
+        outbound: _getRateLimitConfig(capacity),
+        inbound: _getRateLimitConfig(capacity + 1),
+        fastFinalityOutbound: _getRateLimitConfig(capacity + 2),
+        fastFinalityInbound: _getRateLimitConfig(capacity + 3)
+      })
     });
   }
 

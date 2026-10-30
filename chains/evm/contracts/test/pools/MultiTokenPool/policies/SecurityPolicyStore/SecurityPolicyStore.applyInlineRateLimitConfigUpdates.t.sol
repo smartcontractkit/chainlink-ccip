@@ -21,14 +21,7 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     inlineConfigs[1] = _getInlineConfigArgs(s_tokenA, OTHER_CHAIN_SELECTOR, 2 * CAPACITY);
 
     vm.expectEmit(address(s_store));
-    emit SecurityPolicyStore.InlineRateLimitConfigSet(
-      s_tokenA,
-      DEST_CHAIN_SELECTOR,
-      inlineConfigs[0].outboundRateLimiterConfig,
-      inlineConfigs[0].inboundRateLimiterConfig,
-      inlineConfigs[0].fastFinalityOutboundRateLimiterConfig,
-      inlineConfigs[0].fastFinalityInboundRateLimiterConfig
-    );
+    emit SecurityPolicyStore.InlineRateLimitConfigSet(s_tokenA, DEST_CHAIN_SELECTOR, inlineConfigs[0].rateLimitConfig);
     _setInlineRateLimitRecords(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
 
     assertEq(abi.encode(inlineConfigs[0]), abi.encode(_getInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR)));
@@ -108,11 +101,11 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     SecurityPolicyStore.InlineRateLimitConfigArgs memory config =
       _getInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR);
     // The inbound direction changed.
-    assertEq(7 * CAPACITY, config.inboundRateLimiterConfig.capacity);
-    assertEq(8 * CAPACITY, config.fastFinalityInboundRateLimiterConfig.capacity);
+    assertEq(7 * CAPACITY, config.rateLimitConfig.inbound.capacity);
+    assertEq(8 * CAPACITY, config.rateLimitConfig.fastFinalityInbound.capacity);
     // The outbound direction kept its config.
-    assertEq(CAPACITY, config.outboundRateLimiterConfig.capacity);
-    assertEq(CAPACITY + 2, config.fastFinalityOutboundRateLimiterConfig.capacity);
+    assertEq(CAPACITY, config.rateLimitConfig.outbound.capacity);
+    assertEq(CAPACITY + 2, config.rateLimitConfig.fastFinalityOutbound.capacity);
   }
 
   // Reverts
@@ -123,7 +116,7 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     SecurityPolicyStore.InlineRateLimitConfigArgs[] memory inlineConfigs =
       new SecurityPolicyStore.InlineRateLimitConfigArgs[](1);
     inlineConfigs[0] = _getInlineConfigArgs(s_tokenA, DEST_CHAIN_SELECTOR, CAPACITY);
-    inlineConfigs[0].fastFinalityInboundRateLimiterConfig = invalidRateConfig;
+    inlineConfigs[0].rateLimitConfig.fastFinalityInbound = invalidRateConfig;
 
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, invalidRateConfig));
     _setInlineRateLimitRecords(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
@@ -202,10 +195,12 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     return SecurityPolicyStore.InlineRateLimitConfigArgs({
       localToken: localToken,
       remoteChainSelector: remoteChainSelector,
-      outboundRateLimiterConfig: _getRateLimitConfig(capacity),
-      inboundRateLimiterConfig: _getRateLimitConfig(capacity + 1),
-      fastFinalityOutboundRateLimiterConfig: _getRateLimitConfig(capacity + 2),
-      fastFinalityInboundRateLimiterConfig: _getRateLimitConfig(capacity + 3)
+      rateLimitConfig: SecurityPolicyStore.RateLimitConfig({
+        outbound: _getRateLimitConfig(capacity),
+        inbound: _getRateLimitConfig(capacity + 1),
+        fastFinalityOutbound: _getRateLimitConfig(capacity + 2),
+        fastFinalityInbound: _getRateLimitConfig(capacity + 3)
+      })
     });
   }
 }

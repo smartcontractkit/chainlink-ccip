@@ -151,10 +151,12 @@ contract SecurityPolicyStoreSetup is BaseTest {
     inlineConfigs[0] = SecurityPolicyStore.InlineRateLimitConfigArgs({
       localToken: localToken,
       remoteChainSelector: remoteChainSelector,
-      outboundRateLimiterConfig: outbound,
-      inboundRateLimiterConfig: inbound,
-      fastFinalityOutboundRateLimiterConfig: fastFinalityOutbound,
-      fastFinalityInboundRateLimiterConfig: fastFinalityInbound
+      rateLimitConfig: SecurityPolicyStore.RateLimitConfig({
+        outbound: outbound,
+        inbound: inbound,
+        fastFinalityOutbound: fastFinalityOutbound,
+        fastFinalityInbound: fastFinalityInbound
+      })
     });
     _setInlineRateLimitRecords(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
   }
@@ -190,10 +192,12 @@ contract SecurityPolicyStoreSetup is BaseTest {
       policyName: policyName,
       remoteChainSelector: remoteChainSelector,
       localDecimals: DEFAULT_TOKEN_DECIMALS,
-      outboundRateLimiterConfig: outbound,
-      inboundRateLimiterConfig: inbound,
-      fastFinalityOutboundRateLimiterConfig: fastFinalityOutbound,
-      fastFinalityInboundRateLimiterConfig: fastFinalityInbound
+      rateLimitConfig: SecurityPolicyStore.RateLimitConfig({
+        outbound: outbound,
+        inbound: inbound,
+        fastFinalityOutbound: fastFinalityOutbound,
+        fastFinalityInbound: fastFinalityInbound
+      })
     });
     vm.prank(s_poolConfigManager);
     s_store.applyRateLimitPolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs);
@@ -211,9 +215,9 @@ contract SecurityPolicyStoreSetup is BaseTest {
     configs[0] = SecurityPolicyStore.InlineSecurityConfigArgs({
       localToken: localToken,
       remoteChainSelector: remoteChainSelector,
-      outboundCCVs: outboundCCVs,
-      inboundCCVs: inboundCCVs,
-      hook: hook
+      securityConfig: SecurityPolicyStore.SecurityConfig({
+        outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs, hook: hook
+      })
     });
     vm.prank(s_poolConfigManager);
     s_store.applyInlineSecurityConfigUpdates(new IPoolConfigManager.LaneKey[](0), configs);
@@ -231,9 +235,9 @@ contract SecurityPolicyStoreSetup is BaseTest {
     configs[0] = SecurityPolicyStore.SecurityPolicyConfigArgs({
       policyName: policyName,
       remoteChainSelector: remoteChainSelector,
-      outboundCCVs: outboundCCVs,
-      inboundCCVs: inboundCCVs,
-      hook: hook
+      securityConfig: SecurityPolicyStore.SecurityConfig({
+        outboundCCVs: outboundCCVs, inboundCCVs: inboundCCVs, hook: hook
+      })
     });
     vm.prank(s_poolConfigManager);
     s_store.applySecurityPolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), configs);

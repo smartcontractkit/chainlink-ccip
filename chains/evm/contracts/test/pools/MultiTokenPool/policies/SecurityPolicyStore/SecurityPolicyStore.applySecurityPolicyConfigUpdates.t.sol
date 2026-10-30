@@ -15,17 +15,19 @@ contract SecurityPolicyStore_applySecurityPolicyConfigUpdates is SecurityPolicyS
     configs[0] = SecurityPolicyStore.SecurityPolicyConfigArgs({
       policyName: DEFAULT_POLICY,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundCCVs: _ccvsOf(s_ccv1, s_ccv2),
-      inboundCCVs: _arrayOf(s_ccv2),
-      hook: s_hook
+      securityConfig: SecurityPolicyStore.SecurityConfig({
+        outboundCCVs: _ccvsOf(s_ccv1, s_ccv2), inboundCCVs: _arrayOf(s_ccv2), hook: s_hook
+      })
     });
 
     vm.expectEmit(address(s_store));
-    emit SecurityPolicyStore.SecurityPolicyConfigSet(
-      DEFAULT_POLICY, DEST_CHAIN_SELECTOR, configs[0].outboundCCVs, configs[0].inboundCCVs, s_hook
-    );
+    emit SecurityPolicyStore.SecurityPolicyConfigSet(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, configs[0].securityConfig);
     _setSecurityPolicyConfig(
-      DEFAULT_POLICY, DEST_CHAIN_SELECTOR, configs[0].outboundCCVs, configs[0].inboundCCVs, s_hook
+      DEFAULT_POLICY,
+      DEST_CHAIN_SELECTOR,
+      configs[0].securityConfig.outboundCCVs,
+      configs[0].securityConfig.inboundCCVs,
+      s_hook
     );
 
     (uint32 tokenCount, SecurityPolicyStore.SecurityPolicyConfigArgs[] memory records) =

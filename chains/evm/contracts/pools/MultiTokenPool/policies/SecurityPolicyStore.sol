@@ -34,12 +34,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   error SecurityRecordNotFound(address localToken, uint64 remoteChainSelector);
 
   event InlineRateLimitConfigSet(
-    address indexed localToken,
-    uint64 indexed remoteChainSelector,
-    RateLimiter.Config outboundRateLimiterConfig,
-    RateLimiter.Config inboundRateLimiterConfig,
-    RateLimiter.Config fastFinalityOutboundRateLimiterConfig,
-    RateLimiter.Config fastFinalityInboundRateLimiterConfig
+    address indexed localToken, uint64 indexed remoteChainSelector, RateLimitConfig rateLimitConfig
   );
   event InlineRateLimitConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
   event InlineRateLimitDirectionSet(
@@ -50,13 +45,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimiter.Config fastFinalityConfig
   );
   event RateLimitPolicyConfigSet(
-    bytes32 indexed policyName,
-    uint64 indexed remoteChainSelector,
-    uint8 localDecimals,
-    RateLimiter.Config outboundRateLimiterConfig,
-    RateLimiter.Config inboundRateLimiterConfig,
-    RateLimiter.Config fastFinalityOutboundRateLimiterConfig,
-    RateLimiter.Config fastFinalityInboundRateLimiterConfig
+    bytes32 indexed policyName, uint64 indexed remoteChainSelector, uint8 localDecimals, RateLimitConfig rateLimitConfig
   );
   event RateLimitPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
   /// @dev Also stands for the removal of the decimals of the policy.
@@ -78,19 +67,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   event FastFinalityOutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event FastFinalityInboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InlineSecurityConfigSet(
-    address indexed localToken,
-    uint64 indexed remoteChainSelector,
-    address[] outboundCCVs,
-    address[] inboundCCVs,
-    address hook
+    address indexed localToken, uint64 indexed remoteChainSelector, SecurityConfig securityConfig
   );
   event InlineSecurityConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
   event SecurityPolicyConfigSet(
-    bytes32 indexed policyName,
-    uint64 indexed remoteChainSelector,
-    address[] outboundCCVs,
-    address[] inboundCCVs,
-    address hook
+    bytes32 indexed policyName, uint64 indexed remoteChainSelector, SecurityConfig securityConfig
   );
   event SecurityPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
   event SecurityPolicyRemoved(bytes32 indexed policyName);
@@ -102,34 +83,40 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes32 securityPolicyName; // Identifier of the security policy attached to the token, or zero.
   }
 
-  struct InlineRateLimitConfigArgs {
-    address localToken; // ─────────╮ The address of token on this chain.
-    uint64 remoteChainSelector; // ─╯ The remote chain selector.
-    RateLimiter.Config outboundRateLimiterConfig; // The outbound limit for default finality, meaning the rate limits for all of the onRamps for the given chain.
-    RateLimiter.Config inboundRateLimiterConfig; // The inbound limit for default finality, meaning the rate limits for all of the offRamps for the given chain.
-    RateLimiter.Config fastFinalityOutboundRateLimiterConfig; // The outbound limit for FTF.
-    RateLimiter.Config fastFinalityInboundRateLimiterConfig; // The inbound limit for FTF.
+  /// @dev The values of a rate limit record. Amounts are in local token units. While an FTF config is disabled, an FTF
+  /// transfer in its direction uses the default finality bucket of the same record.
+  struct RateLimitConfig {
+    RateLimiter.Config outbound; // The outbound limit for default finality, meaning the rate limits for all of the onRamps for the given chain.
+    RateLimiter.Config inbound; // The inbound limit for default finality, meaning the rate limits for all of the offRamps for the given chain.
+    RateLimiter.Config fastFinalityOutbound; // The outbound limit for FTF.
+    RateLimiter.Config fastFinalityInbound; // The inbound limit for FTF.
   }
 
-  struct InlineRateLimitDirectionArgs {
-    address localToken; // ────────╮ The address of token on this chain.
-    uint64 remoteChainSelector; // ╯ The remote chain selector.
-    IPoolV2.MessageDirection direction; // The direction to update.
-    RateLimiter.Config defaultFinalityConfig; // The rate limit config for default finality.
-    RateLimiter.Config fastFinalityConfig; // The rate limit config for FTF. Disabled means FTF uses the default bucket.
-  }
-
+  /// @dev RateLimitConfig with its policy record key.
   struct RateLimitPolicyConfigArgs {
     bytes32 policyName; // The rate limit policy.
     uint64 remoteChainSelector; // ─╮ The remote chain. Zero names the policy default record.
     uint8 localDecimals; // ────────╯ The decimals of the policy. The first record of the policy fixes them.
-    RateLimiter.Config outboundRateLimiterConfig; // The outbound limit for default finality, meaning the rate limits for all of the onRamps for the given chain.
-    RateLimiter.Config inboundRateLimiterConfig; // The inbound limit for default finality, meaning the rate limits for all of the offRamps for the given chain.
-    RateLimiter.Config fastFinalityOutboundRateLimiterConfig; // The outbound limit for FTF.
-    RateLimiter.Config fastFinalityInboundRateLimiterConfig; // The inbound limit for FTF.
+    RateLimitConfig rateLimitConfig; // The values of the record.
   }
 
-  /// @notice Rate limit policy record to update for inbound or outbound.
+  /// @dev RateLimitConfig with its token and chain.
+  struct InlineRateLimitConfigArgs {
+    address localToken; // ─────────╮ The local token address.
+    uint64 remoteChainSelector; // ─╯ The remote chain.
+    RateLimitConfig rateLimitConfig; // The values of the record.
+  }
+
+  /// @dev One direction of an inline rate limit record to update.
+  struct InlineRateLimitDirectionArgs {
+    address localToken; // ────────╮ The local token address.
+    uint64 remoteChainSelector; // ╯ The remote chain.
+    IPoolV2.MessageDirection direction; // The direction to update.
+    RateLimiter.Config defaultFinalityConfig; // The limit for default finality.
+    RateLimiter.Config fastFinalityConfig; // The limit for FTF. Disabled means FTF uses the default bucket.
+  }
+
+  /// @dev One direction of a rate limit policy record to update.
   struct RateLimitPolicyDirectionArgs {
     bytes32 policyName; // The rate limit policy.
     uint64 remoteChainSelector; // ─────────╮ The remote chain. Zero names the policy default record.
@@ -143,24 +130,21 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   struct SecurityConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
-    address hook; // Address of the IMultiTokenPoolHooks contract of the lane. Zero means no hook.
+    address hook; // The IMultiTokenPoolHooks of the lane.
   }
 
-  struct InlineSecurityConfigArgs {
-    address localToken; // ─────────╮ A registered token.
-    uint64 remoteChainSelector; // ─╯ The remote chain. Not zero.
-    address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain. No duplicate.
-    address[] inboundCCVs; // CCVs required for incoming messages from the remote chain. No duplicate.
-    address hook; // Address of the IMultiTokenPoolHooks contract of the lane. Zero means no hook.
-  }
-
-  /// @notice A security policy record to set.
+  /// @dev SecurityConfig with its policy record key.
   struct SecurityPolicyConfigArgs {
-    bytes32 policyName; // The security policy. Not zero.
-    uint64 remoteChainSelector; // ─╮ The remote chain. Zero names the policy default record.
-    address hook; // ───────────────╯ Address of the IMultiTokenPoolHooks contract of the lane. Zero means no hook.
-    address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain. No duplicate.
-    address[] inboundCCVs; // CCVs required for incoming messages from the remote chain. No duplicate.
+    bytes32 policyName; // The security policy.
+    uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
+    SecurityConfig securityConfig; // The values of the record.
+  }
+
+  /// @dev SecurityConfig with its token and chain.
+  struct InlineSecurityConfigArgs {
+    address localToken; // ─────────╮ The local token address.
+    uint64 remoteChainSelector; // ─╯ The remote chain.
+    SecurityConfig securityConfig; // The values of the record.
   }
 
   /// @notice The registered tokens. A token is registered exactly when it is in this set.
@@ -648,18 +632,18 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       inlineConfigs[i] = InlineRateLimitConfigArgs({
         localToken: localToken,
         remoteChainSelector: remoteChainSelector,
-        outboundRateLimiterConfig: _getInlineRateLimitConfig(
-          localToken, remoteChainSelector, false, IPoolV2.MessageDirection.Outbound
-        ),
-        inboundRateLimiterConfig: _getInlineRateLimitConfig(
-          localToken, remoteChainSelector, false, IPoolV2.MessageDirection.Inbound
-        ),
-        fastFinalityOutboundRateLimiterConfig: _getInlineRateLimitConfig(
-          localToken, remoteChainSelector, true, IPoolV2.MessageDirection.Outbound
-        ),
-        fastFinalityInboundRateLimiterConfig: _getInlineRateLimitConfig(
-          localToken, remoteChainSelector, true, IPoolV2.MessageDirection.Inbound
-        )
+        rateLimitConfig: RateLimitConfig({
+          outbound: _getInlineRateLimitConfig(
+            localToken, remoteChainSelector, false, IPoolV2.MessageDirection.Outbound
+          ),
+          inbound: _getInlineRateLimitConfig(localToken, remoteChainSelector, false, IPoolV2.MessageDirection.Inbound),
+          fastFinalityOutbound: _getInlineRateLimitConfig(
+            localToken, remoteChainSelector, true, IPoolV2.MessageDirection.Outbound
+          ),
+          fastFinalityInbound: _getInlineRateLimitConfig(
+            localToken, remoteChainSelector, true, IPoolV2.MessageDirection.Inbound
+          )
+        })
       });
     }
     return inlineConfigs;
@@ -678,11 +662,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       uint64 remoteChainSelector = uint64(chains[i]);
       SecurityConfig storage securityConfig = s_inlineSecurityConfigs[localToken][remoteChainSelector];
       inlineConfigs[i] = InlineSecurityConfigArgs({
-        localToken: localToken,
-        remoteChainSelector: remoteChainSelector,
-        outboundCCVs: securityConfig.outboundCCVs,
-        inboundCCVs: securityConfig.inboundCCVs,
-        hook: securityConfig.hook
+        localToken: localToken, remoteChainSelector: remoteChainSelector, securityConfig: securityConfig
       });
     }
     return inlineConfigs;
@@ -707,18 +687,18 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
         policyName: policyName,
         remoteChainSelector: remoteChainSelector,
         localDecimals: s_rateLimitPolicyDecimals[policyName],
-        outboundRateLimiterConfig: _getRateLimitPolicyConfig(
-          policyName, remoteChainSelector, false, IPoolV2.MessageDirection.Outbound
-        ),
-        inboundRateLimiterConfig: _getRateLimitPolicyConfig(
-          policyName, remoteChainSelector, false, IPoolV2.MessageDirection.Inbound
-        ),
-        fastFinalityOutboundRateLimiterConfig: _getRateLimitPolicyConfig(
-          policyName, remoteChainSelector, true, IPoolV2.MessageDirection.Outbound
-        ),
-        fastFinalityInboundRateLimiterConfig: _getRateLimitPolicyConfig(
-          policyName, remoteChainSelector, true, IPoolV2.MessageDirection.Inbound
-        )
+        rateLimitConfig: RateLimitConfig({
+          outbound: _getRateLimitPolicyConfig(
+            policyName, remoteChainSelector, false, IPoolV2.MessageDirection.Outbound
+          ),
+          inbound: _getRateLimitPolicyConfig(policyName, remoteChainSelector, false, IPoolV2.MessageDirection.Inbound),
+          fastFinalityOutbound: _getRateLimitPolicyConfig(
+            policyName, remoteChainSelector, true, IPoolV2.MessageDirection.Outbound
+          ),
+          fastFinalityInbound: _getRateLimitPolicyConfig(
+            policyName, remoteChainSelector, true, IPoolV2.MessageDirection.Inbound
+          )
+        })
       });
     }
     return (policy.tokenCount, s_rateLimitPolicyDecimals[policyName], policyConfigs);
@@ -738,11 +718,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       uint64 remoteChainSelector = uint64(chains[i]);
       SecurityConfig storage securityConfig = s_policySecurityConfigs[policyName][remoteChainSelector];
       policyConfigs[i] = SecurityPolicyConfigArgs({
-        policyName: policyName,
-        remoteChainSelector: remoteChainSelector,
-        outboundCCVs: securityConfig.outboundCCVs,
-        inboundCCVs: securityConfig.inboundCCVs,
-        hook: securityConfig.hook
+        policyName: policyName, remoteChainSelector: remoteChainSelector, securityConfig: securityConfig
       });
     }
     return (policy.tokenCount, policyConfigs);
@@ -902,28 +878,22 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
       InlineRateLimitConfigArgs calldata args = inlineConfigsToSet[i];
-      _validateRateLimitConfig(args.outboundRateLimiterConfig);
-      _validateRateLimitConfig(args.inboundRateLimiterConfig);
-      _validateRateLimitConfig(args.fastFinalityOutboundRateLimiterConfig);
-      _validateRateLimitConfig(args.fastFinalityInboundRateLimiterConfig);
+      RateLimitConfig calldata rateLimitConfig = args.rateLimitConfig;
+      _validateRateLimitConfig(rateLimitConfig.outbound);
+      _validateRateLimitConfig(rateLimitConfig.inbound);
+      _validateRateLimitConfig(rateLimitConfig.fastFinalityOutbound);
+      _validateRateLimitConfig(rateLimitConfig.fastFinalityInbound);
 
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineRateLimitChains[args.localToken], args.localToken, args.remoteChainSelector
       );
       mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.TokenBucket bucket))
         storage buckets = s_tokenBuckets[args.localToken][args.remoteChainSelector];
-      _setBucketIfChanged(buckets[false][IPoolV2.MessageDirection.Outbound], args.outboundRateLimiterConfig);
-      _setBucketIfChanged(buckets[false][IPoolV2.MessageDirection.Inbound], args.inboundRateLimiterConfig);
-      _setBucketIfChanged(buckets[true][IPoolV2.MessageDirection.Outbound], args.fastFinalityOutboundRateLimiterConfig);
-      _setBucketIfChanged(buckets[true][IPoolV2.MessageDirection.Inbound], args.fastFinalityInboundRateLimiterConfig);
-      emit InlineRateLimitConfigSet(
-        args.localToken,
-        args.remoteChainSelector,
-        args.outboundRateLimiterConfig,
-        args.inboundRateLimiterConfig,
-        args.fastFinalityOutboundRateLimiterConfig,
-        args.fastFinalityInboundRateLimiterConfig
-      );
+      _setBucketIfChanged(buckets[false][IPoolV2.MessageDirection.Outbound], rateLimitConfig.outbound);
+      _setBucketIfChanged(buckets[false][IPoolV2.MessageDirection.Inbound], rateLimitConfig.inbound);
+      _setBucketIfChanged(buckets[true][IPoolV2.MessageDirection.Outbound], rateLimitConfig.fastFinalityOutbound);
+      _setBucketIfChanged(buckets[true][IPoolV2.MessageDirection.Inbound], rateLimitConfig.fastFinalityInbound);
+      emit InlineRateLimitConfigSet(args.localToken, args.remoteChainSelector, rateLimitConfig);
     }
   }
 
@@ -1002,10 +972,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
           args.policyName, s_rateLimitPolicyDecimals[args.policyName], args.localDecimals
         );
       }
-      _validateRateLimitConfig(args.outboundRateLimiterConfig);
-      _validateRateLimitConfig(args.inboundRateLimiterConfig);
-      _validateRateLimitConfig(args.fastFinalityOutboundRateLimiterConfig);
-      _validateRateLimitConfig(args.fastFinalityInboundRateLimiterConfig);
+      RateLimitConfig calldata rateLimitConfig = args.rateLimitConfig;
+      _validateRateLimitConfig(rateLimitConfig.outbound);
+      _validateRateLimitConfig(rateLimitConfig.inbound);
+      _validateRateLimitConfig(rateLimitConfig.fastFinalityOutbound);
+      _validateRateLimitConfig(rateLimitConfig.fastFinalityInbound);
 
       PolicyConfig._setPolicyRecord(s_rateLimitPolicies, args.policyName, args.remoteChainSelector);
       if (isNewPolicy) {
@@ -1013,19 +984,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       }
       mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.Config config)) storage
         recordConfigs = s_policyRateLimitConfigs[args.policyName][args.remoteChainSelector];
-      recordConfigs[false][IPoolV2.MessageDirection.Outbound] = args.outboundRateLimiterConfig;
-      recordConfigs[false][IPoolV2.MessageDirection.Inbound] = args.inboundRateLimiterConfig;
-      recordConfigs[true][IPoolV2.MessageDirection.Outbound] = args.fastFinalityOutboundRateLimiterConfig;
-      recordConfigs[true][IPoolV2.MessageDirection.Inbound] = args.fastFinalityInboundRateLimiterConfig;
-      emit RateLimitPolicyConfigSet(
-        args.policyName,
-        args.remoteChainSelector,
-        args.localDecimals,
-        args.outboundRateLimiterConfig,
-        args.inboundRateLimiterConfig,
-        args.fastFinalityOutboundRateLimiterConfig,
-        args.fastFinalityInboundRateLimiterConfig
-      );
+      recordConfigs[false][IPoolV2.MessageDirection.Outbound] = rateLimitConfig.outbound;
+      recordConfigs[false][IPoolV2.MessageDirection.Inbound] = rateLimitConfig.inbound;
+      recordConfigs[true][IPoolV2.MessageDirection.Outbound] = rateLimitConfig.fastFinalityOutbound;
+      recordConfigs[true][IPoolV2.MessageDirection.Inbound] = rateLimitConfig.fastFinalityInbound;
+      emit RateLimitPolicyConfigSet(args.policyName, args.remoteChainSelector, args.localDecimals, rateLimitConfig);
     }
   }
 
@@ -1110,19 +1073,13 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
       InlineSecurityConfigArgs calldata args = inlineConfigsToSet[i];
-      _validateSecurityConfig(args.outboundCCVs, args.inboundCCVs);
+      SecurityConfig calldata securityConfig = args.securityConfig;
+      _validateSecurityConfig(securityConfig.outboundCCVs, securityConfig.inboundCCVs);
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineSecurityChains[args.localToken], args.localToken, args.remoteChainSelector
       );
-      _setSecurityConfig(
-        s_inlineSecurityConfigs[args.localToken][args.remoteChainSelector],
-        args.outboundCCVs,
-        args.inboundCCVs,
-        args.hook
-      );
-      emit InlineSecurityConfigSet(
-        args.localToken, args.remoteChainSelector, args.outboundCCVs, args.inboundCCVs, args.hook
-      );
+      _setSecurityConfig(s_inlineSecurityConfigs[args.localToken][args.remoteChainSelector], securityConfig);
+      emit InlineSecurityConfigSet(args.localToken, args.remoteChainSelector, securityConfig);
     }
   }
 
@@ -1156,17 +1113,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
       SecurityPolicyConfigArgs calldata args = policyConfigsToSet[i];
-      _validateSecurityConfig(args.outboundCCVs, args.inboundCCVs);
+      SecurityConfig calldata securityConfig = args.securityConfig;
+      _validateSecurityConfig(securityConfig.outboundCCVs, securityConfig.inboundCCVs);
       PolicyConfig._setPolicyRecord(s_securityPolicies, args.policyName, args.remoteChainSelector);
-      _setSecurityConfig(
-        s_policySecurityConfigs[args.policyName][args.remoteChainSelector],
-        args.outboundCCVs,
-        args.inboundCCVs,
-        args.hook
-      );
-      emit SecurityPolicyConfigSet(
-        args.policyName, args.remoteChainSelector, args.outboundCCVs, args.inboundCCVs, args.hook
-      );
+      _setSecurityConfig(s_policySecurityConfigs[args.policyName][args.remoteChainSelector], securityConfig);
+      emit SecurityPolicyConfigSet(args.policyName, args.remoteChainSelector, securityConfig);
     }
   }
 
@@ -1182,13 +1133,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @dev Any address is accepted for the hook. A MultiTokenPoolHooks must list every pool
   /// that serves a token of its lanes as an authorized caller.
   function _setSecurityConfig(
-    SecurityConfig storage securityConfig,
-    address[] calldata outboundCCVs,
-    address[] calldata inboundCCVs,
-    address hook
+    SecurityConfig storage storedConfig,
+    SecurityConfig calldata config
   ) private {
-    securityConfig.outboundCCVs = outboundCCVs;
-    securityConfig.inboundCCVs = inboundCCVs;
-    securityConfig.hook = hook;
+    storedConfig.outboundCCVs = config.outboundCCVs;
+    storedConfig.inboundCCVs = config.inboundCCVs;
+    storedConfig.hook = config.hook;
   }
 }

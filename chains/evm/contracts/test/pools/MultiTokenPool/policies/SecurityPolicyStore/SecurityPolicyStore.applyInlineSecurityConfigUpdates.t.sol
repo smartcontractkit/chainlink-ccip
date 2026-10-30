@@ -15,16 +15,20 @@ contract SecurityPolicyStore_applyInlineSecurityConfigUpdates is SecurityPolicyS
     configs[0] = SecurityPolicyStore.InlineSecurityConfigArgs({
       localToken: s_tokenA,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      outboundCCVs: _ccvsOf(s_ccv1, s_ccv2),
-      inboundCCVs: _arrayOf(s_ccv2),
-      hook: s_hook
+      securityConfig: SecurityPolicyStore.SecurityConfig({
+        outboundCCVs: _ccvsOf(s_ccv1, s_ccv2), inboundCCVs: _arrayOf(s_ccv2), hook: s_hook
+      })
     });
 
     vm.expectEmit(address(s_store));
-    emit SecurityPolicyStore.InlineSecurityConfigSet(
-      s_tokenA, DEST_CHAIN_SELECTOR, configs[0].outboundCCVs, configs[0].inboundCCVs, s_hook
+    emit SecurityPolicyStore.InlineSecurityConfigSet(s_tokenA, DEST_CHAIN_SELECTOR, configs[0].securityConfig);
+    _setInlineSecurityConfig(
+      s_tokenA,
+      DEST_CHAIN_SELECTOR,
+      configs[0].securityConfig.outboundCCVs,
+      configs[0].securityConfig.inboundCCVs,
+      s_hook
     );
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, configs[0].outboundCCVs, configs[0].inboundCCVs, s_hook);
 
     SecurityPolicyStore.InlineSecurityConfigArgs[] memory records = s_store.getInlineSecurityConfigs(s_tokenA);
     assertEq(1, records.length);
@@ -37,8 +41,8 @@ contract SecurityPolicyStore_applyInlineSecurityConfigUpdates is SecurityPolicyS
     _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _arrayOf(s_ccv2), _arrayOf(s_ccv1), address(0));
 
     SecurityPolicyStore.InlineSecurityConfigArgs[] memory records = s_store.getInlineSecurityConfigs(s_tokenA);
-    assertEq(address(0), records[0].hook);
-    assertEq(abi.encode(_arrayOf(s_ccv2)), abi.encode(records[0].outboundCCVs));
+    assertEq(address(0), records[0].securityConfig.hook);
+    assertEq(abi.encode(_arrayOf(s_ccv2)), abi.encode(records[0].securityConfig.outboundCCVs));
 
     vm.expectEmit(address(s_store));
     emit SecurityPolicyStore.InlineSecurityConfigRemoved(s_tokenA, DEST_CHAIN_SELECTOR);
