@@ -59,7 +59,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 		ocrTypeCodec:         ocrTypeCodec,
 		inflightMessageCache: cache.NewInflightMessageCache(10 * time.Minute),
 		ccipReader:           ccipReaderMock,
-		observer:             &execmetrics.Noop{},
+		metricsReporter:      &execmetrics.Noop{},
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			OracleID:     commontypes.OracleID(1),
 			ConfigDigest: configDigest,
@@ -706,6 +706,7 @@ func Test_getMessagesObservation(t *testing.T) {
 				inflightMessageCache: inflightCache,
 				tokenDataObserver:    &tokenDataObserver,
 				homeChain:            homeChain,
+				metricsReporter:      execmetrics.Noop{},
 				offchainCfg: pluginconfig.ExecuteOffchainConfig{
 					BatchGasLimit: uint64(batchGasLimit),
 				},
