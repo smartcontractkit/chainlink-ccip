@@ -6,6 +6,7 @@ import {IPoolV2} from "../../../interfaces/IPoolV2.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
 import {CCVConfigValidation} from "../../../libraries/CCVConfigValidation.sol";
+import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../../libraries/PolicyConfig.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -30,6 +31,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   error InvalidRateLimitPolicyDecimals(bytes32 policyName, uint8 expected, uint8 actual);
   error TokenHasConfig(address localToken);
   error RateLimitRecordNotFound(address localToken, uint64 remoteChainSelector);
+  error SecurityRecordNotFound(address localToken, uint64 remoteChainSelector);
 
   event InlineRateLimitConfigSet(
     address indexed localToken,
@@ -72,6 +74,10 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   event TokenRemoved(address indexed localToken);
   event TokenRateLimitPolicySet(address indexed localToken, bytes32 indexed policyName);
   event TokenSecurityPolicySet(address indexed localToken, bytes32 indexed policyName);
+  event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event FastFinalityOutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
+  event FastFinalityInboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InlineSecurityConfigSet(
     address indexed localToken,
     uint64 indexed remoteChainSelector,
@@ -255,6 +261,193 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   // ================================================================
+  // │                          Hot path                            │
+  // ================================================================
+
+  /// @notice Consumes the outbound rate limit of an outbound transfer, and returns the hook of the lane.
+  /// @dev Reverts if the token has no security record or no rate limit record for the chain, in that order. The
+  /// connection store checks the requested finality. The fee store computes the token fee before this call.
+  /// @param localToken The local token.
+  /// @param remoteChainSelector The destination chain.
+  /// @param amount The amount after the token fee.
+  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @return hook The hook of the security record. Zero means no hook.
+  function validateLockOrBurn(
+    address localToken,
+    uint64 remoteChainSelector,
+    uint256 amount,
+    bytes4 requestedFinalityConfig
+  ) external onlyAuthorizedCallers returns (address hook) {
+    (PolicyConfig.RecordLevel level, SecurityConfig storage securityConfig) =
+      _resolveSecurityConfig(localToken, remoteChainSelector);
+    if (level == PolicyConfig.RecordLevel.None) revert SecurityRecordNotFound(localToken, remoteChainSelector);
+    _consumeRateLimit(
+      localToken,
+      remoteChainSelector,
+      IPoolV2.MessageDirection.Outbound,
+      requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG,
+      amount
+    );
+    return securityConfig.hook;
+  }
+
+  /// @notice Consumes the inbound rate limit, and returns the hook of the lane.
+  /// @dev Reverts if the token has no rate limit record or no security record for the chain.
+  /// @param localToken The local token.
+  /// @param remoteChainSelector The source chain.
+  /// @param localAmount The amount in local decimals.
+  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @return hook The hook of the security record. Zero means no hook.
+  function validateReleaseOrMint(
+    address localToken,
+    uint64 remoteChainSelector,
+    uint256 localAmount,
+    bytes4 requestedFinalityConfig
+  ) external onlyAuthorizedCallers returns (address hook) {
+    _consumeRateLimit(
+      localToken,
+      remoteChainSelector,
+      IPoolV2.MessageDirection.Inbound,
+      requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG,
+      localAmount
+    );
+    (PolicyConfig.RecordLevel level, SecurityConfig storage securityConfig) =
+      _resolveSecurityConfig(localToken, remoteChainSelector);
+    if (level == PolicyConfig.RecordLevel.None) revert SecurityRecordNotFound(localToken, remoteChainSelector);
+    return securityConfig.hook;
+  }
+
+  /// @dev A transfer never runs without a rate limit record.
+  function _consumeRateLimit(
+    address localToken,
+    uint64 remoteChainSelector,
+    IPoolV2.MessageDirection direction,
+    bool fastFinality,
+    uint256 amount
+  ) private {
+    (PolicyConfig.RecordLevel level, bytes32 policyName, uint64 recordChainSelector) =
+      _resolveRateLimitRecord(localToken, remoteChainSelector);
+    if (level == PolicyConfig.RecordLevel.None) revert RateLimitRecordNotFound(localToken, remoteChainSelector);
+    // If the FTF config of the record is not enabled, an FTF transfer uses the default finality bucket, the same as
+    // TokenPool. A bucket gets the config of its policy record only on use, so this check reads the record.
+    if (fastFinality && !_isFastFinalityRateLimitEnabled(localToken, policyName, recordChainSelector, direction)) {
+      fastFinality = false;
+    }
+    _syncBucket(localToken, remoteChainSelector, policyName, recordChainSelector, direction, fastFinality)
+      ._consume(amount, localToken);
+
+    if (direction == IPoolV2.MessageDirection.Outbound) {
+      if (fastFinality) {
+        emit FastFinalityOutboundRateLimitConsumed(remoteChainSelector, localToken, amount);
+      } else {
+        emit OutboundRateLimitConsumed(remoteChainSelector, localToken, amount);
+      }
+    } else if (fastFinality) {
+      emit FastFinalityInboundRateLimitConsumed(remoteChainSelector, localToken, amount);
+    } else {
+      emit InboundRateLimitConsumed(remoteChainSelector, localToken, amount);
+    }
+  }
+
+  /// @dev Reads only the enabled flag of the FTF config of the record. The FTF choice of a transfer needs nothing else.
+  function _isFastFinalityRateLimitEnabled(
+    address localToken,
+    bytes32 policyName,
+    uint64 recordChainSelector,
+    IPoolV2.MessageDirection direction
+  ) private view returns (bool) {
+    if (policyName == bytes32(0)) {
+      return s_tokenBuckets[localToken][recordChainSelector][true][direction].isEnabled;
+    }
+    return s_policyRateLimitConfigs[policyName][recordChainSelector][true][direction].isEnabled;
+  }
+
+  /// @dev For a token that uses a policy record, copies the config of the record into the bucket if the bucket holds
+  /// another config. The copy refills the bucket. So a bucket refills on its next use after a write that changes the
+  /// config of its record, and after its token moves to a record with another config. Otherwise the bucket keeps its
+  /// state, which is valid for that config. So a bucket never holds more tokens than it would hold if every config
+  /// write and every move of its token to another record refilled it. The copy emits no event, because
+  /// getCurrentRateLimiterStateBatch already shows a bucket that waits for a copy as the copy leaves it.
+  function _syncBucket(
+    address localToken,
+    uint64 remoteChainSelector,
+    bytes32 policyName,
+    uint64 recordChainSelector,
+    IPoolV2.MessageDirection direction,
+    bool fastFinality
+  ) private returns (RateLimiter.TokenBucket storage bucket) {
+    bucket = s_tokenBuckets[localToken][remoteChainSelector][fastFinality][direction];
+    if (policyName == bytes32(0)) {
+      return bucket;
+    }
+
+    RateLimiter.Config storage config =
+      s_policyRateLimitConfigs[policyName][recordChainSelector][fastFinality][direction];
+    if (!_hasConfig(bucket, config)) {
+      bucket._setTokenBucketConfig(config);
+    }
+    return bucket;
+  }
+
+  /// @dev A bucket holds the config of its record exactly when the two agree on every field.
+  function _hasConfig(
+    RateLimiter.TokenBucket storage bucket,
+    RateLimiter.Config storage config
+  ) private view returns (bool) {
+    return bucket.isEnabled == config.isEnabled && bucket.capacity == config.capacity && bucket.rate == config.rate;
+  }
+
+  // ================================================================
+  // │                         Resolution                           │
+  // ================================================================
+
+  /// @dev An inline record overrides the policy, so it is checked before the policy name is read. The policy name is
+  /// zero for an inline record, which keeps its config in the buckets of the token. recordChainSelector is the chain
+  /// key of the record. It is the remote chain for an inline record and for a policy chain record, and zero for a
+  /// policy default record.
+  function _resolveRateLimitRecord(
+    address localToken,
+    uint64 remoteChainSelector
+  ) private view returns (PolicyConfig.RecordLevel level, bytes32 policyName, uint64 recordChainSelector) {
+    if (s_inlineRateLimitChains[localToken].contains(remoteChainSelector)) {
+      return (PolicyConfig.RecordLevel.Inline, bytes32(0), remoteChainSelector);
+    }
+    policyName = s_tokenStates[localToken].rateLimitPolicyName;
+    level = PolicyConfig._resolvePolicyRecordLevel(
+      s_rateLimitPolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
+    );
+    if (level == PolicyConfig.RecordLevel.PolicyChain) {
+      return (level, policyName, remoteChainSelector);
+    }
+    if (level == PolicyConfig.RecordLevel.PolicyDefault) {
+      return (level, policyName, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
+    }
+    return (level, bytes32(0), 0);
+  }
+
+  /// @dev The same order as _resolveRateLimitRecord. A token without a record gets its inline slot for the chain, which
+  /// is empty, because a removal deletes the values of a record.
+  function _resolveSecurityConfig(
+    address localToken,
+    uint64 remoteChainSelector
+  ) private view returns (PolicyConfig.RecordLevel level, SecurityConfig storage securityConfig) {
+    if (s_inlineSecurityChains[localToken].contains(remoteChainSelector)) {
+      return (PolicyConfig.RecordLevel.Inline, s_inlineSecurityConfigs[localToken][remoteChainSelector]);
+    }
+    bytes32 policyName = s_tokenStates[localToken].securityPolicyName;
+    level = PolicyConfig._resolvePolicyRecordLevel(
+      s_securityPolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
+    );
+    if (level == PolicyConfig.RecordLevel.PolicyChain) {
+      return (level, s_policySecurityConfigs[policyName][remoteChainSelector]);
+    }
+    if (level == PolicyConfig.RecordLevel.PolicyDefault) {
+      return (level, s_policySecurityConfigs[policyName][PolicyConfig.DEFAULT_CHAIN_SELECTOR]);
+    }
+    return (level, s_inlineSecurityConfigs[localToken][remoteChainSelector]);
+  }
+
+  // ================================================================
   // │                        Stored views                          │
   // ================================================================
 
@@ -354,6 +547,77 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
+  /// @notice Returns the records of a rate limit policy, in the shape of applyRateLimitPolicyConfigUpdates. Never
+  /// reverts.
+  /// @param policyName The rate limit policy.
+  /// @return tokenCount The number of tokens that use the policy.
+  /// @return localDecimals The decimals of the policy. Every token of the policy has them. Zero if the policy does not
+  /// exist. getPolicyNames shows whether the policy exists.
+  /// @return policyConfigs The records of the policy. Empty if the policy does not exist or has no records.
+  function getRateLimitPolicy(
+    bytes32 policyName
+  ) external view returns (uint32 tokenCount, uint8 localDecimals, RateLimitPolicyConfigArgs[] memory policyConfigs) {
+    PolicyConfig.Policy storage policy = s_rateLimitPolicies.policies[policyName];
+    uint256[] memory chains = policy.remoteChainSelectors.values();
+    policyConfigs = new RateLimitPolicyConfigArgs[](chains.length);
+    for (uint256 i = 0; i < chains.length; ++i) {
+      uint64 remoteChainSelector = uint64(chains[i]);
+      policyConfigs[i] = RateLimitPolicyConfigArgs({
+        policyName: policyName,
+        remoteChainSelector: remoteChainSelector,
+        localDecimals: s_rateLimitPolicyDecimals[policyName],
+        outboundRateLimiterConfig: _getRateLimitPolicyConfig(
+          policyName, remoteChainSelector, false, IPoolV2.MessageDirection.Outbound
+        ),
+        inboundRateLimiterConfig: _getRateLimitPolicyConfig(
+          policyName, remoteChainSelector, false, IPoolV2.MessageDirection.Inbound
+        ),
+        fastFinalityOutboundRateLimiterConfig: _getRateLimitPolicyConfig(
+          policyName, remoteChainSelector, true, IPoolV2.MessageDirection.Outbound
+        ),
+        fastFinalityInboundRateLimiterConfig: _getRateLimitPolicyConfig(
+          policyName, remoteChainSelector, true, IPoolV2.MessageDirection.Inbound
+        )
+      });
+    }
+    return (policy.tokenCount, s_rateLimitPolicyDecimals[policyName], policyConfigs);
+  }
+
+  /// @notice Returns the records of a security policy, in the shape of applySecurityPolicyConfigUpdates. Never reverts.
+  /// @param policyName The security policy.
+  /// @return tokenCount The number of tokens that use the policy.
+  /// @return policyConfigs The records of the policy. Empty if the policy does not exist or has no records.
+  function getSecurityPolicy(
+    bytes32 policyName
+  ) external view returns (uint32 tokenCount, SecurityPolicyConfigArgs[] memory policyConfigs) {
+    PolicyConfig.Policy storage policy = s_securityPolicies.policies[policyName];
+    uint256[] memory chains = policy.remoteChainSelectors.values();
+    policyConfigs = new SecurityPolicyConfigArgs[](chains.length);
+    for (uint256 i = 0; i < chains.length; ++i) {
+      uint64 remoteChainSelector = uint64(chains[i]);
+      SecurityConfig storage securityConfig = s_policySecurityConfigs[policyName][remoteChainSelector];
+      policyConfigs[i] = SecurityPolicyConfigArgs({
+        policyName: policyName,
+        remoteChainSelector: remoteChainSelector,
+        outboundCCVs: securityConfig.outboundCCVs,
+        inboundCCVs: securityConfig.inboundCCVs,
+        hook: securityConfig.hook
+      });
+    }
+    return (policy.tokenCount, policyConfigs);
+  }
+
+  /// @notice Returns the name of every rate limit policy and every security policy. Never reverts.
+  /// @return rateLimitPolicyNames The names of the rate limit policies.
+  /// @return securityPolicyNames The names of the security policies.
+  function getPolicyNames()
+    external
+    view
+    returns (bytes32[] memory rateLimitPolicyNames, bytes32[] memory securityPolicyNames)
+  {
+    return (s_rateLimitPolicies.policyNames.values(), s_securityPolicies.policyNames.values());
+  }
+
   /// @dev The config of an inline rate limit record lives in the bucket of the token, so the getter reads the bucket.
   function _getInlineRateLimitConfig(
     address localToken,
@@ -363,6 +627,16 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) private view returns (RateLimiter.Config memory) {
     RateLimiter.TokenBucket storage bucket = s_tokenBuckets[localToken][remoteChainSelector][fastFinality][direction];
     return RateLimiter.Config({isEnabled: bucket.isEnabled, capacity: bucket.capacity, rate: bucket.rate});
+  }
+
+  /// @dev The config of a rate limit policy record lives in the policy, so the getter reads the policy.
+  function _getRateLimitPolicyConfig(
+    bytes32 policyName,
+    uint64 remoteChainSelector,
+    bool fastFinality,
+    IPoolV2.MessageDirection direction
+  ) private view returns (RateLimiter.Config memory) {
+    return s_policyRateLimitConfigs[policyName][remoteChainSelector][fastFinality][direction];
   }
 
   // ================================================================
