@@ -80,9 +80,7 @@ interface IPoolConfigManager {
     bool isChainOutboundPaused; //                   │ True if the remote chain is paused outbound.
     bool isChainInboundPaused; //                    │ True if the remote chain is paused inbound.
     bool omitSourceTokenAddressOnSend; //            │ True sends pool data without the source token.
-    bool allowSourceTokenAddressMissingOnReceive; // │ True accepts pool data without the source token.
-    uint32 destGasOverhead; //                       │ The destination token execution gas overhead.
-    uint32 destBytesOverhead; // ────────────────────╯ The destination token data byte overhead.
+    bool allowSourceTokenAddressMissingOnReceive; // ╯ True accepts pool data without the source token.
     bytes remoteToken; //                             The encoded remote token. Empty if it cannot be resolved.
     bytes[] remotePools; //                           The encoded trusted remote pools, or an empty list if none exist.
   }
@@ -98,9 +96,10 @@ interface IPoolConfigManager {
     address additionalPoolDataProvider; //  The token's IAdditionalPoolDataProvider. Zero means none.
     uint64[] supportedChains; //            The remote chains covered by the token's resolved lanes.
     bytes32 connectionPolicyName; //        The connection policy of the token. Zero if it has none.
-    bytes32 chainPolicyName; //             The chain policy of the token. Zero if it has none.
+    bytes32 remotePoolPolicyName; //        The remote pool policy of the token. Zero if it has none.
     bytes32 rateLimitPolicyName; //         The rate limit policy of the token. Zero if it has none.
     bytes32 feePolicyName; //               The fee policy of the token. Zero if it has none.
+    bytes32 destOverheadPolicyName; //      The destination overhead policy of the token. Zero if it has none.
     bytes32 securityPolicyName; //          The security policy of the token. Zero if it has none.
   }
 
@@ -135,8 +134,8 @@ interface IPoolConfigManager {
   /// @dev Reverts if a token does not allow the requested finality, even when it has no lane.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fees
-  /// are disabled, return zeros with isEnabled false.
+  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, lanes without an
+  /// enabled fee record and lanes without a destination overhead record return zeros with isEnabled false.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -144,8 +143,9 @@ interface IPoolConfigManager {
 
   /// @notice Returns the resolved lane fee configurations.
   /// @param lanes The token and remote chain lanes to query.
-  /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist return
-  /// a disabled zero configuration.
+  /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist, lanes
+  /// without an enabled fee record and lanes without a destination overhead record return a disabled zero
+  /// configuration.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs);

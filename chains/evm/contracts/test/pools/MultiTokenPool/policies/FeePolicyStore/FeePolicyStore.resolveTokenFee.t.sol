@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {FinalityCodec} from "../../../../../libraries/FinalityCodec.sol";
+import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
+import {FeePolicyStore} from "../../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
+import {FeePolicyStoreSetup} from "./FeePolicyStoreSetup.t.sol";
+
+contract FeePolicyStore_resolveTokenFee is FeePolicyStoreSetup {
+  uint256 internal constant AMOUNT = 1e18;
+
+  function test_resolveTokenFee() public view {
+    assertEq(
+      (AMOUNT * _getFeeConfig().finalityTransferFeeBps) / BPS_DIVIDER,
+      s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true)
+    );
+  }
+
+  function test_resolveTokenFee_FastFinality() public view {
+    assertEq(
+      (AMOUNT * _getFeeConfig().fastFinalityTransferFeeBps) / BPS_DIVIDER,
+      s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec._encodeBlockDepth(10), true)
+    );
+  }
+
+  function test_resolveTokenFee_PolicyChainRecord() public {
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, _getOtherFeeConfig()));
+
+    // The policy chain record serves the chain instead of the policy default record.
+    assertEq(
+      (AMOUNT * _getOtherFeeConfig().finalityTransferFeeBps) / BPS_DIVIDER,
+      s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true)
+    );
+  }
+
+  function test_resolveTokenFee_NoChargeTokenFee() public view {
+    assertEq(
+      0, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, false)
+    );
+  }
+
+  function test_resolveTokenFee_DisabledFeeRecord() public {
+    FeePolicyStore.FeeConfig memory disabledFeeConfig;
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, disabledFeeConfig));
+
+    assertEq(
+      0, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true)
+    );
+  }
+
+  function testFuzz_resolveTokenFee_FeeBelowAmount(
+    uint256 amount,
+    uint16 transferFeeBps
+  ) public {
+    amount = bound(amount, 1, type(uint256).max / BPS_DIVIDER);
+    transferFeeBps = uint16(bound(transferFeeBps, 0, BPS_DIVIDER - 1));
+    FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig();
+    feeConfig.finalityTransferFeeBps = transferFeeBps;
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, feeConfig));
+
+    uint256 feeAmount =
+      s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+
+    assertEq((amount * transferFeeBps) / BPS_DIVIDER, feeAmount);
+    assertLt(feeAmount, amount);
+  }
+
+  // Reverts
+
+  function test_resolveTokenFee_RevertWhen_FeeRecordNotFound() public {
+    // s_otherToken has no record of either type, and the fee record is checked first.
+    vm.expectRevert(
+      abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_otherToken, DEST_CHAIN_SELECTOR)
+    );
+    s_feeStore.resolveTokenFee(s_otherToken, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+
+    // A send without a token fee also needs the record.
+    vm.expectRevert(
+      abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_otherToken, DEST_CHAIN_SELECTOR)
+    );
+    s_feeStore.resolveTokenFee(s_otherToken, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, false);
+  }
+
+  function test_resolveTokenFee_RevertWhen_DestOverheadRecordNotFound() public {
+    _setTokenDestOverheadPolicy(s_token, bytes32(0));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(FeePolicyStore.DestOverheadRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+
+    // A send without a token fee also needs the record.
+    vm.expectRevert(
+      abi.encodeWithSelector(FeePolicyStore.DestOverheadRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, false);
+
+    // A send with a disabled fee record also needs the record.
+    FeePolicyStore.FeeConfig memory disabledFeeConfig;
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, disabledFeeConfig));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(FeePolicyStore.DestOverheadRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+  }
+}
