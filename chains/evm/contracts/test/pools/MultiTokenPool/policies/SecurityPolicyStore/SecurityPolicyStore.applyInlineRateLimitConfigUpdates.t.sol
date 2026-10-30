@@ -75,8 +75,8 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     assertEq(0, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).outbound.tokens);
   }
 
-  /// @notice The direction update writes the two buckets of one direction only, and keeps the other direction.
-  function test_applyInlineRateLimitDirectionUpdates_UpdatesOneDirectionOnly() public {
+  /// @notice The bucket update writes one bucket only, and keeps the other three.
+  function test_applyInlineRateLimitBucketUpdates_UpdatesOneBucketOnly() public {
     _setInlineRateLimitConfigPerSlot(
       s_tokenA,
       DEST_CHAIN_SELECTOR,
@@ -86,26 +86,26 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
       _getRateLimitConfig(CAPACITY + 3)
     );
 
-    SecurityPolicyStore.InlineRateLimitDirectionArgs[] memory directionConfigs =
-      new SecurityPolicyStore.InlineRateLimitDirectionArgs[](1);
-    directionConfigs[0] = SecurityPolicyStore.InlineRateLimitDirectionArgs({
+    SecurityPolicyStore.InlineRateLimitBucketArgs[] memory bucketConfigs =
+      new SecurityPolicyStore.InlineRateLimitBucketArgs[](1);
+    bucketConfigs[0] = SecurityPolicyStore.InlineRateLimitBucketArgs({
       localToken: s_tokenA,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       direction: IPoolV2.MessageDirection.Inbound,
-      defaultFinalityConfig: _getRateLimitConfig(7 * CAPACITY),
-      fastFinalityConfig: _getRateLimitConfig(8 * CAPACITY)
+      fastFinality: false,
+      config: _getRateLimitConfig(7 * CAPACITY)
     });
     vm.prank(s_poolConfigManager);
-    s_store.applyInlineRateLimitDirectionUpdates(directionConfigs);
+    s_store.applyInlineRateLimitBucketUpdates(bucketConfigs);
 
     SecurityPolicyStore.InlineRateLimitConfigArgs memory config =
       _getInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR);
-    // The inbound direction changed.
+    // The inbound default finality bucket changed.
     assertEq(7 * CAPACITY, config.rateLimitConfig.inbound.capacity);
-    assertEq(8 * CAPACITY, config.rateLimitConfig.fastFinalityInbound.capacity);
-    // The outbound direction kept its config.
+    // The other three buckets kept their config.
     assertEq(CAPACITY, config.rateLimitConfig.outbound.capacity);
     assertEq(CAPACITY + 2, config.rateLimitConfig.fastFinalityOutbound.capacity);
+    assertEq(CAPACITY + 3, config.rateLimitConfig.fastFinalityInbound.capacity);
   }
 
   // Reverts
@@ -147,23 +147,23 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     );
   }
 
-  /// @notice The direction update needs the record to exist.
-  function test_applyInlineRateLimitDirectionUpdates_RevertWhen_RateLimitRecordNotFound() public {
-    SecurityPolicyStore.InlineRateLimitDirectionArgs[] memory directionConfigs =
-      new SecurityPolicyStore.InlineRateLimitDirectionArgs[](1);
-    directionConfigs[0] = SecurityPolicyStore.InlineRateLimitDirectionArgs({
+  /// @notice The bucket update needs the record to exist.
+  function test_applyInlineRateLimitBucketUpdates_RevertWhen_RateLimitRecordNotFound() public {
+    SecurityPolicyStore.InlineRateLimitBucketArgs[] memory bucketConfigs =
+      new SecurityPolicyStore.InlineRateLimitBucketArgs[](1);
+    bucketConfigs[0] = SecurityPolicyStore.InlineRateLimitBucketArgs({
       localToken: s_tokenA,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       direction: IPoolV2.MessageDirection.Outbound,
-      defaultFinalityConfig: _getRateLimitConfig(CAPACITY),
-      fastFinalityConfig: _getRateLimitConfig(CAPACITY)
+      fastFinality: false,
+      config: _getRateLimitConfig(CAPACITY)
     });
 
     vm.expectRevert(
       abi.encodeWithSelector(SecurityPolicyStore.RateLimitRecordNotFound.selector, s_tokenA, DEST_CHAIN_SELECTOR)
     );
     vm.prank(s_poolConfigManager);
-    s_store.applyInlineRateLimitDirectionUpdates(directionConfigs);
+    s_store.applyInlineRateLimitBucketUpdates(bucketConfigs);
   }
 
   /// @notice Only an authorized pool config manager writes to the store.

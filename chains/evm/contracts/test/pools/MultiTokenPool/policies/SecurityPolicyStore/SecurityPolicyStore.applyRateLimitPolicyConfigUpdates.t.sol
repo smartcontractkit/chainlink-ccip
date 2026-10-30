@@ -24,9 +24,9 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     assertEq(abi.encode(policyConfigs[0]), abi.encode(records[0]));
   }
 
-  /// @notice The direction update writes one direction of an existing record only. Chain selector zero names the policy
+  /// @notice The bucket update writes one bucket of an existing record only. Chain selector zero names the policy
   /// default record, which the update also accepts.
-  function test_applyRateLimitPolicyDirectionUpdates_UpdatesOneDirectionOnly() public {
+  function test_applyRateLimitPolicyBucketUpdates_UpdatesOneBucketOnly() public {
     _setRateLimitPolicyConfigPerSlot(
       DEFAULT_POLICY,
       DEST_CHAIN_SELECTOR,
@@ -36,24 +36,24 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
       _getRateLimitConfig(CAPACITY + 3)
     );
 
-    SecurityPolicyStore.RateLimitPolicyDirectionArgs[] memory directionConfigs =
-      new SecurityPolicyStore.RateLimitPolicyDirectionArgs[](1);
-    directionConfigs[0] = SecurityPolicyStore.RateLimitPolicyDirectionArgs({
+    SecurityPolicyStore.RateLimitPolicyBucketArgs[] memory bucketConfigs =
+      new SecurityPolicyStore.RateLimitPolicyBucketArgs[](1);
+    bucketConfigs[0] = SecurityPolicyStore.RateLimitPolicyBucketArgs({
       policyName: DEFAULT_POLICY,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       direction: IPoolV2.MessageDirection.Inbound,
-      defaultFinalityConfig: _getRateLimitConfig(7 * CAPACITY),
-      fastFinalityConfig: _getRateLimitConfig(8 * CAPACITY)
+      fastFinality: false,
+      config: _getRateLimitConfig(7 * CAPACITY)
     });
     vm.prank(s_poolConfigManager);
-    s_store.applyRateLimitPolicyDirectionUpdates(directionConfigs);
+    s_store.applyRateLimitPolicyBucketUpdates(bucketConfigs);
 
     SecurityPolicyStore.RateLimitPolicyConfigArgs memory record =
       _getRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR);
     assertEq(7 * CAPACITY, record.rateLimitConfig.inbound.capacity);
-    assertEq(8 * CAPACITY, record.rateLimitConfig.fastFinalityInbound.capacity);
     assertEq(CAPACITY, record.rateLimitConfig.outbound.capacity);
     assertEq(CAPACITY + 2, record.rateLimitConfig.fastFinalityOutbound.capacity);
+    assertEq(CAPACITY + 3, record.rateLimitConfig.fastFinalityInbound.capacity);
   }
 
   /// @notice A bucket copies a new config of its policy record on its next use, and the copy refills the bucket. A set
@@ -113,23 +113,23 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     _applyRateLimitPolicyConfigUpdates(policyConfigs);
   }
 
-  /// @notice The direction update needs the record to exist.
-  function test_applyRateLimitPolicyDirectionUpdates_RevertWhen_PolicyRecordNotFound() public {
-    SecurityPolicyStore.RateLimitPolicyDirectionArgs[] memory directionConfigs =
-      new SecurityPolicyStore.RateLimitPolicyDirectionArgs[](1);
-    directionConfigs[0] = SecurityPolicyStore.RateLimitPolicyDirectionArgs({
+  /// @notice The bucket update needs the record to exist.
+  function test_applyRateLimitPolicyBucketUpdates_RevertWhen_PolicyRecordNotFound() public {
+    SecurityPolicyStore.RateLimitPolicyBucketArgs[] memory bucketConfigs =
+      new SecurityPolicyStore.RateLimitPolicyBucketArgs[](1);
+    bucketConfigs[0] = SecurityPolicyStore.RateLimitPolicyBucketArgs({
       policyName: DEFAULT_POLICY,
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       direction: IPoolV2.MessageDirection.Outbound,
-      defaultFinalityConfig: _getRateLimitConfig(CAPACITY),
-      fastFinalityConfig: _getRateLimitConfig(CAPACITY)
+      fastFinality: false,
+      config: _getRateLimitConfig(CAPACITY)
     });
 
     vm.expectRevert(
       abi.encodeWithSelector(PolicyConfig.PolicyRecordNotFound.selector, DEFAULT_POLICY, DEST_CHAIN_SELECTOR)
     );
     vm.prank(s_poolConfigManager);
-    s_store.applyRateLimitPolicyDirectionUpdates(directionConfigs);
+    s_store.applyRateLimitPolicyBucketUpdates(bucketConfigs);
   }
 
   /// @notice A record removal names a record that exists.

@@ -37,12 +37,12 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     address indexed localToken, uint64 indexed remoteChainSelector, RateLimitConfig rateLimitConfig
   );
   event InlineRateLimitConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
-  event InlineRateLimitDirectionSet(
+  event InlineRateLimitBucketSet(
     address indexed localToken,
     uint64 indexed remoteChainSelector,
     IPoolV2.MessageDirection direction,
-    RateLimiter.Config defaultFinalityConfig,
-    RateLimiter.Config fastFinalityConfig
+    bool fastFinality,
+    RateLimiter.Config config
   );
   event RateLimitPolicyConfigSet(
     bytes32 indexed policyName, uint64 indexed remoteChainSelector, uint8 localDecimals, RateLimitConfig rateLimitConfig
@@ -50,13 +50,13 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   event RateLimitPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
   /// @dev Also stands for the removal of the decimals of the policy.
   event RateLimitPolicyRemoved(bytes32 indexed policyName);
-  event RateLimitPolicyDirectionSet(
+  event RateLimitPolicyBucketSet(
     bytes32 indexed policyName,
     uint64 indexed remoteChainSelector,
     uint8 localDecimals,
     IPoolV2.MessageDirection direction,
-    RateLimiter.Config defaultFinalityConfig,
-    RateLimiter.Config fastFinalityConfig
+    bool fastFinality,
+    RateLimiter.Config config
   );
   event TokenProfileSet(address indexed localToken, uint8 localDecimals);
   event TokenRemoved(address indexed localToken);
@@ -107,22 +107,24 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimitConfig rateLimitConfig; // The values of the record.
   }
 
-  /// @dev One direction of an inline rate limit record to update.
-  struct InlineRateLimitDirectionArgs {
-    address localToken; // ────────╮ The local token address.
-    uint64 remoteChainSelector; // ╯ The remote chain.
-    IPoolV2.MessageDirection direction; // The direction to update.
-    RateLimiter.Config defaultFinalityConfig; // The limit for default finality.
-    RateLimiter.Config fastFinalityConfig; // The limit for FTF. Disabled means FTF uses the default bucket.
+  /// @dev One bucket of an inline rate limit record to update.
+  // solhint-disable-next-line gas-struct-packing
+  struct InlineRateLimitBucketArgs {
+    address localToken; // ────────────────╮ The local token address.
+    uint64 remoteChainSelector; //         │ The remote chain.
+    IPoolV2.MessageDirection direction; // │ The direction of the bucket.
+    bool fastFinality; // ─────────────────╯ True for the fast finality bucket.
+    RateLimiter.Config config; // The limit of the bucket.
   }
 
-  /// @dev One direction of a rate limit policy record to update.
-  struct RateLimitPolicyDirectionArgs {
+  /// @dev One bucket of a rate limit policy record to update.
+  // solhint-disable-next-line gas-struct-packing
+  struct RateLimitPolicyBucketArgs {
     bytes32 policyName; // The rate limit policy.
-    uint64 remoteChainSelector; // ─────────╮ The remote chain. Zero names the policy default record.
-    IPoolV2.MessageDirection direction; // ─╯ The direction to update.
-    RateLimiter.Config defaultFinalityConfig; // The limit for default finality.
-    RateLimiter.Config fastFinalityConfig; // The limit for FTF. Disabled means FTF uses the default bucket.
+    uint64 remoteChainSelector; // ────────╮ The remote chain. Zero names the policy default record.
+    IPoolV2.MessageDirection direction; // │ The direction of the bucket.
+    bool fastFinality; // ─────────────────╯ True for the fast finality bucket.
+    RateLimiter.Config config; // The limit of the bucket.
   }
 
   /// @notice Security config describing the verification and hook requirements for a lane.
@@ -897,30 +899,26 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets one direction of inline rate limit records. Both finality classes of the direction are set together,
-  /// so the direction is never left with a stale FTF config. This writes only the two buckets of the direction, so a
-  /// rate limit manager raises one direction without touching the other, and a set of the same config keeps the state
-  /// of the bucket.
+  /// @notice Sets one bucket of inline rate limit records. The caller names one direction and one finality class, so it
+  /// never supplies the config of another bucket, and a set of the same config keeps the state of the bucket.
   /// @dev The record must exist, so a caller creates it with applyInlineRateLimitConfigUpdates first. Each config
   /// follows the checks of RateLimiter.
-  /// @param directionConfigsToSet The direction records to set.
-  function applyInlineRateLimitDirectionUpdates(
-    InlineRateLimitDirectionArgs[] calldata directionConfigsToSet
+  /// @param bucketConfigsToSet The bucket records to set.
+  function applyInlineRateLimitBucketUpdates(
+    InlineRateLimitBucketArgs[] calldata bucketConfigsToSet
   ) external onlyAuthorizedCallers {
-    for (uint256 i = 0; i < directionConfigsToSet.length; ++i) {
-      InlineRateLimitDirectionArgs calldata args = directionConfigsToSet[i];
+    for (uint256 i = 0; i < bucketConfigsToSet.length; ++i) {
+      InlineRateLimitBucketArgs calldata args = bucketConfigsToSet[i];
       if (!s_inlineRateLimitChains[args.localToken].contains(args.remoteChainSelector)) {
         revert RateLimitRecordNotFound(args.localToken, args.remoteChainSelector);
       }
-      _validateRateLimitConfig(args.defaultFinalityConfig);
-      _validateRateLimitConfig(args.fastFinalityConfig);
+      _validateRateLimitConfig(args.config);
 
       mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.TokenBucket bucket))
         storage buckets = s_tokenBuckets[args.localToken][args.remoteChainSelector];
-      _setBucketIfChanged(buckets[false][args.direction], args.defaultFinalityConfig);
-      _setBucketIfChanged(buckets[true][args.direction], args.fastFinalityConfig);
-      emit InlineRateLimitDirectionSet(
-        args.localToken, args.remoteChainSelector, args.direction, args.defaultFinalityConfig, args.fastFinalityConfig
+      _setBucketIfChanged(buckets[args.fastFinality][args.direction], args.config);
+      emit InlineRateLimitBucketSet(
+        args.localToken, args.remoteChainSelector, args.direction, args.fastFinality, args.config
       );
     }
   }
@@ -992,36 +990,33 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets one direction of rate limit policy records. Both finality classes of the direction are set together,
-  /// so the direction is never left with a stale FTF config.
+  /// @notice Sets one bucket of rate limit policy records. The caller names one direction and one finality class, so it
+  /// never supplies the config of another bucket.
   /// @dev The record must exist, so a caller creates it with applyRateLimitPolicyConfigUpdates first. Chain selector
   /// zero names the policy default record. Each config follows the checks of RateLimiter. A set changes no bucket. A
   /// bucket of a token that uses a policy record copies the config of its record on its next use, when the config of
   /// the bucket differs, which refills the bucket. So a set of the same config refills no bucket.
-  /// @param directionConfigsToSet The direction records to set.
-  function applyRateLimitPolicyDirectionUpdates(
-    RateLimitPolicyDirectionArgs[] calldata directionConfigsToSet
+  /// @param bucketConfigsToSet The bucket records to set.
+  function applyRateLimitPolicyBucketUpdates(
+    RateLimitPolicyBucketArgs[] calldata bucketConfigsToSet
   ) external onlyAuthorizedCallers {
-    for (uint256 i = 0; i < directionConfigsToSet.length; ++i) {
-      RateLimitPolicyDirectionArgs calldata args = directionConfigsToSet[i];
+    for (uint256 i = 0; i < bucketConfigsToSet.length; ++i) {
+      RateLimitPolicyBucketArgs calldata args = bucketConfigsToSet[i];
       // A record exists exactly when its chain is in the record set of its policy. Zero names the default record.
       if (!s_rateLimitPolicies.policies[args.policyName].remoteChainSelectors.contains(args.remoteChainSelector)) {
         revert PolicyConfig.PolicyRecordNotFound(args.policyName, args.remoteChainSelector);
       }
-      _validateRateLimitConfig(args.defaultFinalityConfig);
-      _validateRateLimitConfig(args.fastFinalityConfig);
+      _validateRateLimitConfig(args.config);
 
-      mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.Config config)) storage
-        recordConfigs = s_policyRateLimitConfigs[args.policyName][args.remoteChainSelector];
-      recordConfigs[false][args.direction] = args.defaultFinalityConfig;
-      recordConfigs[true][args.direction] = args.fastFinalityConfig;
-      emit RateLimitPolicyDirectionSet(
+      s_policyRateLimitConfigs[args.policyName][args.remoteChainSelector][args.fastFinality][args.direction] =
+      args.config;
+      emit RateLimitPolicyBucketSet(
         args.policyName,
         args.remoteChainSelector,
         s_rateLimitPolicyDecimals[args.policyName],
         args.direction,
-        args.defaultFinalityConfig,
-        args.fastFinalityConfig
+        args.fastFinality,
+        args.config
       );
     }
   }
