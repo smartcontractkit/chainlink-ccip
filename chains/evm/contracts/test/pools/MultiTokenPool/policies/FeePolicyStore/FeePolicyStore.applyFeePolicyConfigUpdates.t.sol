@@ -134,8 +134,7 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
   // Reverts
 
   function test_applyFeePolicyConfigUpdates_RevertWhen_InvalidFeePolicyConfig() public {
-    // A disabled config must be zero in every fee field. An enabled config needs each fee in basis points below
-    // BPS_DIVIDER.
+    // Four disabled configs with one non-zero field each, and two bps fees at BPS_DIVIDER.
     FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](6);
     invalidFeeConfigs[0].finalityFeeUSDCents = 1;
     invalidFeeConfigs[1].fastFinalityFeeUSDCents = 1;
@@ -179,7 +178,7 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
   }
 
   function test_applyFeePolicyConfigUpdates_RevertWhen_PolicyNotFound() public {
-    // DEST_OVERHEAD_POLICY exists only as a destination overhead policy.
+    // DEST_OVERHEAD_POLICY exists only as a dest overhead policy.
     bytes32[] memory policiesToRemove = new bytes32[](1);
     policiesToRemove[0] = DEST_OVERHEAD_POLICY;
 

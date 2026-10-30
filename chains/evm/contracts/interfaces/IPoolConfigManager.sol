@@ -135,7 +135,7 @@ interface IPoolConfigManager {
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, lanes without an
-  /// enabled fee record and lanes without a destination overhead record return zeros with isEnabled false.
+  /// enabled fee record and lanes without a dest overhead record return zeros with isEnabled false.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -144,8 +144,7 @@ interface IPoolConfigManager {
   /// @notice Returns the resolved lane fee configurations.
   /// @param lanes The token and remote chain lanes to query.
   /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist, lanes
-  /// without an enabled fee record and lanes without a destination overhead record return a disabled zero
-  /// configuration.
+  /// without an enabled fee record and lanes without a dest overhead record return a disabled zero configuration.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs);

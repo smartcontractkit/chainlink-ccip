@@ -7,9 +7,8 @@ import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {FeePolicyStore} from "../../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
 import {BaseTest} from "../../../../BaseTest.t.sol";
 
-/// @notice A fee store with one authorized pool config manager, which sends every call. FEE_POLICY has a policy default
-/// record with an enabled fee. DEST_OVERHEAD_POLICY has a policy default record. s_token uses both policies.
-/// s_otherToken is registered and has no policy.
+/// @notice s_poolConfigManager is the only authorized caller and sends every call. s_token uses FEE_POLICY and
+/// DEST_OVERHEAD_POLICY, which both have a policy default record. s_otherToken is registered with no policy.
 contract FeePolicyStoreSetup is BaseTest {
   bytes32 internal constant FEE_POLICY = "FEE_POLICY";
   bytes32 internal constant DEST_OVERHEAD_POLICY = "DEST_OVERHEAD_POLICY";
@@ -43,7 +42,7 @@ contract FeePolicyStoreSetup is BaseTest {
   // │                          Arguments                           │
   // ================================================================
 
-  /// @dev An enabled fee config. Each field has another value, so a test can tell the fields apart.
+  /// @dev Each field has a distinct value, so tests can tell the fields apart.
   function _getFeeConfig() internal pure returns (FeePolicyStore.FeeConfig memory) {
     return FeePolicyStore.FeeConfig({
       finalityFeeUSDCents: 100,
@@ -54,7 +53,7 @@ contract FeePolicyStoreSetup is BaseTest {
     });
   }
 
-  /// @dev An enabled fee config. Each field differs from _getFeeConfig, so a test can tell the two records apart.
+  /// @dev Each field differs from _getFeeConfig.
   function _getOtherFeeConfig() internal pure returns (FeePolicyStore.FeeConfig memory) {
     return FeePolicyStore.FeeConfig({
       finalityFeeUSDCents: 300,
@@ -72,7 +71,7 @@ contract FeePolicyStoreSetup is BaseTest {
     });
   }
 
-  /// @dev Each field differs from _getDestOverheadConfig, so a test can tell the two records apart.
+  /// @dev Each field differs from _getDestOverheadConfig.
   function _getOtherDestOverheadConfig() internal pure returns (FeePolicyStore.DestOverheadConfig memory) {
     return FeePolicyStore.DestOverheadConfig({destGasOverhead: 150_000, destBytesOverhead: 256});
   }
@@ -143,7 +142,7 @@ contract FeePolicyStoreSetup is BaseTest {
     return inlineConfigs;
   }
 
-  /// @dev This store reads only the token of a profile, so the other fields keep their default values.
+  /// @dev The store only reads the token of a profile.
   function _getTokenProfileArgs(
     address localToken
   ) internal pure returns (PolicyConfig.TokenProfileArgs[] memory profiles) {

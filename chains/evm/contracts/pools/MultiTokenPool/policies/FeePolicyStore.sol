@@ -11,13 +11,11 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-/// @notice Holds the fee type and the destination overhead type of the tokens of a pool config manager. With an enabled
-/// fee record, the OnRamp prices a send with both records.
-/// @dev Only authorized pool config managers write to this store. A transfer only reads it.
-///
-/// A fee record holds the USD fees and the token fees of a send. A disabled fee record makes the OnRamp use the
-/// FeeQuoter. A destination overhead record holds the gas and the bytes that a send needs on the destination chain. A
-/// send needs a destination overhead record also while its fee record is disabled.
+/// @notice Stores the FeePolicy and the DestinationOverheadPolicy for a PoolConfigManager.
+/// @dev Only authorized pool config managers write to this store.
+/// A fee record holds the USD fees and the token fees to be charged at lockOrBurn. A disabled fee record makes the
+/// OnRamp use the FeeQuoter. A destination overhead record holds the gas and the bytes needed for releaseOrMint on the
+/// destination chain.
 contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -57,7 +55,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   );
   event InlineDestOverheadConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
 
-  /// @notice A fee policy record to set, and the shape of a fee policy record in the views.
+  /// @dev FeeConfig with its policy record key.
   struct FeePolicyConfigArgs {
     bytes32 policyName; // The fee policy. Not zero.
     uint64 remoteChainSelector; // ───────╮ The remote chain. Zero names the policy default record.
@@ -68,7 +66,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     bool isEnabled; // ───────────────────╯ False makes the OnRamp use the FeeQuoter.
   }
 
-  /// @notice An inline fee record to set, and the shape of an inline fee record in the views.
+  /// @dev FeeConfig with its token and chain.
   struct InlineFeeConfigArgs {
     address localToken; // ───────────────╮ A registered token.
     uint64 remoteChainSelector; //        │ The remote chain. Not zero.
@@ -79,23 +77,23 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     bool isEnabled; // ───────────────────╯ False makes the OnRamp use the FeeQuoter.
   }
 
-  /// @notice A destination overhead policy record to set, and the shape of such a record in the views.
+  /// @dev DestOverheadConfig with its policy record key.
   struct DestOverheadPolicyConfigArgs {
-    bytes32 policyName; // The destination overhead policy. Not zero.
+    bytes32 policyName; // The dest overhead policy. Not zero.
     uint64 remoteChainSelector; // ─╮ The remote chain. Zero names the policy default record.
-    uint32 destGasOverhead; //      │ Gas to execute the token transfer on the destination chain. Not zero.
+    uint32 destGasOverhead; //      │ Gas for releaseOrMint on the destination chain. Not zero.
     uint32 destBytesOverhead; // ───╯ Data availability bytes of the pool data. At least 192.
   }
 
-  /// @notice An inline destination overhead record to set, and the shape of such a record in the views.
+  /// @dev DestOverheadConfig with its token and chain.
   struct InlineDestOverheadConfigArgs {
     address localToken; // ─────────╮ A registered token.
     uint64 remoteChainSelector; //  │ The remote chain. Not zero.
-    uint32 destGasOverhead; // ─────╯ Gas to execute the token transfer on the destination chain. Not zero.
+    uint32 destGasOverhead; // ─────╯ Gas for releaseOrMint on the destination chain. Not zero.
     uint32 destBytesOverhead; // Data availability bytes of the pool data. At least 192.
   }
 
-  /// @notice The values of a fee record.
+  /// @dev The values of a fee record.
   struct FeeConfig {
     uint32 finalityFeeUSDCents; // ───────╮ Fee for a transfer with default finality, in multiples of 0.01 USD.
     uint32 fastFinalityFeeUSDCents; //    │ Fee for an FTF transfer, in multiples of 0.01 USD.
@@ -104,50 +102,42 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     bool isEnabled; // ───────────────────╯ False makes the OnRamp use the FeeQuoter.
   }
 
-  /// @notice The values of a destination overhead record.
+  /// @dev The values of a dest overhead record.
   struct DestOverheadConfig {
-    uint32 destGasOverhead; // ──╮ Gas to execute the token transfer on the destination chain.
+    uint32 destGasOverhead; // ──╮ Gas for releaseOrMint on the destination chain.
     uint32 destBytesOverhead; // ╯ Data availability bytes of the pool data.
   }
 
-  /// @notice The policies of one token in this store. Zero means that the token has no policy of the type.
+  /// @dev The policies of a token. Zero means no policy.
   struct TokenState {
     bytes32 feePolicyName; // The fee policy of the token.
-    bytes32 destOverheadPolicyName; // The destination overhead policy of the token.
+    bytes32 destOverheadPolicyName; // The dest overhead policy of the token.
   }
 
-  /// @dev The divisor of a fee in basis points. Each fee in basis points must be below it.
+  /// @dev The division factor for bps. Each bps fee must be below it.
   uint256 private constant BPS_DIVIDER = 10_000;
-  /// @dev The length of pool data that carries an EVM source token and empty additional pool data. With an enabled fee
-  /// record, the OnRamp rejects pool data that is longer than destBytesOverhead. So a lane with an enabled fee record
-  /// can always send the source token with empty additional pool data.
+  /// @dev The pool data length of an EVM source token with empty additional pool data, so that every lane with an
+  /// enabled fee record can send the source token.
   uint32 private constant MIN_DEST_BYTES_OVERHEAD = 192;
 
-  /// @dev The registered tokens. This store keeps its own list, because the stores never call each other.
+  /// @dev Each store keeps its own list of registered tokens, as the stores never call each other.
   EnumerableSet.AddressSet private s_tokens;
-  /// @dev The policies of each token. A token that is not registered has no policy, because a token policy set needs a
-  /// registered token, and a deregistration needs a token without a policy.
+  /// @dev Only registered tokens have policies.
   mapping(address localToken => TokenState tokenState) private s_tokenStates;
 
-  /// @dev The fee policies, with the chains of their records and their token counts.
   PolicyConfig.Policies private s_feePolicies;
-  /// @dev The values of each fee policy record. Chain selector zero holds the policy default record.
+  /// @dev Chain selector zero holds the policy default record.
   mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_policyFeeConfigs;
-  /// @dev The chains of the inline fee records of each token. An inline record exists exactly when its chain is in
-  /// the set of its token.
+  /// @dev An inline record exists exactly when its chain is in the set of its token.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineFeeChains;
-  /// @dev The values of each inline fee record.
   mapping(address localToken => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_inlineFeeConfigs;
 
-  /// @dev The destination overhead policies, with the chains of their records and their token counts.
   PolicyConfig.Policies private s_destOverheadPolicies;
-  /// @dev The values of each destination overhead policy record. Chain selector zero holds the policy default record.
+  /// @dev Chain selector zero holds the policy default record.
   mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
     s_policyDestOverheadConfigs;
-  /// @dev The chains of the inline destination overhead records of each token. An inline record exists exactly when
-  /// its chain is in the set of its token.
+  /// @dev An inline record exists exactly when its chain is in the set of its token.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineDestOverheadChains;
-  /// @dev The values of each inline destination overhead record.
   mapping(address localToken => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
     s_inlineDestOverheadConfigs;
 
@@ -164,15 +154,15 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                       Fee resolution                         │
   // ================================================================
 
-  /// @notice Returns the token fee of an outbound transfer.
-  /// @dev Reverts if the token has no fee record or no destination overhead record for the chain, in that order. The
-  /// connection store checks the requested finality before this call.
+  /// @notice Returns the token fee of a lockOrBurn.
+  /// @dev Reverts if the token has no fee record or no dest overhead record for the chain. The connection store checks
+  /// the requested finality before this call.
   /// @param localToken The local token.
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @param chargeTokenFee False for the V1 path, which charges no token fee.
-  /// @return feeAmount The token fee, in local token units. Zero while the fee record is disabled.
+  /// @return feeAmount The token fee in local token units. Zero if the fee record is disabled.
   function resolveTokenFee(
     address localToken,
     uint64 remoteChainSelector,
@@ -191,8 +181,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (amount * transferFeeBps) / BPS_DIVIDER;
   }
 
-  /// @notice Reverts if the token has no fee record or no destination overhead record for the chain, in that order.
-  /// @dev The lane check of the pool config manager calls it, after a write that opens a lane.
+  /// @notice Reverts if the token has no fee record or no dest overhead record for the chain.
+  /// @dev The PoolConfigManager calls it after a write that opens a lane.
   /// @param localToken The local token.
   /// @param remoteChainSelector The remote chain.
   function checkLaneRecords(
@@ -202,7 +192,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     _getLaneFeeConfig(localToken, remoteChainSelector);
   }
 
-  /// @dev Returns the fee record of the token for the chain, after it checks that the token has both records.
+  /// @dev Returns the fee record. Reverts if the fee record or the dest overhead record is missing.
   function _getLaneFeeConfig(
     address localToken,
     uint64 remoteChainSelector
@@ -215,14 +205,13 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return feeConfig;
   }
 
-  /// @notice Returns the fee parameters of each lane for the requested finality. The pool config manager serves
-  /// IPoolConfigManager.getFeeBatch with it.
+  /// @notice Returns the fee of each lane for the requested finality, for IPoolConfigManager.getFeeBatch.
   /// @dev The connection store checks the requested finality and gives hasLanes before this call.
-  /// @param lanes The token and remote chain lanes to query.
+  /// @param lanes The lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @param hasLanes True for each lane that exists, aligned with lanes by index.
-  /// @return fees The fee parameters per lane, aligned with lanes by index. Zeros with isEnabled false for a lane that
-  /// does not exist, has no enabled fee record or has no destination overhead record.
+  /// @param hasLanes Whether each lane exists, aligned with lanes by index.
+  /// @return fees The fee per lane, aligned with lanes by index. Zero with isEnabled false for a lane that does not
+  /// exist, has no enabled fee record or has no dest overhead record.
   function getFeeBatch(
     IPoolConfigManager.LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig,
@@ -249,13 +238,12 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return fees;
   }
 
-  /// @notice Returns the fee config of each lane for both finality classes. The pool config manager serves
-  /// IPoolConfigManager.getTokenTransferFeeConfigBatch with it.
+  /// @notice Returns the fee config of each lane, for IPoolConfigManager.getTokenTransferFeeConfigBatch.
   /// @dev The connection store gives hasLanes before this call.
-  /// @param lanes The token and remote chain lanes to query.
-  /// @param hasLanes True for each lane that exists, aligned with lanes by index.
+  /// @param lanes The lanes to query.
+  /// @param hasLanes Whether each lane exists, aligned with lanes by index.
   /// @return feeConfigs The fee config per lane, aligned with lanes by index. A disabled zero config for a lane that
-  /// does not exist, has no enabled fee record or has no destination overhead record.
+  /// does not exist, has no enabled fee record or has no dest overhead record.
   function getTokenTransferFeeConfigBatch(
     IPoolConfigManager.LaneKey[] calldata lanes,
     bool[] calldata hasLanes
@@ -282,8 +270,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return feeConfigs;
   }
 
-  /// @dev Returns true if the token has an enabled fee record and a destination overhead record for the chain, and
-  /// returns both records.
+  /// @dev Returns both records, and whether the lane has an enabled fee record and a dest overhead record.
   function _resolveEnabledFee(
     IPoolConfigManager.LaneKey calldata lane
   ) private view returns (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) {
@@ -296,13 +283,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (isEnabled, feeConfig, destOverheadConfig);
   }
 
-  /// @notice Returns the level of the fee record and of the destination overhead record that each token would use on
-  /// its remote chain. Never reverts.
-  /// @dev Each level follows the resolution of a transfer, also for a token without a lane, so tooling can check the
-  /// records before a write opens the lane. Chain selector zero gives None.
-  /// @param lanes The token and remote chain lanes to query.
-  /// @return feeLevels The level of the fee record per lane, aligned with lanes by index.
-  /// @return destOverheadLevels The level of the destination overhead record per lane, aligned with lanes by index.
+  /// @notice Returns the record levels that each lane would use, also for a lane that does not exist yet.
+  /// @dev Lets tooling check the records before a write opens a lane.
+  /// @param lanes The lanes to query.
+  /// @return feeLevels The fee record level per lane, aligned with lanes by index.
+  /// @return destOverheadLevels The dest overhead record level per lane, aligned with lanes by index.
   function getLaneRecordLevelBatch(
     IPoolConfigManager.LaneKey[] calldata lanes
   )
@@ -319,9 +304,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (feeLevels, destOverheadLevels);
   }
 
-  /// @dev Returns the fee record that serves the token on the chain, and its level. An inline record overrides the
-  /// policy of the token, so the inline record is checked first. For level None, it returns the inline slot of the
-  /// token for the chain, which holds no record. The caller checks the level before it uses the record.
+  /// @dev Returns the fee record of the token for the chain, and its level. An inline record overrides the policy. For
+  /// level None, the record is the empty inline slot, so callers must check the level first.
   function _resolveFeeConfig(
     address localToken,
     uint64 remoteChainSelector
@@ -342,8 +326,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (level, s_inlineFeeConfigs[localToken][remoteChainSelector]);
   }
 
-  /// @dev Returns the destination overhead record that serves the token on the chain, and its level. It follows the
-  /// same order as _resolveFeeConfig, and also returns the inline slot for level None.
+  /// @dev Same as _resolveFeeConfig, for the dest overhead record.
   function _resolveDestOverheadConfig(
     address localToken,
     uint64 remoteChainSelector
@@ -365,14 +348,14 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   // ================================================================
-  // │                         Stored views                         │
+  // │                         Config views                         │
   // ================================================================
 
-  /// @notice Returns the registration and the policies of a token in this store. Never reverts.
+  /// @notice Returns whether the token is registered, and its policies.
   /// @param localToken The local token.
   /// @return isRegistered True if the token is registered in this store.
   /// @return feePolicyName The fee policy of the token. Zero if it has none.
-  /// @return destOverheadPolicyName The destination overhead policy of the token. Zero if it has none.
+  /// @return destOverheadPolicyName The dest overhead policy of the token. Zero if it has none.
   function getTokenPolicies(
     address localToken
   ) external view returns (bool isRegistered, bytes32 feePolicyName, bytes32 destOverheadPolicyName) {
@@ -380,12 +363,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (s_tokens.contains(localToken), tokenState.feePolicyName, tokenState.destOverheadPolicyName);
   }
 
-  /// @notice Returns the policies of each token. The pool config manager adds them to
-  /// IPoolConfigManager.getTokenConfigBatch. Never reverts.
+  /// @notice Returns the policies of each token, for IPoolConfigManager.getTokenConfigBatch.
   /// @param localTokens The local tokens.
   /// @return feePolicyNames The fee policy per token, aligned with localTokens by index. Zero if it has none.
-  /// @return destOverheadPolicyNames The destination overhead policy per token, aligned with localTokens by index.
-  /// Zero if it has none.
+  /// @return destOverheadPolicyNames The dest overhead policy per token, aligned with localTokens by index. Zero if it
+  /// has none.
   function getTokenPolicyNamesBatch(
     address[] calldata localTokens
   ) external view returns (bytes32[] memory feePolicyNames, bytes32[] memory destOverheadPolicyNames) {
@@ -399,9 +381,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (feePolicyNames, destOverheadPolicyNames);
   }
 
-  /// @notice Returns the name of every fee policy and every destination overhead policy. Never reverts.
+  /// @notice Returns the names of all fee policies and dest overhead policies.
   /// @return feePolicyNames The names of the fee policies.
-  /// @return destOverheadPolicyNames The names of the destination overhead policies.
+  /// @return destOverheadPolicyNames The names of the dest overhead policies.
   function getPolicyNames()
     external
     view
@@ -410,7 +392,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (s_feePolicies.policyNames.values(), s_destOverheadPolicies.policyNames.values());
   }
 
-  /// @notice Returns the records of a fee policy, in the shape of applyFeePolicyConfigUpdates. Never reverts.
+  /// @notice Returns the token count and the records of a fee policy.
   /// @param policyName The fee policy.
   /// @return tokenCount The number of tokens that use the policy.
   /// @return policyConfigs The records of the policy. Empty if the policy does not exist or has no records.
@@ -436,7 +418,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (policy.tokenCount, policyConfigs);
   }
 
-  /// @notice Returns the inline fee records of a token, in the shape of applyInlineFeeConfigUpdates. Never reverts.
+  /// @notice Returns the inline fee records of a token.
   /// @param localToken The local token.
   /// @return inlineConfigs The inline fee records of the token.
   function getInlineFeeConfigs(
@@ -460,9 +442,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return inlineConfigs;
   }
 
-  /// @notice Returns the records of a destination overhead policy, in the shape of
-  /// applyDestOverheadPolicyConfigUpdates. Never reverts.
-  /// @param policyName The destination overhead policy.
+  /// @notice Returns the token count and the records of a dest overhead policy.
+  /// @param policyName The dest overhead policy.
   /// @return tokenCount The number of tokens that use the policy.
   /// @return policyConfigs The records of the policy. Empty if the policy does not exist or has no records.
   function getDestOverheadPolicy(
@@ -484,10 +465,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (policy.tokenCount, policyConfigs);
   }
 
-  /// @notice Returns the inline destination overhead records of a token, in the shape of
-  /// applyInlineDestOverheadConfigUpdates. Never reverts.
+  /// @notice Returns the inline dest overhead records of a token.
   /// @param localToken The local token.
-  /// @return inlineConfigs The inline destination overhead records of the token.
+  /// @return inlineConfigs The inline dest overhead records of the token.
   function getInlineDestOverheadConfigs(
     address localToken
   ) external view returns (InlineDestOverheadConfigArgs[] memory inlineConfigs) {
@@ -510,14 +490,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                            Tokens                            │
   // ================================================================
 
-  /// @notice Deregisters tokens, then registers or updates tokens. The pool config manager makes the same call to every
-  /// store in one transaction.
-  /// @dev Only an authorized pool config manager can call this function. This store keeps no value of the profile, so
-  /// it reads only the token of each profile. A set of a new token registers it with no policy. A set of a registered
-  /// token changes nothing in this store. A deregistration needs a token without a policy and without an inline record
-  /// in this store, so one wrong address cannot drop live config.
-  /// @param tokensToRemove The registered tokens to deregister.
-  /// @param profilesToSet The profiles of the tokens to register or to update.
+  /// @notice Deregisters tokens, then registers tokens. The PoolConfigManager sends the same call to every store.
+  /// @dev This store keeps no profile values, so it only reads the token of each profile. A deregistration needs a
+  /// token without policies and inline records, so a wrong address cannot drop live config.
+  /// @param tokensToRemove The tokens to deregister.
+  /// @param profilesToSet The profiles of the tokens to register. A registered token stays as it is.
   function applyTokenProfileUpdates(
     address[] calldata tokensToRemove,
     PolicyConfig.TokenProfileArgs[] calldata profilesToSet
@@ -546,10 +523,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets the fee policy of tokens. A token uses the records of its new policy at once. Its inline records
-  /// stay.
-  /// @dev Only an authorized pool config manager can call this function. Each item needs a registered token and a
-  /// policy that exists.
+  /// @notice Sets the fee policy of tokens. Inline records are kept.
   /// @param tokenPoliciesToSet The fee policy of each token, applied in order. Zero removes the token from its policy.
   function applyTokenFeePolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
@@ -566,12 +540,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets the destination overhead policy of tokens. A token uses the records of its new policy at once. Its
-  /// inline records stay.
-  /// @dev Only an authorized pool config manager can call this function. Each item needs a registered token and a
-  /// policy that exists.
-  /// @param tokenPoliciesToSet The destination overhead policy of each token, applied in order. Zero removes the token
-  /// from its policy.
+  /// @notice Sets the dest overhead policy of tokens. Inline records are kept.
+  /// @param tokenPoliciesToSet The dest overhead policy of each token, applied in order. Zero removes the token from
+  /// its policy.
   function applyTokenDestOverheadPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
   ) external onlyAuthorizedCallers {
@@ -588,16 +559,15 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   // ================================================================
-  // │                           Fee type                           │
+  // │                          Fee config                          │
   // ================================================================
 
-  /// @notice Removes fee policy records, removes fee policies, then sets fee policy records.
-  /// @dev Only an authorized pool config manager can call this function. The first record set under a new name
-  /// creates the policy. A record removal keeps the policy, also when it has no records left. A policy removal needs a
-  /// policy without tokens and without records.
-  /// @param policyConfigsToRemove The policy records to remove. Chain selector zero names the policy default record.
+  /// @notice Removes fee policy records, then removes fee policies, then sets fee policy records.
+  /// @dev The first record set under a new name creates the policy. Only a policy without tokens and records can be
+  /// removed.
+  /// @param policyConfigsToRemove The records to remove.
   /// @param policiesToRemove The policies to remove.
-  /// @param policyConfigsToSet The policy records to set. Each one replaces every value of its record.
+  /// @param policyConfigsToSet The records to set.
   function applyFeePolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata policyConfigsToRemove,
     bytes32[] calldata policiesToRemove,
@@ -637,9 +607,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Removes inline fee records, then sets inline fee records.
-  /// @dev Only an authorized pool config manager can call this function.
   /// @param inlineConfigsToRemove The inline records to remove.
-  /// @param inlineConfigsToSet The inline records to set. Each one replaces every value of its record.
+  /// @param inlineConfigsToSet The inline records to set.
   function applyInlineFeeConfigUpdates(
     IPoolConfigManager.LaneKey[] calldata inlineConfigsToRemove,
     InlineFeeConfigArgs[] calldata inlineConfigsToSet
@@ -674,9 +643,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev Returns true if the fee config is valid. An enabled config needs each fee in basis points below BPS_DIVIDER,
-  /// the same as in TokenPool.applyTokenTransferFeeConfigUpdates. A disabled config must be zero in every field, so
-  /// that no fee value stays hidden in storage.
+  /// @dev Each bps fee must be below BPS_DIVIDER, the same as TokenPool. A disabled config must be all zero, so no fee
+  /// value stays hidden in storage.
   function _isValidFeeConfig(
     FeeConfig memory feeConfig
   ) private pure returns (bool) {
@@ -688,17 +656,16 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   // ================================================================
-  // │                   Destination overhead type                  │
+  // │                     Dest overhead config                     │
   // ================================================================
 
-  /// @notice Removes destination overhead policy records, removes destination overhead policies, then sets destination
-  /// overhead policy records.
-  /// @dev Only an authorized pool config manager can call this function. The first record set under a new name
-  /// creates the policy. A record removal keeps the policy, also when it has no records left. A policy removal needs a
-  /// policy without tokens and without records.
-  /// @param policyConfigsToRemove The policy records to remove. Chain selector zero names the policy default record.
+  /// @notice Removes dest overhead policy records, then removes dest overhead policies, then sets dest overhead policy
+  /// records.
+  /// @dev The first record set under a new name creates the policy. Only a policy without tokens and records can be
+  /// removed.
+  /// @param policyConfigsToRemove The records to remove.
   /// @param policiesToRemove The policies to remove.
-  /// @param policyConfigsToSet The policy records to set. Each one replaces every value of its record.
+  /// @param policyConfigsToSet The records to set.
   function applyDestOverheadPolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata policyConfigsToRemove,
     bytes32[] calldata policiesToRemove,
@@ -732,10 +699,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Removes inline destination overhead records, then sets inline destination overhead records.
-  /// @dev Only an authorized pool config manager can call this function.
+  /// @notice Removes inline dest overhead records, then sets inline dest overhead records.
   /// @param inlineConfigsToRemove The inline records to remove.
-  /// @param inlineConfigsToSet The inline records to set. Each one replaces every value of its record.
+  /// @param inlineConfigsToSet The inline records to set.
   function applyInlineDestOverheadConfigUpdates(
     IPoolConfigManager.LaneKey[] calldata inlineConfigsToRemove,
     InlineDestOverheadConfigArgs[] calldata inlineConfigsToSet
@@ -765,8 +731,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev Returns true if the destination overhead config is valid. The gas overhead must be above zero, the same as in
-  /// TokenPool.applyTokenTransferFeeConfigUpdates. The bytes overhead must be at least MIN_DEST_BYTES_OVERHEAD.
+  /// @dev The gas overhead must be non-zero, the same as TokenPool. The bytes overhead must be at least
+  /// MIN_DEST_BYTES_OVERHEAD.
   function _isValidDestOverheadConfig(
     DestOverheadConfig memory destOverheadConfig
   ) private pure returns (bool) {

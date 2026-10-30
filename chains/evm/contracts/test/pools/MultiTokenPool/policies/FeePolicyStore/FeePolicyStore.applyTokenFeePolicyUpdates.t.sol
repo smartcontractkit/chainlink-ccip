@@ -97,7 +97,7 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
   }
 
   function test_applyTokenFeePolicyUpdates_RevertWhen_PolicyNotFound() public {
-    // DEST_OVERHEAD_POLICY exists only as a destination overhead policy.
+    // DEST_OVERHEAD_POLICY exists only as a dest overhead policy.
     vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, DEST_OVERHEAD_POLICY));
     s_feeStore.applyTokenFeePolicyUpdates(_getTokenPolicyArgs(s_token, DEST_OVERHEAD_POLICY));
   }

@@ -11,9 +11,8 @@ contract FeePolicyStore_getLaneRecordLevelBatch is FeePolicyStoreSetup {
   uint64 internal constant OTHER_CHAIN_SELECTOR = 4949039107694359620;
 
   function test_getLaneRecordLevelBatch() public {
-    // Both policies get a policy chain record on the source chain and on the other chain. The token also gets an inline
-    // destination overhead record on the source chain, and an inline fee record on the other chain. An inline record
-    // overrides a policy chain record.
+    // Both policies get chain records on SOURCE and OTHER. Inline records then override the dest overhead on SOURCE and
+    // the fee on OTHER.
     _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, SOURCE_CHAIN_SELECTOR, _getFeeConfig()));
     _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, OTHER_CHAIN_SELECTOR, _getFeeConfig()));
     _setDestOverheadPolicyConfig(

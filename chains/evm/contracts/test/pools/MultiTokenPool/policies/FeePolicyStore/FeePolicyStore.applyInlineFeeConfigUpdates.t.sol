@@ -65,7 +65,7 @@ contract FeePolicyStore_applyInlineFeeConfigUpdates is FeePolicyStoreSetup {
   // Reverts
 
   function test_applyInlineFeeConfigUpdates_RevertWhen_InvalidInlineFeeConfig() public {
-    // A disabled config with a fee, and an enabled config with a fee in basis points at BPS_DIVIDER.
+    // A disabled config with fees, and a bps fee at BPS_DIVIDER.
     FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](2);
     invalidFeeConfigs[0] = _getFeeConfig();
     invalidFeeConfigs[0].isEnabled = false;
