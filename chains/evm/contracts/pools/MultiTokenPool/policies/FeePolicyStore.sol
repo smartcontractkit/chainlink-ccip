@@ -105,8 +105,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev The division factor for bps. Each bps fee must be below it.
   uint256 private constant BPS_DIVIDER = 10_000;
-  /// @dev The pool data length of an EVM source token with empty additional pool data, so that every lane with an
-  /// enabled fee record can send the source token.
+  /// @dev Minimum ABI pool data size:
+  /// 32 bytes for token decimals.
+  /// 64 bytes for offsets to the source token and additional data.
+  /// 64 bytes for the source token length and encoded EVM address.
+  /// 32 bytes for the length of empty additional data.
   uint32 private constant MIN_DEST_BYTES_OVERHEAD = 192;
 
   /// @dev Each store keeps its own list of registered tokens, as the stores never call each other.
