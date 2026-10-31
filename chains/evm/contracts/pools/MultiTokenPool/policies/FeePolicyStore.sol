@@ -117,22 +117,31 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @dev Only registered tokens have policies.
   mapping(address localToken => TokenState tokenState) private s_tokenStates;
 
-  PolicyConfig.Policies private s_feePolicies;
-  /// @dev Fee policy record details. Chain selector zero holds the policy default.
-  mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_policyFeeConfigs;
+  // ================================================================
+  // │                       Inline storage                         │
+  // ================================================================
 
   /// @dev An inline fee record exists when a token x chain is in the set.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineFeeChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_inlineFeeConfigs;
 
-  PolicyConfig.Policies private s_destOverheadPolicies;
-  /// @dev Overheads policy record details. Chain selector zero holds the policy default.
-  mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
-    s_policyDestOverheadConfigs;
   /// @dev An inline overhead record exists when a token x chain is in the set.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineDestOverheadChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
     s_inlineDestOverheadConfigs;
+
+  // ================================================================
+  // │                       Policy storage                         │
+  // ================================================================
+
+  PolicyConfig.Policies private s_feePolicies;
+  /// @dev Fee policy record details. Chain selector zero holds the policy default.
+  mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_policyFeeConfigs;
+
+  PolicyConfig.Policies private s_destOverheadPolicies;
+  /// @dev Overheads policy record details. Chain selector zero holds the policy default.
+  mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
+    s_policyDestOverheadConfigs;
 
   /// @param authorizedCallers The pool config managers that can write to this store.
   constructor(
@@ -144,7 +153,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   // ================================================================
-  // │                       Fee resolution                         │
+  // │                         Transfer fee                         │
   // ================================================================
 
   /// @notice Returns the token fee of a lockOrBurn.
@@ -173,17 +182,6 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (amount * feeConfig.finalityTransferFeeBps) / BPS_DIVIDER;
   }
 
-  /// @notice Reverts if the token has no fee record or no dest overhead record for the chain.
-  /// @dev The PoolConfigManager calls it after a write that opens a lane.
-  /// @param localToken The local token.
-  /// @param remoteChainSelector The remote chain.
-  function checkLaneRecords(
-    address localToken,
-    uint64 remoteChainSelector
-  ) external view {
-    _getLaneFeeConfig(localToken, remoteChainSelector);
-  }
-
   /// @dev Returns the fee record. Reverts if the fee record or the dest overhead record is missing.
   function _getLaneFeeConfig(
     address localToken,
@@ -196,6 +194,53 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (level == PolicyConfig.RecordLevel.None) revert DestOverheadRecordNotFound(localToken, remoteChainSelector);
     return feeConfig;
   }
+
+  /// @dev Returns the fee record of the token for the chain, and its level. An inline record overrides the policy. For
+  /// level None, the record is the empty inline slot, so callers must check the level first.
+  function _resolveFeeConfig(
+    address localToken,
+    uint64 remoteChainSelector
+  ) private view returns (PolicyConfig.RecordLevel level, FeeConfig storage feeConfig) {
+    if (s_inlineFeeChains[localToken].contains(remoteChainSelector)) {
+      return (PolicyConfig.RecordLevel.Inline, s_inlineFeeConfigs[localToken][remoteChainSelector]);
+    }
+    bytes32 policyName = s_tokenStates[localToken].feePolicyName;
+    level = PolicyConfig._resolvePolicyRecordLevel(
+      s_feePolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
+    );
+    if (level == PolicyConfig.RecordLevel.PolicyChain) {
+      return (level, s_policyFeeConfigs[policyName][remoteChainSelector]);
+    }
+    if (level == PolicyConfig.RecordLevel.PolicyDefault) {
+      return (level, s_policyFeeConfigs[policyName][PolicyConfig.DEFAULT_CHAIN_SELECTOR]);
+    }
+    return (level, s_inlineFeeConfigs[localToken][remoteChainSelector]);
+  }
+
+  /// @dev Same as _resolveFeeConfig, for the dest overhead record.
+  function _resolveDestOverheadConfig(
+    address localToken,
+    uint64 remoteChainSelector
+  ) private view returns (PolicyConfig.RecordLevel level, DestOverheadConfig storage destOverheadConfig) {
+    if (s_inlineDestOverheadChains[localToken].contains(remoteChainSelector)) {
+      return (PolicyConfig.RecordLevel.Inline, s_inlineDestOverheadConfigs[localToken][remoteChainSelector]);
+    }
+    bytes32 policyName = s_tokenStates[localToken].destOverheadPolicyName;
+    level = PolicyConfig._resolvePolicyRecordLevel(
+      s_destOverheadPolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
+    );
+    if (level == PolicyConfig.RecordLevel.PolicyChain) {
+      return (level, s_policyDestOverheadConfigs[policyName][remoteChainSelector]);
+    }
+    if (level == PolicyConfig.RecordLevel.PolicyDefault) {
+      return (level, s_policyDestOverheadConfigs[policyName][PolicyConfig.DEFAULT_CHAIN_SELECTOR]);
+    }
+    return (level, s_inlineDestOverheadConfigs[localToken][remoteChainSelector]);
+  }
+
+  // ================================================================
+  // │                       Resolved views                         │
+  // ================================================================
 
   /// @notice Returns the fee of each lane for the requested finality.
   /// @dev Does not check that the lane exists. The PoolConfigManager zeros a lane that does not exist.
@@ -252,17 +297,15 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return feeConfigs;
   }
 
-  /// @dev Returns both records, and whether the lane has an enabled fee record and a dest overhead record.
-  function _resolveEnabledFee(
-    IPoolConfigManager.LaneKey calldata lane
-  ) private view returns (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) {
-    PolicyConfig.RecordLevel feeLevel;
-    (feeLevel, feeConfig) = _resolveFeeConfig(lane.localToken, lane.remoteChainSelector);
-    PolicyConfig.RecordLevel destOverheadLevel;
-    (destOverheadLevel, destOverheadConfig) = _resolveDestOverheadConfig(lane.localToken, lane.remoteChainSelector);
-    isEnabled = feeLevel != PolicyConfig.RecordLevel.None && feeConfig.isEnabled
-      && destOverheadLevel != PolicyConfig.RecordLevel.None;
-    return (isEnabled, feeConfig, destOverheadConfig);
+  /// @notice Reverts if the token has no fee record or no dest overhead record for the chain.
+  /// @dev The PoolConfigManager calls it after a write that opens a lane.
+  /// @param localToken The local token.
+  /// @param remoteChainSelector The remote chain.
+  function checkLaneRecords(
+    address localToken,
+    uint64 remoteChainSelector
+  ) external view {
+    _getLaneFeeConfig(localToken, remoteChainSelector);
   }
 
   /// @notice Returns the record levels that each lane would use, also for a lane that does not exist yet.
@@ -286,51 +329,21 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (feeLevels, destOverheadLevels);
   }
 
-  /// @dev Returns the fee record of the token for the chain, and its level. An inline record overrides the policy. For
-  /// level None, the record is the empty inline slot, so callers must check the level first.
-  function _resolveFeeConfig(
-    address localToken,
-    uint64 remoteChainSelector
-  ) private view returns (PolicyConfig.RecordLevel level, FeeConfig storage feeConfig) {
-    if (s_inlineFeeChains[localToken].contains(remoteChainSelector)) {
-      return (PolicyConfig.RecordLevel.Inline, s_inlineFeeConfigs[localToken][remoteChainSelector]);
-    }
-    bytes32 policyName = s_tokenStates[localToken].feePolicyName;
-    level = PolicyConfig._resolvePolicyRecordLevel(
-      s_feePolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
-    );
-    if (level == PolicyConfig.RecordLevel.PolicyChain) {
-      return (level, s_policyFeeConfigs[policyName][remoteChainSelector]);
-    }
-    if (level == PolicyConfig.RecordLevel.PolicyDefault) {
-      return (level, s_policyFeeConfigs[policyName][PolicyConfig.DEFAULT_CHAIN_SELECTOR]);
-    }
-    return (level, s_inlineFeeConfigs[localToken][remoteChainSelector]);
-  }
-
-  /// @dev Same as _resolveFeeConfig, for the dest overhead record.
-  function _resolveDestOverheadConfig(
-    address localToken,
-    uint64 remoteChainSelector
-  ) private view returns (PolicyConfig.RecordLevel level, DestOverheadConfig storage destOverheadConfig) {
-    if (s_inlineDestOverheadChains[localToken].contains(remoteChainSelector)) {
-      return (PolicyConfig.RecordLevel.Inline, s_inlineDestOverheadConfigs[localToken][remoteChainSelector]);
-    }
-    bytes32 policyName = s_tokenStates[localToken].destOverheadPolicyName;
-    level = PolicyConfig._resolvePolicyRecordLevel(
-      s_destOverheadPolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
-    );
-    if (level == PolicyConfig.RecordLevel.PolicyChain) {
-      return (level, s_policyDestOverheadConfigs[policyName][remoteChainSelector]);
-    }
-    if (level == PolicyConfig.RecordLevel.PolicyDefault) {
-      return (level, s_policyDestOverheadConfigs[policyName][PolicyConfig.DEFAULT_CHAIN_SELECTOR]);
-    }
-    return (level, s_inlineDestOverheadConfigs[localToken][remoteChainSelector]);
+  /// @dev Returns both records, and whether the lane has an enabled fee record and a dest overhead record.
+  function _resolveEnabledFee(
+    IPoolConfigManager.LaneKey calldata lane
+  ) private view returns (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) {
+    PolicyConfig.RecordLevel feeLevel;
+    (feeLevel, feeConfig) = _resolveFeeConfig(lane.localToken, lane.remoteChainSelector);
+    PolicyConfig.RecordLevel destOverheadLevel;
+    (destOverheadLevel, destOverheadConfig) = _resolveDestOverheadConfig(lane.localToken, lane.remoteChainSelector);
+    isEnabled = feeLevel != PolicyConfig.RecordLevel.None && feeConfig.isEnabled
+      && destOverheadLevel != PolicyConfig.RecordLevel.None;
+    return (isEnabled, feeConfig, destOverheadConfig);
   }
 
   // ================================================================
-  // │                         Config views                         │
+  // │                        Stored views                          │
   // ================================================================
 
   /// @notice Returns whether the token is registered, and its policies.
@@ -363,15 +376,42 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (feePolicyNames, destOverheadPolicyNames);
   }
 
-  /// @notice Returns the names of all fee policies and dest overhead policies.
-  /// @return feePolicyNames The names of the fee policies.
-  /// @return destOverheadPolicyNames The names of the dest overhead policies.
-  function getPolicyNames()
-    external
-    view
-    returns (bytes32[] memory feePolicyNames, bytes32[] memory destOverheadPolicyNames)
-  {
-    return (s_feePolicies.policyNames.values(), s_destOverheadPolicies.policyNames.values());
+  /// @notice Returns the inline fee records of a token.
+  /// @param localToken The local token.
+  /// @return inlineConfigs The inline fee records of the token.
+  function getInlineFeeConfigs(
+    address localToken
+  ) external view returns (InlineFeeConfigArgs[] memory inlineConfigs) {
+    uint256[] memory remoteChainSelectors = s_inlineFeeChains[localToken].values();
+    inlineConfigs = new InlineFeeConfigArgs[](remoteChainSelectors.length);
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
+      inlineConfigs[i] = InlineFeeConfigArgs({
+        localToken: localToken,
+        remoteChainSelector: remoteChainSelector,
+        feeConfig: s_inlineFeeConfigs[localToken][remoteChainSelector]
+      });
+    }
+    return inlineConfigs;
+  }
+
+  /// @notice Returns the inline dest overhead records of a token.
+  /// @param localToken The local token.
+  /// @return inlineConfigs The inline dest overhead records of the token.
+  function getInlineDestOverheadConfigs(
+    address localToken
+  ) external view returns (InlineDestOverheadConfigArgs[] memory inlineConfigs) {
+    uint256[] memory remoteChainSelectors = s_inlineDestOverheadChains[localToken].values();
+    inlineConfigs = new InlineDestOverheadConfigArgs[](remoteChainSelectors.length);
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
+      inlineConfigs[i] = InlineDestOverheadConfigArgs({
+        localToken: localToken,
+        remoteChainSelector: remoteChainSelector,
+        destOverheadConfig: s_inlineDestOverheadConfigs[localToken][remoteChainSelector]
+      });
+    }
+    return inlineConfigs;
   }
 
   /// @notice Returns the token count and the records of a fee policy.
@@ -395,25 +435,6 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (policy.tokenCount, policyConfigs);
   }
 
-  /// @notice Returns the inline fee records of a token.
-  /// @param localToken The local token.
-  /// @return inlineConfigs The inline fee records of the token.
-  function getInlineFeeConfigs(
-    address localToken
-  ) external view returns (InlineFeeConfigArgs[] memory inlineConfigs) {
-    uint256[] memory remoteChainSelectors = s_inlineFeeChains[localToken].values();
-    inlineConfigs = new InlineFeeConfigArgs[](remoteChainSelectors.length);
-    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
-      inlineConfigs[i] = InlineFeeConfigArgs({
-        localToken: localToken,
-        remoteChainSelector: remoteChainSelector,
-        feeConfig: s_inlineFeeConfigs[localToken][remoteChainSelector]
-      });
-    }
-    return inlineConfigs;
-  }
-
   /// @notice Returns the token count and the records of a dest overhead policy.
   /// @param policyName The dest overhead policy.
   /// @return tokenCount The number of tokens that use the policy.
@@ -435,23 +456,15 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (policy.tokenCount, policyConfigs);
   }
 
-  /// @notice Returns the inline dest overhead records of a token.
-  /// @param localToken The local token.
-  /// @return inlineConfigs The inline dest overhead records of the token.
-  function getInlineDestOverheadConfigs(
-    address localToken
-  ) external view returns (InlineDestOverheadConfigArgs[] memory inlineConfigs) {
-    uint256[] memory remoteChainSelectors = s_inlineDestOverheadChains[localToken].values();
-    inlineConfigs = new InlineDestOverheadConfigArgs[](remoteChainSelectors.length);
-    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
-      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
-      inlineConfigs[i] = InlineDestOverheadConfigArgs({
-        localToken: localToken,
-        remoteChainSelector: remoteChainSelector,
-        destOverheadConfig: s_inlineDestOverheadConfigs[localToken][remoteChainSelector]
-      });
-    }
-    return inlineConfigs;
+  /// @notice Returns the names of all fee policies and dest overhead policies.
+  /// @return feePolicyNames The names of the fee policies.
+  /// @return destOverheadPolicyNames The names of the dest overhead policies.
+  function getPolicyNames()
+    external
+    view
+    returns (bytes32[] memory feePolicyNames, bytes32[] memory destOverheadPolicyNames)
+  {
+    return (s_feePolicies.policyNames.values(), s_destOverheadPolicies.policyNames.values());
   }
 
   // ================================================================
@@ -530,6 +543,34 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                          Fee config                          │
   // ================================================================
 
+  /// @notice Removes inline fee records, then sets inline fee records.
+  /// @param inlineConfigsToRemove The inline records to remove.
+  /// @param inlineConfigsToSet The inline records to set.
+  function applyInlineFeeConfigUpdates(
+    IPoolConfigManager.LaneKey[] calldata inlineConfigsToRemove,
+    InlineFeeConfigArgs[] calldata inlineConfigsToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < inlineConfigsToRemove.length; ++i) {
+      address localToken = inlineConfigsToRemove[i].localToken;
+      uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
+
+      PolicyConfig._removeInlineRecord(s_inlineFeeChains[localToken], localToken, remoteChainSelector);
+      delete s_inlineFeeConfigs[localToken][remoteChainSelector];
+      emit InlineFeeConfigRemoved(localToken, remoteChainSelector);
+    }
+
+    for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
+      address localToken = inlineConfigsToSet[i].localToken;
+      uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
+      FeeConfig calldata feeConfig = inlineConfigsToSet[i].feeConfig;
+      if (!_isValidFeeConfig(feeConfig)) revert InvalidInlineFeeConfig(localToken, remoteChainSelector, feeConfig);
+
+      PolicyConfig._setInlineRecord(s_tokens, s_inlineFeeChains[localToken], localToken, remoteChainSelector);
+      s_inlineFeeConfigs[localToken][remoteChainSelector] = feeConfig;
+      emit InlineFeeConfigSet(localToken, remoteChainSelector, feeConfig);
+    }
+  }
+
   /// @notice Removes fee policy records, then removes fee policies, then sets fee policy records.
   /// @dev The first record set under a new name creates the policy. Only a policy without tokens and records can be
   /// removed.
@@ -568,34 +609,6 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Removes inline fee records, then sets inline fee records.
-  /// @param inlineConfigsToRemove The inline records to remove.
-  /// @param inlineConfigsToSet The inline records to set.
-  function applyInlineFeeConfigUpdates(
-    IPoolConfigManager.LaneKey[] calldata inlineConfigsToRemove,
-    InlineFeeConfigArgs[] calldata inlineConfigsToSet
-  ) external onlyAuthorizedCallers {
-    for (uint256 i = 0; i < inlineConfigsToRemove.length; ++i) {
-      address localToken = inlineConfigsToRemove[i].localToken;
-      uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
-
-      PolicyConfig._removeInlineRecord(s_inlineFeeChains[localToken], localToken, remoteChainSelector);
-      delete s_inlineFeeConfigs[localToken][remoteChainSelector];
-      emit InlineFeeConfigRemoved(localToken, remoteChainSelector);
-    }
-
-    for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
-      address localToken = inlineConfigsToSet[i].localToken;
-      uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
-      FeeConfig calldata feeConfig = inlineConfigsToSet[i].feeConfig;
-      if (!_isValidFeeConfig(feeConfig)) revert InvalidInlineFeeConfig(localToken, remoteChainSelector, feeConfig);
-
-      PolicyConfig._setInlineRecord(s_tokens, s_inlineFeeChains[localToken], localToken, remoteChainSelector);
-      s_inlineFeeConfigs[localToken][remoteChainSelector] = feeConfig;
-      emit InlineFeeConfigSet(localToken, remoteChainSelector, feeConfig);
-    }
-  }
-
   /// @dev Each bps fee must be below BPS_DIVIDER, the same as TokenPool. A disabled config must be all zero, so no fee
   /// value stays hidden in storage.
   function _isValidFeeConfig(
@@ -611,6 +624,36 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // ================================================================
   // │                     Dest overhead config                     │
   // ================================================================
+
+  /// @notice Removes inline dest overhead records, then sets inline dest overhead records.
+  /// @param inlineConfigsToRemove The inline records to remove.
+  /// @param inlineConfigsToSet The inline records to set.
+  function applyInlineDestOverheadConfigUpdates(
+    IPoolConfigManager.LaneKey[] calldata inlineConfigsToRemove,
+    InlineDestOverheadConfigArgs[] calldata inlineConfigsToSet
+  ) external onlyAuthorizedCallers {
+    for (uint256 i = 0; i < inlineConfigsToRemove.length; ++i) {
+      address localToken = inlineConfigsToRemove[i].localToken;
+      uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
+
+      PolicyConfig._removeInlineRecord(s_inlineDestOverheadChains[localToken], localToken, remoteChainSelector);
+      delete s_inlineDestOverheadConfigs[localToken][remoteChainSelector];
+      emit InlineDestOverheadConfigRemoved(localToken, remoteChainSelector);
+    }
+
+    for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
+      address localToken = inlineConfigsToSet[i].localToken;
+      uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
+      DestOverheadConfig calldata destOverheadConfig = inlineConfigsToSet[i].destOverheadConfig;
+      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
+        revert InvalidInlineDestOverheadConfig(localToken, remoteChainSelector, destOverheadConfig);
+      }
+
+      PolicyConfig._setInlineRecord(s_tokens, s_inlineDestOverheadChains[localToken], localToken, remoteChainSelector);
+      s_inlineDestOverheadConfigs[localToken][remoteChainSelector] = destOverheadConfig;
+      emit InlineDestOverheadConfigSet(localToken, remoteChainSelector, destOverheadConfig);
+    }
+  }
 
   /// @notice Removes dest overhead policy records, then removes dest overhead policies, then sets dest overhead policy
   /// records.
@@ -650,36 +693,6 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       PolicyConfig._setPolicyRecord(s_destOverheadPolicies, policyName, remoteChainSelector);
       s_policyDestOverheadConfigs[policyName][remoteChainSelector] = destOverheadConfig;
       emit DestOverheadPolicyConfigSet(policyName, remoteChainSelector, destOverheadConfig);
-    }
-  }
-
-  /// @notice Removes inline dest overhead records, then sets inline dest overhead records.
-  /// @param inlineConfigsToRemove The inline records to remove.
-  /// @param inlineConfigsToSet The inline records to set.
-  function applyInlineDestOverheadConfigUpdates(
-    IPoolConfigManager.LaneKey[] calldata inlineConfigsToRemove,
-    InlineDestOverheadConfigArgs[] calldata inlineConfigsToSet
-  ) external onlyAuthorizedCallers {
-    for (uint256 i = 0; i < inlineConfigsToRemove.length; ++i) {
-      address localToken = inlineConfigsToRemove[i].localToken;
-      uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
-
-      PolicyConfig._removeInlineRecord(s_inlineDestOverheadChains[localToken], localToken, remoteChainSelector);
-      delete s_inlineDestOverheadConfigs[localToken][remoteChainSelector];
-      emit InlineDestOverheadConfigRemoved(localToken, remoteChainSelector);
-    }
-
-    for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
-      address localToken = inlineConfigsToSet[i].localToken;
-      uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
-      DestOverheadConfig calldata destOverheadConfig = inlineConfigsToSet[i].destOverheadConfig;
-      if (!_isValidDestOverheadConfig(destOverheadConfig)) {
-        revert InvalidInlineDestOverheadConfig(localToken, remoteChainSelector, destOverheadConfig);
-      }
-
-      PolicyConfig._setInlineRecord(s_tokens, s_inlineDestOverheadChains[localToken], localToken, remoteChainSelector);
-      s_inlineDestOverheadConfigs[localToken][remoteChainSelector] = destOverheadConfig;
-      emit InlineDestOverheadConfigSet(localToken, remoteChainSelector, destOverheadConfig);
     }
   }
 
