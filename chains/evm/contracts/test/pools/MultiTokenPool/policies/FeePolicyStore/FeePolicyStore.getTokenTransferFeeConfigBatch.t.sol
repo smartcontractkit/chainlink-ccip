@@ -18,13 +18,10 @@ contract FeePolicyStore_getTokenTransferFeeConfigBatch is FeePolicyStoreSetup {
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](3);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});
     lanes[1] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: DEST_CHAIN_SELECTOR});
-    lanes[2] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
-    // s_token has records on the source chain, but no lane, so the third lane gets a disabled config.
-    bool[] memory hasLanes = new bool[](3);
-    hasLanes[0] = true;
-    hasLanes[1] = true;
+    // s_otherToken has inline records on the dest chain only, so the third lane gets a disabled config.
+    lanes[2] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
 
-    IPoolV2.TokenTransferFeeConfig[] memory feeConfigs = s_feeStore.getTokenTransferFeeConfigBatch(lanes, hasLanes);
+    IPoolV2.TokenTransferFeeConfig[] memory feeConfigs = s_feeStore.getTokenTransferFeeConfigBatch(lanes);
 
     assertEq(3, feeConfigs.length);
     assertEq(
@@ -43,7 +40,7 @@ contract FeePolicyStore_getTokenTransferFeeConfigBatch is FeePolicyStoreSetup {
     _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, disabledFeeRecord));
 
     IPoolV2.TokenTransferFeeConfig[] memory feeConfigs =
-      s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), _getHasLanes(true));
+      s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
 
     IPoolV2.TokenTransferFeeConfig memory disabledFeeConfig;
     assertEq(abi.encode(disabledFeeConfig), abi.encode(feeConfigs[0]));
@@ -53,7 +50,7 @@ contract FeePolicyStore_getTokenTransferFeeConfigBatch is FeePolicyStoreSetup {
     _setTokenFeePolicy(s_token, bytes32(0));
 
     IPoolV2.TokenTransferFeeConfig[] memory feeConfigs =
-      s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), _getHasLanes(true));
+      s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
 
     IPoolV2.TokenTransferFeeConfig memory disabledFeeConfig;
     assertEq(abi.encode(disabledFeeConfig), abi.encode(feeConfigs[0]));
@@ -63,17 +60,10 @@ contract FeePolicyStore_getTokenTransferFeeConfigBatch is FeePolicyStoreSetup {
     _setTokenDestOverheadPolicy(s_token, bytes32(0));
 
     IPoolV2.TokenTransferFeeConfig[] memory feeConfigs =
-      s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), _getHasLanes(true));
+      s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
 
     IPoolV2.TokenTransferFeeConfig memory disabledFeeConfig;
     assertEq(abi.encode(disabledFeeConfig), abi.encode(feeConfigs[0]));
-  }
-
-  // Reverts
-
-  function test_getTokenTransferFeeConfigBatch_RevertWhen_HasLanesLengthMismatch() public {
-    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.HasLanesLengthMismatch.selector, 1, 2));
-    s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new bool[](2));
   }
 
   function _getTokenTransferFeeConfig(

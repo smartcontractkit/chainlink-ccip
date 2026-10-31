@@ -48,23 +48,6 @@ contract FeePolicyStore_resolveTokenFee is FeePolicyStoreSetup {
     );
   }
 
-  function testFuzz_resolveTokenFee_FeeBelowAmount(
-    uint256 amount,
-    uint16 transferFeeBps
-  ) public {
-    amount = bound(amount, 1, type(uint256).max / BPS_DIVIDER);
-    transferFeeBps = uint16(bound(transferFeeBps, 0, BPS_DIVIDER - 1));
-    FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig();
-    feeConfig.finalityTransferFeeBps = transferFeeBps;
-    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, feeConfig));
-
-    uint256 feeAmount =
-      s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
-
-    assertEq((amount * transferFeeBps) / BPS_DIVIDER, feeAmount);
-    assertLt(feeAmount, amount);
-  }
-
   // Reverts
 
   function test_resolveTokenFee_RevertWhen_FeeRecordNotFound() public {

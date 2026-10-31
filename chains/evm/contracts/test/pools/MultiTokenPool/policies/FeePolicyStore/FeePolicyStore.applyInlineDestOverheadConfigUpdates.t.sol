@@ -31,9 +31,8 @@ contract FeePolicyStore_applyInlineDestOverheadConfigUpdates is FeePolicyStoreSe
 
     assertEq(abi.encode(inlineConfigs), abi.encode(s_feeStore.getInlineDestOverheadConfigs(s_token)));
     // The inline record overrides the policy chain record of the token.
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     assertEq(INLINE_DEST_GAS_OVERHEAD, fees[0].destGasOverhead);
   }
 

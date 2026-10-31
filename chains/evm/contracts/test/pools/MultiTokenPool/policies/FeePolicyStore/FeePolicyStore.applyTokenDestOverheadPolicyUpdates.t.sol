@@ -41,9 +41,8 @@ contract FeePolicyStore_applyTokenDestOverheadPolicyUpdates is FeePolicyStoreSet
     (tokenCount,) = s_feeStore.getDestOverheadPolicy(OTHER_POLICY);
     assertEq(1, tokenCount);
     // The token uses the records of its new policy at once.
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     assertEq(OTHER_DEST_GAS_OVERHEAD, fees[0].destGasOverhead);
   }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../../../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {FeePolicyStore} from "../../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
 import {FeePolicyStoreSetup} from "./FeePolicyStoreSetup.t.sol";
@@ -46,6 +47,24 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
     assertEq(abi.encode(policyConfigs), abi.encode(storedConfigs));
   }
 
+  function test_applyFeePolicyConfigUpdates_SameRecordTwice() public {
+    FeePolicyStore.FeePolicyConfigArgs[] memory policyConfigs = new FeePolicyStore.FeePolicyConfigArgs[](2);
+    policyConfigs[0] = _getFeePolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getFeeConfig())[0];
+    policyConfigs[1] = _getFeePolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getOtherFeeConfig())[0];
+
+    vm.expectEmit();
+    emit FeePolicyStore.FeePolicyConfigSet(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getFeeConfig());
+    vm.expectEmit();
+    emit FeePolicyStore.FeePolicyConfigSet(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getOtherFeeConfig());
+    s_feeStore.applyFeePolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs);
+
+    (, FeePolicyStore.FeePolicyConfigArgs[] memory storedConfigs) = s_feeStore.getFeePolicy(OTHER_POLICY);
+    assertEq(1, storedConfigs.length);
+    assertEq(abi.encode(policyConfigs[1]), abi.encode(storedConfigs[0]));
+    (bytes32[] memory feePolicyNames,) = s_feeStore.getPolicyNames();
+    assertEq(2, feePolicyNames.length);
+  }
+
   function test_applyFeePolicyConfigUpdates_BoundaryValues() public {
     // A disabled record with zero in every field, and an enabled record with the highest fees.
     FeePolicyStore.FeeConfig memory disabledFeeConfig;
@@ -85,6 +104,34 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
     (PolicyConfig.RecordLevel[] memory feeLevels,) =
       s_feeStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(uint8(PolicyConfig.RecordLevel.PolicyDefault), uint8(feeLevels[0]));
+  }
+
+  function test_applyFeePolicyConfigUpdates_RemoveLastRecord() public {
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getFeeConfig()));
+    _setTokenFeePolicy(s_token, OTHER_POLICY);
+    s_feeStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
+    PolicyConfig.PolicyRecordKey[] memory recordsToRemove = new PolicyConfig.PolicyRecordKey[](1);
+    recordsToRemove[0] =
+      PolicyConfig.PolicyRecordKey({policyName: OTHER_POLICY, remoteChainSelector: DEST_CHAIN_SELECTOR});
+
+    vm.expectEmit();
+    emit FeePolicyStore.FeePolicyConfigRemoved(OTHER_POLICY, DEST_CHAIN_SELECTOR);
+    s_feeStore.applyFeePolicyConfigUpdates(
+      recordsToRemove, new bytes32[](0), new FeePolicyStore.FeePolicyConfigArgs[](0)
+    );
+
+    (uint32 tokenCount, FeePolicyStore.FeePolicyConfigArgs[] memory storedConfigs) =
+      s_feeStore.getFeePolicy(OTHER_POLICY);
+    assertEq(1, tokenCount);
+    assertEq(0, storedConfigs.length);
+    (PolicyConfig.RecordLevel[] memory feeLevels,) =
+      s_feeStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
+    assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(feeLevels[0]));
+
+    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
+    s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
+    s_feeStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
   }
 
   function test_applyFeePolicyConfigUpdates_RemovePolicy() public {

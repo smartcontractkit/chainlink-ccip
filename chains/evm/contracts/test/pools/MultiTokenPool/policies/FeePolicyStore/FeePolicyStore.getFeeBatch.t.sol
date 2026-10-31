@@ -18,14 +18,10 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](3);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});
     lanes[1] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: DEST_CHAIN_SELECTOR});
-    lanes[2] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
-    // s_token has records on the source chain, but no lane, so the third lane gets no fee.
-    bool[] memory hasLanes = new bool[](3);
-    hasLanes[0] = true;
-    hasLanes[1] = true;
+    // s_otherToken has inline records on the dest chain only, so the third lane gets no fee.
+    lanes[2] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
 
-    IPoolConfigManager.LaneFee[] memory fees =
-      s_feeStore.getFeeBatch(lanes, FinalityCodec.WAIT_FOR_FINALITY_FLAG, hasLanes);
+    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(lanes, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     assertEq(3, fees.length);
     assertEq(abi.encode(_getLaneFee(_getFeeConfig(), _getDestOverheadConfig())), abi.encode(fees[0]));
@@ -40,18 +36,16 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
       _getDestOverheadPolicyConfigArgs(DEST_OVERHEAD_POLICY, DEST_CHAIN_SELECTOR, _getOtherDestOverheadConfig())
     );
 
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     // The policy chain records serve the chain instead of the policy default records.
     assertEq(abi.encode(_getLaneFee(_getOtherFeeConfig(), _getOtherDestOverheadConfig())), abi.encode(fees[0]));
   }
 
   function test_getFeeBatch_FastFinality() public view {
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec._encodeBlockDepth(10), _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec._encodeBlockDepth(10));
 
     assertEq(_getFeeConfig().fastFinalityFeeUSDCents, fees[0].feeUSDCents);
     assertEq(_getFeeConfig().fastFinalityTransferFeeBps, fees[0].tokenFeeBps);
@@ -62,20 +56,34 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
     FeePolicyStore.FeeConfig memory disabledFeeConfig;
     _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, disabledFeeConfig));
 
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     IPoolConfigManager.LaneFee memory disabledFee;
     assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
   }
 
+  function test_getFeeBatch_EnabledZeroFees() public {
+    FeePolicyStore.FeeConfig memory feeConfig;
+    feeConfig.isEnabled = true;
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, feeConfig));
+    IPoolConfigManager.LaneFee memory expectedFee = _getLaneFee(feeConfig, _getDestOverheadConfig());
+
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+
+    assertEq(abi.encode(expectedFee), abi.encode(fees[0]));
+
+    fees = s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec._encodeBlockDepth(10));
+
+    assertEq(abi.encode(expectedFee), abi.encode(fees[0]));
+  }
+
   function test_getFeeBatch_NoFeeRecord() public {
     _setTokenFeePolicy(s_token, bytes32(0));
 
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     IPoolConfigManager.LaneFee memory disabledFee;
     assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
@@ -90,9 +98,8 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
       _getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR), new FeePolicyStore.InlineFeeConfigArgs[](0)
     );
 
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     IPoolConfigManager.LaneFee memory disabledFee;
     assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
@@ -101,21 +108,11 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
   function test_getFeeBatch_NoDestOverheadRecord() public {
     _setTokenDestOverheadPolicy(s_token, bytes32(0));
 
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, _getHasLanes(true)
-    );
+    IPoolConfigManager.LaneFee[] memory fees =
+      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     IPoolConfigManager.LaneFee memory disabledFee;
     assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
-  }
-
-  // Reverts
-
-  function test_getFeeBatch_RevertWhen_HasLanesLengthMismatch() public {
-    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.HasLanesLengthMismatch.selector, 1, 0));
-    s_feeStore.getFeeBatch(
-      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG, new bool[](0)
-    );
   }
 
   /// @dev The fee of a lane with default finality.

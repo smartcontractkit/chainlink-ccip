@@ -87,6 +87,31 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
     assertEq(1, s_feeStore.getInlineFeeConfigs(s_token).length);
   }
 
+  function test_applyTokenFeePolicyUpdates_PolicyWithoutLaneRecord() public {
+    PolicyConfig.PolicyRecordKey[] memory recordsToRemove = new PolicyConfig.PolicyRecordKey[](1);
+    recordsToRemove[0] = PolicyConfig.PolicyRecordKey({
+      policyName: OTHER_POLICY, remoteChainSelector: PolicyConfig.DEFAULT_CHAIN_SELECTOR
+    });
+    s_feeStore.applyFeePolicyConfigUpdates(
+      recordsToRemove, new bytes32[](0), _getFeePolicyConfigArgs(OTHER_POLICY, SOURCE_CHAIN_SELECTOR, _getFeeConfig())
+    );
+    s_feeStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
+
+    vm.expectEmit();
+    emit FeePolicyStore.TokenFeePolicySet(s_token, OTHER_POLICY);
+    s_feeStore.applyTokenFeePolicyUpdates(_getTokenPolicyArgs(s_token, OTHER_POLICY));
+
+    (PolicyConfig.RecordLevel[] memory feeLevels,) =
+      s_feeStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
+    assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(feeLevels[0]));
+    s_feeStore.checkLaneRecords(s_token, SOURCE_CHAIN_SELECTOR);
+
+    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
+    s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+    vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
+    s_feeStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
+  }
+
   // Reverts
 
   function test_applyTokenFeePolicyUpdates_RevertWhen_LocalTokenNotRegistered() public {

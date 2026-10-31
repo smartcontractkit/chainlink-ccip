@@ -33,7 +33,6 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   );
   error FeeRecordNotFound(address localToken, uint64 remoteChainSelector);
   error DestOverheadRecordNotFound(address localToken, uint64 remoteChainSelector);
-  error HasLanesLengthMismatch(uint256 lanesLength, uint256 hasLanesLength);
 
   /// @dev A set of a new token also registers it.
   event TokenProfileSet(address indexed localToken);
@@ -195,24 +194,19 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return feeConfig;
   }
 
-  /// @notice Returns the fee of each lane for the requested finality, for IPoolConfigManager.getFeeBatch.
-  /// @dev The connection store checks the requested finality and gives hasLanes before this call.
+  /// @notice Returns the fee of each lane for the requested finality.
+  /// @dev Does not check that the lane exists. The PoolConfigManager zeros a lane that does not exist.
   /// @param lanes The lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @param hasLanes Whether each lane exists, aligned with lanes by index.
-  /// @return fees The fee per lane, aligned with lanes by index. Zero with isEnabled false for a lane that does not
-  /// exist, has no enabled fee record or has no dest overhead record.
+  /// @return fees The fee per lane, aligned with lanes by index. Zero with isEnabled false for a lane that has no
+  /// enabled fee record or has no dest overhead record.
   function getFeeBatch(
     IPoolConfigManager.LaneKey[] calldata lanes,
-    bytes4 requestedFinalityConfig,
-    bool[] calldata hasLanes
+    bytes4 requestedFinalityConfig
   ) external view returns (IPoolConfigManager.LaneFee[] memory fees) {
-    if (lanes.length != hasLanes.length) revert HasLanesLengthMismatch(lanes.length, hasLanes.length);
-
     bool isFastFinality = requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG;
     fees = new IPoolConfigManager.LaneFee[](lanes.length);
     for (uint256 i = 0; i < lanes.length; ++i) {
-      if (!hasLanes[i]) continue;
       (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
         _resolveEnabledFee(lanes[i]);
       if (!isEnabled) continue;
@@ -229,20 +223,15 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Returns the fee config of each lane, for IPoolConfigManager.getTokenTransferFeeConfigBatch.
-  /// @dev The connection store gives hasLanes before this call.
+  /// @dev Does not check that the lane exists. The PoolConfigManager zeros a lane that does not exist.
   /// @param lanes The lanes to query.
-  /// @param hasLanes Whether each lane exists, aligned with lanes by index.
   /// @return feeConfigs The fee config per lane, aligned with lanes by index. A disabled zero config for a lane that
-  /// does not exist, has no enabled fee record or has no dest overhead record.
+  /// has no enabled fee record or has no dest overhead record.
   function getTokenTransferFeeConfigBatch(
-    IPoolConfigManager.LaneKey[] calldata lanes,
-    bool[] calldata hasLanes
+    IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs) {
-    if (lanes.length != hasLanes.length) revert HasLanesLengthMismatch(lanes.length, hasLanes.length);
-
     feeConfigs = new IPoolV2.TokenTransferFeeConfig[](lanes.length);
     for (uint256 i = 0; i < lanes.length; ++i) {
-      if (!hasLanes[i]) continue;
       (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
         _resolveEnabledFee(lanes[i]);
       if (!isEnabled) continue;

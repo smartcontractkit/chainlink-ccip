@@ -151,14 +151,6 @@ contract FeePolicyStoreSetup is BaseTest {
     return lanes;
   }
 
-  function _getHasLanes(
-    bool hasLane
-  ) internal pure returns (bool[] memory hasLanes) {
-    hasLanes = new bool[](1);
-    hasLanes[0] = hasLane;
-    return hasLanes;
-  }
-
   // ================================================================
   // │                         Config writes                        │
   // ================================================================
