@@ -17,17 +17,17 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
     );
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](3);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});
-    lanes[1] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: DEST_CHAIN_SELECTOR});
-    // s_otherToken has inline records on the dest chain only, so the third lane gets no fee.
-    lanes[2] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
+    // A missing lane must not stop the batch or shift later results.
+    lanes[1] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
+    lanes[2] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: DEST_CHAIN_SELECTOR});
 
     IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(lanes, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     assertEq(3, fees.length);
     assertEq(abi.encode(_getLaneFee(_getFeeConfig(), _getDestOverheadConfig())), abi.encode(fees[0]));
-    assertEq(abi.encode(_getLaneFee(_getOtherFeeConfig(), _getOtherDestOverheadConfig())), abi.encode(fees[1]));
     IPoolConfigManager.LaneFee memory disabledFee;
-    assertEq(abi.encode(disabledFee), abi.encode(fees[2]));
+    assertEq(abi.encode(disabledFee), abi.encode(fees[1]));
+    assertEq(abi.encode(_getLaneFee(_getOtherFeeConfig(), _getOtherDestOverheadConfig())), abi.encode(fees[2]));
   }
 
   function test_getFeeBatch_PolicyChainRecords() public {
@@ -60,6 +60,22 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
       s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
     IPoolConfigManager.LaneFee memory disabledFee;
+    assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
+  }
+
+  function test_getFeeBatch_DisabledInlineRecordOverridesPolicy() public {
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, _getOtherFeeConfig()));
+    FeePolicyStore.FeeConfig memory disabledFeeConfig;
+    _setInlineFeeConfig(_getInlineFeeConfigArgs(s_token, DEST_CHAIN_SELECTOR, disabledFeeConfig));
+    IPoolConfigManager.LaneKey[] memory lanes = _getLaneKeys(s_token, DEST_CHAIN_SELECTOR);
+
+    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(lanes, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+
+    IPoolConfigManager.LaneFee memory disabledFee;
+    assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
+
+    fees = s_feeStore.getFeeBatch(lanes, FinalityCodec._encodeBlockDepth(10));
+
     assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
   }
 

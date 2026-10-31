@@ -37,6 +37,9 @@ contract FeePolicyStore_resolveTokenFee is FeePolicyStoreSetup {
     assertEq(
       0, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, false)
     );
+    assertEq(
+      0, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec._encodeBlockDepth(10), false)
+    );
   }
 
   function test_resolveTokenFee_DisabledFeeRecord() public {
@@ -46,6 +49,19 @@ contract FeePolicyStore_resolveTokenFee is FeePolicyStoreSetup {
     assertEq(
       0, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true)
     );
+    assertEq(
+      0, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec._encodeBlockDepth(10), true)
+    );
+  }
+
+  function test_resolveTokenFee_RoundsDown() public {
+    FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig();
+    feeConfig.finalityTransferFeeBps = 3_333;
+    feeConfig.fastFinalityTransferFeeBps = 6_667;
+    _setInlineFeeConfig(_getInlineFeeConfigArgs(s_token, DEST_CHAIN_SELECTOR, feeConfig));
+
+    assertEq(0, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 3, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true));
+    assertEq(2, s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 3, FinalityCodec._encodeBlockDepth(10), true));
   }
 
   // Reverts

@@ -188,10 +188,13 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) private view returns (FeeConfig storage feeConfig) {
     PolicyConfig.RecordLevel level;
+
     (level, feeConfig) = _resolveFeeConfig(localToken, remoteChainSelector);
     if (level == PolicyConfig.RecordLevel.None) revert FeeRecordNotFound(localToken, remoteChainSelector);
+
     (level,) = _resolveDestOverheadConfig(localToken, remoteChainSelector);
     if (level == PolicyConfig.RecordLevel.None) revert DestOverheadRecordNotFound(localToken, remoteChainSelector);
+
     return feeConfig;
   }
 
@@ -204,10 +207,12 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (s_inlineFeeChains[localToken].contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.Inline, s_inlineFeeConfigs[localToken][remoteChainSelector]);
     }
+
     bytes32 policyName = s_tokenStates[localToken].feePolicyName;
     level = PolicyConfig._resolvePolicyRecordLevel(
       s_feePolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
     );
+
     if (level == PolicyConfig.RecordLevel.PolicyChain) {
       return (level, s_policyFeeConfigs[policyName][remoteChainSelector]);
     }
@@ -225,10 +230,12 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (s_inlineDestOverheadChains[localToken].contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.Inline, s_inlineDestOverheadConfigs[localToken][remoteChainSelector]);
     }
+
     bytes32 policyName = s_tokenStates[localToken].destOverheadPolicyName;
     level = PolicyConfig._resolvePolicyRecordLevel(
       s_destOverheadPolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
     );
+
     if (level == PolicyConfig.RecordLevel.PolicyChain) {
       return (level, s_policyDestOverheadConfigs[policyName][remoteChainSelector]);
     }
@@ -254,6 +261,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view returns (IPoolConfigManager.LaneFee[] memory fees) {
     bool isFastFinality = requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG;
     fees = new IPoolConfigManager.LaneFee[](lanes.length);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
         _resolveEnabledFee(lanes[i]);
@@ -279,6 +287,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs) {
     feeConfigs = new IPoolV2.TokenTransferFeeConfig[](lanes.length);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
         _resolveEnabledFee(lanes[i]);
@@ -322,10 +331,12 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   {
     feeLevels = new PolicyConfig.RecordLevel[](lanes.length);
     destOverheadLevels = new PolicyConfig.RecordLevel[](lanes.length);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       (feeLevels[i],) = _resolveFeeConfig(lanes[i].localToken, lanes[i].remoteChainSelector);
       (destOverheadLevels[i],) = _resolveDestOverheadConfig(lanes[i].localToken, lanes[i].remoteChainSelector);
     }
+
     return (feeLevels, destOverheadLevels);
   }
 
@@ -335,8 +346,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) private view returns (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) {
     PolicyConfig.RecordLevel feeLevel;
     (feeLevel, feeConfig) = _resolveFeeConfig(lane.localToken, lane.remoteChainSelector);
+
     PolicyConfig.RecordLevel destOverheadLevel;
     (destOverheadLevel, destOverheadConfig) = _resolveDestOverheadConfig(lane.localToken, lane.remoteChainSelector);
+
     isEnabled = feeLevel != PolicyConfig.RecordLevel.None && feeConfig.isEnabled
       && destOverheadLevel != PolicyConfig.RecordLevel.None;
     return (isEnabled, feeConfig, destOverheadConfig);
@@ -368,6 +381,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view returns (bytes32[] memory feePolicyNames, bytes32[] memory destOverheadPolicyNames) {
     feePolicyNames = new bytes32[](localTokens.length);
     destOverheadPolicyNames = new bytes32[](localTokens.length);
+
     for (uint256 i = 0; i < localTokens.length; ++i) {
       TokenState storage tokenState = s_tokenStates[localTokens[i]];
       feePolicyNames[i] = tokenState.feePolicyName;
@@ -384,6 +398,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view returns (InlineFeeConfigArgs[] memory inlineConfigs) {
     uint256[] memory remoteChainSelectors = s_inlineFeeChains[localToken].values();
     inlineConfigs = new InlineFeeConfigArgs[](remoteChainSelectors.length);
+
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       inlineConfigs[i] = InlineFeeConfigArgs({
@@ -403,6 +418,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view returns (InlineDestOverheadConfigArgs[] memory inlineConfigs) {
     uint256[] memory remoteChainSelectors = s_inlineDestOverheadChains[localToken].values();
     inlineConfigs = new InlineDestOverheadConfigArgs[](remoteChainSelectors.length);
+
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       inlineConfigs[i] = InlineDestOverheadConfigArgs({
@@ -424,6 +440,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     PolicyConfig.Policy storage policy = s_feePolicies.policies[policyName];
     uint256[] memory remoteChainSelectors = policy.remoteChainSelectors.values();
     policyConfigs = new FeePolicyConfigArgs[](remoteChainSelectors.length);
+
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       policyConfigs[i] = FeePolicyConfigArgs({
@@ -445,6 +462,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     PolicyConfig.Policy storage policy = s_destOverheadPolicies.policies[policyName];
     uint256[] memory remoteChainSelectors = policy.remoteChainSelectors.values();
     policyConfigs = new DestOverheadPolicyConfigArgs[](remoteChainSelectors.length);
+
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       policyConfigs[i] = DestOverheadPolicyConfigArgs({
@@ -482,8 +500,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external onlyAuthorizedCallers {
     for (uint256 i = 0; i < tokensToRemove.length; ++i) {
       address localToken = tokensToRemove[i];
+
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
+
       if (
         tokenState.feePolicyName != bytes32(0) || tokenState.destOverheadPolicyName != bytes32(0)
           || s_inlineFeeChains[localToken].length() != 0 || s_inlineDestOverheadChains[localToken].length() != 0
@@ -512,6 +532,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
       address localToken = tokenPoliciesToSet[i].localToken;
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
+
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
 
@@ -530,6 +551,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
       address localToken = tokenPoliciesToSet[i].localToken;
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
+
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
 
@@ -563,6 +585,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = inlineConfigsToSet[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
       FeeConfig calldata feeConfig = inlineConfigsToSet[i].feeConfig;
+
       if (!_isValidFeeConfig(feeConfig)) revert InvalidInlineFeeConfig(localToken, remoteChainSelector, feeConfig);
 
       PolicyConfig._setInlineRecord(s_tokens, s_inlineFeeChains[localToken], localToken, remoteChainSelector);
@@ -601,6 +624,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       bytes32 policyName = policyConfigsToSet[i].policyName;
       uint64 remoteChainSelector = policyConfigsToSet[i].remoteChainSelector;
       FeeConfig calldata feeConfig = policyConfigsToSet[i].feeConfig;
+
       if (!_isValidFeeConfig(feeConfig)) revert InvalidFeePolicyConfig(policyName, remoteChainSelector, feeConfig);
 
       PolicyConfig._setPolicyRecord(s_feePolicies, policyName, remoteChainSelector);
@@ -645,6 +669,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = inlineConfigsToSet[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
       DestOverheadConfig calldata destOverheadConfig = inlineConfigsToSet[i].destOverheadConfig;
+
       if (!_isValidDestOverheadConfig(destOverheadConfig)) {
         revert InvalidInlineDestOverheadConfig(localToken, remoteChainSelector, destOverheadConfig);
       }
@@ -686,6 +711,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       bytes32 policyName = policyConfigsToSet[i].policyName;
       uint64 remoteChainSelector = policyConfigsToSet[i].remoteChainSelector;
       DestOverheadConfig calldata destOverheadConfig = policyConfigsToSet[i].destOverheadConfig;
+
       if (!_isValidDestOverheadConfig(destOverheadConfig)) {
         revert InvalidDestOverheadPolicyConfig(policyName, remoteChainSelector, destOverheadConfig);
       }
