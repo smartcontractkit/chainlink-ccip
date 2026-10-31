@@ -22,37 +22,37 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.UintSet;
 
   error ZeroAddressInvalid();
-  error TokenHasConfig(address localToken);
-  error InvalidFeePolicyConfig(bytes32 policyName, uint64 remoteChainSelector, FeeConfig feeConfig);
   error InvalidInlineFeeConfig(address localToken, uint64 remoteChainSelector, FeeConfig feeConfig);
-  error InvalidDestOverheadPolicyConfig(
-    bytes32 policyName, uint64 remoteChainSelector, DestOverheadConfig destOverheadConfig
-  );
+  error InvalidFeePolicyConfig(bytes32 policyName, uint64 remoteChainSelector, FeeConfig feeConfig);
   error InvalidInlineDestOverheadConfig(
     address localToken, uint64 remoteChainSelector, DestOverheadConfig destOverheadConfig
   );
+  error InvalidDestOverheadPolicyConfig(
+    bytes32 policyName, uint64 remoteChainSelector, DestOverheadConfig destOverheadConfig
+  );
+  error TokenHasConfig(address localToken);
   error FeeRecordNotFound(address localToken, uint64 remoteChainSelector);
   error DestOverheadRecordNotFound(address localToken, uint64 remoteChainSelector);
 
+  event InlineFeeConfigSet(address indexed localToken, uint64 indexed remoteChainSelector, FeeConfig feeConfig);
+  event InlineFeeConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
+  event FeePolicyConfigSet(bytes32 indexed policyName, uint64 indexed remoteChainSelector, FeeConfig feeConfig);
+  event FeePolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
+  event FeePolicyRemoved(bytes32 indexed policyName);
   /// @dev A set of a new token also registers it.
   event TokenProfileSet(address indexed localToken);
   event TokenRemoved(address indexed localToken);
   event TokenFeePolicySet(address indexed localToken, bytes32 indexed policyName);
   event TokenDestOverheadPolicySet(address indexed localToken, bytes32 indexed policyName);
-  event FeePolicyConfigSet(bytes32 indexed policyName, uint64 indexed remoteChainSelector, FeeConfig feeConfig);
-  event FeePolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
-  event FeePolicyRemoved(bytes32 indexed policyName);
-  event InlineFeeConfigSet(address indexed localToken, uint64 indexed remoteChainSelector, FeeConfig feeConfig);
-  event InlineFeeConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
+  event InlineDestOverheadConfigSet(
+    address indexed localToken, uint64 indexed remoteChainSelector, DestOverheadConfig destOverheadConfig
+  );
+  event InlineDestOverheadConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
   event DestOverheadPolicyConfigSet(
     bytes32 indexed policyName, uint64 indexed remoteChainSelector, DestOverheadConfig destOverheadConfig
   );
   event DestOverheadPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
   event DestOverheadPolicyRemoved(bytes32 indexed policyName);
-  event InlineDestOverheadConfigSet(
-    address indexed localToken, uint64 indexed remoteChainSelector, DestOverheadConfig destOverheadConfig
-  );
-  event InlineDestOverheadConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
 
   /// @dev The values of a fee record.
   struct FeeConfig {
