@@ -103,6 +103,11 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 
+    // The provider gives an all-zero answer.
+    vm.mockCall(remoteTokenAddressProvider, getRemoteTokenAddressCall, abi.encode(abi.encode(address(0))));
+    _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
+    _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
+
     // The provider reverts.
     vm.mockCallRevert(remoteTokenAddressProvider, getRemoteTokenAddressCall, "");
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));

@@ -88,6 +88,10 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     vm.mockCall(remoteTokenAddressProvider, getRemoteTokenAddressCall, abi.encode(bytes("")));
     _assertLaneConnection(expectedConnection);
 
+    // The provider gives an all-zero answer.
+    vm.mockCall(remoteTokenAddressProvider, getRemoteTokenAddressCall, abi.encode(abi.encode(address(0))));
+    _assertLaneConnection(expectedConnection);
+
     // The provider has no code.
     _setRemoteTokenAddressProvider(CONNECTION_POLICY, makeAddr("providerWithoutCode"));
     _assertLaneConnection(expectedConnection);

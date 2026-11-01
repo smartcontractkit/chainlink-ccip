@@ -126,7 +126,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     address remoteTokenAddressProvider; // The IRemoteTokenAddressProvider of the policy. Zero means none.
   }
 
-  /// @dev The values of a remote pool record.
+  /// @dev The values of a remote pool record. The 2 bool flags let one chain use an MTTP while the other keeps its legacy
+  /// pool. Legacy pools do not send token address at source and cannot read such pool data at dest.
+  /// Once both chains use an MTTP, turn omitSourceTokenAddressOnSend off on both chains.
+  /// Keep allowSourceTokenAddressMissingOnReceive on until every message sent without a source token has succeeded.
+  /// This includes failed messages and messages sent by an MTTP during migration. Then turn it off and remove the
+  /// legacy pools.
   struct RemotePoolConfig {
     bool omitSourceTokenAddressOnSend; // ───────────╮ True sends pool data without the source token.
     bool allowSourceTokenAddressMissingOnReceive; // ╯ True accepts pool data without the source token.
@@ -360,7 +365,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev Returns the remote token of the connection record of the token. A connection policy record asks the
   /// IRemoteTokenAddressProvider of the policy, and a revert of the provider stops the transfer. Reverts if the remote
-  /// token is empty, which includes a policy without a provider.
+  /// token is empty or all zero. A policy without a provider gives empty bytes.
   function _resolveRemoteToken(
     address localToken,
     uint64 remoteChainSelector
@@ -377,13 +382,13 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       }
     }
 
-    if (remoteToken.length == 0) revert InvalidRemoteToken(localToken, remoteChainSelector);
+    if (!_isValidRemoteToken(remoteToken)) revert InvalidRemoteToken(localToken, remoteChainSelector);
     return remoteToken;
   }
 
-  /// @dev Returns the answer of the IRemoteTokenAddressProvider of the connection policy of the token. Empty if the
-  /// policy has no provider, or if the provider has no code or reverts. An answer that does not decode as bytes
-  /// reverts, because try does not catch a failed decode.
+  /// @dev Returns the answer of the IRemoteTokenAddressProvider of the connection policy of the token. Returns empty
+  /// bytes if the policy has no provider, if the provider has no code or reverts, or if the answer is all zero. An
+  /// answer that does not decode as bytes reverts, because try does not catch a failed decode.
   function _tryGetPolicyRemoteToken(
     address localToken,
     uint64 remoteChainSelector
@@ -398,9 +403,18 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       .getRemoteTokenAddress(localToken, remoteChainSelector) returns (
       bytes memory providerRemoteToken
     ) {
-      remoteToken = providerRemoteToken;
+      if (_isValidRemoteToken(providerRemoteToken)) remoteToken = providerRemoteToken;
     } catch {}
     return remoteToken;
+  }
+
+  /// @dev Returns false if the remote token is empty or all zero. No chain has a token at an all-zero address, so a
+  /// send to it loses its amount. Zero bytes of the same length have the same hash exactly when the remote token is
+  /// empty or all zero.
+  function _isValidRemoteToken(
+    bytes memory remoteToken
+  ) private pure returns (bool) {
+    return keccak256(remoteToken) != keccak256(new bytes(remoteToken.length));
   }
 
   /// @dev An inline connection record overrides the connection policy of the token.
@@ -585,9 +599,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @notice Returns the connection, the remote pool record and the pause state of each lane, for
   /// IPoolConfigManager.getLaneConnectionBatch.
   /// @dev A token without a lane gets only its pause state. A lane of a connection policy record shows the answer of
-  /// the IRemoteTokenAddressProvider of the policy. The remote token is empty if the policy has no provider, or if the
-  /// provider has no code or reverts. This view reverts if a provider answer does not decode as bytes. It can also
-  /// revert if a provider uses all the gas or returns a very large answer.
+  /// the IRemoteTokenAddressProvider of the policy. The remote token is empty if the policy has no provider, if the
+  /// provider has no code or reverts, or if the answer is all zero. This view reverts if a provider answer does not
+  /// decode as bytes. It can also revert if a provider uses all the gas or returns a very large answer.
   /// @param lanes The lanes to query.
   /// @return connections The connection per lane, aligned with lanes by index.
   function getLaneConnectionBatch(
@@ -1098,7 +1112,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @dev After a removal, the token uses its connection policy on that chain, if the policy serves it there. So a
   /// removal reverts if the policy gives the token other remote token bytes, because a send with a wrong remote token
   /// loses its amount. A policy without a provider and a provider failure do not block the removal, because such a
-  /// lane stops every send. The check reads the policy records and the provider at the time of the call.
+  /// lane stops every send. An all-zero answer is a provider failure. The check reads the policy records and the
+  /// provider at the time of the call.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineConnectionConfigUpdates(
@@ -1132,12 +1147,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = inlineConfigsToSet[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
       bytes calldata remoteToken = inlineConfigsToSet[i].remoteToken;
-
-      // No chain has a token at an all-zero address, and a send to it can never be executed. Zero bytes of the same
-      // length have the same hash exactly when the remote token is empty or all zero.
-      if (keccak256(remoteToken) == keccak256(new bytes(remoteToken.length))) {
-        revert InvalidRemoteToken(localToken, remoteChainSelector);
-      }
+      if (!_isValidRemoteToken(remoteToken)) revert InvalidRemoteToken(localToken, remoteChainSelector);
 
       PolicyConfig._setInlineRecord(s_tokens, s_inlineConnectionChains[localToken], localToken, remoteChainSelector);
       s_inlineRemoteTokens[localToken][remoteChainSelector] = remoteToken;

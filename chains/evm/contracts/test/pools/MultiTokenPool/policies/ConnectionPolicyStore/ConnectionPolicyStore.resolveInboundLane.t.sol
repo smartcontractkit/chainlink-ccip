@@ -309,8 +309,22 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_RevertWhen_InvalidRemoteToken() public {
-    _setRemoteTokenAddressProvider(CONNECTION_POLICY, address(0));
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
+
+    // The provider gives an all-zero answer.
+    vm.mockCall(
+      address(s_remoteTokenAddressProvider),
+      abi.encodeCall(IRemoteTokenAddressProvider.getRemoteTokenAddress, (s_token, DEST_CHAIN_SELECTOR)),
+      abi.encode(abi.encode(address(0)))
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(ConnectionPolicyStore.InvalidRemoteToken.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
+
+    // The policy has no provider.
+    _setRemoteTokenAddressProvider(CONNECTION_POLICY, address(0));
 
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.InvalidRemoteToken.selector, s_token, DEST_CHAIN_SELECTOR)
