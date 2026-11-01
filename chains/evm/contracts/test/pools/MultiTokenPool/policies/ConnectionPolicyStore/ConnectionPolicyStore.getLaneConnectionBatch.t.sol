@@ -12,11 +12,11 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     bytes memory inlineRemoteToken = abi.encode(makeAddr("inlineRemoteToken"));
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, inlineRemoteToken));
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.omitSourceTokenAddressOnSend = true;
-    remotePoolConfig.allowSourceTokenAddressMissingOnReceive = true;
-    remotePoolConfig.remotePoolAddresses = new bytes[](2);
-    remotePoolConfig.remotePoolAddresses[0] = s_remotePool;
-    remotePoolConfig.remotePoolAddresses[1] = abi.encode(makeAddr("legacyPool"));
+    remotePoolConfig.useLegacyPoolDataOnSend = true;
+    remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](2);
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_remotePool;
+    remotePoolConfig.remotePools[1].remotePoolAddress = abi.encode(makeAddr("legacyPool"));
+    remotePoolConfig.remotePools[1].allowLegacyPoolDataOnReceive = true;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](3);
@@ -31,16 +31,15 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     IPoolConfigManager.LaneConnection memory expectedConnection;
     expectedConnection.hasConnection = true;
     expectedConnection.remoteToken = abi.encode(s_token);
-    expectedConnection.remotePools = _getRemotePoolConfig().remotePoolAddresses;
+    expectedConnection.remotePools = _getRemotePoolConfig().remotePools;
     assertEq(abi.encode(expectedConnection), abi.encode(connections[0]));
 
     IPoolConfigManager.LaneConnection memory noConnection;
     assertEq(abi.encode(noConnection), abi.encode(connections[1]));
 
     expectedConnection.remoteToken = inlineRemoteToken;
-    expectedConnection.omitSourceTokenAddressOnSend = true;
-    expectedConnection.allowSourceTokenAddressMissingOnReceive = true;
-    expectedConnection.remotePools = remotePoolConfig.remotePoolAddresses;
+    expectedConnection.useLegacyPoolDataOnSend = true;
+    expectedConnection.remotePools = remotePoolConfig.remotePools;
     assertEq(abi.encode(expectedConnection), abi.encode(connections[2]));
   }
 
@@ -78,7 +77,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
       abi.encodeCall(IRemoteTokenAddressProvider.getRemoteTokenAddress, (s_token, DEST_CHAIN_SELECTOR));
     IPoolConfigManager.LaneConnection memory expectedConnection;
     expectedConnection.hasConnection = true;
-    expectedConnection.remotePools = _getRemotePoolConfig().remotePoolAddresses;
+    expectedConnection.remotePools = _getRemotePoolConfig().remotePools;
 
     // The provider reverts.
     vm.mockCallRevert(remoteTokenAddressProvider, getRemoteTokenAddressCall, "");
@@ -109,7 +108,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
 
     assertTrue(connection.hasConnection);
     assertEq(abi.encode(s_token), connection.remoteToken);
-    assertEq(abi.encode(_getRemotePoolConfig().remotePoolAddresses), abi.encode(connection.remotePools));
+    assertEq(abi.encode(_getRemotePoolConfig().remotePools), abi.encode(connection.remotePools));
   }
 
   function test_getLaneConnectionBatch_NoRemotePoolRecord() public {

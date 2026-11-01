@@ -13,7 +13,8 @@ contract MockPoolConfigManager is IPoolConfigManager {
   IPoolConfigManager.OutboundLane internal s_outboundLane;
   IPoolConfigManager.ResolvedInboundTransfer internal s_inboundTransfer;
   IPoolConfigManager.TokenConfig internal s_tokenConfig;
-  IPoolConfigManager.LaneConnection internal s_laneConnection;
+  /// @dev Encoded, because the legacy code generator cannot copy a struct array from memory to storage.
+  bytes internal s_laneConnection;
   IPoolConfigManager.LaneFee internal s_laneFee;
   IPoolV2.TokenTransferFeeConfig internal s_feeConfig;
   address[] internal s_outboundCCVs;
@@ -44,7 +45,7 @@ contract MockPoolConfigManager is IPoolConfigManager {
   function setLaneConnection(
     IPoolConfigManager.LaneConnection memory connection
   ) external {
-    s_laneConnection = connection;
+    s_laneConnection = abi.encode(connection);
   }
 
   function setLaneFee(
@@ -133,7 +134,7 @@ contract MockPoolConfigManager is IPoolConfigManager {
   ) external view returns (LaneConnection[] memory connections) {
     connections = new LaneConnection[](lanes.length);
     for (uint256 i = 0; i < lanes.length; ++i) {
-      connections[i] = s_laneConnection;
+      connections[i] = abi.decode(s_laneConnection, (LaneConnection));
     }
     return connections;
   }

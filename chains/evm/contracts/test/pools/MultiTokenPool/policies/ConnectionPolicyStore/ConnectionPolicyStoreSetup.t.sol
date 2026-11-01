@@ -150,15 +150,11 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     return providers;
   }
 
-  /// @dev Trusts s_remotePool, with both source token flags off.
+  /// @dev Trusts s_remotePool, with the flags for legacy pool data off.
   function _getRemotePoolConfig() internal view returns (ConnectionPolicyStore.RemotePoolConfig memory) {
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = s_remotePool;
-    return ConnectionPolicyStore.RemotePoolConfig({
-      omitSourceTokenAddressOnSend: false,
-      allowSourceTokenAddressMissingOnReceive: false,
-      remotePoolAddresses: remotePoolAddresses
-    });
+    IPoolConfigManager.RemotePool[] memory remotePools = new IPoolConfigManager.RemotePool[](1);
+    remotePools[0].remotePoolAddress = s_remotePool;
+    return ConnectionPolicyStore.RemotePoolConfig({useLegacyPoolDataOnSend: false, remotePools: remotePools});
   }
 
   function _getRemotePoolPolicyConfigArgs(

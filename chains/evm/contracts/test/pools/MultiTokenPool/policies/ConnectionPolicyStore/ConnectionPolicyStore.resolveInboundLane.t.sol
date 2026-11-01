@@ -50,8 +50,9 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     assertEq(AMOUNT, transfer.localAmount);
   }
 
-  function test_resolveInboundLane_SourceTokenAddressMissing() public {
-    _allowSourceTokenAddressMissingOnReceive();
+  function test_resolveInboundLane_LegacyPoolData() public {
+    // s_remotePool has the flag on, and s_otherRemotePool has it off.
+    _allowLegacyPoolDataOnReceive();
 
     // A source without the source token does not depend on the remote token address provider.
     vm.expectCall(
@@ -67,6 +68,23 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     // Empty pool data, as a pool older than 1.5.1 sends it, uses the local decimals.
     transfer = _resolveInboundLane(s_token, s_remotePool, "", AMOUNT);
     assertEq(AMOUNT, transfer.localAmount);
+  }
+
+  function test_resolveInboundLane_LegacyPoolData_PolicyRecord() public {
+    // A policy record has a flag for each remote pool, the same as an inline record.
+    _setRemotePoolPolicyConfig(
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolConfigWithFlag())
+    );
+    bytes memory sourcePoolData = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS));
+
+    IPoolConfigManager.ResolvedInboundTransfer memory transfer =
+      _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
+    assertEq(AMOUNT, transfer.localAmount);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    _resolveInboundLane(s_token, s_otherRemotePool, sourcePoolData, AMOUNT);
   }
 
   function test_resolveInboundLane_AdditionalPoolData() public {
@@ -95,15 +113,20 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
 
   function test_resolveInboundLane_AdditionalPoolDataProviderGetsEmptyData() public {
     _setAdditionalPoolDataProvider(s_token);
-    _allowSourceTokenAddressMissingOnReceive();
+    // s_remotePool has the flag on, and s_otherRemotePool has it off.
+    _allowLegacyPoolDataOnReceive();
     bytes memory callData = abi.encodeCall(
       IAdditionalPoolDataProvider.isAdditionalPoolDataValid, (s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "")
     );
     vm.mockCall(s_additionalPoolDataProvider, callData, abi.encode(true));
 
     // The provider decides whether a source without additional pool data is valid.
-    vm.expectCall(s_additionalPoolDataProvider, callData);
+    vm.expectCall(s_additionalPoolDataProvider, callData, 3);
+    // Legacy pool data of 32 and 0 bytes.
     _resolveInboundLane(s_token, s_remotePool, abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)), AMOUNT);
+    _resolveInboundLane(s_token, s_remotePool, "", AMOUNT);
+    // Pool data with the source token, from a source token without a provider. The flag of the pool does not matter.
+    _resolveInboundLane(s_token, s_otherRemotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
   }
 
   function test_resolveInboundLane_OutboundPauseIgnored() public {
@@ -237,7 +260,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
 
     // An inline record without remote pools works outbound only.
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePoolAddresses = new bytes[](0);
+    remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](0);
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
     vm.expectRevert(
@@ -248,23 +271,42 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
   }
 
-  function test_resolveInboundLane_RevertWhen_SourceTokenAddressMissing() public {
+  function test_resolveInboundLane_RevertWhen_LegacyPoolDataNotAllowed() public {
     bytes[] memory sourcePoolDatas = new bytes[](2);
     sourcePoolDatas[0] = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS));
     sourcePoolDatas[1] = "";
 
     for (uint256 i = 0; i < sourcePoolDatas.length; ++i) {
       vm.expectRevert(
-        abi.encodeWithSelector(ConnectionPolicyStore.SourceTokenAddressMissing.selector, s_token, DEST_CHAIN_SELECTOR)
+        abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_token, DEST_CHAIN_SELECTOR)
       );
       _resolveInboundLane(s_token, s_remotePool, sourcePoolDatas[i], AMOUNT);
     }
+
+    // The flag of s_remotePool does not apply to s_otherRemotePool in the same record.
+    _allowLegacyPoolDataOnReceive();
+    for (uint256 i = 0; i < sourcePoolDatas.length; ++i) {
+      vm.expectRevert(
+        abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_token, DEST_CHAIN_SELECTOR)
+      );
+      _resolveInboundLane(s_token, s_otherRemotePool, sourcePoolDatas[i], AMOUNT);
+    }
+
+    // The flag of the inline record of s_token does not apply to the policy record that s_otherToken uses.
+    _setTokenRemotePoolPolicy(s_otherToken, REMOTE_POOL_POLICY);
+    _setInlineConnectionConfig(
+      _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
+    );
+    vm.expectRevert(
+      abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_otherToken, DEST_CHAIN_SELECTOR)
+    );
+    _resolveInboundLane(s_otherToken, s_remotePool, sourcePoolDatas[0], AMOUNT);
   }
 
   function test_resolveInboundLane_RevertWhen_SourceTokenMismatch() public {
-    // A trusted remote pool burned another token. A source token in the pool data is checked also while the record
-    // accepts pool data without it.
-    _allowSourceTokenAddressMissingOnReceive();
+    // A trusted remote pool burned another token. A source token in the pool data is checked also from a remote pool
+    // that can send pool data without it.
+    _allowLegacyPoolDataOnReceive();
     address otherSourceToken = makeAddr("otherSourceToken");
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, otherSourceToken, "");
 
@@ -356,20 +398,25 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
 
   function test_resolveInboundLane_RevertWhen_InvalidAdditionalPoolData() public {
     _setAdditionalPoolDataProvider(s_token);
-    bytes memory additionalPoolData = abi.encode(keccak256("otherUid"));
     vm.mockCall(
       s_additionalPoolDataProvider,
       abi.encodeWithSelector(IAdditionalPoolDataProvider.isAdditionalPoolDataValid.selector),
       abi.encode(false)
     );
-    bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, additionalPoolData);
+    bytes[] memory additionalPoolDatas = new bytes[](2);
+    additionalPoolDatas[0] = abi.encode(keccak256("otherUid"));
+    // A provider can reject a source without additional pool data.
+    additionalPoolDatas[1] = "";
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        ConnectionPolicyStore.InvalidAdditionalPoolData.selector, s_token, DEST_CHAIN_SELECTOR, additionalPoolData
-      )
-    );
-    _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
+    for (uint256 i = 0; i < additionalPoolDatas.length; ++i) {
+      bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, additionalPoolDatas[i]);
+      vm.expectRevert(
+        abi.encodeWithSelector(
+          ConnectionPolicyStore.InvalidAdditionalPoolData.selector, s_token, DEST_CHAIN_SELECTOR, additionalPoolDatas[i]
+        )
+      );
+      _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
+    }
   }
 
   function test_resolveInboundLane_RevertWhen_OverflowDetected() public {
@@ -419,9 +466,24 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
   }
 
-  function _allowSourceTokenAddressMissingOnReceive() private {
-    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.allowSourceTokenAddressMissingOnReceive = true;
-    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
+  /// @dev Sets _getRemotePoolConfigWithFlag as an inline record of s_token.
+  function _allowLegacyPoolDataOnReceive() private {
+    _setInlineRemotePoolConfig(
+      _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, _getRemotePoolConfigWithFlag())
+    );
+  }
+
+  /// @dev s_remotePool can send pool data without the source token, and s_otherRemotePool cannot.
+  function _getRemotePoolConfigWithFlag()
+    private
+    view
+    returns (ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig)
+  {
+    remotePoolConfig = _getRemotePoolConfig();
+    remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](2);
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_remotePool;
+    remotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
+    remotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
+    return remotePoolConfig;
   }
 }

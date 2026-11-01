@@ -6,8 +6,7 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 /// @notice Gives each token its own address as the remote token on every remote chain.
 /// @dev A connection policy uses this provider only if each of its tokens has the same address on each chain of the
-/// policy. The answer has the EVM encoding, so these chains must be EVM chains. The provider has no config. So one
-/// instance can serve every connection policy on a chain.
+/// policy. The answer has the EVM encoding, so these chains must be EVM chains.
 contract SameAddressRemoteTokenAddressProvider is IRemoteTokenAddressProvider, ITypeAndVersion {
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "SameAddressRemoteTokenAddressProvider 2.1.0-dev";

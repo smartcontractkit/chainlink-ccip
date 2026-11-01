@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
+
 import {FinalityCodec} from "../../../../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {ConnectionPolicyStore} from "../../../../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
@@ -10,11 +12,11 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionPolicyStoreSetup {
   function test_applyRemotePoolPolicyConfigUpdates() public {
     ConnectionPolicyStore.RemotePoolConfig memory chainRemotePoolConfig = _getRemotePoolConfig();
-    chainRemotePoolConfig.remotePoolAddresses = new bytes[](2);
-    chainRemotePoolConfig.remotePoolAddresses[0] = s_remotePool;
-    chainRemotePoolConfig.remotePoolAddresses[1] = s_otherRemotePool;
-    chainRemotePoolConfig.omitSourceTokenAddressOnSend = true;
-    chainRemotePoolConfig.allowSourceTokenAddressMissingOnReceive = true;
+    chainRemotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](2);
+    chainRemotePoolConfig.remotePools[0].remotePoolAddress = s_remotePool;
+    chainRemotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
+    chainRemotePoolConfig.remotePools[1].allowLegacyPoolDataOnReceive = true;
+    chainRemotePoolConfig.useLegacyPoolDataOnSend = true;
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
       new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](2);
     policyConfigs[0] = _getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, chainRemotePoolConfig)[0];
@@ -41,8 +43,8 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
   function test_applyRemotePoolPolicyConfigUpdates_ReplaceRecord() public {
     ConnectionPolicyStore.RemotePoolConfig memory newRemotePoolConfig = _getRemotePoolConfig();
-    newRemotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
-    newRemotePoolConfig.allowSourceTokenAddressMissingOnReceive = true;
+    newRemotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
+    newRemotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, newRemotePoolConfig);
 
@@ -139,7 +141,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
       _getPolicyRecordKeys(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
     bytes32[] memory policiesToRemove = _getPolicyNames(REMOTE_POOL_POLICY);
     ConnectionPolicyStore.RemotePoolConfig memory newRemotePoolConfig = _getRemotePoolConfig();
-    newRemotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
+    newRemotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, newRemotePoolConfig);
 
@@ -168,7 +170,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_ZeroAddressInvalid() public {
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePoolAddresses[0] = "";
+    remotePoolConfig.remotePools[0].remotePoolAddress = "";
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, remotePoolConfig);
 
@@ -180,9 +182,9 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_RemotePoolAlreadyAdded() public {
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePoolAddresses = new bytes[](2);
-    remotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
-    remotePoolConfig.remotePoolAddresses[1] = s_otherRemotePool;
+    remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](2);
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
+    remotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, remotePoolConfig);
 

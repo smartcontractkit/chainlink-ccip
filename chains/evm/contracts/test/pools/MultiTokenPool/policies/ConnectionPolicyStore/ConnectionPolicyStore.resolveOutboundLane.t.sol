@@ -77,10 +77,10 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
     assertEq(_getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, additionalPoolData), lane.destPoolData);
   }
 
-  function test_resolveOutboundLane_OmitSourceTokenAddressOnSend() public {
+  function test_resolveOutboundLane_LegacyPoolData() public {
     _setAdditionalPoolDataProvider(s_token);
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.omitSourceTokenAddressOnSend = true;
+    remotePoolConfig.useLegacyPoolDataOnSend = true;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
     // A legacy pool parses only the decimals, so the lane sends no additional pool data.

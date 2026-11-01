@@ -21,7 +21,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// the remote token. A connection policy record opens its chain for every token of the policy, or only for its subset
 /// tokens. It takes the remote token from the IRemoteTokenAddressProvider of the policy. A connection policy has no
 /// policy default record.
-/// A remote pool record holds the trusted remote pools and the two source token flags.
+/// A remote pool record holds the trusted remote pools and the flags for legacy pool data.
 contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -48,7 +48,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   error RemotePoolRecordNotFound(address localToken, uint64 remoteChainSelector);
   error InvalidSourcePoolAddress(address localToken, uint64 remoteChainSelector, bytes sourcePoolAddress);
   error InvalidSourcePoolData(bytes sourcePoolData);
-  error SourceTokenAddressMissing(address localToken, uint64 remoteChainSelector);
+  error LegacyPoolDataNotAllowed(address localToken, uint64 remoteChainSelector);
   error SourceTokenMismatch(
     address localToken, uint64 remoteChainSelector, bytes expectedSourceToken, bytes actualSourceToken
   );
@@ -126,16 +126,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     address remoteTokenAddressProvider; // The IRemoteTokenAddressProvider of the policy. Zero means none.
   }
 
-  /// @dev The values of a remote pool record. The 2 bool flags let one chain use an MTTP while the other keeps its legacy
-  /// pool. Legacy pools do not send token address at source and cannot read such pool data at dest.
-  /// Once both chains use an MTTP, turn omitSourceTokenAddressOnSend off on both chains.
-  /// Keep allowSourceTokenAddressMissingOnReceive on until every message sent without a source token has succeeded.
-  /// This includes failed messages and messages sent by an MTTP during migration. Then turn it off and remove the
-  /// legacy pools.
+  /// @dev The values of a remote pool record. Legacy pool data is pool data of 0 or 32 bytes, as a TokenPool sends it.
+  /// It holds no source token and no additional pool data. A legacy pool accepts only legacy pool data, so a lane to a
+  /// remote legacy pool needs useLegacyPoolDataOnSend on.
+  /// A remote legacy pool needs allowLegacyPoolDataOnReceive on forever, because its messages never expire. It serves
+  /// one token, so its address proves which token it burned only on the inline record of its token. A remote
+  /// multi-token pool needs the flag only for the messages that it sent with useLegacyPoolDataOnSend on.
   struct RemotePoolConfig {
-    bool omitSourceTokenAddressOnSend; // ───────────╮ True sends pool data without the source token.
-    bool allowSourceTokenAddressMissingOnReceive; // ╯ True accepts pool data without the source token.
-    bytes[] remotePoolAddresses; // The trusted remote pools, abi encoded for EVM chains. No empty or duplicate entry.
+    bool useLegacyPoolDataOnSend; // True sends legacy pool data.
+    IPoolConfigManager.RemotePool[] remotePools; // The trusted remote pools. No empty or duplicate address.
   }
 
   /// @dev RemotePoolConfig with its policy record key.
@@ -187,9 +186,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev The stored values of a remote pool record.
   struct RemotePoolRecord {
-    bool omitSourceTokenAddressOnSend; // ───────────╮ True sends pool data without the source token.
-    bool allowSourceTokenAddressMissingOnReceive; // ╯ True accepts pool data without the source token.
+    bool useLegacyPoolDataOnSend; // True sends legacy pool data.
     EnumerableSet.Bytes32Set remotePoolHashes; // The hashes of the trusted remote pools.
+    mapping(bytes32 remotePoolHash => bool isAllowed) allowLegacyPoolDataOnReceive; // For each remote pool.
   }
 
   /// @dev The pause flags of a remote chain.
@@ -285,12 +284,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     lane.remoteToken = _resolveRemoteToken(localToken, remoteChainSelector);
     lane.destPoolData = _encodePoolData(
-      localToken,
-      remoteChainSelector,
-      requestedFinalityConfig,
-      tokenArgs,
-      tokenState,
-      record.omitSourceTokenAddressOnSend
+      localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs, tokenState, record.useLegacyPoolDataOnSend
     );
     lane.localDecimals = tokenState.localDecimals;
     lane.lockOrBurnFlavor = tokenState.lockOrBurnFlavor;
@@ -328,8 +322,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
 
     RemotePoolRecord storage record = _resolveLane(localToken, remoteChainSelector);
+    bytes32 sourcePoolHash = keccak256(sourcePoolAddress);
     // Each remote pool record trusts only its own remote pools.
-    if (!record.remotePoolHashes.contains(keccak256(sourcePoolAddress))) {
+    if (!record.remotePoolHashes.contains(sourcePoolHash)) {
       revert InvalidSourcePoolAddress(localToken, remoteChainSelector, sourcePoolAddress);
     }
     uint8 remoteDecimals = _checkPoolData(
@@ -338,7 +333,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       requestedFinalityConfig,
       sourcePoolData,
       tokenState,
-      record.allowSourceTokenAddressMissingOnReceive
+      record.allowLegacyPoolDataOnReceive[sourcePoolHash]
     );
 
     transfer.localAmount = _calculateLocalAmount(sourceDenominatedAmount, remoteDecimals, tokenState.localDecimals);
@@ -470,7 +465,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                          Pool data                           │
   // ================================================================
 
-  /// @dev With omitSourceTokenAddressOnSend on, the pool data holds only the decimals, which a legacy pool parses.
+  /// @dev With useLegacyPoolDataOnSend on, the pool data holds only the decimals, which a legacy pool parses.
   /// Otherwise it also holds the source token and the additional pool data, which is empty for a token without a
   /// provider.
   function _encodePoolData(
@@ -479,9 +474,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs,
     TokenState memory tokenState,
-    bool omitSourceTokenAddressOnSend
+    bool useLegacyPoolDataOnSend
   ) private view returns (bytes memory) {
-    if (omitSourceTokenAddressOnSend) {
+    if (useLegacyPoolDataOnSend) {
       return abi.encode(uint256(tokenState.localDecimals));
     }
 
@@ -496,15 +491,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev Decodes the pool data, checks the source token and the additional pool data, and returns the remote
   /// decimals. A source token must equal the remote token of the lane. Pool data without the source token needs
-  /// allowSourceTokenAddressMissingOnReceive. The additional pool data provider of the token checks the additional pool
-  /// data of every transfer, also empty data.
+  /// allowLegacyPoolDataOnReceive on the source pool. The additional pool data provider of the token checks the
+  /// additional pool data of every transfer, also empty data.
   function _checkPoolData(
     address localToken,
     uint64 remoteChainSelector,
     bytes4 requestedFinalityConfig,
     bytes calldata sourcePoolData,
     TokenState memory tokenState,
-    bool allowSourceTokenAddressMissingOnReceive
+    bool allowLegacyPoolDataOnReceive
   ) private view returns (uint8 remoteDecimals) {
     bytes memory sourceToken;
     bytes memory additionalPoolData;
@@ -512,7 +507,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     // A source multi-token pool serves many tokens, so a trusted source pool does not prove which token it burned.
     if (sourceToken.length == 0) {
-      if (!allowSourceTokenAddressMissingOnReceive) revert SourceTokenAddressMissing(localToken, remoteChainSelector);
+      if (!allowLegacyPoolDataOnReceive) revert LegacyPoolDataNotAllowed(localToken, remoteChainSelector);
     } else {
       // Only this check needs the remote token, so a source that omits the source token does not depend on the
       // remote token address provider.
@@ -635,8 +630,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
         ? s_inlineRemoteTokens[localToken][remoteChainSelector]
         : _tryGetPolicyRemoteToken(localToken, remoteChainSelector);
       (, RemotePoolRecord storage record) = _resolveRemotePoolRecord(localToken, remoteChainSelector);
-      connection.omitSourceTokenAddressOnSend = record.omitSourceTokenAddressOnSend;
-      connection.allowSourceTokenAddressMissingOnReceive = record.allowSourceTokenAddressMissingOnReceive;
+      connection.useLegacyPoolDataOnSend = record.useLegacyPoolDataOnSend;
       connection.remotePools = _getRemotePools(record);
     }
     return connections;
@@ -954,23 +948,23 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   function _getRemotePoolConfig(
     RemotePoolRecord storage record
   ) private view returns (RemotePoolConfig memory) {
-    return RemotePoolConfig({
-      omitSourceTokenAddressOnSend: record.omitSourceTokenAddressOnSend,
-      allowSourceTokenAddressMissingOnReceive: record.allowSourceTokenAddressMissingOnReceive,
-      remotePoolAddresses: _getRemotePools(record)
-    });
+    return
+      RemotePoolConfig({useLegacyPoolDataOnSend: record.useLegacyPoolDataOnSend, remotePools: _getRemotePools(record)});
   }
 
   function _getRemotePools(
     RemotePoolRecord storage record
-  ) private view returns (bytes[] memory remotePoolAddresses) {
+  ) private view returns (IPoolConfigManager.RemotePool[] memory remotePools) {
     bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
-    remotePoolAddresses = new bytes[](remotePoolHashes.length);
+    remotePools = new IPoolConfigManager.RemotePool[](remotePoolHashes.length);
 
     for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
-      remotePoolAddresses[i] = s_remotePoolAddresses[remotePoolHashes[i]];
+      remotePools[i] = IPoolConfigManager.RemotePool({
+        remotePoolAddress: s_remotePoolAddresses[remotePoolHashes[i]],
+        allowLegacyPoolDataOnReceive: record.allowLegacyPoolDataOnReceive[remotePoolHashes[i]]
+      });
     }
-    return remotePoolAddresses;
+    return remotePools;
   }
 
   // ================================================================
@@ -1293,7 +1287,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
       RemotePoolConfig calldata remotePoolConfig = inlineConfigsToSet[i].remotePoolConfig;
 
-      _validateRemotePoolAddresses(remoteChainSelector, remotePoolConfig.remotePoolAddresses);
+      _validateRemotePools(remoteChainSelector, remotePoolConfig.remotePools);
 
       PolicyConfig._setInlineRecord(s_tokens, s_inlineRemotePoolChains[localToken], localToken, remoteChainSelector);
       _setRemotePoolRecord(s_inlineRemotePoolRecords[localToken][remoteChainSelector], remotePoolConfig);
@@ -1335,10 +1329,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       RemotePoolConfig calldata remotePoolConfig = policyConfigsToSet[i].remotePoolConfig;
 
       // A policy record serves many tokens, so it must trust at least one remote pool.
-      if (remotePoolConfig.remotePoolAddresses.length == 0) {
+      if (remotePoolConfig.remotePools.length == 0) {
         revert PolicyRecordHasNoPools(policyName, remoteChainSelector);
       }
-      _validateRemotePoolAddresses(remoteChainSelector, remotePoolConfig.remotePoolAddresses);
+      _validateRemotePools(remoteChainSelector, remotePoolConfig.remotePools);
 
       PolicyConfig._setPolicyRecord(s_remotePoolPolicies, policyName, remoteChainSelector);
       _setRemotePoolRecord(s_policyRemotePoolRecords[policyName][remoteChainSelector], remotePoolConfig);
@@ -1346,46 +1340,48 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev An empty or duplicate remote pool reverts, the same as TokenPool.
-  function _validateRemotePoolAddresses(
+  /// @dev An empty or duplicate remote pool address reverts, the same as TokenPool.
+  function _validateRemotePools(
     uint64 remoteChainSelector,
-    bytes[] calldata remotePoolAddresses
+    IPoolConfigManager.RemotePool[] calldata remotePools
   ) private pure {
-    for (uint256 i = 0; i < remotePoolAddresses.length; ++i) {
-      if (remotePoolAddresses[i].length == 0) revert ZeroAddressInvalid();
+    for (uint256 i = 0; i < remotePools.length; ++i) {
+      bytes calldata remotePoolAddress = remotePools[i].remotePoolAddress;
+      if (remotePoolAddress.length == 0) revert ZeroAddressInvalid();
       for (uint256 j = 0; j < i; ++j) {
-        if (keccak256(remotePoolAddresses[j]) == keccak256(remotePoolAddresses[i])) {
-          revert RemotePoolAlreadyAdded(remoteChainSelector, remotePoolAddresses[i]);
+        if (keccak256(remotePools[j].remotePoolAddress) == keccak256(remotePoolAddress)) {
+          revert RemotePoolAlreadyAdded(remoteChainSelector, remotePoolAddress);
         }
       }
     }
   }
 
-  /// @dev Replaces every value of the record. The caller runs _validateRemotePoolAddresses first, so each remote pool
-  /// is not empty and is new to the cleared set.
+  /// @dev Replaces every value of the record. The caller runs _validateRemotePools first, so each remote pool is not
+  /// empty and is new to the cleared set.
   function _setRemotePoolRecord(
     RemotePoolRecord storage record,
     RemotePoolConfig calldata remotePoolConfig
   ) private {
     _clearRemotePools(record);
-    record.omitSourceTokenAddressOnSend = remotePoolConfig.omitSourceTokenAddressOnSend;
-    record.allowSourceTokenAddressMissingOnReceive = remotePoolConfig.allowSourceTokenAddressMissingOnReceive;
+    record.useLegacyPoolDataOnSend = remotePoolConfig.useLegacyPoolDataOnSend;
 
-    for (uint256 i = 0; i < remotePoolConfig.remotePoolAddresses.length; ++i) {
-      bytes calldata remotePoolAddress = remotePoolConfig.remotePoolAddresses[i];
-      bytes32 remotePoolHash = keccak256(remotePoolAddress);
+    for (uint256 i = 0; i < remotePoolConfig.remotePools.length; ++i) {
+      IPoolConfigManager.RemotePool calldata pool = remotePoolConfig.remotePools[i];
+      bytes32 remotePoolHash = keccak256(pool.remotePoolAddress);
       record.remotePoolHashes.add(remotePoolHash);
-      s_remotePoolAddresses[remotePoolHash] = remotePoolAddress;
+      record.allowLegacyPoolDataOnReceive[remotePoolHash] = pool.allowLegacyPoolDataOnReceive;
+      s_remotePoolAddresses[remotePoolHash] = pool.remotePoolAddress;
     }
   }
 
-  /// @dev Delete does not clear a set inside a struct, so each remote pool is removed first.
+  /// @dev Delete does not clear a set or a mapping inside a struct, so each remote pool and its flag are removed first.
   function _clearRemotePools(
     RemotePoolRecord storage record
   ) private {
     bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
     for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
       record.remotePoolHashes.remove(remotePoolHashes[i]);
+      delete record.allowLegacyPoolDataOnReceive[remotePoolHashes[i]];
     }
   }
 

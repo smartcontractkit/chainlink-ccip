@@ -12,9 +12,9 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionPolicyStoreSetup {
   function test_applyInlineRemotePoolConfigUpdates() public {
     ConnectionPolicyStore.RemotePoolConfig memory destRemotePoolConfig = _getRemotePoolConfig();
-    destRemotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
-    destRemotePoolConfig.omitSourceTokenAddressOnSend = true;
-    destRemotePoolConfig.allowSourceTokenAddressMissingOnReceive = true;
+    destRemotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
+    destRemotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
+    destRemotePoolConfig.useLegacyPoolDataOnSend = true;
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
       new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](2);
     inlineConfigs[0] = _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, destRemotePoolConfig)[0];
@@ -71,8 +71,8 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
   function test_applyInlineRemotePoolConfigUpdates_ReplaceRecord() public {
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, _getRemotePoolConfig()));
     ConnectionPolicyStore.RemotePoolConfig memory newRemotePoolConfig = _getRemotePoolConfig();
-    newRemotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
-    newRemotePoolConfig.allowSourceTokenAddressMissingOnReceive = true;
+    newRemotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
+    newRemotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
       _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, newRemotePoolConfig);
 
@@ -93,11 +93,22 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     s_connectionStore.resolveInboundLane(
       s_token, DEST_CHAIN_SELECTOR, s_remotePool, "", 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
+
+    // A set also replaces the flag of a remote pool that stays.
+    newRemotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = false;
+    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, newRemotePoolConfig));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    s_connectionStore.resolveInboundLane(
+      s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, "", 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function test_applyInlineRemotePoolConfigUpdates_RemoveInlineRecord() public {
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
     vm.expectEmit();
@@ -114,7 +125,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(1, connections[0].remotePools.length);
-    assertEq(s_remotePool, connections[0].remotePools[0]);
+    assertEq(s_remotePool, connections[0].remotePools[0].remotePoolAddress);
   }
 
   function test_applyInlineRemotePoolConfigUpdates_RemoveDeletesValues() public {
@@ -123,8 +134,8 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
       _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
     );
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.omitSourceTokenAddressOnSend = true;
-    remotePoolConfig.allowSourceTokenAddressMissingOnReceive = true;
+    remotePoolConfig.useLegacyPoolDataOnSend = true;
+    remotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
     s_connectionStore.applyInlineRemotePoolConfigUpdates(
@@ -134,15 +145,14 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR));
     assertTrue(connections[0].hasConnection);
-    assertFalse(connections[0].omitSourceTokenAddressOnSend);
-    assertFalse(connections[0].allowSourceTokenAddressMissingOnReceive);
+    assertFalse(connections[0].useLegacyPoolDataOnSend);
     assertEq(0, connections[0].remotePools.length);
   }
 
   function test_applyInlineRemotePoolConfigUpdates_RemovalsRunFirst() public {
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, _getRemotePoolConfig()));
     ConnectionPolicyStore.RemotePoolConfig memory newRemotePoolConfig = _getRemotePoolConfig();
-    newRemotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
+    newRemotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
       _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, newRemotePoolConfig);
 
@@ -155,7 +165,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
 
   function test_applyInlineRemotePoolConfigUpdates_RevertWhen_ZeroAddressInvalid() public {
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePoolAddresses[0] = "";
+    remotePoolConfig.remotePools[0].remotePoolAddress = "";
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
       _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig);
 
@@ -165,10 +175,12 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
 
   function test_applyInlineRemotePoolConfigUpdates_RevertWhen_RemotePoolAlreadyAdded() public {
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePoolAddresses = new bytes[](3);
-    remotePoolConfig.remotePoolAddresses[0] = s_remotePool;
-    remotePoolConfig.remotePoolAddresses[1] = s_otherRemotePool;
-    remotePoolConfig.remotePoolAddresses[2] = s_remotePool;
+    remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](3);
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_remotePool;
+    remotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
+    // A duplicate address reverts also with another flag.
+    remotePoolConfig.remotePools[2].remotePoolAddress = s_remotePool;
+    remotePoolConfig.remotePools[2].allowLegacyPoolDataOnReceive = true;
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
       _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig);
 

@@ -14,7 +14,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
   function setUp() public override {
     super.setUp();
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePoolAddresses[0] = s_otherRemotePool;
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
     _setRemotePoolPolicyConfig(_getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, remotePoolConfig));
   }
 
@@ -41,7 +41,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(1, connections[0].remotePools.length);
-    assertEq(s_otherRemotePool, connections[0].remotePools[0]);
+    assertEq(s_otherRemotePool, connections[0].remotePools[0].remotePoolAddress);
   }
 
   function test_applyTokenRemotePoolPolicyUpdates_ZeroPolicyNameClearsTokenPolicy() public {
@@ -97,7 +97,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     // The inline record still overrides the new policy on its chain.
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
-    assertEq(s_remotePool, connections[0].remotePools[0]);
+    assertEq(s_remotePool, connections[0].remotePools[0].remotePoolAddress);
   }
 
   // Reverts
