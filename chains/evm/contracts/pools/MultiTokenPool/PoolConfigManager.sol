@@ -6,6 +6,7 @@ import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol";
 
+import {PolicyConfig} from "../../libraries/PolicyConfig.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {FeePolicyStore} from "./policies/FeePolicyStore.sol";
 import {SecurityPolicyStore} from "./policies/SecurityPolicyStore.sol";
@@ -14,6 +15,7 @@ import {ConnectionPolicyStore} from "./tmp/ConnectionPolicyStore.stub.sol";
 import {
   AccessControlDefaultAdminRules
 } from "@openzeppelin/contracts@5.3.0/access/extensions/AccessControlDefaultAdminRules.sol";
+import {Address} from "@openzeppelin/contracts@5.3.0/utils/Address.sol";
 
 /// @notice Entry point to configure the tokens of multi-token pools and to read their config.
 /// @dev This contract holds roles, not config, so it can be replaced without copying state.
@@ -289,6 +291,184 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     return address(i_tokenAdminRegistry);
   }
 
+  /// @notice Returns the level of the record that each type would use for each lane, following the resolution of a
+  /// transfer. Never reverts.
+  /// @dev The connection level shows whether the lane exists. Connection and remote pool policies have no default
+  /// records, so their levels are never PolicyDefault. An inline remote pool record may also trust policy pools; its
+  /// level stays Inline. Chain selector zero gives None for every type. Each returned array is aligned with lanes by
+  /// index.
+  /// @param lanes The token and remote chain lanes to query.
+  /// @return connectionLevels The level of the connection record.
+  /// @return remotePoolLevels The level of the remote pool record.
+  /// @return rateLimitLevels The level of the rate limit record.
+  /// @return feeLevels The level of the fee record.
+  /// @return destOverheadLevels The level of the destination overhead record.
+  /// @return securityLevels The level of the security record.
+  function getLaneRecordLevelBatch(
+    LaneKey[] calldata lanes
+  )
+    external
+    view
+    returns (
+      PolicyConfig.RecordLevel[] memory connectionLevels,
+      PolicyConfig.RecordLevel[] memory remotePoolLevels,
+      PolicyConfig.RecordLevel[] memory rateLimitLevels,
+      PolicyConfig.RecordLevel[] memory feeLevels,
+      PolicyConfig.RecordLevel[] memory destOverheadLevels,
+      PolicyConfig.RecordLevel[] memory securityLevels
+    )
+  {
+    (connectionLevels, remotePoolLevels) = i_connectionStore.getLaneRecordLevelBatch(lanes);
+    (feeLevels, destOverheadLevels) = i_feeStore.getLaneRecordLevelBatch(lanes);
+    (rateLimitLevels, securityLevels) = i_securityStore.getLaneRecordLevelBatch(lanes);
+    return (connectionLevels, remotePoolLevels, rateLimitLevels, feeLevels, destOverheadLevels, securityLevels);
+  }
+
+  // These views forward the call with _forwardView, so each one has the parameters and returns of its store function
+  // and no names, because the forward does not read them. The store function documents the result.
+
+  /// @notice Returns the flag and the subset tokens of a connection policy record. Forwards to
+  /// ConnectionPolicyStore.getSubsetTokens. Never reverts.
+  function getSubsetTokens(
+    bytes32, // policyName
+    uint64 // remoteChainSelector
+  ) external view returns (bool, address[] memory) {
+    _forwardView(address(i_connectionStore));
+  }
+
+  /// @notice Returns the records of a connection policy, in the shape of applyConnectionPolicyConfigUpdates. Forwards
+  /// to ConnectionPolicyStore.getConnectionPolicy. Never reverts.
+  function getConnectionPolicy(
+    bytes32 // policyName
+  ) external view returns (uint32, address, ConnectionPolicyStore.ConnectionPolicyConfigArgs[] memory) {
+    _forwardView(address(i_connectionStore));
+  }
+
+  /// @notice Returns the records of a remote pool policy, in the shape of applyRemotePoolPolicyConfigUpdates.
+  /// Forwards to ConnectionPolicyStore.getRemotePoolPolicy. Never reverts.
+  function getRemotePoolPolicy(
+    bytes32 // policyName
+  ) external view returns (uint32, ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory) {
+    _forwardView(address(i_connectionStore));
+  }
+
+  /// @notice Returns the records of a rate limit policy, in the shape of applyRateLimitPolicyConfigUpdates.
+  /// Forwards to SecurityPolicyStore.getRateLimitPolicy. Never reverts.
+  function getRateLimitPolicy(
+    bytes32 // policyName
+  ) external view returns (uint32, uint8, SecurityPolicyStore.RateLimitPolicyConfigArgs[] memory) {
+    _forwardView(address(i_securityStore));
+  }
+
+  /// @notice Returns the records of a fee policy, in the shape of applyFeePolicyConfigUpdates. Forwards to
+  /// FeePolicyStore.getFeePolicy. Never reverts.
+  function getFeePolicy(
+    bytes32 // policyName
+  ) external view returns (uint32, FeePolicyStore.FeePolicyConfigArgs[] memory) {
+    _forwardView(address(i_feeStore));
+  }
+
+  /// @notice Returns the records of a destination overhead policy, in the shape of
+  /// applyDestOverheadPolicyConfigUpdates. Forwards to FeePolicyStore.getDestOverheadPolicy. Never reverts.
+  function getDestOverheadPolicy(
+    bytes32 // policyName
+  ) external view returns (uint32, FeePolicyStore.DestOverheadPolicyConfigArgs[] memory) {
+    _forwardView(address(i_feeStore));
+  }
+
+  /// @notice Returns the records of a security policy, in the shape of applySecurityPolicyConfigUpdates. Forwards to
+  /// SecurityPolicyStore.getSecurityPolicy. Never reverts.
+  function getSecurityPolicy(
+    bytes32 // policyName
+  ) external view returns (uint32, SecurityPolicyStore.SecurityPolicyConfigArgs[] memory) {
+    _forwardView(address(i_securityStore));
+  }
+
+  // Each inline record view lists every inline record of its type for a token, also on a chain where the token has no
+  // lane. A store view with the same signature builds the list.
+
+  /// @notice Returns the inline connection records of a token, in the shape of applyInlineConnectionConfigUpdates.
+  /// Forwards to ConnectionPolicyStore.getInlineConnectionConfigs. Never reverts.
+  function getInlineConnectionConfigs(
+    address // localToken
+  ) external view returns (ConnectionPolicyStore.InlineConnectionConfigArgs[] memory) {
+    _forwardView(address(i_connectionStore));
+  }
+
+  /// @notice Returns the inline remote pool records of a token, in the shape of applyInlineRemotePoolConfigUpdates.
+  /// Forwards to ConnectionPolicyStore.getInlineRemotePoolConfigs. Never reverts.
+  function getInlineRemotePoolConfigs(
+    address // localToken
+  ) external view returns (ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory) {
+    _forwardView(address(i_connectionStore));
+  }
+
+  /// @notice Returns the inline rate limit records of a token, in the shape of applyInlineRateLimitConfigUpdates.
+  /// Forwards to SecurityPolicyStore.getInlineRateLimitConfigs. Never reverts. Each record shows the config of its
+  /// buckets.
+  function getInlineRateLimitConfigs(
+    address // localToken
+  ) external view returns (SecurityPolicyStore.InlineRateLimitConfigArgs[] memory) {
+    _forwardView(address(i_securityStore));
+  }
+
+  /// @notice Returns the inline fee records of a token, in the shape of applyInlineFeeConfigUpdates. Forwards to
+  /// FeePolicyStore.getInlineFeeConfigs. Never reverts.
+  function getInlineFeeConfigs(
+    address // localToken
+  ) external view returns (FeePolicyStore.InlineFeeConfigArgs[] memory) {
+    _forwardView(address(i_feeStore));
+  }
+
+  /// @notice Returns the inline destination overhead records of a token, in the shape of
+  /// applyInlineDestOverheadConfigUpdates. Forwards to FeePolicyStore.getInlineDestOverheadConfigs. Never reverts.
+  function getInlineDestOverheadConfigs(
+    address // localToken
+  ) external view returns (FeePolicyStore.InlineDestOverheadConfigArgs[] memory) {
+    _forwardView(address(i_feeStore));
+  }
+
+  /// @notice Returns the inline security records of a token, in the shape of applyInlineSecurityConfigUpdates.
+  /// Forwards to SecurityPolicyStore.getInlineSecurityConfigs. Never reverts.
+  function getInlineSecurityConfigs(
+    address // localToken
+  ) external view returns (SecurityPolicyStore.InlineSecurityConfigArgs[] memory) {
+    _forwardView(address(i_securityStore));
+  }
+
+  /// @notice Returns the name of every policy of each type. Never reverts.
+  /// @dev The lists include policies that no token uses and policies with no records.
+  /// @return connectionPolicyNames The names of the connection policies.
+  /// @return remotePoolPolicyNames The names of the remote pool policies.
+  /// @return rateLimitPolicyNames The names of the rate limit policies.
+  /// @return feePolicyNames The names of the fee policies.
+  /// @return destOverheadPolicyNames The names of the destination overhead policies.
+  /// @return securityPolicyNames The names of the security policies.
+  function getPolicyNames()
+    external
+    view
+    returns (
+      bytes32[] memory connectionPolicyNames,
+      bytes32[] memory remotePoolPolicyNames,
+      bytes32[] memory rateLimitPolicyNames,
+      bytes32[] memory feePolicyNames,
+      bytes32[] memory destOverheadPolicyNames,
+      bytes32[] memory securityPolicyNames
+    )
+  {
+    (connectionPolicyNames, remotePoolPolicyNames) = i_connectionStore.getPolicyNames();
+    (feePolicyNames, destOverheadPolicyNames) = i_feeStore.getPolicyNames();
+    (rateLimitPolicyNames, securityPolicyNames) = i_securityStore.getPolicyNames();
+    return (
+      connectionPolicyNames,
+      remotePoolPolicyNames,
+      rateLimitPolicyNames,
+      feePolicyNames,
+      destOverheadPolicyNames,
+      securityPolicyNames
+    );
+  }
+
   // ================================================================
   // │                           Helpers                            │
   // ================================================================
@@ -298,6 +478,18 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     address localToken
   ) private view {
     if (msg.sender != i_tokenAdminRegistry.getPool(localToken)) revert CallerIsNotTokenPool(msg.sender, localToken);
+  }
+
+  /// @dev Ends the call with the unchanged return data of the store view that has the signature of the called view.
+  /// Both views return the same types, so the data is also valid here and this contract needs no ABI coder for those
+  /// types. Only assembly can return raw bytes from a function with typed returns.
+  function _forwardView(
+    address store
+  ) private view {
+    bytes memory returnData = Address.functionStaticCall(store, msg.data);
+    assembly ("memory-safe") {
+      return(add(returnData, 32), mload(returnData))
+    }
   }
 
   /// @dev Passes for CONFIG_ROLE, POLICY_ROLE or the policy role of the type.
