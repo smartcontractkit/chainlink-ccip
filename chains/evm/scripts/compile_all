@@ -139,6 +139,7 @@ compileContract pools/MultiTokenPool/MultiTokenPoolHooks
 compileContract pools/MultiTokenPool/MultiTokenPoolHooksExternalBlocklist
 compileContract pools/MultiTokenPool/policies/SecurityPolicyStore
 compileContract pools/MultiTokenPool/FactoryTokenWithUIDPoolDataProvider
+compileContract pools/MultiTokenPool/policies/FeePolicyStore
 
 compileContract tokens/CrossChainToken
 
