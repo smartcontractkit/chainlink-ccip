@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
-
 import {FinalityCodec} from "../../../../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {ConnectionPolicyStore} from "../../../../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
@@ -11,23 +9,20 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 
 contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionPolicyStoreSetup {
   function test_applyRemotePoolPolicyConfigUpdates() public {
-    ConnectionPolicyStore.RemotePoolConfig memory chainRemotePoolConfig = _getRemotePoolConfig();
-    chainRemotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](2);
-    chainRemotePoolConfig.remotePools[0].remotePoolAddress = s_remotePool;
-    chainRemotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
-    chainRemotePoolConfig.remotePools[1].allowLegacyPoolDataOnReceive = true;
-    chainRemotePoolConfig.useLegacyPoolDataOnSend = true;
+    bytes[] memory chainRemotePoolAddresses = new bytes[](2);
+    chainRemotePoolAddresses[0] = s_remotePool;
+    chainRemotePoolAddresses[1] = s_otherRemotePool;
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
       new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](2);
-    policyConfigs[0] = _getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, chainRemotePoolConfig)[0];
+    policyConfigs[0] = _getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, chainRemotePoolAddresses)[0];
     policyConfigs[1] =
-      _getRemotePoolPolicyConfigArgs(OTHER_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _getRemotePoolConfig())[0];
+      _getRemotePoolPolicyConfigArgs(OTHER_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))[0];
 
     vm.expectEmit();
-    emit ConnectionPolicyStore.RemotePoolPolicyConfigSet(OTHER_POLICY, DEST_CHAIN_SELECTOR, chainRemotePoolConfig);
+    emit ConnectionPolicyStore.RemotePoolPolicyConfigSet(OTHER_POLICY, DEST_CHAIN_SELECTOR, chainRemotePoolAddresses);
     vm.expectEmit();
     emit ConnectionPolicyStore.RemotePoolPolicyConfigSet(
-      OTHER_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _getRemotePoolConfig()
+      OTHER_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool)
     );
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(
       new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
@@ -42,15 +37,14 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
   }
 
   function test_applyRemotePoolPolicyConfigUpdates_ReplaceRecord() public {
-    ConnectionPolicyStore.RemotePoolConfig memory newRemotePoolConfig = _getRemotePoolConfig();
-    newRemotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
-    newRemotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
-    ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, newRemotePoolConfig);
+    ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs = _getRemotePoolPolicyConfigArgs(
+      REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_otherRemotePool)
+    );
+    bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
 
     vm.expectEmit();
     emit ConnectionPolicyStore.RemotePoolPolicyConfigSet(
-      REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, newRemotePoolConfig
+      REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_otherRemotePool)
     );
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(
       new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
@@ -59,7 +53,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
     _assertRemotePoolPolicy(REMOTE_POOL_POLICY, 1, policyConfigs);
     // The change applies at once to every token of the policy, and the old remote pool is no longer trusted.
     s_connectionStore.resolveInboundLane(
-      s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, "", 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -67,13 +61,13 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
       )
     );
     s_connectionStore.resolveInboundLane(
-      s_token, DEST_CHAIN_SELECTOR, s_remotePool, "", 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      s_token, DEST_CHAIN_SELECTOR, s_remotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
   }
 
   function test_applyRemotePoolPolicyConfigUpdates_RemoveRecord() public {
     _setRemotePoolPolicyConfig(
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolConfig())
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))
     );
     PolicyConfig.PolicyRecordKey[] memory recordsToRemove =
       _getPolicyRecordKeys(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
@@ -87,20 +81,21 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
     _assertRemotePoolPolicy(
       REMOTE_POOL_POLICY,
       1,
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _getRemotePoolConfig())
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))
     );
-    // The token falls back to the policy default record at once.
-    (, PolicyConfig.RecordLevel[] memory remotePoolLevels) =
-      s_connectionStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
-    assertEq(uint8(PolicyConfig.RecordLevel.PolicyDefault), uint8(remotePoolLevels[0]));
+    // The record of another chain does not serve the chain, so the token has no remote pool record there at once.
+    vm.expectRevert(
+      abi.encodeWithSelector(ConnectionPolicyStore.RemotePoolRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    s_connectionStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
   }
 
   function test_applyRemotePoolPolicyConfigUpdates_RemoveLastRecord() public {
     PolicyConfig.PolicyRecordKey[] memory recordsToRemove =
-      _getPolicyRecordKeys(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
+      _getPolicyRecordKeys(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit ConnectionPolicyStore.RemotePoolPolicyConfigRemoved(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
+    emit ConnectionPolicyStore.RemotePoolPolicyConfigRemoved(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(
       recordsToRemove, new bytes32[](0), new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](0)
     );
@@ -117,11 +112,11 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
     _setTokenRemotePoolPolicy(s_token, bytes32(0));
     // The record removals run before the policy removals, so one call can remove the records and the policy.
     PolicyConfig.PolicyRecordKey[] memory recordsToRemove =
-      _getPolicyRecordKeys(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
+      _getPolicyRecordKeys(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
     bytes32[] memory policiesToRemove = _getPolicyNames(REMOTE_POOL_POLICY);
 
     vm.expectEmit();
-    emit ConnectionPolicyStore.RemotePoolPolicyConfigRemoved(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
+    emit ConnectionPolicyStore.RemotePoolPolicyConfigRemoved(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
     vm.expectEmit();
     emit ConnectionPolicyStore.RemotePoolPolicyRemoved(REMOTE_POOL_POLICY);
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(
@@ -138,12 +133,11 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
   function test_applyRemotePoolPolicyConfigUpdates_RemovalsRunFirst() public {
     _setTokenRemotePoolPolicy(s_token, bytes32(0));
     PolicyConfig.PolicyRecordKey[] memory recordsToRemove =
-      _getPolicyRecordKeys(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
+      _getPolicyRecordKeys(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
     bytes32[] memory policiesToRemove = _getPolicyNames(REMOTE_POOL_POLICY);
-    ConnectionPolicyStore.RemotePoolConfig memory newRemotePoolConfig = _getRemotePoolConfig();
-    newRemotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
-    ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, newRemotePoolConfig);
+    ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs = _getRemotePoolPolicyConfigArgs(
+      REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_otherRemotePool)
+    );
 
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(recordsToRemove, policiesToRemove, policyConfigs);
 
@@ -154,9 +148,8 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
   // Reverts
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_PolicyRecordHasNoPools() public {
-    ConnectionPolicyStore.RemotePoolConfig memory emptyRemotePoolConfig;
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, emptyRemotePoolConfig);
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, new bytes[](0));
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -168,25 +161,40 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
     );
   }
 
-  function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_ZeroAddressInvalid() public {
-    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePools[0].remotePoolAddress = "";
-    ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, remotePoolConfig);
+  function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {
+    // A remote pool policy has no policy default record.
+    vm.expectRevert(PolicyConfig.ZeroChainSelectorNotAllowed.selector);
+    _setRemotePoolPolicyConfig(
+      _getRemotePoolPolicyConfigArgs(
+        REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool)
+      )
+    );
+  }
 
+  function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_ZeroAddressInvalid() public {
+    // An empty first remote pool reverts, and so does an empty later remote pool.
+    bytes[] memory remotePoolAddresses = new bytes[](2);
+    remotePoolAddresses[1] = s_remotePool;
     vm.expectRevert(ConnectionPolicyStore.ZeroAddressInvalid.selector);
-    s_connectionStore.applyRemotePoolPolicyConfigUpdates(
-      new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
+    _setRemotePoolPolicyConfig(
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, remotePoolAddresses)
+    );
+
+    remotePoolAddresses[0] = s_remotePool;
+    remotePoolAddresses[1] = "";
+    vm.expectRevert(ConnectionPolicyStore.ZeroAddressInvalid.selector);
+    _setRemotePoolPolicyConfig(
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, remotePoolAddresses)
     );
   }
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_RemotePoolAlreadyAdded() public {
-    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](2);
-    remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
-    remotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
+    bytes[] memory remotePoolAddresses = new bytes[](3);
+    remotePoolAddresses[0] = s_otherRemotePool;
+    remotePoolAddresses[1] = s_remotePool;
+    remotePoolAddresses[2] = s_otherRemotePool;
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, remotePoolConfig);
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, remotePoolAddresses);
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -200,7 +208,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_ZeroPolicyNameNotAllowed() public {
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
-      _getRemotePoolPolicyConfigArgs(bytes32(0), DEST_CHAIN_SELECTOR, _getRemotePoolConfig());
+      _getRemotePoolPolicyConfigArgs(bytes32(0), DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool));
 
     vm.expectRevert(PolicyConfig.ZeroPolicyNameNotAllowed.selector);
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(
@@ -210,10 +218,10 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_PolicyRecordNotFound() public {
     PolicyConfig.PolicyRecordKey[] memory recordsToRemove =
-      _getPolicyRecordKeys(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
+      _getPolicyRecordKeys(REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR);
 
     vm.expectRevert(
-      abi.encodeWithSelector(PolicyConfig.PolicyRecordNotFound.selector, REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR)
+      abi.encodeWithSelector(PolicyConfig.PolicyRecordNotFound.selector, REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR)
     );
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(
       recordsToRemove, new bytes32[](0), new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](0)
@@ -251,7 +259,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_UnauthorizedCaller() public {
     ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs =
-      _getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolConfig());
+      _getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool));
     vm.startPrank(STRANGER);
 
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));

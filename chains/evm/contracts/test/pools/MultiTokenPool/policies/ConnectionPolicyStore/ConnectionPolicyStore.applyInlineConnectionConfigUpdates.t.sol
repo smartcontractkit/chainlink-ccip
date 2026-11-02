@@ -113,8 +113,9 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 
-    // The provider has no code.
-    _setRemoteTokenAddressProvider(CONNECTION_POLICY, makeAddr("providerWithoutCode"));
+    // The provider loses its code after the set.
+    vm.clearMockedCalls();
+    vm.etch(remoteTokenAddressProvider, "");
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 

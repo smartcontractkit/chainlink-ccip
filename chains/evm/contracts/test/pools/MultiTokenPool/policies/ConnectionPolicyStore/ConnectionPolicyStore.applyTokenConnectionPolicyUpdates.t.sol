@@ -107,6 +107,20 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
 
   // Reverts
 
+  function test_applyTokenConnectionPolicyUpdates_RevertWhen_TokenHasConfig() public {
+    _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, true));
+    _addSubsetToken(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token);
+    bytes32[2] memory newPolicyNames = [bytes32(0), OTHER_POLICY];
+
+    // A subset token can neither leave its policy nor move to another policy.
+    for (uint256 i = 0; i < newPolicyNames.length; ++i) {
+      vm.expectRevert(abi.encodeWithSelector(ConnectionPolicyStore.TokenHasConfig.selector, s_token));
+      _setTokenConnectionPolicy(s_token, newPolicyNames[i]);
+    }
+    // A set of the same policy changes nothing, so it runs.
+    _setTokenConnectionPolicy(s_token, CONNECTION_POLICY);
+  }
+
   function test_applyTokenConnectionPolicyUpdates_RevertWhen_LocalTokenNotRegistered() public {
     address unknownToken = makeAddr("unknownToken");
 

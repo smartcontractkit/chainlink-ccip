@@ -28,7 +28,7 @@ contract ConnectionPolicyStore_checkLaneRecords is ConnectionPolicyStoreSetup {
     );
     s_connectionStore.checkLaneRecords(s_otherToken, DEST_CHAIN_SELECTOR);
 
-    // Chain selector zero names the policy default record, so it never resolves to a record.
+    // A remote pool policy has no policy default record, so chain selector zero never resolves to a record.
     vm.expectRevert(
       abi.encodeWithSelector(
         ConnectionPolicyStore.RemotePoolRecordNotFound.selector, s_token, PolicyConfig.DEFAULT_CHAIN_SELECTOR

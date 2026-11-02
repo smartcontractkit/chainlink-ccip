@@ -14,8 +14,8 @@ import {BaseTest} from "../../../../BaseTest.t.sol";
 
 /// @notice s_poolConfigManager is the only authorized caller and sends every call. s_token uses CONNECTION_POLICY and
 /// REMOTE_POOL_POLICY. CONNECTION_POLICY serves every token of the policy on DEST_CHAIN_SELECTOR, with
-/// s_remoteTokenAddressProvider. REMOTE_POOL_POLICY has a policy default record that trusts s_remotePool. s_otherToken
-/// is registered with no policy.
+/// s_remoteTokenAddressProvider. REMOTE_POOL_POLICY has a policy chain record on DEST_CHAIN_SELECTOR that trusts
+/// s_remotePool. s_otherToken is registered with no policy.
 contract ConnectionPolicyStoreSetup is BaseTest {
   bytes32 internal constant CONNECTION_POLICY = "CONNECTION_POLICY";
   bytes32 internal constant REMOTE_POOL_POLICY = "REMOTE_POOL_POLICY";
@@ -42,6 +42,8 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     s_otherToken = address(_deployToken("OTHER", USDC_TOKEN_DECIMALS));
     s_remoteTokenAddressProvider = new SameAddressRemoteTokenAddressProvider();
     s_connectionStore = new ConnectionPolicyStore(_arrayOf(s_poolConfigManager));
+    // A provider needs code. The tests mock each call to it.
+    vm.etch(s_additionalPoolDataProvider, hex"00");
     vm.startPrank(s_poolConfigManager);
 
     _registerToken(s_token);
@@ -49,7 +51,7 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, false));
     _setRemoteTokenAddressProvider(CONNECTION_POLICY, address(s_remoteTokenAddressProvider));
     _setRemotePoolPolicyConfig(
-      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _getRemotePoolConfig())
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))
     );
     _setTokenConnectionPolicy(s_token, CONNECTION_POLICY);
     _setTokenRemotePoolPolicy(s_token, REMOTE_POOL_POLICY);
@@ -157,14 +159,22 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     return ConnectionPolicyStore.RemotePoolConfig({useLegacyPoolDataOnSend: false, remotePools: remotePools});
   }
 
+  function _getRemotePoolAddresses(
+    bytes memory remotePool
+  ) internal pure returns (bytes[] memory remotePoolAddresses) {
+    remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = remotePool;
+    return remotePoolAddresses;
+  }
+
   function _getRemotePoolPolicyConfigArgs(
     bytes32 policyName,
     uint64 remoteChainSelector,
-    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig
+    bytes[] memory remotePoolAddresses
   ) internal pure returns (ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory policyConfigs) {
     policyConfigs = new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](1);
     policyConfigs[0] = ConnectionPolicyStore.RemotePoolPolicyConfigArgs({
-      policyName: policyName, remoteChainSelector: remoteChainSelector, remotePoolConfig: remotePoolConfig
+      policyName: policyName, remoteChainSelector: remoteChainSelector, remotePoolAddresses: remotePoolAddresses
     });
     return policyConfigs;
   }
@@ -176,7 +186,10 @@ contract ConnectionPolicyStoreSetup is BaseTest {
   ) internal pure returns (ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs) {
     inlineConfigs = new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](1);
     inlineConfigs[0] = ConnectionPolicyStore.InlineRemotePoolConfigArgs({
-      localToken: localToken, remoteChainSelector: remoteChainSelector, remotePoolConfig: remotePoolConfig
+      localToken: localToken,
+      remoteChainSelector: remoteChainSelector,
+      trustPolicyRemotePools: false,
+      remotePoolConfig: remotePoolConfig
     });
     return inlineConfigs;
   }
@@ -220,6 +233,17 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     uint64 remoteChainSelector
   ) internal view returns (IPoolConfigManager.LaneConnection memory) {
     return s_connectionStore.getLaneConnectionBatch(_getLaneKeys(localToken, remoteChainSelector))[0];
+  }
+
+  /// @dev The test profile compiles without via-ir, and the decoder of the getRemotePoolPolicy return is too deep for
+  /// the stack. So this reads only the token count from the raw return.
+  function _getRemotePoolPolicyTokenCount(
+    bytes32 policyName
+  ) internal view returns (uint32) {
+    (bool success, bytes memory returnData) =
+      address(s_connectionStore).staticcall(abi.encodeCall(ConnectionPolicyStore.getRemotePoolPolicy, (policyName)));
+    assertTrue(success);
+    return abi.decode(returnData, (uint32));
   }
 
   /// @dev The test profile compiles without via-ir, and the decoder of the getRemotePoolPolicy return is too deep for
@@ -321,5 +345,21 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs
   ) internal {
     s_connectionStore.applyInlineRemotePoolConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
+  }
+
+  /// @dev Sets an inline record of the token on DEST_CHAIN_SELECTOR. It lists one remote pool and trusts the remote
+  /// pools of the policy record.
+  function _setInlineRemotePoolConfigTrustingPolicy(
+    address localToken,
+    bytes memory remotePool,
+    bool allowLegacyPoolDataOnReceive
+  ) internal {
+    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
+    remotePoolConfig.remotePools[0].remotePoolAddress = remotePool;
+    remotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = allowLegacyPoolDataOnReceive;
+    ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
+      _getInlineRemotePoolConfigArgs(localToken, DEST_CHAIN_SELECTOR, remotePoolConfig);
+    inlineConfigs[0].trustPolicyRemotePools = true;
+    _setInlineRemotePoolConfig(inlineConfigs);
   }
 }

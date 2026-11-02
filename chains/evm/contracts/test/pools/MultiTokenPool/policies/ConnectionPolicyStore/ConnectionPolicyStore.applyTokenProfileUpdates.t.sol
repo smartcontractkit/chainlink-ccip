@@ -216,6 +216,15 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
     s_connectionStore.applyTokenProfileUpdates(_arrayOf(s_newToken), new PolicyConfig.TokenProfileArgs[](0));
   }
 
+  function test_applyTokenProfileUpdates_RevertWhen_ProviderHasNoCode() public {
+    address providerWithoutCode = makeAddr("providerWithoutCode");
+    PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_newToken);
+    profiles[0].additionalPoolDataProvider = providerWithoutCode;
+
+    vm.expectRevert(abi.encodeWithSelector(ConnectionPolicyStore.ProviderHasNoCode.selector, providerWithoutCode));
+    s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
+  }
+
   function test_applyTokenProfileUpdates_RevertWhen_TokenHasConfig() public {
     // Each of the four kinds of config blocks the deregistration on its own.
     _setTokenConnectionPolicy(s_otherToken, CONNECTION_POLICY);

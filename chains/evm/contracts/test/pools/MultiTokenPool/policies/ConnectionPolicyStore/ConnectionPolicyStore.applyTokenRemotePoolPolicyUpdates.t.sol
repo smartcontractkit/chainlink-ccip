@@ -13,9 +13,9 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
   /// @dev OTHER_POLICY trusts s_otherRemotePool on DEST_CHAIN_SELECTOR only.
   function setUp() public override {
     super.setUp();
-    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
-    _setRemotePoolPolicyConfig(_getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, remotePoolConfig));
+    _setRemotePoolPolicyConfig(
+      _getRemotePoolPolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_otherRemotePool))
+    );
   }
 
   function test_applyTokenRemotePoolPolicyUpdates() public {
@@ -33,15 +33,43 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     assertEq(OTHER_POLICY, remotePoolPolicyName);
     (,, remotePoolPolicyName) = s_connectionStore.getTokenPolicies(s_otherToken);
     assertEq(REMOTE_POOL_POLICY, remotePoolPolicyName);
-    (uint32 tokenCount,) = s_connectionStore.getRemotePoolPolicy(REMOTE_POOL_POLICY);
+    uint32 tokenCount = _getRemotePoolPolicyTokenCount(REMOTE_POOL_POLICY);
     assertEq(1, tokenCount);
-    (tokenCount,) = s_connectionStore.getRemotePoolPolicy(OTHER_POLICY);
+    tokenCount = _getRemotePoolPolicyTokenCount(OTHER_POLICY);
     assertEq(1, tokenCount);
     // The token uses the records of its new policy at once.
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(1, connections[0].remotePools.length);
     assertEq(s_otherRemotePool, connections[0].remotePools[0].remotePoolAddress);
+  }
+
+  function test_applyTokenRemotePoolPolicyUpdates_InlineRecordTrustingPolicy() public {
+    bytes memory legacyPool = abi.encode(makeAddr("legacyPool"));
+    _setInlineRemotePoolConfigTrustingPolicy(s_token, legacyPool, true);
+    bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
+    bytes memory legacyPoolData = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS));
+
+    // A move: the inline record trusts the remote pools of the new policy, and keeps its own remote pool.
+    _setTokenRemotePoolPolicy(s_token, OTHER_POLICY);
+    _resolveInbound(s_otherRemotePool, sourcePoolData);
+    _resolveInbound(legacyPool, legacyPoolData);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.InvalidSourcePoolAddress.selector, s_token, DEST_CHAIN_SELECTOR, s_remotePool
+      )
+    );
+    _resolveInbound(s_remotePool, sourcePoolData);
+
+    // An exit: only the remote pool of the inline record stays.
+    _setTokenRemotePoolPolicy(s_token, bytes32(0));
+    _resolveInbound(legacyPool, legacyPoolData);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.InvalidSourcePoolAddress.selector, s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool
+      )
+    );
+    _resolveInbound(s_otherRemotePool, sourcePoolData);
   }
 
   function test_applyTokenRemotePoolPolicyUpdates_ZeroPolicyNameClearsTokenPolicy() public {
@@ -51,7 +79,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
 
     (,, bytes32 remotePoolPolicyName) = s_connectionStore.getTokenPolicies(s_token);
     assertEq(bytes32(0), remotePoolPolicyName);
-    (uint32 tokenCount,) = s_connectionStore.getRemotePoolPolicy(REMOTE_POOL_POLICY);
+    uint32 tokenCount = _getRemotePoolPolicyTokenCount(REMOTE_POOL_POLICY);
     assertEq(0, tokenCount);
     // The lane stays, but a transfer needs a remote pool record.
     (, PolicyConfig.RecordLevel[] memory remotePoolLevels) =
@@ -68,7 +96,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     emit ConnectionPolicyStore.TokenRemotePoolPolicySet(s_token, REMOTE_POOL_POLICY);
     s_connectionStore.applyTokenRemotePoolPolicyUpdates(_getTokenPolicyArgs(s_token, REMOTE_POOL_POLICY));
 
-    (uint32 tokenCount,) = s_connectionStore.getRemotePoolPolicy(REMOTE_POOL_POLICY);
+    uint32 tokenCount = _getRemotePoolPolicyTokenCount(REMOTE_POOL_POLICY);
     assertEq(1, tokenCount);
   }
 
@@ -82,9 +110,9 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
 
     (,, bytes32 remotePoolPolicyName) = s_connectionStore.getTokenPolicies(s_token);
     assertEq(bytes32(0), remotePoolPolicyName);
-    (uint32 tokenCount,) = s_connectionStore.getRemotePoolPolicy(REMOTE_POOL_POLICY);
+    uint32 tokenCount = _getRemotePoolPolicyTokenCount(REMOTE_POOL_POLICY);
     assertEq(0, tokenCount);
-    (tokenCount,) = s_connectionStore.getRemotePoolPolicy(OTHER_POLICY);
+    tokenCount = _getRemotePoolPolicyTokenCount(OTHER_POLICY);
     assertEq(0, tokenCount);
   }
 
@@ -120,5 +148,14 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
 
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
     s_connectionStore.applyTokenRemotePoolPolicyUpdates(_getTokenPolicyArgs(s_token, OTHER_POLICY));
+  }
+
+  function _resolveInbound(
+    bytes memory sourcePoolAddress,
+    bytes memory sourcePoolData
+  ) private view {
+    s_connectionStore.resolveInboundLane(
+      s_token, DEST_CHAIN_SELECTOR, sourcePoolAddress, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 }

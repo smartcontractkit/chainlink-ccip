@@ -10,11 +10,14 @@ import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreSetup {
-  /// @dev CONNECTION_POLICY serves only its subset tokens on SOURCE_CHAIN_SELECTOR. The policy default record of
-  /// REMOTE_POOL_POLICY covers that chain.
+  /// @dev CONNECTION_POLICY serves only its subset tokens on SOURCE_CHAIN_SELECTOR. REMOTE_POOL_POLICY has a record for
+  /// that chain.
   function setUp() public override {
     super.setUp();
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, true));
+    _setRemotePoolPolicyConfig(
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))
+    );
   }
 
   function test_applySubsetTokenUpdates() public {
@@ -74,15 +77,22 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
   function test_applySubsetTokenUpdates_TokenLeavesPolicy() public {
     _addSubsetToken(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token);
 
-    // A subset token that leaves the policy stays in the set, but has no lane.
+    // A subset token cannot leave the policy.
+    vm.expectRevert(abi.encodeWithSelector(ConnectionPolicyStore.TokenHasConfig.selector, s_token));
+    _setTokenConnectionPolicy(s_token, bytes32(0));
+
+    // After the removal of its subset entry it can leave, and the set does not keep it.
+    s_connectionStore.applySubsetTokenUpdates(
+      _getSubsetTokenArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token),
+      new ConnectionPolicyStore.SubsetTokenArgs[](0)
+    );
     _setTokenConnectionPolicy(s_token, bytes32(0));
     (, address[] memory subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR);
-    assertEq(_arrayOf(s_token), subsetTokens);
-    assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, SOURCE_CHAIN_SELECTOR))[0]);
+    assertEq(0, subsetTokens.length);
 
-    // Its lane opens again at once when it joins the policy again.
+    // A join again gives no subset lane, the same as a first join.
     _setTokenConnectionPolicy(s_token, CONNECTION_POLICY);
-    assertTrue(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, SOURCE_CHAIN_SELECTOR))[0]);
+    assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, SOURCE_CHAIN_SELECTOR))[0]);
   }
 
   // Reverts

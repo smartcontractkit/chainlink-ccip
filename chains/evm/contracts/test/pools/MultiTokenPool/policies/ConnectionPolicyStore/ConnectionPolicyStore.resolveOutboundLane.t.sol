@@ -46,6 +46,9 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
   function test_resolveOutboundLane_SubsetToken() public {
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, true));
     _addSubsetToken(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token);
+    _setRemotePoolPolicyConfig(
+      _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))
+    );
 
     IPoolConfigManager.OutboundLane memory lane =
       s_connectionStore.resolveOutboundLane(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
@@ -95,6 +98,22 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
     assertEq(abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)), lane.destPoolData);
     // The remote token comes from the connection record, also when the pool data omits the source token.
     assertEq(abi.encode(s_token), lane.remoteToken);
+  }
+
+  function test_resolveOutboundLane_TrustPolicyRemotePools() public {
+    // An inline record that trusts the remote pools of the policy record still gives the send flag of the token.
+    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
+    remotePoolConfig.useLegacyPoolDataOnSend = true;
+    ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
+      _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig);
+    inlineConfigs[0].trustPolicyRemotePools = true;
+    _setInlineRemotePoolConfig(inlineConfigs);
+
+    IPoolConfigManager.OutboundLane memory lane =
+      s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
+
+    assertEq(abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)), lane.destPoolData);
   }
 
   function test_resolveOutboundLane_FastFinality() public {
@@ -244,7 +263,8 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
   }
 
   function test_resolveOutboundLane_RevertWhen_RemoteTokenAddressProviderHasNoCode() public {
-    _setRemoteTokenAddressProvider(CONNECTION_POLICY, makeAddr("providerWithoutCode"));
+    // The provider loses its code after the set.
+    vm.etch(address(s_remoteTokenAddressProvider), "");
 
     // The empty answer fails the decode.
     vm.expectRevert(bytes(""));

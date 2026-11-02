@@ -62,21 +62,6 @@ contract ConnectionPolicyStore_applyRemoteTokenAddressProviderUpdates is Connect
     s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
-  function test_applyRemoteTokenAddressProviderUpdates_ProviderWithoutCode() public {
-    // Any address is accepted. A provider without code gives no remote token, so a send reverts.
-    address providerWithoutCode = makeAddr("providerWithoutCode");
-
-    s_connectionStore.applyRemoteTokenAddressProviderUpdates(
-      _getRemoteTokenAddressProviderArgs(CONNECTION_POLICY, providerWithoutCode)
-    );
-
-    (, address remoteTokenAddressProvider,) = s_connectionStore.getConnectionPolicy(CONNECTION_POLICY);
-    assertEq(providerWithoutCode, remoteTokenAddressProvider);
-    assertEq(0, _getLaneConnection(s_token, DEST_CHAIN_SELECTOR).remoteToken.length);
-    vm.expectRevert(bytes(""));
-    s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
-  }
-
   function test_applyRemoteTokenAddressProviderUpdates_AppliedInOrder() public {
     ConnectionPolicyStore.RemoteTokenAddressProviderArgs[] memory providers =
       new ConnectionPolicyStore.RemoteTokenAddressProviderArgs[](2);
@@ -95,6 +80,15 @@ contract ConnectionPolicyStore_applyRemoteTokenAddressProviderUpdates is Connect
   }
 
   // Reverts
+
+  function test_applyRemoteTokenAddressProviderUpdates_RevertWhen_ProviderHasNoCode() public {
+    address providerWithoutCode = makeAddr("providerWithoutCode");
+
+    vm.expectRevert(abi.encodeWithSelector(ConnectionPolicyStore.ProviderHasNoCode.selector, providerWithoutCode));
+    s_connectionStore.applyRemoteTokenAddressProviderUpdates(
+      _getRemoteTokenAddressProviderArgs(CONNECTION_POLICY, providerWithoutCode)
+    );
+  }
 
   function test_applyRemoteTokenAddressProviderUpdates_RevertWhen_PolicyNotFound() public {
     // REMOTE_POOL_POLICY exists only as a remote pool policy.
