@@ -26,6 +26,8 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     );
     _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
 
+    vm.expectEmit(address(s_store));
+    emit SecurityPolicyStore.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, s_tokenA, 100e18);
     vm.prank(s_poolConfigManager);
     address hook =
       s_store.validateLockOrBurn(s_tokenA, DEST_CHAIN_SELECTOR, 100e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
@@ -81,17 +83,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     IPoolConfigManager.LaneRateLimiterState memory state = _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR);
     assertEq(CAPACITY - 100e18, state.outbound.tokens);
     assertEq(CAPACITY + 1, state.inbound.tokens);
-  }
-
-  /// @notice The event names the direction and finality that the transfer consumed.
-  function test_validateLockOrBurn_EmitsConsumedEvent() public {
-    _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
-
-    vm.expectEmit(address(s_store));
-    emit SecurityPolicyStore.OutboundRateLimitConsumed(DEST_CHAIN_SELECTOR, s_tokenA, 100e18);
-    vm.prank(s_poolConfigManager);
-    s_store.validateLockOrBurn(s_tokenA, DEST_CHAIN_SELECTOR, 100e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
   }
 
   // Policy records
