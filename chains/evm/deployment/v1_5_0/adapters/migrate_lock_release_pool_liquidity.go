@@ -13,28 +13,43 @@ import (
 	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	evm_contract "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 )
 
 // MigrateLockReleasePoolLiquiditySequence returns the SOURCE half of a lock-release liquidity
-// migration for v1.5.0 pools. It extracts liquidity from the old pool to the timelock with the v1.5.0
-// bindings and records the moved amount in input.Resolved for the v2.0.0 sink.
+// migration for v1.5.0 pools, plain and *AndProxy. It extracts liquidity from the effective holder
+// to the timelock and records the moved amount in input.Resolved for the v2.0.0 sink.
+//
+// A plain pool always holds its own liquidity. A LockReleaseTokenPoolAndProxy routes every
+// lock/release through its previous pool when getPreviousPool() is set, so the liquidity may sit in
+// either contract:
+//   - the previous pool holds a balance: the migration is delegated to the source of the previous
+//     pool's on-chain version (v1.4.0 or v1.2.0), which runs its own checks against it. This holds
+//     even when the proxy also has a balance (e.g. the previous pool was set after the proxy had
+//     locked tokens, or someone transferred tokens to the proxy); the amount inputs apply to the
+//     previous pool's balance only, and once it is drained, rerunning the same input migrates the
+//     proxy's balance;
+//   - only the proxy holds a balance: it is extracted with the v1.5.0 bindings (rebalancer take-over,
+//     withdraw, restore), whether or not a previous pool is set.
+//
+// A previous pool that is itself an *AndProxy fails before any balance decides the holder.
+//
+// getPreviousPool() is only called on the *AndProxy type; it does not exist on a plain pool.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-v1.5.0-adapter:migrate-lock-release-pool-liquidity-source",
 		semver.MustParse("1.5.0"),
-		"Extract lock-release liquidity from a v1.5.0 pool to the timelock",
+		"Extract lock-release liquidity from a v1.5.0 pool, or the previous pool behind an *AndProxy, to the timelock",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
 			evmChain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 			}
-			chainSel := input.ChainSelector
 			oldPool := common.HexToAddress(input.OldPoolAddress)
 			newPool := common.HexToAddress(input.NewPoolAddress)
-			timelock := common.HexToAddress(input.TimelockAddress)
 
 			oldTV, _, err := t.ValidateLockReleaseMigrationPoolPair(b, evmChain, oldPool, newPool)
 			if err != nil {
@@ -55,89 +70,188 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
-
-			balanceReport, err := cldf_ops.ExecuteOperation(b, erc20_ops.BalanceOf, evmChain, evm_contract.FunctionInput[common.Address]{
-				ChainSelector: chainSel,
-				Address:       tokenAddr,
-				Args:          oldPool,
-			})
+			oldPoolBalance, err := tokenBalance(b, evmChain, tokenAddr, oldPool)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to get balance of old pool %s: %w", oldPool, err)
 			}
-			balance := balanceReport.Output
 
-			amount, err := input.ComputeAmount(balance)
+			if oldTV.Type.String() != cciputils.LockReleaseTokenPoolAndProxy.String() {
+				return t.migrateV150Holder(b, evmChain, input, oldPool, oldPoolBalance)
+			}
+
+			previous, err := previousPool(evmChain, oldPool, nil)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to read getPreviousPool from proxy %s: %w", oldPool, err)
+			}
+			if previous == (common.Address{}) {
+				return t.migrateV150Holder(b, evmChain, input, oldPool, oldPoolBalance)
+			}
+
+			previousVersion, previousType, err := previousTypeAndVersion(b, evmChain, previous)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
-			if amount.Sign() == 0 {
-				return sequences.OnChainOutput{}, fmt.Errorf("computed migration amount is zero")
+			if previousType == cciputils.LockReleaseTokenPoolAndProxy.String() || previousType == cciputils.BurnMintTokenPoolAndProxy.String() {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"previous pool %s of proxy %s is itself a %s; nested proxies are not supported",
+					previous, oldPool, previousType)
 			}
-			if amount.Cmp(balance) > 0 {
-				return sequences.OnChainOutput{}, fmt.Errorf("migration amount %s exceeds old pool balance %s", amount, balance)
-			}
-
-			if err := t.RequireTimelockOwnsOldPool(b, evmChain, oldPool, timelock); err != nil {
-				return sequences.OnChainOutput{}, err
-			}
-
-			rebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
-				ChainSelector: chainSel,
-				Address:       oldPool,
-			})
+			previousBalance, err := tokenBalance(b, evmChain, tokenAddr, previous)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to get rebalancer from old pool %s: %w", oldPool, err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to get balance of previous pool %s of proxy %s: %w", previous, oldPool, err)
 			}
 
-			// Skip the take-over and the restore when the timelock already is the rebalancer: both
-			// would be no-op writes in the proposal.
-			originalRebalancer := rebalancerReport.Output
-			handOver := originalRebalancer != timelock
-
-			var writes []evm_contract.WriteOutput
-			if handOver {
-				setRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       oldPool,
-					Args:          timelock,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to set rebalancer on old pool %s: %w", oldPool, err)
-				}
-				writes = append(writes, setRebalancerReport.Output)
+			switch {
+			case previousBalance.Sign() > 0:
+				// The previous pool takes priority even when the proxy also holds a balance; the amount
+				// inputs apply to the previous pool's balance alone. Once it is drained, rerunning the
+				// same input lands on the proxy.
+				return delegateToPreviousPool(b, chains, input, oldPool, previous, previousVersion, previousType)
+			case oldPoolBalance.Sign() > 0:
+				return t.migrateV150Holder(b, evmChain, input, oldPool, oldPoolBalance)
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"neither proxy %s nor its previous pool %s holds any liquidity to migrate", oldPool, previous)
 			}
-
-			withdrawReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.WithdrawLiquidityProposalOnly, evmChain, evm_contract.FunctionInput[*big.Int]{
-				ChainSelector: chainSel,
-				Address:       oldPool,
-				Args:          amount,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to withdraw liquidity from old pool %s: %w", oldPool, err)
-			}
-			writes = append(writes, withdrawReport.Output)
-
-			if handOver {
-				restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
-					ChainSelector: chainSel,
-					Address:       oldPool,
-					Args:          originalRebalancer,
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to restore rebalancer on old pool %s: %w", oldPool, err)
-				}
-				writes = append(writes, restoreRebalancerReport.Output)
-			}
-
-			batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
-			}
-
-			if input.Resolved != nil {
-				input.Resolved.Amount = amount
-			}
-			return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 		},
 	)
+}
+
+// delegateToPreviousPool runs the liquidity migration source registered for the previous pool's
+// on-chain version against the previous pool. Only OldPoolAddress changes: Resolved is a pointer,
+// so the amount the delegated source resolves reaches the sink unchanged.
+//
+// The adapter is resolved from the global registry, the one the MigrateLockReleasePoolLiquidity
+// changeset resolves this source from.
+func delegateToPreviousPool(
+	b cldf_ops.Bundle,
+	chains cldf_chain.BlockChains,
+	input tokensapi.MigrateLockReleasePoolLiquidityInput,
+	proxy, previous common.Address,
+	previousVersion *semver.Version,
+	previousType string,
+) (sequences.OnChainOutput, error) {
+	adapter, _, err := tokensapi.ResolveAdapter(tokensapi.GetTokenAdapterRegistry(), input.ChainSelector, previousVersion)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"previous pool %s (%s %s) of proxy %s does not support liquidity migration yet: %w",
+			previous, previousType, previousVersion, proxy, err)
+	}
+	seq := adapter.MigrateLockReleasePoolLiquiditySequence()
+	if seq == nil {
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"previous pool %s (%s %s) of proxy %s does not support liquidity migration yet",
+			previous, previousType, previousVersion, proxy)
+	}
+
+	previousInput := input
+	previousInput.OldPoolAddress = previous.Hex()
+	report, err := cldf_ops.ExecuteSequence(b, seq, chains, previousInput)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("previous pool %s of proxy %s: %w", previous, proxy, err)
+	}
+	return report.Output, nil
+}
+
+// migrateV150Holder extracts liquidity held by the v1.5.0 pool at holder itself: set the timelock as
+// rebalancer, withdraw the amount to it, and restore the original rebalancer. withdrawLiquidity is
+// rebalancer-gated, so it uses the proposal-only op and is always batched; the take-over and restore
+// are skipped when the timelock already is the rebalancer.
+func (t *TokenAdapter) migrateV150Holder(
+	b cldf_ops.Bundle,
+	evmChain evm.Chain,
+	input tokensapi.MigrateLockReleasePoolLiquidityInput,
+	holder common.Address,
+	balance *big.Int,
+) (sequences.OnChainOutput, error) {
+	chainSel := input.ChainSelector
+	timelock := common.HexToAddress(input.TimelockAddress)
+
+	amount, err := input.ComputeAmount(balance)
+	if err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+	if amount.Sign() == 0 {
+		return sequences.OnChainOutput{}, fmt.Errorf("computed migration amount is zero")
+	}
+	if amount.Cmp(balance) > 0 {
+		return sequences.OnChainOutput{}, fmt.Errorf("migration amount %s exceeds old pool balance %s", amount, balance)
+	}
+
+	if err := t.RequireTimelockOwnsOldPool(b, evmChain, holder, timelock); err != nil {
+		return sequences.OnChainOutput{}, err
+	}
+
+	rebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.GetRebalancer, evmChain, evm_contract.FunctionInput[struct{}]{
+		ChainSelector: chainSel,
+		Address:       holder,
+	})
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to get rebalancer from old pool %s: %w", holder, err)
+	}
+
+	// Skip the take-over and the restore when the timelock already is the rebalancer: both
+	// would be no-op writes in the proposal.
+	originalRebalancer := rebalancerReport.Output
+	handOver := originalRebalancer != timelock
+
+	var writes []evm_contract.WriteOutput
+	if handOver {
+		setRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       holder,
+			Args:          timelock,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to set rebalancer on old pool %s: %w", holder, err)
+		}
+		writes = append(writes, setRebalancerReport.Output)
+	}
+
+	withdrawReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.WithdrawLiquidityProposalOnly, evmChain, evm_contract.FunctionInput[*big.Int]{
+		ChainSelector: chainSel,
+		Address:       holder,
+		Args:          amount,
+	})
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to withdraw liquidity from old pool %s: %w", holder, err)
+	}
+	writes = append(writes, withdrawReport.Output)
+
+	if handOver {
+		restoreRebalancerReport, err := cldf_ops.ExecuteOperation(b, lrtp_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       holder,
+			Args:          originalRebalancer,
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to restore rebalancer on old pool %s: %w", holder, err)
+		}
+		writes = append(writes, restoreRebalancerReport.Output)
+	}
+
+	batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation: %w", err)
+	}
+
+	if input.Resolved != nil {
+		input.Resolved.Amount = amount
+	}
+	return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+}
+
+// tokenBalance reads token.balanceOf(holder).
+func tokenBalance(b cldf_ops.Bundle, evmChain evm.Chain, token, holder common.Address) (*big.Int, error) {
+	report, err := cldf_ops.ExecuteOperation(b, erc20_ops.BalanceOf, evmChain, evm_contract.FunctionInput[common.Address]{
+		ChainSelector: evmChain.Selector,
+		Address:       token,
+		Args:          holder,
+	},
+		cldf_ops.WithForceExecute[evm_contract.FunctionInput[common.Address], evm.Chain](),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return report.Output, nil
 }

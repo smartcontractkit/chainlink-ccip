@@ -31,6 +31,10 @@ import (
 // limiter, release the amount to the timelock, then deregister it. When the timelock already is an
 // offRamp it is left registered and only the release is emitted.
 //
+// It runs directly when the old pool named is the v1.2.0 pool, or delegated from the v1.5.0 source
+// when the old pool named is the LockReleaseTokenPoolAndProxy in front of it; either way every check
+// and write targets the v1.2.0 pool.
+//
 // Fails fast, before emitting anything, when:
 //   - the pool can accept liquidity: releaseOrMint does not decrement provider credits, so it would
 //     release provider funds and strand their claims. canAcceptLiquidity is immutable, so false

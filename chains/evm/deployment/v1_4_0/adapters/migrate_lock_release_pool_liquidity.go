@@ -24,6 +24,10 @@ import (
 // or *AndProxy variant. getRebalancer/setRebalancer are the generated v1.4.0 ops; the withdraw is the
 // hand-written WithdrawLiquidityProposalOnly, because the generated v1.4.0 withdrawLiquidity is
 // `public` and would execute directly with the deployer key.
+//
+// It runs directly when the old pool named is the v1.4.0 pool, or delegated from the v1.5.0 source
+// when the old pool named is the LockReleaseTokenPoolAndProxy in front of it; either way every check
+// and write targets the v1.4.0 pool.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-v1.4.0-adapter:migrate-lock-release-pool-liquidity-source",

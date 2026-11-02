@@ -80,9 +80,7 @@ interface IPoolConfigManager {
     bool isChainOutboundPaused; //                   │ True if the remote chain is paused outbound.
     bool isChainInboundPaused; //                    │ True if the remote chain is paused inbound.
     bool omitSourceTokenAddressOnSend; //            │ True sends pool data without the source token.
-    bool allowSourceTokenAddressMissingOnReceive; // │ True accepts pool data without the source token.
-    uint32 destGasOverhead; //                       │ The destination token execution gas overhead.
-    uint32 destBytesOverhead; // ────────────────────╯ The destination token data byte overhead.
+    bool allowSourceTokenAddressMissingOnReceive; // ╯ True accepts pool data without the source token.
     bytes remoteToken; //                             The encoded remote token. Empty if it cannot be resolved.
     bytes[] remotePools; //                           The encoded trusted remote pools, or an empty list if none exist.
   }
@@ -95,12 +93,13 @@ interface IPoolConfigManager {
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out. Burn if not registered.
     bytes4 allowedFinalityConfig; //      │ The allowed finality config. Decode with FinalityCodec.
     address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
-    address tokenIdentityMetadataProvider; // The token's ITokenIdentityMetadataProvider. Zero means none.
+    address additionalPoolDataProvider; //  The token's IAdditionalPoolDataProvider. Zero means none.
     uint64[] supportedChains; //            The remote chains covered by the token's resolved lanes.
     bytes32 connectionPolicyName; //        The connection policy of the token. Zero if it has none.
-    bytes32 chainPolicyName; //             The chain policy of the token. Zero if it has none.
+    bytes32 remotePoolPolicyName; //        The remote pool policy of the token. Zero if it has none.
     bytes32 rateLimitPolicyName; //         The rate limit policy of the token. Zero if it has none.
     bytes32 feePolicyName; //               The fee policy of the token. Zero if it has none.
+    bytes32 destOverheadPolicyName; //      The destination overhead policy of the token. Zero if it has none.
     bytes32 securityPolicyName; //          The security policy of the token. Zero if it has none.
   }
 
@@ -109,6 +108,7 @@ interface IPoolConfigManager {
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param tokenArgs The token arguments of the message. The sender chooses them.
   /// @param chargeTokenFee Whether to deduct a token fee from the transfer amount.
   /// @return lane The resolved outbound configuration, pool data, token fee and hook to call before moving tokens.
   function validateLockOrBurn(
@@ -116,11 +116,12 @@ interface IPoolConfigManager {
     uint64 remoteChainSelector,
     uint256 amount,
     bytes4 requestedFinalityConfig,
+    bytes calldata tokenArgs,
     bool chargeTokenFee
   ) external returns (OutboundLane memory lane);
 
-  /// @notice Checks the inbound lane, source token and token identity metadata, converts token transfer amount, and
-  /// consumes inbound rate limit.
+  /// @notice Checks the inbound lane, the source token and the additional pool data. Converts the amount to local
+  /// decimals, and consumes the inbound rate limit.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
   /// @return transfer The converted amount, token profile and postflight hook.
@@ -133,8 +134,8 @@ interface IPoolConfigManager {
   /// @dev Reverts if a token does not allow the requested finality, even when it has no lane.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, or whose fees
-  /// are disabled, return zeros with isEnabled false.
+  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, lanes without an
+  /// enabled fee record and lanes without a dest overhead record return zeros with isEnabled false.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -142,8 +143,8 @@ interface IPoolConfigManager {
 
   /// @notice Returns the resolved lane fee configurations.
   /// @param lanes The token and remote chain lanes to query.
-  /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist return
-  /// a disabled zero configuration.
+  /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist, lanes
+  /// without an enabled fee record and lanes without a dest overhead record return a disabled zero configuration.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs);
@@ -165,12 +166,14 @@ interface IPoolConfigManager {
 
   /// @notice Returns the resolved hook and outbound and inbound CCV lists.
   /// @param lanes The token and remote chain lanes to query.
+  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @return hooks The lane's IMultiTokenPoolHooks per lane, aligned with lanes by index. Zero if no hook is configured
   /// or no lane exists.
   /// @return outboundCCVs The configured outbound CCVs per lane, aligned with lanes by index. Empty if no lane exists.
   /// @return inboundCCVs The configured inbound CCVs per lane, aligned with lanes by index. Empty if no lane exists.
   function getLaneVerificationBatch(
-    LaneKey[] calldata lanes
+    LaneKey[] calldata lanes,
+    bytes4 requestedFinalityConfig
   ) external view returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs);
 
   /// @notice Returns the token's resolved configuration.

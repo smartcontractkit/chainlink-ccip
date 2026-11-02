@@ -24,10 +24,11 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     emit MultiTokenPool.LockedOrBurned(DEST_CHAIN_SELECTOR, address(s_token), s_allowedOnRamp, amount);
 
     (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) =
-      s_pool.lockOrBurn(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "");
+      s_pool.lockOrBurn(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "args");
 
     assertEq(destTokenAmount, amount);
     assertEq(s_poolConfigManager.lastRequestedFinalityConfig(), FinalityCodec._encodeBlockDepth(5));
+    assertEq(s_poolConfigManager.lastTokenArgs(), "args");
     assertEq(lockOrBurnOut.destTokenAddress, abi.encode(s_remoteToken));
     assertEq(lockOrBurnOut.destPoolData, DEST_POOL_DATA);
     assertEq(s_token.balanceOf(address(s_pool)), 0);

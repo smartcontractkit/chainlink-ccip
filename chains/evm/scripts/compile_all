@@ -14,6 +14,7 @@ OPTIMIZE_RUNS_OFFRAMP=23000
 OPTIMIZE_RUNS_FEE_QUOTER=27500
 OPTIMIZE_RUNS_LARGE_POOL=17000
 OPTIMIZE_RUNS_SUCCINCT_ZK_VERIFIER=15000
+OPTIMIZE_RUNS_SECURITY_POLICY_STORE=1000
 
 
 PROJECT="ccip"
@@ -84,6 +85,9 @@ function getOptimizations() {
       "SiloedLockReleaseTokenPool")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_LARGE_POOL"
         ;;
+      "SecurityPolicyStore")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_SECURITY_POLICY_STORE"
+        ;;
     esac
 
     echo "$optimize_runs_override"
@@ -132,6 +136,9 @@ compileContract pools/AdvancedPoolHooks
 compileContract pools/extractors/AdvancedPoolHooksExtractor
 compileContract pools/MultiTokenPool/MultiTokenPoolHooks
 compileContract pools/MultiTokenPool/MultiTokenPoolHooksExternalBlocklist
+compileContract pools/MultiTokenPool/policies/SecurityPolicyStore
+compileContract pools/MultiTokenPool/FactoryTokenWithUIDPoolDataProvider
+compileContract pools/MultiTokenPool/policies/FeePolicyStore
 
 compileContract tokens/CrossChainToken
 
