@@ -69,20 +69,26 @@ interface IPoolConfigManager {
     TokenBucket fastFinalityInbound; //  The inbound FTF bucket.
   }
 
+  /// @notice A trusted remote pool and its permission to send legacy pool data without token identity.
+  struct RemotePool {
+    bytes remotePoolAddress; // The encoded remote pool address.
+    bool allowLegacyPoolDataOnReceive; // True accepts legacy pool data from this pool.
+  }
+
   /// @notice Resolved connection and effective pause state for one token and remote chain.
   struct LaneConnection {
-    bool hasConnection; // ──────────────────────────╮ True if the token has a connection to the remote chain.
-    bool isOutboundPaused; //                        │ Whether outbound transfers are paused.
-    bool isInboundPaused; //                         │ Whether inbound transfers are paused.
-    bool isGloballyPaused; //                        │ True if the global pause is on.
-    bool isTokenOutboundPaused; //                   │ True if the token is paused outbound.
-    bool isTokenInboundPaused; //                    │ True if the token is paused inbound.
-    bool isChainOutboundPaused; //                   │ True if the remote chain is paused outbound.
-    bool isChainInboundPaused; //                    │ True if the remote chain is paused inbound.
-    bool omitSourceTokenAddressOnSend; //            │ True sends pool data without the source token.
-    bool allowSourceTokenAddressMissingOnReceive; // ╯ True accepts pool data without the source token.
-    bytes remoteToken; //                             The encoded remote token. Empty if it cannot be resolved.
-    bytes[] remotePools; //                           The encoded trusted remote pools, or an empty list if none exist.
+    bool hasConnection; // ───────────────╮ True if the token has a connection to the remote chain.
+    bool isOutboundPaused; //             │ Whether outbound transfers are paused.
+    bool isInboundPaused; //              │ Whether inbound transfers are paused.
+    bool isGloballyPaused; //             │ True if the global pause is on.
+    bool isTokenOutboundPaused; //        │ True if the token is paused outbound.
+    bool isTokenInboundPaused; //         │ True if the token is paused inbound.
+    bool isChainOutboundPaused; //        │ True if the remote chain is paused outbound.
+    bool isChainInboundPaused; //         │ True if the remote chain is paused inbound.
+    bool omitSourceTokenAddressOnSend; // │ True sends pool data without the source token.
+    bool useLegacyPoolDataOnSend; // ─────╯ True accepts pool data without the source token.
+    bytes remoteToken; //                   The encoded remote token. Empty if it cannot be resolved.
+    RemotePool[] remotePools; //                      The trusted pools and their individual legacy-data permissions.
   }
 
   /// @notice Resolved token-level configuration, independent of lane selection and pause state.
