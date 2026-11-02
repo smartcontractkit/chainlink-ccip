@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
+
 import {CCVConfigValidation} from "../../../../../libraries/CCVConfigValidation.sol";
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SecurityPolicyStore_applyInlineSecurityConfigUpdates is SecurityPolicyStoreSetup {
   /// @notice One call sets an inline security record. The two CCV lists differ, so a swap of the two is caught on the
@@ -80,6 +84,14 @@ contract SecurityPolicyStore_applyInlineSecurityConfigUpdates is SecurityPolicyS
     vm.prank(s_poolConfigManager);
     s_store.applyInlineSecurityConfigUpdates(
       _lanesOf(s_tokenA, DEST_CHAIN_SELECTOR), new SecurityPolicyStore.InlineSecurityConfigArgs[](0)
+    );
+  }
+
+  /// @notice Only an authorized pool config manager writes to the store.
+  function test_applyInlineSecurityConfigUpdates_RevertWhen_UnauthorizedCaller() public {
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, address(this)));
+    s_store.applyInlineSecurityConfigUpdates(
+      new IPoolConfigManager.LaneKey[](0), new SecurityPolicyStore.InlineSecurityConfigArgs[](0)
     );
   }
 }

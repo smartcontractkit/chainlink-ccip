@@ -27,11 +27,27 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using RateLimiter for RateLimiter.TokenBucket;
 
   error ZeroAddressInvalid();
-  error InvalidDecimalArgs(uint8 expected, uint8 actual);
+  error InvalidDecimalArgs(address localToken, uint8 expected, uint8 actual);
   error InvalidRateLimitPolicyDecimals(bytes32 policyName, uint8 expected, uint8 actual);
   error TokenHasConfig(address localToken);
   error RateLimitRecordNotFound(address localToken, uint64 remoteChainSelector);
   error SecurityRecordNotFound(address localToken, uint64 remoteChainSelector);
+  error InvalidInlineRateLimitConfig(address localToken, uint64 remoteChainSelector, RateLimitConfig rateLimitConfig);
+  error InvalidRateLimitPolicyConfig(bytes32 policyName, uint64 remoteChainSelector, RateLimitConfig rateLimitConfig);
+  error InvalidInlineRateLimitBucketConfig(
+    address localToken,
+    uint64 remoteChainSelector,
+    IPoolV2.MessageDirection direction,
+    bool fastFinality,
+    RateLimiter.Config config
+  );
+  error InvalidRateLimitPolicyBucketConfig(
+    bytes32 policyName,
+    uint64 remoteChainSelector,
+    IPoolV2.MessageDirection direction,
+    bool fastFinality,
+    RateLimiter.Config config
+  );
 
   event InlineRateLimitConfigSet(
     address indexed localToken, uint64 indexed remoteChainSelector, RateLimitConfig rateLimitConfig
@@ -422,27 +438,22 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                       Resolved views                         │
   // ================================================================
 
-  /// @notice Returns the hook and the CCV lists of each lane, for IPoolConfigManager.getLaneVerificationBatch. Never
-  /// reverts while hasLanes has the length of lanes.
+  /// @notice Returns the hook and the CCV lists of each lane, for IPoolConfigManager.getLaneVerificationBatch.
+  /// @dev Does not check that the lane exists. The pool config manager zeros a lane that does not exist.
   /// @param lanes The token and remote chain lanes to query.
-  /// @param hasLanes True for each lane that exists, aligned with lanes by index. The connection store gives them.
-  /// @return hooks The hook per lane, aligned with lanes by index. Zero if no hook is configured, if no lane exists, or
-  /// if the token has no security record.
-  /// @return outboundCCVs The outbound CCVs per lane, aligned with lanes by index. Empty if no lane exists or if the
-  /// token has no security record.
-  /// @return inboundCCVs The inbound CCVs per lane, aligned with lanes by index. Empty if no lane exists or if the
-  /// token has no security record.
+  /// @return hooks The hook per lane, aligned with lanes by index. Zero if no hook is configured or if the token has no
+  /// security record.
+  /// @return outboundCCVs The outbound CCVs per lane, aligned with lanes by index. Empty if the token has no security
+  /// record.
+  /// @return inboundCCVs The inbound CCVs per lane, aligned with lanes by index. Empty if the token has no security
+  /// record.
   function getLaneVerificationBatch(
-    IPoolConfigManager.LaneKey[] calldata lanes,
-    bool[] calldata hasLanes
+    IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs) {
     hooks = new address[](lanes.length);
     outboundCCVs = new address[][](lanes.length);
     inboundCCVs = new address[][](lanes.length);
     for (uint256 i = 0; i < lanes.length; ++i) {
-      if (!hasLanes[i]) {
-        continue;
-      }
       (, SecurityConfig storage securityConfig) =
         _resolveSecurityConfig(lanes[i].localToken, lanes[i].remoteChainSelector);
       hooks[i] = securityConfig.hook;
@@ -453,21 +464,16 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Returns the four buckets of each lane as they are at this block, for
-  /// IPoolConfigManager.getCurrentRateLimiterStateBatch. Never reverts while hasLanes has the length of lanes.
-  /// @dev A bucket that waits for a copy shows as a full bucket with the config of its policy record.
+  /// IPoolConfigManager.getCurrentRateLimiterStateBatch.
+  /// @dev Does not check that the lane exists. The pool config manager zeros a lane that does not exist. A bucket that
+  /// waits for a copy shows as a full bucket with the config of its policy record.
   /// @param lanes The token and remote chain lanes to query.
-  /// @param hasLanes True for each lane that exists, aligned with lanes by index. The connection store gives them.
-  /// @return states The buckets per lane, aligned with lanes by index. All zero if no lane exists or the token has no
-  /// rate limit record.
+  /// @return states The buckets per lane, aligned with lanes by index. All zero if the token has no rate limit record.
   function getCurrentRateLimiterStateBatch(
-    IPoolConfigManager.LaneKey[] calldata lanes,
-    bool[] calldata hasLanes
+    IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (IPoolConfigManager.LaneRateLimiterState[] memory states) {
     states = new IPoolConfigManager.LaneRateLimiterState[](lanes.length);
     for (uint256 i = 0; i < lanes.length; ++i) {
-      if (!hasLanes[i]) {
-        continue;
-      }
       states[i] = _getCurrentRateLimiterState(lanes[i].localToken, lanes[i].remoteChainSelector);
     }
     return states;
@@ -796,7 +802,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (localToken == address(0)) revert ZeroAddressInvalid();
       TokenState storage tokenState = s_tokenStates[localToken];
       if (s_tokens.contains(localToken) && tokenState.localDecimals != args.localDecimals) {
-        revert InvalidDecimalArgs(tokenState.localDecimals, args.localDecimals);
+        revert InvalidDecimalArgs(localToken, tokenState.localDecimals, args.localDecimals);
       }
 
       s_tokens.add(localToken);
@@ -881,10 +887,13 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
       InlineRateLimitConfigArgs calldata args = inlineConfigsToSet[i];
       RateLimitConfig calldata rateLimitConfig = args.rateLimitConfig;
-      _validateRateLimitConfig(rateLimitConfig.outbound);
-      _validateRateLimitConfig(rateLimitConfig.inbound);
-      _validateRateLimitConfig(rateLimitConfig.fastFinalityOutbound);
-      _validateRateLimitConfig(rateLimitConfig.fastFinalityInbound);
+      if (
+        !_isValidRateLimitConfig(rateLimitConfig.outbound) || !_isValidRateLimitConfig(rateLimitConfig.inbound)
+          || !_isValidRateLimitConfig(rateLimitConfig.fastFinalityOutbound)
+          || !_isValidRateLimitConfig(rateLimitConfig.fastFinalityInbound)
+      ) {
+        revert InvalidInlineRateLimitConfig(args.localToken, args.remoteChainSelector, rateLimitConfig);
+      }
 
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineRateLimitChains[args.localToken], args.localToken, args.remoteChainSelector
@@ -912,7 +921,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (!s_inlineRateLimitChains[args.localToken].contains(args.remoteChainSelector)) {
         revert RateLimitRecordNotFound(args.localToken, args.remoteChainSelector);
       }
-      _validateRateLimitConfig(args.config);
+      if (!_isValidRateLimitConfig(args.config)) {
+        revert InvalidInlineRateLimitBucketConfig(
+          args.localToken, args.remoteChainSelector, args.direction, args.fastFinality, args.config
+        );
+      }
 
       mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.TokenBucket bucket))
         storage buckets = s_tokenBuckets[args.localToken][args.remoteChainSelector];
@@ -971,10 +984,13 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
         );
       }
       RateLimitConfig calldata rateLimitConfig = args.rateLimitConfig;
-      _validateRateLimitConfig(rateLimitConfig.outbound);
-      _validateRateLimitConfig(rateLimitConfig.inbound);
-      _validateRateLimitConfig(rateLimitConfig.fastFinalityOutbound);
-      _validateRateLimitConfig(rateLimitConfig.fastFinalityInbound);
+      if (
+        !_isValidRateLimitConfig(rateLimitConfig.outbound) || !_isValidRateLimitConfig(rateLimitConfig.inbound)
+          || !_isValidRateLimitConfig(rateLimitConfig.fastFinalityOutbound)
+          || !_isValidRateLimitConfig(rateLimitConfig.fastFinalityInbound)
+      ) {
+        revert InvalidRateLimitPolicyConfig(args.policyName, args.remoteChainSelector, rateLimitConfig);
+      }
 
       PolicyConfig._setPolicyRecord(s_rateLimitPolicies, args.policyName, args.remoteChainSelector);
       if (isNewPolicy) {
@@ -1006,7 +1022,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (!s_rateLimitPolicies.policies[args.policyName].remoteChainSelectors.contains(args.remoteChainSelector)) {
         revert PolicyConfig.PolicyRecordNotFound(args.policyName, args.remoteChainSelector);
       }
-      _validateRateLimitConfig(args.config);
+      if (!_isValidRateLimitConfig(args.config)) {
+        revert InvalidRateLimitPolicyBucketConfig(
+          args.policyName, args.remoteChainSelector, args.direction, args.fastFinality, args.config
+        );
+      }
 
       s_policyRateLimitConfigs[args.policyName][args.remoteChainSelector][args.fastFinality][args.direction] =
       args.config;
@@ -1022,15 +1042,15 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @dev The checks of RateLimiter._setTokenBucketConfig. A set runs them for every config before it writes. A policy
-  /// record stores a config without a bucket, so these are its only checks.
-  function _validateRateLimitConfig(
+  /// record stores a config without a bucket, so these are its only checks. The callers revert with the policy or token
+  /// and chain, so a batch op names the record that failed.
+  function _isValidRateLimitConfig(
     RateLimiter.Config calldata config
-  ) private pure {
+  ) private pure returns (bool) {
     if (config.isEnabled) {
-      if (config.rate > config.capacity) revert RateLimiter.InvalidRateLimitRate(config);
-    } else if (config.rate != 0 || config.capacity != 0) {
-      revert RateLimiter.DisabledNonZeroRateLimit(config);
+      return config.rate <= config.capacity;
     }
+    return config.rate == 0 && config.capacity == 0;
   }
 
   /// @dev Writes a config into a bucket unless the bucket already holds it. A write refills the bucket, so a set of the

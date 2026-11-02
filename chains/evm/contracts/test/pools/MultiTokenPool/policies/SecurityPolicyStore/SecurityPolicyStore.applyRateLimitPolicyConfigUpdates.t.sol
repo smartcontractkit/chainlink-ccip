@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IPoolV2} from "../../../../../interfaces/IPoolV2.sol";
-
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {RateLimiter} from "../../../../../libraries/RateLimiter.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
+
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicyStoreSetup {
   /// @notice The first record set under a new name creates the policy and fixes its decimals. Each of the four configs
@@ -15,6 +15,11 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     SecurityPolicyStore.RateLimitPolicyConfigArgs[] memory policyConfigs =
       new SecurityPolicyStore.RateLimitPolicyConfigArgs[](1);
     policyConfigs[0] = _getPolicyConfigArgs(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, CAPACITY);
+
+    vm.expectEmit(address(s_store));
+    emit SecurityPolicyStore.RateLimitPolicyConfigSet(
+      DEFAULT_POLICY, DEST_CHAIN_SELECTOR, DEFAULT_TOKEN_DECIMALS, policyConfigs[0].rateLimitConfig
+    );
     _applyRateLimitPolicyConfigUpdates(policyConfigs);
 
     (uint32 tokenCount, uint8 localDecimals, SecurityPolicyStore.RateLimitPolicyConfigArgs[] memory records) =
@@ -22,38 +27,6 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     assertEq(0, tokenCount);
     assertEq(DEFAULT_TOKEN_DECIMALS, localDecimals);
     assertEq(abi.encode(policyConfigs[0]), abi.encode(records[0]));
-  }
-
-  /// @notice The bucket update writes one bucket of an existing record only. Chain selector zero names the policy
-  /// default record, which the update also accepts.
-  function test_applyRateLimitPolicyBucketUpdates_UpdatesOneBucketOnly() public {
-    _setRateLimitPolicyConfigPerSlot(
-      DEFAULT_POLICY,
-      DEST_CHAIN_SELECTOR,
-      _getRateLimitConfig(CAPACITY),
-      _getRateLimitConfig(CAPACITY + 1),
-      _getRateLimitConfig(CAPACITY + 2),
-      _getRateLimitConfig(CAPACITY + 3)
-    );
-
-    SecurityPolicyStore.RateLimitPolicyBucketArgs[] memory bucketConfigs =
-      new SecurityPolicyStore.RateLimitPolicyBucketArgs[](1);
-    bucketConfigs[0] = SecurityPolicyStore.RateLimitPolicyBucketArgs({
-      policyName: DEFAULT_POLICY,
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      direction: IPoolV2.MessageDirection.Inbound,
-      fastFinality: false,
-      config: _getRateLimitConfig(7 * CAPACITY)
-    });
-    vm.prank(s_poolConfigManager);
-    s_store.applyRateLimitPolicyBucketUpdates(bucketConfigs);
-
-    SecurityPolicyStore.RateLimitPolicyConfigArgs memory record =
-      _getRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR);
-    assertEq(7 * CAPACITY, record.rateLimitConfig.inbound.capacity);
-    assertEq(CAPACITY, record.rateLimitConfig.outbound.capacity);
-    assertEq(CAPACITY + 2, record.rateLimitConfig.fastFinalityOutbound.capacity);
-    assertEq(CAPACITY + 3, record.rateLimitConfig.fastFinalityInbound.capacity);
   }
 
   /// @notice A bucket copies a new config of its policy record on its next use, and the copy refills the bucket. A set
@@ -113,25 +86,6 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     _applyRateLimitPolicyConfigUpdates(policyConfigs);
   }
 
-  /// @notice The bucket update needs the record to exist.
-  function test_applyRateLimitPolicyBucketUpdates_RevertWhen_PolicyRecordNotFound() public {
-    SecurityPolicyStore.RateLimitPolicyBucketArgs[] memory bucketConfigs =
-      new SecurityPolicyStore.RateLimitPolicyBucketArgs[](1);
-    bucketConfigs[0] = SecurityPolicyStore.RateLimitPolicyBucketArgs({
-      policyName: DEFAULT_POLICY,
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      direction: IPoolV2.MessageDirection.Outbound,
-      fastFinality: false,
-      config: _getRateLimitConfig(CAPACITY)
-    });
-
-    vm.expectRevert(
-      abi.encodeWithSelector(PolicyConfig.PolicyRecordNotFound.selector, DEFAULT_POLICY, DEST_CHAIN_SELECTOR)
-    );
-    vm.prank(s_poolConfigManager);
-    s_store.applyRateLimitPolicyBucketUpdates(bucketConfigs);
-  }
-
   /// @notice A record removal names a record that exists.
   function test_applyRateLimitPolicyConfigUpdates_RevertWhen_PolicyRecordNotFound() public {
     vm.expectRevert(
@@ -140,16 +94,31 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
     _removeRateLimitPolicyRecords(DEFAULT_POLICY, DEST_CHAIN_SELECTOR);
   }
 
-  /// @notice Each config of a record follows the checks of RateLimiter.
+  /// @notice Each config of a record follows the checks of RateLimiter, and the revert names the record.
   function test_applyRateLimitPolicyConfigUpdates_RevertWhen_InvalidRateLimitConfig() public {
-    RateLimiter.Config memory invalidRateConfig = RateLimiter.Config({isEnabled: true, capacity: 10, rate: 11});
     SecurityPolicyStore.RateLimitPolicyConfigArgs[] memory policyConfigs =
       new SecurityPolicyStore.RateLimitPolicyConfigArgs[](1);
     policyConfigs[0] = _getPolicyConfigArgs(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, CAPACITY);
-    policyConfigs[0].rateLimitConfig.fastFinalityOutbound = invalidRateConfig;
+    policyConfigs[0].rateLimitConfig.fastFinalityOutbound =
+      RateLimiter.Config({isEnabled: true, capacity: 10, rate: 11});
 
-    vm.expectRevert(abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, invalidRateConfig));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        SecurityPolicyStore.InvalidRateLimitPolicyConfig.selector,
+        DEFAULT_POLICY,
+        DEST_CHAIN_SELECTOR,
+        policyConfigs[0].rateLimitConfig
+      )
+    );
     _applyRateLimitPolicyConfigUpdates(policyConfigs);
+  }
+
+  /// @notice Only an authorized pool config manager writes to the store.
+  function test_applyRateLimitPolicyConfigUpdates_RevertWhen_UnauthorizedCaller() public {
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, address(this)));
+    s_store.applyRateLimitPolicyConfigUpdates(
+      new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new SecurityPolicyStore.RateLimitPolicyConfigArgs[](0)
+    );
   }
 
   // Helpers
@@ -193,17 +162,6 @@ contract SecurityPolicyStore_applyRateLimitPolicyConfigUpdates is SecurityPolicy
       _arrayOfBytes32(policyName),
       new SecurityPolicyStore.RateLimitPolicyConfigArgs[](0)
     );
-  }
-
-  function _getRateLimitPolicyConfig(
-    bytes32 policyName,
-    uint64 remoteChainSelector
-  ) internal view returns (SecurityPolicyStore.RateLimitPolicyConfigArgs memory) {
-    (,, SecurityPolicyStore.RateLimitPolicyConfigArgs[] memory records) = s_store.getRateLimitPolicy(policyName);
-    for (uint256 i = 0; i < records.length; ++i) {
-      if (records[i].remoteChainSelector == remoteChainSelector) return records[i];
-    }
-    revert("policy record not found");
   }
 
   /// @dev Gives each of the four configs its own capacity.

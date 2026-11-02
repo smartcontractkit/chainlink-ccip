@@ -14,7 +14,7 @@ OPTIMIZE_RUNS_OFFRAMP=23000
 OPTIMIZE_RUNS_FEE_QUOTER=27500
 OPTIMIZE_RUNS_LARGE_POOL=17000
 OPTIMIZE_RUNS_SUCCINCT_ZK_VERIFIER=15000
-# SecurityPolicyStore exceeds the EIP-170 runtime size limit with higher runs (24,780 bytes at 50000, 21,175 at 1000).
+# SecurityPolicyStore exceeds the EIP-170 runtime size limit with higher optimizer runs.
 OPTIMIZE_RUNS_SECURITY_POLICY_STORE=1000
 
 

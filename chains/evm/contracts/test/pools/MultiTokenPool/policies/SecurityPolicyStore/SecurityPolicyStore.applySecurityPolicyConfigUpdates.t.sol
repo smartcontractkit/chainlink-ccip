@@ -6,6 +6,8 @@ import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 contract SecurityPolicyStore_applySecurityPolicyConfigUpdates is SecurityPolicyStoreSetup {
   /// @notice The first record set under a new name creates the policy. The two CCV lists differ, so a swap of the two
   /// is caught on the read-back.
@@ -73,6 +75,14 @@ contract SecurityPolicyStore_applySecurityPolicyConfigUpdates is SecurityPolicyS
   function test_applySecurityPolicyConfigUpdates_RevertWhen_PolicyNotFound() public {
     vm.expectRevert(abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, DEFAULT_POLICY));
     _removeSecurityPolicy(DEFAULT_POLICY);
+  }
+
+  /// @notice Only an authorized pool config manager writes to the store.
+  function test_applySecurityPolicyConfigUpdates_RevertWhen_UnauthorizedCaller() public {
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, address(this)));
+    s_store.applySecurityPolicyConfigUpdates(
+      new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new SecurityPolicyStore.SecurityPolicyConfigArgs[](0)
+    );
   }
 
   // Helpers

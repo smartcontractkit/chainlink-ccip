@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
-import {IPoolV2} from "../../../../../interfaces/IPoolV2.sol";
 
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {RateLimiter} from "../../../../../libraries/RateLimiter.sol";
@@ -75,54 +74,37 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     assertEq(0, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).outbound.tokens);
   }
 
-  /// @notice The bucket update writes one bucket only, and keeps the other three.
-  function test_applyInlineRateLimitBucketUpdates_UpdatesOneBucketOnly() public {
-    _setInlineRateLimitConfigPerSlot(
-      s_tokenA,
-      DEST_CHAIN_SELECTOR,
-      _getRateLimitConfig(CAPACITY),
-      _getRateLimitConfig(CAPACITY + 1),
-      _getRateLimitConfig(CAPACITY + 2),
-      _getRateLimitConfig(CAPACITY + 3)
-    );
-
-    SecurityPolicyStore.InlineRateLimitBucketArgs[] memory bucketConfigs =
-      new SecurityPolicyStore.InlineRateLimitBucketArgs[](1);
-    bucketConfigs[0] = SecurityPolicyStore.InlineRateLimitBucketArgs({
-      localToken: s_tokenA,
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      direction: IPoolV2.MessageDirection.Inbound,
-      fastFinality: false,
-      config: _getRateLimitConfig(7 * CAPACITY)
-    });
-    vm.prank(s_poolConfigManager);
-    s_store.applyInlineRateLimitBucketUpdates(bucketConfigs);
-
-    SecurityPolicyStore.InlineRateLimitConfigArgs memory config =
-      _getInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR);
-    // The inbound default finality bucket changed.
-    assertEq(7 * CAPACITY, config.rateLimitConfig.inbound.capacity);
-    // The other three buckets kept their config.
-    assertEq(CAPACITY, config.rateLimitConfig.outbound.capacity);
-    assertEq(CAPACITY + 2, config.rateLimitConfig.fastFinalityOutbound.capacity);
-    assertEq(CAPACITY + 3, config.rateLimitConfig.fastFinalityInbound.capacity);
-  }
-
   // Reverts
 
-  /// @notice Each config of a record follows the checks of RateLimiter.
+  /// @notice Each config of a record follows the checks of RateLimiter, and the revert names the record.
   function test_applyInlineRateLimitConfigUpdates_RevertWhen_InvalidRateLimitConfig() public {
-    RateLimiter.Config memory invalidRateConfig = RateLimiter.Config({isEnabled: true, capacity: 10, rate: 11});
     SecurityPolicyStore.InlineRateLimitConfigArgs[] memory inlineConfigs =
       new SecurityPolicyStore.InlineRateLimitConfigArgs[](1);
     inlineConfigs[0] = _getInlineConfigArgs(s_tokenA, DEST_CHAIN_SELECTOR, CAPACITY);
-    inlineConfigs[0].rateLimitConfig.fastFinalityInbound = invalidRateConfig;
+    inlineConfigs[0].rateLimitConfig.fastFinalityInbound = RateLimiter.Config({isEnabled: true, capacity: 10, rate: 11});
 
-    vm.expectRevert(abi.encodeWithSelector(RateLimiter.InvalidRateLimitRate.selector, invalidRateConfig));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        SecurityPolicyStore.InvalidInlineRateLimitConfig.selector,
+        s_tokenA,
+        DEST_CHAIN_SELECTOR,
+        inlineConfigs[0].rateLimitConfig
+      )
+    );
     _setInlineRateLimitRecords(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
 
     RateLimiter.Config memory disabledConfig = RateLimiter.Config({isEnabled: false, capacity: 10, rate: 0});
-    vm.expectRevert(abi.encodeWithSelector(RateLimiter.DisabledNonZeroRateLimit.selector, disabledConfig));
+    SecurityPolicyStore.RateLimitConfig memory disabledRecord = SecurityPolicyStore.RateLimitConfig({
+      outbound: disabledConfig,
+      inbound: disabledConfig,
+      fastFinalityOutbound: disabledConfig,
+      fastFinalityInbound: disabledConfig
+    });
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        SecurityPolicyStore.InvalidInlineRateLimitConfig.selector, s_tokenA, DEST_CHAIN_SELECTOR, disabledRecord
+      )
+    );
     _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, disabledConfig);
   }
 
@@ -145,25 +127,6 @@ contract SecurityPolicyStore_applyInlineRateLimitConfigUpdates is SecurityPolicy
     _setInlineRateLimitRecords(
       _lanesOf(s_tokenA, DEST_CHAIN_SELECTOR), new SecurityPolicyStore.InlineRateLimitConfigArgs[](0)
     );
-  }
-
-  /// @notice The bucket update needs the record to exist.
-  function test_applyInlineRateLimitBucketUpdates_RevertWhen_RateLimitRecordNotFound() public {
-    SecurityPolicyStore.InlineRateLimitBucketArgs[] memory bucketConfigs =
-      new SecurityPolicyStore.InlineRateLimitBucketArgs[](1);
-    bucketConfigs[0] = SecurityPolicyStore.InlineRateLimitBucketArgs({
-      localToken: s_tokenA,
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      direction: IPoolV2.MessageDirection.Outbound,
-      fastFinality: false,
-      config: _getRateLimitConfig(CAPACITY)
-    });
-
-    vm.expectRevert(
-      abi.encodeWithSelector(SecurityPolicyStore.RateLimitRecordNotFound.selector, s_tokenA, DEST_CHAIN_SELECTOR)
-    );
-    vm.prank(s_poolConfigManager);
-    s_store.applyInlineRateLimitBucketUpdates(bucketConfigs);
   }
 
   /// @notice Only an authorized pool config manager writes to the store.

@@ -5,6 +5,8 @@ import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 contract SecurityPolicyStore_applyTokenProfileUpdates is SecurityPolicyStoreSetup {
   /// @notice A set of a new token registers it. The token has no policy, and a deregistration clears its decimals.
   function test_applyTokenProfileUpdates_RegistersAndDeregistersToken() public {
@@ -40,7 +42,7 @@ contract SecurityPolicyStore_applyTokenProfileUpdates is SecurityPolicyStoreSetu
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        SecurityPolicyStore.InvalidDecimalArgs.selector, DEFAULT_TOKEN_DECIMALS, DEFAULT_TOKEN_DECIMALS + 1
+        SecurityPolicyStore.InvalidDecimalArgs.selector, s_tokenA, DEFAULT_TOKEN_DECIMALS, DEFAULT_TOKEN_DECIMALS + 1
       )
     );
     _applyTokenProfileUpdates(new address[](0), profiles);
@@ -66,5 +68,11 @@ contract SecurityPolicyStore_applyTokenProfileUpdates is SecurityPolicyStoreSetu
     address unknownToken = makeAddr("unknownToken");
     vm.expectRevert(abi.encodeWithSelector(PolicyConfig.LocalTokenNotRegistered.selector, unknownToken));
     _applyTokenProfileUpdates(_arrayOf(unknownToken), new PolicyConfig.TokenProfileArgs[](0));
+  }
+
+  /// @notice Only an authorized pool config manager writes to the store.
+  function test_applyTokenProfileUpdates_RevertWhen_UnauthorizedCaller() public {
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, address(this)));
+    s_store.applyTokenProfileUpdates(new address[](0), new PolicyConfig.TokenProfileArgs[](0));
   }
 }

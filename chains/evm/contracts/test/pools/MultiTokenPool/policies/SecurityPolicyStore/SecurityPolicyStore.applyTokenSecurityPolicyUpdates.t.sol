@@ -5,6 +5,8 @@ import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
 
+import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
+
 contract SecurityPolicyStore_applyTokenSecurityPolicyUpdates is SecurityPolicyStoreSetup {
   /// @notice A set binds a token to a policy and moves its token count. Zero removes the token from its policy.
   function test_applyTokenSecurityPolicyUpdates_SetsAndRemovesPolicy() public {
@@ -39,5 +41,11 @@ contract SecurityPolicyStore_applyTokenSecurityPolicyUpdates is SecurityPolicySt
     address unknownToken = makeAddr("unknownToken");
     vm.expectRevert(abi.encodeWithSelector(PolicyConfig.LocalTokenNotRegistered.selector, unknownToken));
     _setTokenSecurityPolicy(unknownToken, DEFAULT_POLICY);
+  }
+
+  /// @notice Only an authorized pool config manager writes to the store.
+  function test_applyTokenSecurityPolicyUpdates_RevertWhen_UnauthorizedCaller() public {
+    vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, address(this)));
+    s_store.applyTokenSecurityPolicyUpdates(new PolicyConfig.TokenPolicyArgs[](0));
   }
 }

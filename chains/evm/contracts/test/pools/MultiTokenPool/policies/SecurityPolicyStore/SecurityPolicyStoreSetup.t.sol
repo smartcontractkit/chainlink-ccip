@@ -80,12 +80,6 @@ contract SecurityPolicyStoreSetup is BaseTest {
     return lanes;
   }
 
-  function _trueArrayOf() internal pure returns (bool[] memory flags) {
-    flags = new bool[](1);
-    flags[0] = true;
-    return flags;
-  }
-
   function _ccvsOf(
     address firstCCV,
     address secondCCV
@@ -252,7 +246,7 @@ contract SecurityPolicyStoreSetup is BaseTest {
     uint64 remoteChainSelector
   ) internal view returns (IPoolConfigManager.LaneRateLimiterState memory) {
     IPoolConfigManager.LaneRateLimiterState[] memory states =
-      s_store.getCurrentRateLimiterStateBatch(_lanesOf(localToken, remoteChainSelector), _trueArrayOf());
+      s_store.getCurrentRateLimiterStateBatch(_lanesOf(localToken, remoteChainSelector));
     return states[0];
   }
 
