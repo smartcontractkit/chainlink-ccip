@@ -472,6 +472,272 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   // ================================================================
+  // │                         Config writes                        │
+  // ================================================================
+
+  // Each config write has a store function with the same signature, so its call data is also a valid call to that
+  // store function. Address.functionCall returns each store revert that has data unchanged. A revert without data
+  // becomes FailedCall.
+
+  /// @notice Deregisters tokens, then sets the profile of tokens. All three stores apply the call. See
+  /// ConnectionPolicyStore.applyTokenProfileUpdates, FeePolicyStore.applyTokenProfileUpdates and
+  /// SecurityPolicyStore.applyTokenProfileUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. The connection store runs first, so a token that fails
+  /// in more than one store reverts with the error of the first of them.
+  function applyTokenProfileUpdates(
+    address[] calldata, // tokensToRemove
+    PolicyConfig.TokenProfileArgs[] calldata // profilesToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    bytes memory callData = msg.data;
+    Address.functionCall(address(i_connectionStore), callData);
+    Address.functionCall(address(i_feeStore), callData);
+    Address.functionCall(address(i_securityStore), callData);
+  }
+
+  /// @notice Sets the connection policy of tokens. See ConnectionPolicyStore.applyTokenConnectionPolicyUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. The lanes that the new policy opens are not checked, the
+  /// same as for a connection policy record.
+  function applyTokenConnectionPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+  }
+
+  /// @notice Sets the remote pool policy of tokens. See ConnectionPolicyStore.applyTokenRemotePoolPolicyUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyTokenRemotePoolPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+  }
+
+  /// @notice Sets the rate limit policy of tokens. See SecurityPolicyStore.applyTokenRateLimitPolicyUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyTokenRateLimitPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  /// @notice Sets the fee policy of tokens. See FeePolicyStore.applyTokenFeePolicyUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyTokenFeePolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_feeStore), msg.data);
+  }
+
+  /// @notice Sets the destination overhead policy of tokens. See FeePolicyStore.applyTokenDestOverheadPolicyUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyTokenDestOverheadPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_feeStore), msg.data);
+  }
+
+  /// @notice Sets the security policy of tokens. See SecurityPolicyStore.applyTokenSecurityPolicyUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyTokenSecurityPolicyUpdates(
+    PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  /// @notice Removes and sets connection policy records, and removes connection policies. See
+  /// ConnectionPolicyStore.applyConnectionPolicyConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or CONNECTION_POLICY_ROLE. A policy record is not checked, because
+  /// no store lists the tokens that it serves.
+  function applyConnectionPolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
+    bytes32[] calldata, // policiesToRemove
+    ConnectionPolicyStore.ConnectionPolicyConfigArgs[] calldata // policyConfigsToSet
+  ) external {
+    _checkPolicyRoles(CONNECTION_POLICY_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+  }
+
+  /// @notice Removes and sets inline connection records. See ConnectionPolicyStore.applyInlineConnectionConfigUpdates.
+  /// Each inline record that is set opens a lane, so the token must have a record of each other type for the chain
+  /// after the call.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. Reverts for the first type that a token misses.
+  /// @param inlineConfigsToSet The inline records to set.
+  function applyInlineConnectionConfigUpdates(
+    LaneKey[] calldata, // inlineConfigsToRemove
+    ConnectionPolicyStore.InlineConnectionConfigArgs[] calldata inlineConfigsToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+    for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
+      _checkLane(inlineConfigsToSet[i].localToken, inlineConfigsToSet[i].remoteChainSelector);
+    }
+  }
+
+  /// @notice Removes and adds subset tokens. See ConnectionPolicyStore.applySubsetTokenUpdates. Each subset token that
+  /// is added opens a lane, so the token must have a record of each other type for the chain after the call.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or CONNECTION_POLICY_ROLE. Reverts for the first type that a token
+  /// misses.
+  /// @param tokensToAdd The subset tokens to add.
+  function applySubsetTokenUpdates(
+    ConnectionPolicyStore.SubsetTokenArgs[] calldata, // tokensToRemove
+    ConnectionPolicyStore.SubsetTokenArgs[] calldata tokensToAdd
+  ) external {
+    _checkPolicyRoles(CONNECTION_POLICY_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+    for (uint256 i = 0; i < tokensToAdd.length; ++i) {
+      _checkLane(tokensToAdd[i].localToken, tokensToAdd[i].remoteChainSelector);
+    }
+  }
+
+  /// @notice Sets the remote token address providers of connection policies. See
+  /// ConnectionPolicyStore.applyRemoteTokenAddressProviderUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or CONNECTION_POLICY_ROLE. A provider set opens no lane, so the
+  /// lane check does not run.
+  function applyRemoteTokenAddressProviderUpdates(
+    ConnectionPolicyStore.RemoteTokenAddressProviderArgs[] calldata // providersToSet
+  ) external {
+    _checkPolicyRoles(CONNECTION_POLICY_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+  }
+
+  /// @notice Removes and sets remote pool policy records, and removes remote pool policies. See
+  /// ConnectionPolicyStore.applyRemotePoolPolicyConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or REMOTE_POOL_POLICY_ROLE.
+  function applyRemotePoolPolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
+    bytes32[] calldata, // policiesToRemove
+    ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] calldata // policyConfigsToSet
+  ) external {
+    _checkPolicyRoles(REMOTE_POOL_POLICY_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+  }
+
+  /// @notice Removes and sets inline remote pool records. See ConnectionPolicyStore.applyInlineRemotePoolConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyInlineRemotePoolConfigUpdates(
+    LaneKey[] calldata, // inlineConfigsToRemove
+    ConnectionPolicyStore.InlineRemotePoolConfigArgs[] calldata // inlineConfigsToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_connectionStore), msg.data);
+  }
+
+  /// @notice Removes and sets rate limit policy records, and removes rate limit policies. See
+  /// SecurityPolicyStore.applyRateLimitPolicyConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or RATE_LIMIT_POLICY_ROLE.
+  function applyRateLimitPolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
+    bytes32[] calldata, // policiesToRemove
+    SecurityPolicyStore.RateLimitPolicyConfigArgs[] calldata // policyConfigsToSet
+  ) external {
+    _checkPolicyRoles(RATE_LIMIT_POLICY_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  /// @notice Updates one config of existing rate limit policy records. See
+  /// SecurityPolicyStore.applyRateLimitPolicyBucketUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or RATE_LIMIT_POLICY_ROLE.
+  function applyRateLimitPolicyBucketUpdates(
+    SecurityPolicyStore.RateLimitPolicyBucketArgs[] calldata // bucketConfigsToSet
+  ) external {
+    _checkPolicyRoles(RATE_LIMIT_POLICY_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  /// @notice Removes and sets inline rate limit records. See SecurityPolicyStore.applyInlineRateLimitConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyInlineRateLimitConfigUpdates(
+    LaneKey[] calldata, // inlineConfigsToRemove
+    SecurityPolicyStore.InlineRateLimitConfigArgs[] calldata // inlineConfigsToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  /// @notice Updates one config of existing inline rate limit records. See
+  /// SecurityPolicyStore.applyInlineRateLimitBucketUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyInlineRateLimitBucketUpdates(
+    SecurityPolicyStore.InlineRateLimitBucketArgs[] calldata // bucketConfigsToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  /// @notice Removes and sets fee policy records, and removes fee policies. See
+  /// FeePolicyStore.applyFeePolicyConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or FEE_POLICY_ROLE.
+  function applyFeePolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
+    bytes32[] calldata, // policiesToRemove
+    FeePolicyStore.FeePolicyConfigArgs[] calldata // policyConfigsToSet
+  ) external {
+    _checkPolicyRoles(FEE_POLICY_ROLE);
+    Address.functionCall(address(i_feeStore), msg.data);
+  }
+
+  /// @notice Removes and sets inline fee records. See FeePolicyStore.applyInlineFeeConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyInlineFeeConfigUpdates(
+    LaneKey[] calldata, // inlineConfigsToRemove
+    FeePolicyStore.InlineFeeConfigArgs[] calldata // inlineConfigsToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_feeStore), msg.data);
+  }
+
+  /// @notice Removes and sets destination overhead policy records, and removes destination overhead policies. See
+  /// FeePolicyStore.applyDestOverheadPolicyConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or DEST_OVERHEAD_POLICY_ROLE.
+  function applyDestOverheadPolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
+    bytes32[] calldata, // policiesToRemove
+    FeePolicyStore.DestOverheadPolicyConfigArgs[] calldata // policyConfigsToSet
+  ) external {
+    _checkPolicyRoles(DEST_OVERHEAD_POLICY_ROLE);
+    Address.functionCall(address(i_feeStore), msg.data);
+  }
+
+  /// @notice Removes and sets inline destination overhead records. See
+  /// FeePolicyStore.applyInlineDestOverheadConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyInlineDestOverheadConfigUpdates(
+    LaneKey[] calldata, // inlineConfigsToRemove
+    FeePolicyStore.InlineDestOverheadConfigArgs[] calldata // inlineConfigsToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_feeStore), msg.data);
+  }
+
+  /// @notice Removes and sets security policy records, and removes security policies. See
+  /// SecurityPolicyStore.applySecurityPolicyConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or SECURITY_POLICY_ROLE.
+  function applySecurityPolicyConfigUpdates(
+    PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
+    bytes32[] calldata, // policiesToRemove
+    SecurityPolicyStore.SecurityPolicyConfigArgs[] calldata // policyConfigsToSet
+  ) external {
+    _checkPolicyRoles(SECURITY_POLICY_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  /// @notice Removes and sets inline security records. See SecurityPolicyStore.applyInlineSecurityConfigUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  function applyInlineSecurityConfigUpdates(
+    LaneKey[] calldata, // inlineConfigsToRemove
+    SecurityPolicyStore.InlineSecurityConfigArgs[] calldata // inlineConfigsToSet
+  ) external {
+    _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
+    Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  // ================================================================
   // │                           Helpers                            │
   // ================================================================
 
@@ -480,6 +746,19 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     address localToken
   ) private view {
     if (msg.sender != i_tokenAdminRegistry.getPool(localToken)) revert CallerIsNotTokenPool(msg.sender, localToken);
+  }
+
+  /// @dev The one check that reads all three stores. It runs after each write that opens a lane: an inline connection
+  /// record set and a subset token add. Off-chain tooling checks the other writes, such as a connection policy record
+  /// set. The connection store checks the remote pool record, then the fee store checks its records, then the security
+  /// store checks its records.
+  function _checkLane(
+    address localToken,
+    uint64 remoteChainSelector
+  ) private view {
+    i_connectionStore.checkLaneRecords(localToken, remoteChainSelector);
+    i_feeStore.checkLaneRecords(localToken, remoteChainSelector);
+    i_securityStore.checkLaneRecords(localToken, remoteChainSelector);
   }
 
   /// @dev Ends the call with the unchanged return data of the store view that has the signature of the called view.

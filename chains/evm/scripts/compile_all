@@ -16,6 +16,7 @@ OPTIMIZE_RUNS_LARGE_POOL=17000
 OPTIMIZE_RUNS_SUCCINCT_ZK_VERIFIER=15000
 OPTIMIZE_RUNS_CONNECTION_POLICY_STORE=50
 OPTIMIZE_RUNS_SECURITY_POLICY_STORE=1000
+OPTIMIZE_RUNS_POOL_CONFIG_MANAGER=50
 
 
 PROJECT="ccip"
@@ -92,6 +93,9 @@ function getOptimizations() {
       "SecurityPolicyStore")
         optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_SECURITY_POLICY_STORE"
         ;;
+      "PoolConfigManager")
+        optimize_runs_override="--optimizer-runs $OPTIMIZE_RUNS_POOL_CONFIG_MANAGER"
+        ;;
     esac
 
     echo "$optimize_runs_override"
@@ -145,6 +149,7 @@ compileContract pools/MultiTokenPool/FactoryTokenWithUIDPoolDataProvider
 compileContract pools/MultiTokenPool/SameAddressRemoteTokenAddressProvider
 compileContract pools/MultiTokenPool/policies/ConnectionPolicyStore
 compileContract pools/MultiTokenPool/policies/FeePolicyStore
+compileContract pools/MultiTokenPool/PoolConfigManager
 
 compileContract tokens/CrossChainToken
 
