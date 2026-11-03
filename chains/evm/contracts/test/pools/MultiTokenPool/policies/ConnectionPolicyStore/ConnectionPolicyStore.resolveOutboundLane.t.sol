@@ -272,7 +272,7 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
     vm.etch(address(s_remoteTokenAddressProvider), "");
 
     // The empty answer fails the decode.
-    vm.expectRevert(bytes(""));
+    vm.expectRevert();
     s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
   }
 

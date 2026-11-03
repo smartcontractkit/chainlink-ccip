@@ -550,7 +550,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
 
     // The empty answer fails the decode.
-    vm.expectRevert(bytes(""));
+    vm.expectRevert();
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
   }
 

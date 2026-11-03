@@ -965,7 +965,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @param policyName The connection policy.
   /// @param remoteChainSelector The chain of the policy record.
   /// @return onlySubsetTokens True if the record serves only its subset tokens. False if the record does not exist.
-  /// @return subsetTokens The subset tokens. They have a lane only while onlySubsetTokens is true.
+  /// @return subsetTokens The tokens that the record serves while onlySubsetTokens is true.
   function getSubsetTokens(
     bytes32 policyName,
     uint64 remoteChainSelector
