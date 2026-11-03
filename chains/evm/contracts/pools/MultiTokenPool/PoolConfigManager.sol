@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IMultiTokenPool} from "../../interfaces/IMultiTokenPool.sol";
 import {IPoolConfigManager} from "../../interfaces/IPoolConfigManager.sol";
 import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
@@ -735,6 +736,92 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   ) external {
     _checkRoleOr(CONFIG_ROLE, TOKEN_MANAGER_ROLE);
     Address.functionCall(address(i_securityStore), msg.data);
+  }
+
+  // ================================================================
+  // │                            Pause                             │
+  // ================================================================
+
+  /// @notice Turns on the global pause. It stops every token on every chain in both directions. The pause flags of
+  /// tokens and chains do not change.
+  /// @dev Only callable by DEFAULT_ADMIN_ROLE or PAUSER_ROLE. So the default admin can stop all transfers in an
+  /// emergency without first granting itself a role.
+  function pauseGlobally() external {
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, PAUSER_ROLE);
+    i_connectionStore.setGlobalPause(true);
+  }
+
+  /// @notice Turns off the global pause. Paused tokens and chains stay paused.
+  /// @dev Only callable by DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE.
+  function unpauseGlobally() external {
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, UNPAUSER_ROLE);
+    i_connectionStore.setGlobalPause(false);
+  }
+
+  /// @notice Pauses tokens in one direction or in both directions. Any address can be paused, also before the token is
+  /// registered.
+  /// @dev Only callable by DEFAULT_ADMIN_ROLE or PAUSER_ROLE.
+  /// @param localTokens The tokens to pause.
+  /// @param direction The direction to pause, or Both.
+  function pauseTokens(
+    address[] calldata localTokens,
+    ConnectionPolicyStore.PauseDirection direction
+  ) external {
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, PAUSER_ROLE);
+    i_connectionStore.setTokenPause(localTokens, direction, true);
+  }
+
+  /// @notice Unpauses tokens in one direction or in both directions.
+  /// @dev Only callable by DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE.
+  /// @param localTokens The tokens to unpause.
+  /// @param direction The direction to unpause, or Both.
+  function unpauseTokens(
+    address[] calldata localTokens,
+    ConnectionPolicyStore.PauseDirection direction
+  ) external {
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, UNPAUSER_ROLE);
+    i_connectionStore.setTokenPause(localTokens, direction, false);
+  }
+
+  /// @notice Pauses remote chains for every token, in one direction or in both directions.
+  /// @dev Only callable by DEFAULT_ADMIN_ROLE or PAUSER_ROLE.
+  /// @param remoteChainSelectors The remote chains to pause.
+  /// @param direction The direction to pause, or Both.
+  function pauseChains(
+    uint64[] calldata remoteChainSelectors,
+    ConnectionPolicyStore.PauseDirection direction
+  ) external {
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, PAUSER_ROLE);
+    i_connectionStore.setChainPause(remoteChainSelectors, direction, true);
+  }
+
+  /// @notice Unpauses remote chains in one direction or in both directions.
+  /// @dev Only callable by DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE.
+  /// @param remoteChainSelectors The remote chains to unpause.
+  /// @param direction The direction to unpause, or Both.
+  function unpauseChains(
+    uint64[] calldata remoteChainSelectors,
+    ConnectionPolicyStore.PauseDirection direction
+  ) external {
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, UNPAUSER_ROLE);
+    i_connectionStore.setChainPause(remoteChainSelectors, direction, false);
+  }
+
+  // ================================================================
+  // │                            Fees                              │
+  // ================================================================
+
+  /// @notice Sends the token fees that a pool holds to a recipient. The pool sends its whole balance of each token.
+  /// @dev Only callable by FEE_COLLECTOR_ROLE. The pool accepts this call only from its pool config manager.
+  /// @param pool The pool that holds the fees.
+  /// @param feeTokens The tokens to withdraw.
+  /// @param recipient The receiver of the fees. Must not be zero.
+  function withdrawFeeTokens(
+    IMultiTokenPool pool,
+    address[] calldata feeTokens,
+    address recipient
+  ) external onlyRole(FEE_COLLECTOR_ROLE) {
+    pool.withdrawFeeTokens(feeTokens, recipient);
   }
 
   // ================================================================
