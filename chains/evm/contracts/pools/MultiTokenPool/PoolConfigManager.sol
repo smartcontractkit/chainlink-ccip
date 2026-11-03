@@ -755,7 +755,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   /// @notice Turns off the global pause. Paused tokens and chains stay paused.
   /// @dev Only callable by DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE.
   function unpauseGlobally() external {
-    _checkRoleOr(DEFAULT_ADMIN_ROLE, PAUSER_ROLE);
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, UNPAUSER_ROLE);
     i_connectionStore.setGlobalPause(false);
   }
 
