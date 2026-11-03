@@ -30,7 +30,7 @@ contract FeePolicyStore_applyInlineFeeConfigUpdates is FeePolicyStoreSetup {
     // The inline record overrides the policy chain record of the token.
     assertEq(
       (1e18 * uint256(INLINE_TRANSFER_FEE_BPS)) / BPS_DIVIDER,
-      s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true)
+      s_feeStore.validateLockOrBurn(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, 0)
     );
   }
 
@@ -65,12 +65,12 @@ contract FeePolicyStore_applyInlineFeeConfigUpdates is FeePolicyStoreSetup {
   // Reverts
 
   function test_applyInlineFeeConfigUpdates_RevertWhen_InvalidInlineFeeConfig() public {
-    // A disabled config with fees, and a bps fee at BPS_DIVIDER.
+    // Each bps fee at BPS_DIVIDER.
     FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](2);
     invalidFeeConfigs[0] = _getFeeConfig();
-    invalidFeeConfigs[0].isEnabled = false;
+    invalidFeeConfigs[0].finalityTransferFeeBps = uint16(BPS_DIVIDER);
     invalidFeeConfigs[1] = _getFeeConfig();
-    invalidFeeConfigs[1].finalityTransferFeeBps = uint16(BPS_DIVIDER);
+    invalidFeeConfigs[1].fastFinalityTransferFeeBps = uint16(BPS_DIVIDER);
 
     for (uint256 i = 0; i < invalidFeeConfigs.length; ++i) {
       FeePolicyStore.InlineFeeConfigArgs[] memory inlineConfigs =

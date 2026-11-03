@@ -6,6 +6,7 @@ import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.s
 import {IRemoteTokenAddressProvider} from "../../../../../interfaces/IRemoteTokenAddressProvider.sol";
 
 import {FinalityCodec} from "../../../../../libraries/FinalityCodec.sol";
+import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {ConnectionPolicyStore} from "../../../../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
 import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 
@@ -21,6 +22,20 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     expectedTransfer.localAmount = AMOUNT;
     expectedTransfer.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Burn;
     assertEq(abi.encode(expectedTransfer), abi.encode(transfer));
+  }
+
+  function test_resolveInboundLane_TokenProfile() public {
+    address burnAddress = makeAddr("burnAddress");
+    PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_token);
+    profiles[0].lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.BurnToAddress;
+    profiles[0].lockOrBurnAddress = burnAddress;
+    s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
+
+    IPoolConfigManager.ResolvedInboundTransfer memory transfer =
+      _resolveInboundLane(s_token, s_remotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
+
+    assertEq(uint8(IPoolConfigManager.LockOrBurnFlavor.BurnToAddress), uint8(transfer.lockOrBurnFlavor));
+    assertEq(burnAddress, transfer.lockOrBurnAddress);
   }
 
   function test_resolveInboundLane_ConvertsDecimals() public view {

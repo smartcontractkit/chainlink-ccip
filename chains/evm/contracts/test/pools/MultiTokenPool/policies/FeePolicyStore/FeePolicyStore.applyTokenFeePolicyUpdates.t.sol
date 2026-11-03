@@ -39,7 +39,7 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
     // The token uses the records of its new policy at once.
     assertEq(
       (1e18 * uint256(OTHER_TRANSFER_FEE_BPS)) / BPS_DIVIDER,
-      s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true)
+      s_feeStore.validateLockOrBurn(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, 0)
     );
   }
 
@@ -107,7 +107,7 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
     s_feeStore.checkLaneRecords(s_token, SOURCE_CHAIN_SELECTOR);
 
     vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
-    s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+    s_feeStore.validateLockOrBurn(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, 0);
     vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
     s_feeStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
   }

@@ -58,7 +58,7 @@ interface IPoolConfigManager {
     uint32 destGasOverhead; // ──╮ The destination token execution gas overhead.
     uint32 destBytesOverhead; // │ The destination token data byte overhead.
     uint16 tokenFeeBps; //       │ The fee deducted from the transferred asset, in basis points.
-    bool isEnabled; // ──────────╯ Whether pool fees are enabled. False requests default fees.
+    bool isEnabled; // ──────────╯ False if the lane has no fee. MultiTokenPool.getFee then reverts.
   }
 
   /// @notice Current buckets for both finality classes for one token and remote chain.
@@ -139,8 +139,8 @@ interface IPoolConfigManager {
   /// @dev Reverts if a token does not allow the requested finality, even when it has no lane.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, lanes without an
-  /// enabled fee record and lanes without a dest overhead record return zeros with isEnabled false.
+  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, lanes without a
+  /// fee record and lanes without a destination overhead record return zeros with isEnabled false.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -149,7 +149,7 @@ interface IPoolConfigManager {
   /// @notice Returns the resolved lane fee configurations.
   /// @param lanes The token and remote chain lanes to query.
   /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist, lanes
-  /// without an enabled fee record and lanes without a dest overhead record return a disabled zero configuration.
+  /// without a fee record and lanes without a destination overhead record return zeros with isEnabled false.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs);

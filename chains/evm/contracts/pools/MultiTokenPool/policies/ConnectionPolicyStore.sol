@@ -278,7 +278,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs
   ) external view returns (IPoolConfigManager.OutboundLane memory lane) {
-    TokenState memory tokenState = s_tokenStates[localToken];
+    TokenState storage tokenState = s_tokenStates[localToken];
     if (s_isGloballyPaused) revert GloballyPaused();
     if (tokenState.isOutboundPaused) revert TokenIsPaused(localToken, PauseDirection.Outbound);
     if (s_chainPauses[remoteChainSelector].isOutboundPaused) {
@@ -325,7 +325,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint256 sourceDenominatedAmount,
     bytes4 requestedFinalityConfig
   ) external view returns (IPoolConfigManager.ResolvedInboundTransfer memory transfer) {
-    TokenState memory tokenState = s_tokenStates[localToken];
+    TokenState storage tokenState = s_tokenStates[localToken];
     if (s_isGloballyPaused) revert GloballyPaused();
     if (tokenState.isInboundPaused) revert TokenIsPaused(localToken, PauseDirection.Inbound);
     if (s_chainPauses[remoteChainSelector].isInboundPaused) {
@@ -363,7 +363,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @dev Reverts if the lane does not trust the source pool. Returns the allowLegacyPoolDataOnReceive flag of the
-  /// source pool.
+  /// source pool on an inline record, and false for a pool of a policy record.
   function _checkSourcePool(
     address localToken,
     uint64 remoteChainSelector,
@@ -502,7 +502,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector,
     bytes4 requestedFinalityConfig,
     bytes calldata tokenArgs,
-    TokenState memory tokenState,
+    TokenState storage tokenState,
     bool useLegacyPoolDataOnSend
   ) private view returns (bytes memory) {
     if (useLegacyPoolDataOnSend) {
@@ -526,7 +526,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector,
     bytes4 requestedFinalityConfig,
     bytes calldata sourcePoolData,
-    TokenState memory tokenState,
+    TokenState storage tokenState,
     bool allowLegacyPoolDataOnReceive
   ) private view returns (uint8 remoteDecimals) {
     bytes memory sourceToken;
@@ -1235,7 +1235,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
         }
       }
 
-      PolicyConfig._removeInlineRecord(s_inlineConnectionChains[localToken], localToken, remoteChainSelector);
+      s_inlineConnectionChains[localToken].remove(remoteChainSelector);
       delete s_inlineRemoteTokens[localToken][remoteChainSelector];
       emit InlineConnectionConfigRemoved(localToken, remoteChainSelector);
     }

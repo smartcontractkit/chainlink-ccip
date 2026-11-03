@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
 
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
+import {Pool} from "../../../../../libraries/Pool.sol";
 import {FeePolicyStore} from "../../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
 import {BaseTest} from "../../../../BaseTest.t.sol";
 
@@ -14,7 +15,7 @@ contract FeePolicyStoreSetup is BaseTest {
   bytes32 internal constant DEST_OVERHEAD_POLICY = "DEST_OVERHEAD_POLICY";
   bytes32 internal constant OTHER_POLICY = "OTHER_POLICY";
   uint256 internal constant BPS_DIVIDER = 10_000;
-  uint32 internal constant MIN_DEST_BYTES_OVERHEAD = 192;
+  uint32 internal constant MIN_DEST_BYTES_OVERHEAD = Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 
   FeePolicyStore internal s_feeStore;
   address internal s_poolConfigManager = makeAddr("poolConfigManager");
@@ -45,22 +46,14 @@ contract FeePolicyStoreSetup is BaseTest {
   /// @dev Each field has a distinct value, so tests can tell the fields apart.
   function _getFeeConfig() internal pure returns (FeePolicyStore.FeeConfig memory) {
     return FeePolicyStore.FeeConfig({
-      finalityFeeUSDCents: 100,
-      fastFinalityFeeUSDCents: 200,
-      finalityTransferFeeBps: 10,
-      fastFinalityTransferFeeBps: 30,
-      isEnabled: true
+      finalityFeeUSDCents: 100, fastFinalityFeeUSDCents: 200, finalityTransferFeeBps: 10, fastFinalityTransferFeeBps: 30
     });
   }
 
   /// @dev Each field differs from _getFeeConfig.
   function _getOtherFeeConfig() internal pure returns (FeePolicyStore.FeeConfig memory) {
     return FeePolicyStore.FeeConfig({
-      finalityFeeUSDCents: 300,
-      fastFinalityFeeUSDCents: 400,
-      finalityTransferFeeBps: 50,
-      fastFinalityTransferFeeBps: 70,
-      isEnabled: true
+      finalityFeeUSDCents: 300, fastFinalityFeeUSDCents: 400, finalityTransferFeeBps: 50, fastFinalityTransferFeeBps: 70
     });
   }
 

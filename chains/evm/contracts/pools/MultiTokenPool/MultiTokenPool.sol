@@ -41,6 +41,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   error CallerIsNotARampOnRouter(address caller);
   error CallerIsNotPoolConfigManager(address caller);
   error UnsupportedLockOrBurnFlavor(address token, IPoolConfigManager.LockOrBurnFlavor flavor);
+  error LaneFeeNotFound(address localToken, uint64 destChainSelector);
 
   event LockedOrBurned(uint64 indexed remoteChainSelector, address indexed token, address sender, uint256 amount);
   event ReleasedOrMinted(
@@ -421,8 +422,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev Reverts if the token profile does not allow the requested finality. If the fee config is disabled, returns
-  /// zeros with isEnabled false to signal the OnRamp to use FeeQuoter defaults.
+  /// @dev Reverts if the token profile does not allow the requested finality, or if the lane has no fee. So the OnRamp
+  /// never prices a token of this pool with the FeeQuoter.
   function getFee(
     address localToken,
     uint64 destChainSelector,
@@ -438,6 +439,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   {
     IPoolConfigManager.LaneFee memory fee =
       s_poolConfigManager.getFeeBatch(_laneKeys(localToken, destChainSelector), requestedFinalityConfig)[0];
+    if (!fee.isEnabled) revert LaneFeeNotFound(localToken, destChainSelector);
     return (fee.feeUSDCents, fee.destGasOverhead, fee.destBytesOverhead, fee.tokenFeeBps, fee.isEnabled);
   }
 
