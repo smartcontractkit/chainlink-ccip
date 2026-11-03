@@ -30,7 +30,6 @@ contract FeePolicyStore_validateLockOrBurn is FeePolicyStoreSetup {
   function test_validateLockOrBurn_PolicyChainRecord() public {
     _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, _getOtherFeeConfig()));
 
-    // The policy chain record serves the chain instead of the policy default record.
     assertEq(
       (AMOUNT * _getOtherFeeConfig().finalityTransferFeeBps) / BPS_DIVIDER,
       s_feeStore.validateLockOrBurn(
@@ -92,7 +91,7 @@ contract FeePolicyStore_validateLockOrBurn is FeePolicyStoreSetup {
     );
     uint32 destBytesOverhead = _getOtherDestOverheadConfig().destBytesOverhead;
 
-    // The inline record sets the limit instead of the policy default record.
+    // The inline byte limit overrides the policy default.
     s_feeStore.validateLockOrBurn(
       s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, destBytesOverhead
     );
@@ -119,7 +118,7 @@ contract FeePolicyStore_validateLockOrBurn is FeePolicyStoreSetup {
     destOverheadConfig.destBytesOverhead = destBytesOverhead;
     _setInlineDestOverheadConfig(_getInlineDestOverheadConfigArgs(s_token, DEST_CHAIN_SELECTOR, destOverheadConfig));
 
-    // Pool data of the same length as the bytes overhead passes, also on the V1 path.
+    // The byte limit is inclusive, whether or not a token fee is charged.
     s_feeStore.validateLockOrBurn(
       s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, destBytesOverhead
     );
@@ -144,7 +143,7 @@ contract FeePolicyStore_validateLockOrBurn is FeePolicyStoreSetup {
   // Reverts
 
   function test_validateLockOrBurn_RevertWhen_FeeRecordNotFound() public {
-    // s_otherToken has no record of either type, and the fee record is checked first.
+    // Both records are missing; report the missing fee record first.
     vm.expectRevert(
       abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_otherToken, DEST_CHAIN_SELECTOR)
     );
@@ -152,7 +151,7 @@ contract FeePolicyStore_validateLockOrBurn is FeePolicyStoreSetup {
       s_otherToken, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, 0
     );
 
-    // A send without a token fee also needs the record.
+    // Disabling token fees must not bypass the missing fee record check.
     vm.expectRevert(
       abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_otherToken, DEST_CHAIN_SELECTOR)
     );
@@ -169,7 +168,7 @@ contract FeePolicyStore_validateLockOrBurn is FeePolicyStoreSetup {
     );
     s_feeStore.validateLockOrBurn(s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, 0);
 
-    // A send without a token fee also needs the record.
+    // Destination overheads are still required when no token fee is charged.
     vm.expectRevert(
       abi.encodeWithSelector(FeePolicyStore.DestOverheadRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR)
     );
@@ -192,7 +191,7 @@ contract FeePolicyStore_validateLockOrBurn is FeePolicyStoreSetup {
       s_token, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, destPoolDataLength
     );
 
-    // A send without a token fee also checks the pool data.
+    // The V1 path must enforce the same byte limit without charging a token fee.
     vm.expectRevert(
       abi.encodeWithSelector(
         FeePolicyStore.PoolDataTooLarge.selector,

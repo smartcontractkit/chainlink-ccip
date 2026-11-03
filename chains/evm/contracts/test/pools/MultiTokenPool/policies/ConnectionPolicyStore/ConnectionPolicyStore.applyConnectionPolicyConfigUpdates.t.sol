@@ -22,7 +22,7 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
       new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
     );
 
-    // The first record set under a new name creates the policy, with no provider.
+    // Adding the first record creates the policy without a provider.
     (
       uint32 tokenCount,
       address remoteTokenAddressProvider,
@@ -38,7 +38,7 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
   }
 
   function test_applyConnectionPolicyConfigUpdates_ReplaceRecord() public {
-    // With onlySubsetTokens on, the record serves only its subset tokens, so s_token loses its lane.
+    // Enabling the subset restriction excludes s_token because the list is empty.
     vm.expectEmit();
     emit ConnectionPolicyStore.ConnectionPolicyConfigSet(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true);
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
@@ -67,7 +67,7 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
     _addSubsetToken(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, s_token);
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, false));
 
-    // The subset tokens stay while onlySubsetTokens is off, and serve again when it is on.
+    // Disabling and re-enabling the restriction preserves the subset list.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
 
     (bool onlySubsetTokens, address[] memory subsetTokens) =
@@ -86,7 +86,7 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
       new ConnectionPolicyStore.ConnectionPolicyConfigArgs[](0)
     );
 
-    // A record removal keeps the policy, its tokens and its provider.
+    // Removing a chain record preserves the policy, assigned tokens, and provider.
     (
       uint32 tokenCount,
       address remoteTokenAddressProvider,
@@ -119,7 +119,7 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
     assertFalse(onlySubsetTokens);
     assertEq(0, subsetTokens.length);
 
-    // A record that is set again starts with no subset tokens.
+    // Recreating the record must not restore its old subset list.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
     (, subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR);
     assertEq(0, subsetTokens.length);
@@ -128,7 +128,6 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
 
   function test_applyConnectionPolicyConfigUpdates_RemovePolicy() public {
     _setTokenConnectionPolicy(s_token, bytes32(0));
-    // The record removals run before the policy removals, so one call can remove the records and the policy.
     vm.expectEmit();
     emit ConnectionPolicyStore.ConnectionPolicyConfigRemoved(CONNECTION_POLICY, DEST_CHAIN_SELECTOR);
     vm.expectEmit();
@@ -141,7 +140,7 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
 
     (bytes32[] memory connectionPolicyNames,) = s_connectionStore.getPolicyNames();
     assertEq(0, connectionPolicyNames.length);
-    // The policy removal also removes the provider, so a policy that is created again has none.
+    // Recreating the policy must not restore its old provider.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, false));
     (, address remoteTokenAddressProvider,) = s_connectionStore.getConnectionPolicy(CONNECTION_POLICY);
     assertEq(address(0), remoteTokenAddressProvider);

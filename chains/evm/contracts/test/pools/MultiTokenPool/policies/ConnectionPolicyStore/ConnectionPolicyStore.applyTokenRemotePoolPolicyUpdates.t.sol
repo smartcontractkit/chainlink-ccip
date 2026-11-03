@@ -37,7 +37,6 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     assertEq(1, tokenCount);
     tokenCount = _getRemotePoolPolicyTokenCount(OTHER_POLICY);
     assertEq(1, tokenCount);
-    // The token uses the records of its new policy at once.
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(1, connections[0].remotePools.length);
@@ -50,7 +49,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
     bytes memory legacyPoolData = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS));
 
-    // A move: the inline record trusts the remote pools of the new policy, and keeps its own remote pool.
+    // Changing policy replaces the policy pools while preserving the inline pool.
     _setTokenRemotePoolPolicy(s_token, OTHER_POLICY);
     _resolveInbound(s_otherRemotePool, sourcePoolData);
     _resolveInbound(legacyPool, legacyPoolData);
@@ -61,7 +60,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     );
     _resolveInbound(s_remotePool, sourcePoolData);
 
-    // An exit: only the remote pool of the inline record stays.
+    // Leaving the policy keeps only the inline pool.
     _setTokenRemotePoolPolicy(s_token, bytes32(0));
     _resolveInbound(legacyPool, legacyPoolData);
     vm.expectRevert(
@@ -81,7 +80,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     assertEq(bytes32(0), remotePoolPolicyName);
     uint32 tokenCount = _getRemotePoolPolicyTokenCount(REMOTE_POOL_POLICY);
     assertEq(0, tokenCount);
-    // The lane stays, but a transfer needs a remote pool record.
+    // The connection still exists, but transfers require a remote pool record.
     (, PolicyConfig.RecordLevel[] memory remotePoolLevels) =
       s_connectionStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(remotePoolLevels[0]));
@@ -101,7 +100,7 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
   }
 
   function test_applyTokenRemotePoolPolicyUpdates_SameTokenTwice() public {
-    // Each item reads the policy that the item before it set, so the token counts stay correct.
+    // Sequential assignments for the same token must update each policy's token count correctly.
     PolicyConfig.TokenPolicyArgs[] memory tokenPolicies = new PolicyConfig.TokenPolicyArgs[](2);
     tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: OTHER_POLICY});
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: bytes32(0)});
@@ -126,7 +125,6 @@ contract ConnectionPolicyStore_applyTokenRemotePoolPolicyUpdates is ConnectionPo
     _setTokenRemotePoolPolicy(s_token, OTHER_POLICY);
 
     assertEq(1, s_connectionStore.getInlineRemotePoolConfigs(s_token).length);
-    // The inline record still overrides the new policy on its chain.
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(s_remotePool, connections[0].remotePools[0].remotePoolAddress);

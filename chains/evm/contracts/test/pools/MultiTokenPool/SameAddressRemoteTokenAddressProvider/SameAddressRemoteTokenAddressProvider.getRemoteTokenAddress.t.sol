@@ -13,7 +13,6 @@ contract SameAddressRemoteTokenAddressProvider_getRemoteTokenAddress is Test {
     s_provider = new SameAddressRemoteTokenAddressProvider();
   }
 
-  /// @notice Each token gets its own address in the EVM encoding, on every remote chain.
   function testFuzz_getRemoteTokenAddress(
     address localToken,
     uint64 remoteChainSelector

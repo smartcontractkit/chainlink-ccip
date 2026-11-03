@@ -29,7 +29,7 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
     bytes memory remoteToken = abi.encode(makeAddr("remoteToken"));
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, remoteToken));
 
-    // The inline record wins, so the provider of the policy is not asked.
+    // The inline remote token takes precedence without calling the policy's provider.
     vm.expectCall(
       address(s_remoteTokenAddressProvider),
       abi.encodeCall(IRemoteTokenAddressProvider.getRemoteTokenAddress, (s_token, DEST_CHAIN_SELECTOR)),
@@ -39,7 +39,6 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
       s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
 
     assertEq(remoteToken, lane.remoteToken);
-    // The pool data carries the local token as the source token.
     assertEq(_getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), lane.destPoolData);
   }
 
@@ -57,7 +56,7 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
   }
 
   function test_resolveOutboundLane_AdditionalPoolData() public {
-    // A finality other than zero, so the test fails if the provider does not get the requested finality.
+    // Use nonzero finality to detect a missing argument when calling the provider.
     PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_token);
     profiles[0].allowedFinalityConfig = ALLOWED_FINALITY;
     profiles[0].additionalPoolDataProvider = s_additionalPoolDataProvider;
@@ -82,7 +81,7 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
     remotePoolConfig.useLegacyPoolDataOnSend = true;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
-    // A legacy pool parses only the decimals, so the lane sends no additional pool data.
+    // Legacy destinations expect only token decimals, so the additional data provider must not be called.
     vm.expectCall(
       s_additionalPoolDataProvider,
       abi.encodeWithSelector(IAdditionalPoolDataProvider.getAdditionalPoolData.selector),
@@ -92,12 +91,12 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
       s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
 
     assertEq(abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)), lane.destPoolData);
-    // The remote token comes from the connection record, also when the pool data omits the source token.
+    // Omitting the source token from pool data does not change the destination token address.
     assertEq(abi.encode(s_token), lane.remoteToken);
   }
 
   function test_resolveOutboundLane_TrustPolicyRemotePools() public {
-    // An inline record that trusts the remote pools of the policy record still gives the send flag of the token.
+    // Trusting policy pools must not override the inline outbound data format.
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
     remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
     remotePoolConfig.useLegacyPoolDataOnSend = true;
@@ -198,7 +197,6 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
   }
 
   function test_resolveOutboundLane_RevertWhen_SubsetTokenNotFound() public {
-    // A record with onlySubsetTokens on, without s_token in its subset.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, true));
 
     vm.expectRevert(
@@ -246,7 +244,6 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
       s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
     }
 
-    // The policy has no provider.
     _setRemoteTokenAddressProvider(CONNECTION_POLICY, address(0));
 
     vm.expectRevert(
@@ -268,10 +265,8 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
   }
 
   function test_resolveOutboundLane_RevertWhen_RemoteTokenAddressProviderHasNoCode() public {
-    // The provider loses its code after the set.
     vm.etch(address(s_remoteTokenAddressProvider), "");
 
-    // The empty answer fails the decode.
     vm.expectRevert();
     s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
   }

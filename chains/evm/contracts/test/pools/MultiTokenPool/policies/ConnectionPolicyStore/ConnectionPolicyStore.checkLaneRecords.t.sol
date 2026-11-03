@@ -11,7 +11,7 @@ contract ConnectionPolicyStore_checkLaneRecords is ConnectionPolicyStoreSetup {
   }
 
   function test_checkLaneRecords_InlineRecordWithoutLane() public {
-    // The check ignores the lanes and the pause state, so it can run before the write that opens the lane.
+    // Remote pool records can be checked before a connection is configured, regardless of pause state.
     _setInlineRemotePoolConfig(
       _getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, _getRemotePoolConfig())
     );
@@ -28,7 +28,7 @@ contract ConnectionPolicyStore_checkLaneRecords is ConnectionPolicyStoreSetup {
     );
     s_connectionStore.checkLaneRecords(s_otherToken, DEST_CHAIN_SELECTOR);
 
-    // A remote pool policy has no policy default record, so chain selector zero never resolves to a record.
+    // Remote pool policies have no default record at chain selector zero.
     vm.expectRevert(
       abi.encodeWithSelector(
         ConnectionPolicyStore.RemotePoolRecordNotFound.selector, s_token, PolicyConfig.DEFAULT_CHAIN_SELECTOR

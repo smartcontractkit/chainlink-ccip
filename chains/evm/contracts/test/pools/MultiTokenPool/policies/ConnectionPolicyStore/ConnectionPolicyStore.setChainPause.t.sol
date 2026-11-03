@@ -94,7 +94,7 @@ contract ConnectionPolicyStore_setChainPause is ConnectionPolicyStoreSetup {
     remoteChainSelectors[0] = DEST_CHAIN_SELECTOR;
     remoteChainSelectors[1] = SOURCE_CHAIN_SELECTOR;
 
-    // Only SOURCE_CHAIN_SELECTOR changes, so only SOURCE_CHAIN_SELECTOR emits.
+    // Only the chain whose pause state changes should emit an event.
     vm.recordLogs();
     s_connectionStore.setChainPause(remoteChainSelectors, ConnectionPolicyStore.PauseDirection.Outbound, true);
 
@@ -111,7 +111,7 @@ contract ConnectionPolicyStore_setChainPause is ConnectionPolicyStoreSetup {
   }
 
   function test_setChainPause_ChainWithoutLane() public {
-    // Any chain is accepted. A pause of chain selector zero stops no transfer, because no lane uses it.
+    // Chain selector zero cannot have a connection, so pausing it cannot block transfers.
     uint64[] memory remoteChainSelectors = new uint64[](2);
     remoteChainSelectors[0] = SOURCE_CHAIN_SELECTOR;
     remoteChainSelectors[1] = PolicyConfig.DEFAULT_CHAIN_SELECTOR;

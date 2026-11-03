@@ -66,7 +66,6 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
   }
 
   function test_applyFeePolicyConfigUpdates_BoundaryValues() public {
-    // A record with zero in every field, and a record with the highest fees.
     FeePolicyStore.FeeConfig memory zeroFeeConfig;
     FeePolicyStore.FeeConfig memory maxFeeConfig = FeePolicyStore.FeeConfig({
       finalityFeeUSDCents: type(uint32).max,
@@ -180,7 +179,7 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
   // Reverts
 
   function test_applyFeePolicyConfigUpdates_RevertWhen_InvalidFeePolicyConfig() public {
-    // Each bps fee at BPS_DIVIDER.
+    // Neither finality class may charge 100% of the transferred tokens.
     FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](2);
     invalidFeeConfigs[0] = _getFeeConfig();
     invalidFeeConfigs[0].finalityTransferFeeBps = uint16(BPS_DIVIDER);

@@ -16,7 +16,7 @@ contract ConnectionPolicyStore_getTokenProfiles is ConnectionPolicyStoreSetup {
     profiles[0].additionalPoolDataProvider = s_additionalPoolDataProvider;
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
     s_connectionStore.setTokenPause(_arrayOf(s_token), ConnectionPolicyStore.PauseDirection.Inbound, true);
-    // Any address has pause flags, also one that is not registered.
+    // Pause flags can be set before a token is registered.
     address unknownToken = makeAddr("unknownToken");
     s_connectionStore.setTokenPause(_arrayOf(unknownToken), ConnectionPolicyStore.PauseDirection.Outbound, true);
     address[] memory localTokens = new address[](2);
@@ -49,7 +49,7 @@ contract ConnectionPolicyStore_getTokenProfiles is ConnectionPolicyStoreSetup {
     ConnectionPolicyStore.TokenProfile memory storedProfile =
       s_connectionStore.getTokenProfiles(_arrayOf(s_otherToken))[0];
 
-    // The token shows the profile and the pause flags that it had at its deregistration.
+    // Deregistration preserves the stored profile and pause flags.
     assertFalse(storedProfile.isRegistered);
     assertEq(USDC_TOKEN_DECIMALS, storedProfile.localDecimals);
     assertEq(uint8(IPoolConfigManager.LockOrBurnFlavor.Burn), uint8(storedProfile.lockOrBurnFlavor));

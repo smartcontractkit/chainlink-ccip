@@ -14,15 +14,13 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 import {IERC20Metadata} from "@openzeppelin/contracts@5.3.0/token/ERC20/extensions/IERC20Metadata.sol";
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
-/// @notice Stores the token profiles, the pause state, the connection records and the remote pool records of a
-/// PoolConfigManager. It builds the pool data for lockOrBurn, and checks the pool data for releaseOrMint.
-/// @dev Only authorized pool config managers write to this store.
-/// A token has a lane to a chain exactly when a connection record serves it there. A transfer on the lane also needs a
-/// remote pool record. An inline connection record holds the remote token. A connection policy record opens its chain
-/// for every token of the policy, or only for its subset tokens. It takes the remote token from the
-/// IRemoteTokenAddressProvider of the policy. A connection policy and a remote pool policy have no policy default
-/// record.
-/// A remote pool record holds the trusted remote pools and the flags for legacy pool data.
+/// @notice Stores token profiles, connections, trusted remote pools, and pause state for a PoolConfigManager.
+/// Builds outbound pool data and validates inbound pool data for multi-token pools.
+/// @dev Only authorized pool config managers can update the configuration.
+/// Connection records determine which remote chains a token can use. Transfers also require a remote pool record.
+/// Inline connections specify the remote token directly; policy connections use an IRemoteTokenAddressProvider.
+/// A connection policy can enable a chain for all assigned tokens or restrict it to a subset.
+/// Inline records override the corresponding policy records. Connection and remote pool policies have no defaults.
 contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -62,14 +60,14 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   event ConnectionPolicyConfigSet(
     bytes32 indexed policyName, uint64 indexed remoteChainSelector, bool onlySubsetTokens
   );
-  /// @dev Also stands for the removal of the subset tokens of the record.
+  /// @dev Removing a record also clears its subset tokens.
   event ConnectionPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
-  /// @dev Also stands for the removal of the remote token address provider of the policy.
+  /// @dev Removing a policy also clears its remote token address provider.
   event ConnectionPolicyRemoved(bytes32 indexed policyName);
   event RemoteTokenAddressProviderSet(bytes32 indexed policyName, address remoteTokenAddressProvider);
   event SubsetTokenAdded(bytes32 indexed policyName, uint64 indexed remoteChainSelector, address indexed localToken);
   event SubsetTokenRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector, address indexed localToken);
-  /// @dev A set of a new token also registers it.
+  /// @dev Setting a profile for a new token also registers it.
   event TokenProfileSet(
     address indexed localToken,
     uint8 localDecimals,
@@ -101,135 +99,133 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   event TokenPauseSet(address indexed localToken, bool isOutboundPaused, bool isInboundPaused);
   event ChainPauseSet(uint64 indexed remoteChainSelector, bool isOutboundPaused, bool isInboundPaused);
 
-  /// @dev The direction of a pause. Both covers outbound and inbound.
+  /// @dev Whether to pause outbound transfers, inbound transfers, or both.
   enum PauseDirection {
     Outbound,
     Inbound,
     Both
   }
 
-  /// @dev A connection policy record with its key.
+  /// @dev Connection policy configuration for a remote chain.
   struct ConnectionPolicyConfigArgs {
-    bytes32 policyName; // The connection policy. Not zero.
-    uint64 remoteChainSelector; // ─╮ The remote chain. Not zero.
-    bool onlySubsetTokens; // ──────╯ True opens the chain only for the subset tokens of the record.
+    bytes32 policyName; // The connection policy name. Must be nonzero.
+    uint64 remoteChainSelector; // ─╮ The remote chain selector. Must be nonzero.
+    bool onlySubsetTokens; // ──────╯ Whether to restrict this chain to the tokens in the subset list.
   }
 
-  /// @dev An inline connection record with its token and chain.
+  /// @dev Connection configuration for a single token and remote chain.
   struct InlineConnectionConfigArgs {
-    address localToken; // ─────────╮ A registered token.
-    uint64 remoteChainSelector; // ─╯ The remote chain. Not zero.
-    bytes remoteToken; //             The token on the remote chain, abi encoded for EVM chains. Not all zero.
+    address localToken; // ─────────╮ The registered local token.
+    uint64 remoteChainSelector; // ─╯ The remote chain selector. Must be nonzero.
+    bytes remoteToken; //             Remote token address, ABI encoded for EVM chains. Cannot be empty or all zero.
   }
 
-  /// @dev A subset token of a connection policy record.
+  /// @dev Identifies a token in a connection policy's subset list for a remote chain.
   struct SubsetTokenArgs {
-    bytes32 policyName; // The connection policy.
-    uint64 remoteChainSelector; // ─╮ The chain of the policy record.
-    address localToken; // ─────────╯ A token of the policy.
+    bytes32 policyName; // The connection policy name.
+    uint64 remoteChainSelector; // ─╮ The remote chain selector.
+    address localToken; // ─────────╯ A token assigned to the policy.
   }
 
-  /// @dev The remote token address provider of a connection policy.
+  /// @dev Remote token address provider configuration for a connection policy.
   struct RemoteTokenAddressProviderArgs {
-    bytes32 policyName; // The connection policy. It must exist.
-    address remoteTokenAddressProvider; // The IRemoteTokenAddressProvider of the policy. Zero means none.
+    bytes32 policyName; // The name of an existing connection policy.
+    address remoteTokenAddressProvider; // The IRemoteTokenAddressProvider address. Zero removes the provider.
   }
 
-  /// @dev The remote pools and the send flag of an inline remote pool record. Legacy pool data is pool data of 0 or 32
-  /// bytes, as a TokenPool sends it. It holds no source token and no additional pool data, so it proves no token. A
-  /// legacy pool accepts only legacy pool data, so a lane to a remote legacy pool needs useLegacyPoolDataOnSend on. A
-  /// remote legacy pool needs allowLegacyPoolDataOnReceive on forever, because its messages never expire. A remote
-  /// multi-token pool needs the flag only for the messages that it sent with useLegacyPoolDataOnSend on.
+  /// @dev Trusted remote pools and the outbound pool data format for a token and chain.
+  /// Enable useLegacyPoolDataOnSend while the destination uses a legacy TokenPool, which expects only token decimals.
+  /// Disable it once the destination supports the multi-token pool data format with a source token and additional data.
   struct RemotePoolConfig {
-    bool useLegacyPoolDataOnSend; // True sends legacy pool data.
-    IPoolConfigManager.RemotePool[] remotePools; // The trusted remote pools. No empty or duplicate address.
+    bool useLegacyPoolDataOnSend; // Whether to send only the token decimals in the pool data.
+    IPoolConfigManager.RemotePool[] remotePools; // Trusted remote pools. Addresses must be nonempty and unique.
   }
 
-  /// @dev The remote pools of a policy record, with its policy record key.
+  /// @dev Trusted remote pools for a policy and remote chain. Policy records do not allow legacy pool data.
   struct RemotePoolPolicyConfigArgs {
-    bytes32 policyName; // The remote pool policy. Not zero.
-    uint64 remoteChainSelector; // The remote chain. Not zero.
-    bytes[] remotePoolAddresses; // The trusted remote pools. At least one. No empty or duplicate address.
+    bytes32 policyName; // The remote pool policy name. Must be nonzero.
+    uint64 remoteChainSelector; // The remote chain selector. Must be nonzero.
+    bytes[] remotePoolAddresses; // At least one trusted remote pool. Addresses must be nonempty and unique.
   }
 
-  /// @dev RemotePoolConfig with its token and chain.
+  /// @dev Remote pool configuration for a single token and chain.
+  /// An inline record overrides the token's remote pool policy. Enable trustPolicyRemotePools to also trust policy
+  /// pools while keeping inline permissions for inflight legacy messages. For pools in both records, the inline
+  /// allowLegacyPoolDataOnReceive flag applies.
   struct InlineRemotePoolConfigArgs {
-    address localToken; // ──────────╮ A registered token.
-    uint64 remoteChainSelector; //   │ The remote chain. Not zero.
-    bool trustPolicyRemotePools; // ─╯ True also trusts the pools of the policy record that would serve the token.
-    RemotePoolConfig remotePoolConfig; // The values of the record.
+    address localToken; // ──────────╮ The registered local token.
+    uint64 remoteChainSelector; //   │ The remote chain selector. Must be nonzero.
+    bool trustPolicyRemotePools; // ─╯ Whether to also trust pools from the token's policy for this chain.
+    RemotePoolConfig remotePoolConfig; // The trusted pools and outbound pool data format.
   }
 
-  /// @dev The stored profile and pause flags of an address.
+  /// @dev Stored token profile, registration status, and pause flags.
   // solhint-disable-next-line gas-struct-packing
   struct TokenProfile {
     bool isRegistered; // ───────────────────────────────────╮ True if the token is registered.
     uint8 localDecimals; //                                  │ The decimals of the local token.
-    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the token out.
-    address lockOrBurnAddress; //                            │ The BurnToAddress target or the Lock box.
-    bytes4 allowedFinalityConfig; //                         │ The allowed FTF finality. Zero allows default only.
-    bool isOutboundPaused; //                                │ True if the token is paused outbound.
-    bool isInboundPaused; // ────────────────────────────────╯ True if the token is paused inbound.
-    address additionalPoolDataProvider; // The IAdditionalPoolDataProvider of the token. Zero means none.
+    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ The token operation used for outbound transfers.
+    address lockOrBurnAddress; //                            │ The BurnToAddress target or LockBox address.
+    bytes4 allowedFinalityConfig; //                         │ Allowed finality, encoded with FinalityCodec.
+    bool isOutboundPaused; //                                │ Whether outbound transfers are paused for this token.
+    bool isInboundPaused; // ────────────────────────────────╯ Whether inbound transfers are paused for this token.
+    address additionalPoolDataProvider; // The token's IAdditionalPoolDataProvider. Zero means no provider.
   }
 
-  /// @dev The profile, the pause flags and the policies of a token. Zero means no policy. Only the pause functions
-  /// change the pause flags, so a pause holds through every other write.
+  /// @dev Token profile, pause flags, and assigned policies. Only the pause functions change the pause flags.
   struct TokenState {
-    address lockOrBurnAddress; // ───────────────────────────╮ The BurnToAddress target or the Lock box.
+    address lockOrBurnAddress; // ───────────────────────────╮ The BurnToAddress target or LockBox address.
     uint8 localDecimals; //                                  │ The decimals of the local token.
-    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the token out.
-    bytes4 allowedFinalityConfig; //                         │ The allowed FTF finality. Zero allows default only.
-    bool isOutboundPaused; //                                │ True stops lockOrBurn of the token to every chain.
-    bool isInboundPaused; // ────────────────────────────────╯ True stops releaseOrMint of the token from every chain.
-    address additionalPoolDataProvider; // The IAdditionalPoolDataProvider of the token. Zero means none.
-    bytes32 connectionPolicyName; // The connection policy of the token.
-    bytes32 remotePoolPolicyName; // The remote pool policy of the token.
+    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ The token operation used for outbound transfers.
+    bytes4 allowedFinalityConfig; //                         │ Allowed finality, encoded with FinalityCodec.
+    bool isOutboundPaused; //                                │ Whether outbound transfers are paused on all chains.
+    bool isInboundPaused; // ────────────────────────────────╯ Whether inbound transfers are paused on all chains.
+    address additionalPoolDataProvider; // The token's IAdditionalPoolDataProvider. Zero means no provider.
+    bytes32 connectionPolicyName; // The assigned connection policy. Zero means no policy.
+    bytes32 remotePoolPolicyName; // The assigned remote pool policy. Zero means no policy.
   }
 
-  /// @dev The values of a connection policy record.
+  /// @dev Controls which tokens assigned to a connection policy can use a remote chain.
   struct ConnectionPolicyRecord {
-    bool onlySubsetTokens; // True serves only the subset tokens. False serves every token of the policy.
-    EnumerableSet.AddressSet subsetTokens; // The tokens that the record serves while onlySubsetTokens is true.
+    bool onlySubsetTokens; // Whether to restrict the chain to subsetTokens. False allows all tokens in the policy.
+    EnumerableSet.AddressSet subsetTokens; // Allowed tokens when onlySubsetTokens is true. Retained when false.
   }
 
-  /// @dev The stored values of a remote pool record. Only _setInlineRemotePoolRecord turns a flag on, so the flags stay
-  /// false on a policy record.
+  /// @dev Trusted remote pools and compatibility settings. All flags are false for policy records.
   struct RemotePoolRecord {
-    bool useLegacyPoolDataOnSend; // ─╮ True sends legacy pool data.
-    bool trustPolicyRemotePools; // ──╯ As in InlineRemotePoolConfigArgs.
+    bool useLegacyPoolDataOnSend; // ─╮ Whether to send only the token decimals in the pool data.
+    bool trustPolicyRemotePools; // ──╯ Whether to also trust pools from the token's policy for this chain.
     EnumerableSet.Bytes32Set remotePoolHashes; // The hashes of the trusted remote pools.
-    mapping(bytes32 remotePoolHash => bool isAllowed) allowLegacyPoolDataOnReceive; // For each remote pool.
+    mapping(bytes32 remotePoolHash => bool isAllowed) allowLegacyPoolDataOnReceive; // Legacy receive permission per pool.
   }
 
   /// @dev The pause flags of a remote chain.
   struct ChainPause {
-    bool isOutboundPaused; // ─╮ True stops lockOrBurn of every token to the chain.
-    bool isInboundPaused; // ──╯ True stops releaseOrMint of every token from the chain.
+    bool isOutboundPaused; // ─╮ Whether outbound transfers to this chain are paused for all tokens.
+    bool isInboundPaused; // ──╯ Whether inbound transfers from this chain are paused for all tokens.
   }
 
-  /// @dev The length of pool data that holds only the decimals. Every TokenPool since 1.5.1 sends and parses it.
+  /// @dev Length of the ABI-encoded token decimals sent by legacy TokenPools.
   uint256 private constant POOL_DATA_DECIMALS_LENGTH = 32;
-  /// @dev The shortest pool data that holds a source token. It is abi.encode of the decimals, a source token of 1 to 32
-  /// bytes and empty additional pool data.
+  /// @dev Minimum ABI-encoded length of token decimals, a nonempty source token, and empty additional pool data.
   uint256 private constant POOL_DATA_WITH_SOURCE_TOKEN_MIN_LENGTH = 192;
 
-  /// @dev Each store keeps its own list of registered tokens, as the stores never call each other.
+  /// @dev Each policy store tracks registered tokens independently.
   EnumerableSet.AddressSet private s_tokens;
-  /// @dev Any address has pause flags, also before it is registered. A deregistered token keeps its profile.
+  /// @dev Tokens can be paused before registration. Profiles and pause flags are retained after deregistration.
   mapping(address localToken => TokenState tokenState) private s_tokenStates;
-  /// @dev A remote pool record keeps only the hash of each remote pool. Every record shares this mapping.
+  /// @dev Pool addresses are stored once and shared by records that reference their hash.
   mapping(bytes32 remotePoolHash => bytes remotePoolAddress) private s_remotePoolAddresses;
 
   // ================================================================
   // │                       Inline storage                         │
   // ================================================================
 
-  /// @dev A token has an inline connection record for a chain exactly when the chain is in the set of the token.
+  /// @dev Remote chains with an inline connection record, indexed by local token.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineConnectionChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => bytes remoteToken)) private s_inlineRemoteTokens;
 
-  /// @dev A token has an inline remote pool record for a chain exactly when the chain is in the set of the token.
+  /// @dev Remote chains with an inline remote pool record, indexed by local token.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineRemotePoolChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => RemotePoolRecord record)) private
     s_inlineRemotePoolRecords;
@@ -241,7 +237,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   PolicyConfig.Policies private s_connectionPolicies;
   mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => ConnectionPolicyRecord record)) private
     s_policyConnectionRecords;
-  /// @dev Zero means that the policy has no provider, so its records give no remote token.
+  /// @dev Provider used to resolve remote token addresses for each connection policy. Zero means no provider.
   mapping(bytes32 policyName => address remoteTokenAddressProvider) private s_remoteTokenAddressProviders;
 
   PolicyConfig.Policies private s_remotePoolPolicies;
@@ -253,7 +249,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // ================================================================
 
   mapping(uint64 remoteChainSelector => ChainPause chainPause) private s_chainPauses;
-  /// @dev Separate from the token and chain pause flags, so they keep their state when the global pause ends.
+  /// @dev Unpausing globally does not clear token or chain pauses.
   bool private s_isGloballyPaused;
 
   /// @param authorizedCallers The pool config managers that can write to this store.
@@ -269,16 +265,13 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                     Transfer validation                      │
   // ================================================================
 
-  /// @notice Resolves the lane of a lockOrBurn and builds its pool data.
-  /// @dev Reverts if a pause stops the transfer, if the token has no connection record or no remote pool record for
-  /// the chain, or if the token does not allow the requested finality. A failure of the remote token address provider
-  /// or of the additional pool data provider also stops the transfer.
+  /// @notice Validates the outbound lane and builds the pool data for lockOrBurn.
+  /// @dev Checks pauses and the requested finality. Requires connection and remote pool records. Provider failures revert.
   /// @param localToken The local token.
-  /// @param remoteChainSelector The destination chain.
+  /// @param remoteChainSelector The destination chain selector.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @param tokenArgs The token args of the message. Only the additional pool data provider gets them.
-  /// @return lane The remote token, the pool data and the profile values of the token. The fee store and the security
-  /// store give the token fee and the hook.
+  /// @param tokenArgs Sender-supplied arguments passed to the additional pool data provider.
+  /// @return lane The resolved connection, pool data, and token profile. The fee amount and hook are left unset.
   function resolveOutboundLane(
     address localToken,
     uint64 remoteChainSelector,
@@ -311,20 +304,16 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return lane;
   }
 
-  /// @notice Resolves the lane of a releaseOrMint, checks the source pool and the pool data, and converts the amount
-  /// to local decimals. The finality is not checked, because the allowed finality is the config of this chain as a
-  /// source, the same as TokenPool.
-  /// @dev Reverts if a pause stops the transfer, if the token has no connection record or no remote pool record for
-  /// the chain, or if the remote pool record does not trust the source pool. The pool data must pass _checkPoolData.
+  /// @notice Validates the inbound lane and pool data. Converts the amount to local token units.
+  /// @dev Checks pauses and requires both connection and remote pool records. As in TokenPool, allowedFinalityConfig
+  /// applies only to outbound transfers; requestedFinalityConfig is passed to the additional pool data provider.
   /// @param localToken The local token.
-  /// @param remoteChainSelector The source chain.
-  /// @param sourcePoolAddress The source pool, abi encoded for EVM chains.
+  /// @param remoteChainSelector The source chain selector.
+  /// @param sourcePoolAddress The source pool address, ABI encoded for EVM chains.
   /// @param sourcePoolData The pool data from the source pool.
-  /// @param sourceDenominatedAmount The amount in the decimals of the source chain.
-  /// @param requestedFinalityConfig The finality that the sender requested. Only the additional pool data provider
-  /// gets it.
-  /// @return transfer The amount in local decimals and the profile values of the token. The security store gives the
-  /// hook.
+  /// @param sourceDenominatedAmount The amount in source token units.
+  /// @param requestedFinalityConfig The finality requested by the sender, encoded with FinalityCodec.
+  /// @return transfer The amount in local token units and the token's lock or burn configuration. The hook is left unset.
   function resolveInboundLane(
     address localToken,
     uint64 remoteChainSelector,
@@ -340,7 +329,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       revert ChainIsPaused(remoteChainSelector, PauseDirection.Inbound);
     }
 
-    // One more local here is stack too deep, so _checkPoolData resolves the connection level itself.
+    // Resolve the connection level inside _checkPoolData to avoid a stack-too-deep error here.
     (, bool isInline, RemotePoolRecord storage record) = _resolveLane(localToken, remoteChainSelector);
     bool allowLegacyPoolDataOnReceive =
       _checkSourcePool(localToken, remoteChainSelector, isInline, record, sourcePoolAddress);
@@ -354,16 +343,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return transfer;
   }
 
-  /// @dev Returns the connection record level, the remote pool record of the lane, and true if the remote pool record
-  /// is inline. Only an inline remote pool record gives the flags for legacy pool data to a transfer. Reverts if the
-  /// token has no connection record or no remote pool record for the chain.
+  /// @dev Resolves the connection level and remote pool record. Reverts if either is missing.
+  /// isInline identifies whether the remote pool record is inline and can allow legacy pool data.
   function _resolveLane(
     address localToken,
     uint64 remoteChainSelector
   ) private view returns (PolicyConfig.RecordLevel connectionLevel, bool isInline, RemotePoolRecord storage record) {
     connectionLevel = _resolveConnectionLevel(localToken, remoteChainSelector);
     if (connectionLevel == PolicyConfig.RecordLevel.None) {
-      // A policy record without the lane has onlySubsetTokens on, and the token is not a subset token.
+      // If the chain is configured, the token must have been excluded by the policy's subset restriction.
       bytes32 policyName = s_tokenStates[localToken].connectionPolicyName;
       if (s_connectionPolicies.policies[policyName].remoteChainSelectors.contains(remoteChainSelector)) {
         revert SubsetTokenNotFound(policyName, remoteChainSelector, localToken);
@@ -379,8 +367,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (connectionLevel, remotePoolLevel == PolicyConfig.RecordLevel.Inline, record);
   }
 
-  /// @dev Reverts if the lane does not trust the source pool. Returns the allowLegacyPoolDataOnReceive flag of the
-  /// source pool on an inline record, and false for a pool of a policy record.
+  /// @dev Checks that the source pool is trusted and returns its legacy receive permission.
+  /// Inline pool settings take precedence. Pools trusted only through a policy cannot send legacy pool data.
   function _checkSourcePool(
     address localToken,
     uint64 remoteChainSelector,
@@ -403,9 +391,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     revert InvalidSourcePoolAddress(localToken, remoteChainSelector, sourcePoolAddress);
   }
 
-  /// @dev Returns the remote token of the connection record at connectionLevel. A connection policy record asks the
-  /// IRemoteTokenAddressProvider of the policy, and a revert of the provider stops the transfer. Reverts if the remote
-  /// token is empty or all zero.
+  /// @dev Returns the inline remote token or queries the connection policy's provider.
+  /// Reverts if the provider call fails or the remote token is empty or all zero.
   function _resolveRemoteToken(
     address localToken,
     uint64 remoteChainSelector,
@@ -426,14 +413,14 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return remoteToken;
   }
 
-  /// @dev Returns the answer of the IRemoteTokenAddressProvider of the connection policy of the token, with the cases
-  /// of getLaneConnectionBatch.
+  /// @dev Returns the policy's remote token. Returns empty bytes if the provider is missing, reverts, or returns an
+  /// invalid address. Malformed return data still reverts because try/catch does not catch ABI decoding errors.
   function _tryGetPolicyRemoteToken(
     address localToken,
     uint64 remoteChainSelector
   ) private view returns (bytes memory remoteToken) {
     address remoteTokenAddressProvider = s_remoteTokenAddressProviders[s_tokenStates[localToken].connectionPolicyName];
-    // An address without code returns no data, which fails the decode. Zero has no code.
+    // Avoid a decoding failure when the provider is unset or has no code.
     if (remoteTokenAddressProvider.code.length == 0) {
       return remoteToken;
     }
@@ -447,16 +434,14 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return remoteToken;
   }
 
-  /// @dev Returns false if the remote token is empty or all zero. No chain has a token at an all-zero address, so a
-  /// send to it loses its amount. Zero bytes of the same length have the same hash exactly when the remote token is
-  /// empty or all zero.
+  /// @dev Returns false for empty or all-zero remote token addresses.
   function _isValidRemoteToken(
     bytes memory remoteToken
   ) private pure returns (bool) {
     return keccak256(remoteToken) != keccak256(new bytes(remoteToken.length));
   }
 
-  /// @dev An inline connection record overrides the connection policy of the token.
+  /// @dev Inline connections take precedence over the token's connection policy.
   function _resolveConnectionLevel(
     address localToken,
     uint64 remoteChainSelector
@@ -466,8 +451,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return PolicyConfig.RecordLevel.None;
   }
 
-  /// @dev True if a connection policy record of the policy of the token serves the token on the chain. While
-  /// onlySubsetTokens is on, the record serves only its subset tokens.
+  /// @dev Returns whether the token's connection policy enables this chain for the token, including subset restrictions.
   function _hasPolicyLane(
     address localToken,
     uint64 remoteChainSelector
@@ -481,8 +465,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return !policyRecord.onlySubsetTokens || policyRecord.subsetTokens.contains(localToken);
   }
 
-  /// @dev Returns the remote pool record of the token for the chain, and its level. An inline record overrides the
-  /// policy. Otherwise the result is that of _resolvePolicyRemotePoolRecord.
+  /// @dev Returns the inline remote pool record if present, otherwise the token's policy record for this chain.
   function _resolveRemotePoolRecord(
     address localToken,
     uint64 remoteChainSelector
@@ -493,8 +476,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
   }
 
-  /// @dev Returns the remote pool record of the policy of the token for the chain, and its level. For level None, the
-  /// record is empty.
+  /// @dev Returns the token's remote pool policy record for this chain. Returns an empty record with level None if absent.
   function _resolvePolicyRemotePoolRecord(
     address localToken,
     uint64 remoteChainSelector
@@ -503,7 +485,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (s_remotePoolPolicies.policies[policyName].remoteChainSelectors.contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.PolicyChain, s_policyRemotePoolRecords[policyName][remoteChainSelector]);
     }
-    // No write reaches the zero policy name, so this record is empty.
+    // The zero policy name cannot be configured, so its records are always empty.
     return (PolicyConfig.RecordLevel.None, s_policyRemotePoolRecords[bytes32(0)][remoteChainSelector]);
   }
 
@@ -511,9 +493,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                          Pool data                           │
   // ================================================================
 
-  /// @dev With useLegacyPoolDataOnSend on, the pool data holds only the decimals, which a legacy pool parses.
-  /// Otherwise it also holds the source token and the additional pool data, which is empty for a token without a
-  /// provider.
+  /// @dev Encodes only token decimals for a legacy destination pool. Otherwise includes the source token and any
+  /// additional pool data from the token's provider.
   function _encodePoolData(
     address localToken,
     uint64 remoteChainSelector,
@@ -531,13 +512,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       additionalPoolData = IAdditionalPoolDataProvider(tokenState.additionalPoolDataProvider)
         .getAdditionalPoolData(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs);
     }
-    // The source token has the encoding of a remote token in CCIP, which is abi.encode(address) for an EVM chain.
+    // Use the same address encoding that the destination stores for an EVM remote token.
     return abi.encode(uint256(tokenState.localDecimals), abi.encode(localToken), additionalPoolData);
   }
 
-  /// @dev Decodes the pool data, checks the source token and the additional pool data, and returns the remote
-  /// decimals. A source token must equal the remote token of the lane. Pool data without the source token needs
-  /// allowLegacyPoolDataOnReceive on the source pool.
+  /// @dev Validates the source token and additional pool data. Returns the source token decimals.
+  /// Pool data without a source token requires allowLegacyPoolDataOnReceive for the source pool.
   function _checkPoolData(
     address localToken,
     uint64 remoteChainSelector,
@@ -550,12 +530,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes memory additionalPoolData;
     (remoteDecimals, sourceToken, additionalPoolData) = _decodePoolData(sourcePoolData, tokenState.localDecimals);
 
-    // A source multi-token pool serves many tokens, so a trusted source pool does not prove which token it burned.
+    // A trusted multi-token pool can burn different tokens, so its address alone does not identify the source token.
     if (sourceToken.length == 0) {
       if (!allowLegacyPoolDataOnReceive) revert LegacyPoolDataNotAllowed(localToken, remoteChainSelector);
     } else {
-      // Only this check needs the remote token, so a source that omits the source token does not depend on the
-      // remote token address provider.
+      // Legacy messages have no source token to compare and do not need the remote token address provider.
       PolicyConfig.RecordLevel connectionLevel = _resolveConnectionLevel(localToken, remoteChainSelector);
       bytes memory remoteToken = _resolveRemoteToken(localToken, remoteChainSelector, connectionLevel);
       if (keccak256(sourceToken) != keccak256(remoteToken)) {
@@ -563,7 +542,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       }
     }
 
-    // Empty data also goes to the provider, so the issuer decides if a source without additional pool data is valid.
+    // Validate empty additional data too, so the provider can reject transfers that omit required data.
     address additionalPoolDataProvider = tokenState.additionalPoolDataProvider;
     if (
       additionalPoolDataProvider != address(0)
@@ -575,13 +554,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return remoteDecimals;
   }
 
-  /// @dev Decodes the three pool data formats: empty, the decimals only, and the decimals with the source token and
-  /// the additional pool data.
+  /// @dev Decodes legacy pool data or the multi-token format containing decimals, source token, and additional data.
   function _decodePoolData(
     bytes calldata sourcePoolData,
     uint8 localDecimals
   ) private pure returns (uint8 remoteDecimals, bytes memory sourceToken, bytes memory additionalPoolData) {
-    // Pools older than 1.5.1 send no pool data. This is the same fallback as TokenPool.
+    // Older pools send no decimals. As in TokenPool, assume the source and destination use the same decimals.
     if (sourcePoolData.length == 0) {
       return (localDecimals, sourceToken, additionalPoolData);
     }
@@ -590,12 +568,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (sourcePoolData.length == POOL_DATA_DECIMALS_LENGTH) {
       decodedDecimals = abi.decode(sourcePoolData, (uint256));
     } else {
-      // Shorter data cannot hold a source token. Without this check, abi.decode reverts on some of it with no error
-      // data.
+      // Reject truncated data with a custom error before decoding.
       if (sourcePoolData.length < POOL_DATA_WITH_SOURCE_TOKEN_MIN_LENGTH) revert InvalidSourcePoolData(sourcePoolData);
       (decodedDecimals, sourceToken, additionalPoolData) = abi.decode(sourcePoolData, (uint256, bytes, bytes));
-      // abi.decode also accepts encodings that abi.encode never makes, such as offsets that overlap. Only the exact
-      // bytes of abi.encode are valid, with a source token that is not empty.
+      // Require a source token and canonical ABI encoding. abi.decode alone accepts overlapping offsets and trailing data.
       if (
         sourceToken.length == 0
           || keccak256(abi.encode(decodedDecimals, sourceToken, additionalPoolData)) != keccak256(sourcePoolData)
@@ -608,8 +584,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (uint8(decodedDecimals), sourceToken, additionalPoolData);
   }
 
-  /// @dev Same as TokenPool, with the local decimals as a parameter. An amount that fails an overflow check cannot
-  /// exist on this chain, so the transfer reverts.
+  /// @dev Converts the remote amount to local token units using the same scaling and overflow checks as TokenPool.
   function _calculateLocalAmount(
     uint256 remoteAmount,
     uint8 remoteDecimals,
@@ -624,12 +599,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (decimalsDiff > 77) {
         revert OverflowDetected(remoteDecimals, localDecimals, remoteAmount);
       }
-      // Solidity rounds down, so the pool never mints more than the remote chain sent.
+      // Round down when the local token has fewer decimals.
       return remoteAmount / (10 ** decimalsDiff);
     }
 
     uint8 diffDecimals = localDecimals - remoteDecimals;
-    // The second check stops an overflow of the product.
+    // Check both exponentiation and multiplication for overflow.
     if (diffDecimals > 77 || remoteAmount > type(uint256).max / (10 ** diffDecimals)) {
       revert OverflowDetected(remoteDecimals, localDecimals, remoteAmount);
     }
@@ -640,14 +615,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                       Resolved views                         │
   // ================================================================
 
-  /// @notice Returns the connection, the remote pool record and the pause state of each lane, for
-  /// IPoolConfigManager.getLaneConnectionBatch.
-  /// @dev A token without a lane gets only its pause state. A lane of a connection policy record shows the answer of
-  /// the IRemoteTokenAddressProvider of the policy. The remote token is empty if the policy has no provider, if the
-  /// provider has no code or reverts, or if the answer is all zero. This view reverts if a provider answer does not
-  /// decode as bytes, because try does not catch a failed decode. It can also revert if a provider uses all the gas or
-  /// returns a very large answer. An inline record with trustPolicyRemotePools on shows its own remote pools first,
-  /// then the other remote pools of the policy record. Each remote pool shows once, with the flag that a transfer uses.
+  /// @notice Returns the resolved connection, trusted remote pools, and pause state for each lane.
+  /// @dev Returns only pause state for missing lanes. The remote token is empty if its provider is unset, has no code,
+  /// reverts, or returns an invalid address. Malformed return data still reverts.
+  /// When trustPolicyRemotePools is enabled, inline pools come first, followed by policy pools not already listed.
+  /// The inline legacy receive permission applies to pools listed in both records.
   /// @param lanes The lanes to query.
   /// @return connections The connection per lane, aligned with lanes by index.
   function getLaneConnectionBatch(
@@ -676,7 +648,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (level == PolicyConfig.RecordLevel.None) continue;
 
       connection.hasConnection = true;
-      // A provider failure leaves the remote token empty, so ops still see the other values of the lane.
+      // Keep the rest of the lane visible if the provider reverts or returns an invalid address.
       connection.remoteToken = level == PolicyConfig.RecordLevel.Inline
         ? s_inlineRemoteTokens[localToken][remoteChainSelector]
         : _tryGetPolicyRemoteToken(localToken, remoteChainSelector);
@@ -694,9 +666,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return connections;
   }
 
-  /// @notice Returns the config of each token, for IPoolConfigManager.getTokenConfigBatch.
-  /// @dev A token that is not registered gets zero values. The fee store and the security store give the policies of
-  /// their types, so those names are zero here.
+  /// @notice Returns token profiles, supported chains, and assigned connection and remote pool policies.
+  /// @dev Unregistered tokens return zero values. Fee and security policy names are left unset for the other stores
+  /// to populate.
   /// @param localTokens The local tokens.
   /// @return configs The token configs, aligned with localTokens by index.
   function getTokenConfigBatch(
@@ -723,10 +695,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return configs;
   }
 
-  /// @notice Reverts for the first lane whose token does not allow the requested finality, for
-  /// IPoolConfigManager.getFeeBatch.
-  /// @dev Checks a token without a lane too, the same as TokenPool. A token that is not registered allows only default
-  /// finality.
+  /// @notice Checks that every token allows the requested finality.
+  /// @dev Finality is checked even for missing lanes, as in TokenPool. Unregistered tokens allow only default finality.
   /// @param lanes The lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   function checkRequestedFinalityBatch(
@@ -741,10 +711,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Returns whether each token has a lane to its remote chain. Ignores the pause state.
-  /// @dev The PoolConfigManager zeros the lane views of the other stores for a lane that does not exist.
+  /// @notice Returns whether each token has a connection to its remote chain, regardless of pause state.
+  /// @dev The PoolConfigManager uses this result to clear other stores' view results for missing lanes.
   /// @param lanes The lanes to query.
-  /// @return hasLanes True if a connection record serves the token on the chain, aligned with lanes by index.
+  /// @return hasLanes Whether each lane has an applicable connection record, in the same order as lanes.
   function hasLaneBatch(
     IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (bool[] memory hasLanes) {
@@ -758,7 +728,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Reverts if the token has no remote pool record for the chain.
-  /// @dev The PoolConfigManager calls it after a write that opens a lane.
+  /// @dev Used by the PoolConfigManager to validate remote pool configuration when enabling a lane.
   /// @param localToken The local token.
   /// @param remoteChainSelector The remote chain.
   function checkLaneRecords(
@@ -769,9 +739,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (level == PolicyConfig.RecordLevel.None) revert RemotePoolRecordNotFound(localToken, remoteChainSelector);
   }
 
-  /// @notice Returns the record levels that each lane would use, also for a lane that does not exist yet.
-  /// @dev Lets tooling check the records before a write opens a lane. The connection level shows whether the lane
-  /// exists. Neither level is ever PolicyDefault.
+  /// @notice Returns the connection and remote pool record levels for each token and chain.
+  /// @dev Resolves the two record types independently, so configuration can be checked before enabling a lane.
+  /// Neither policy type supports default records.
   /// @param lanes The lanes to query.
   /// @return connectionLevels The connection record level per lane, aligned with lanes by index.
   /// @return remotePoolLevels The remote pool record level per lane, aligned with lanes by index.
@@ -792,8 +762,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (connectionLevels, remotePoolLevels);
   }
 
-  /// @dev The chains of the inline connection records of the token, then the chains where only its connection policy
-  /// gives it a lane.
+  /// @dev Returns inline chains first, then policy chains enabled for the token. Each chain appears once.
   function _getSupportedChains(
     address localToken
   ) private view returns (uint64[] memory remoteChainSelectors) {
@@ -825,13 +794,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                        Stored views                          │
   // ================================================================
 
-  /// @notice Returns one page of the registered tokens, with the paging rules of
-  /// TokenAdminRegistry.getAllConfiguredTokens.
-  /// @dev A deregistration moves the last token into the place of the removed token. So a reader can miss a token if a
-  /// deregistration happens between two pages.
+  /// @notice Returns a page of registered tokens.
+  /// @dev Deregistration can change token ordering. Query pages at the same block to avoid skipping tokens.
   /// @param startIndex The position of the first token to return.
   /// @param maxCount The maximum number of tokens to return.
-  /// @return tokens The tokens. Fewer than maxCount only at the end of the list.
+  /// @return tokens Up to maxCount registered tokens starting at startIndex.
   function getAllConfiguredTokens(
     uint64 startIndex,
     uint64 maxCount
@@ -853,8 +820,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return tokens;
   }
 
-  /// @notice Returns the stored profile and the pause flags of each token. A deregistered token shows the profile that
-  /// it had at its deregistration.
+  /// @notice Returns stored token profiles and pause flags, including those retained after deregistration.
   /// @param localTokens The local tokens.
   /// @return profiles The profiles, aligned with localTokens by index.
   function getTokenProfiles(
@@ -878,7 +844,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return profiles;
   }
 
-  /// @notice Returns whether the token is registered, and its policies.
+  /// @notice Returns the token's registration status and assigned policies.
   /// @param localToken The local token.
   /// @return isRegistered True if the token is registered in this store.
   /// @return connectionPolicyName The connection policy of the token. Zero if it has none.
@@ -934,7 +900,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return inlineConfigs;
   }
 
-  /// @notice Returns the token count, the provider and the records of a connection policy.
+  /// @notice Returns the token count, provider, and records of a connection policy.
   /// @param policyName The connection policy.
   /// @return tokenCount The number of tokens that use the policy.
   /// @return remoteTokenAddressProvider The IRemoteTokenAddressProvider of the policy. Zero if it has none.
@@ -961,11 +927,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (policy.tokenCount, s_remoteTokenAddressProviders[policyName], policyConfigs);
   }
 
-  /// @notice Returns the flag and the subset tokens of a connection policy record.
+  /// @notice Returns the subset restriction and token list for a connection policy on a remote chain.
   /// @param policyName The connection policy.
   /// @param remoteChainSelector The chain of the policy record.
-  /// @return onlySubsetTokens True if the record serves only its subset tokens. False if the record does not exist.
-  /// @return subsetTokens The tokens that the record serves while onlySubsetTokens is true.
+  /// @return onlySubsetTokens Whether the policy restricts this chain to subsetTokens. False if no record exists.
+  /// @return subsetTokens The token list used when onlySubsetTokens is true. Retained but ignored when false.
   function getSubsetTokens(
     bytes32 policyName,
     uint64 remoteChainSelector
@@ -1065,13 +1031,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                            Tokens                            │
   // ================================================================
 
-  /// @notice Deregisters tokens, then registers or updates tokens. The PoolConfigManager sends the same call to every
-  /// store.
-  /// @dev A set of a registered token replaces its profile and keeps its policies. Its decimals never change, because
-  /// wrong decimals mint a wrong amount. A deregistration needs a token without policies and inline records, so a
-  /// wrong address cannot drop live config. A deregistered token can be registered again, also with other decimals.
+  /// @notice Deregisters tokens, then registers or updates token profiles.
+  /// @dev A registered token's decimals cannot change. Other profile updates preserve its policies and pause flags.
+  /// Deregistration requires all assigned policies and inline records to be removed first. The token can then be
+  /// registered again with different decimals. The PoolConfigManager applies these updates to every policy store.
   /// @param tokensToRemove The tokens to deregister.
-  /// @param profilesToSet The profiles of the tokens to register or to update.
+  /// @param profilesToSet The token profiles to add or update.
   function applyTokenProfileUpdates(
     address[] calldata tokensToRemove,
     PolicyConfig.TokenProfileArgs[] calldata profilesToSet
@@ -1111,7 +1076,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       tokenState.localDecimals = profile.localDecimals;
       tokenState.lockOrBurnFlavor = profile.lockOrBurnFlavor;
       tokenState.lockOrBurnAddress = profile.lockOrBurnAddress;
-      // Any value is accepted, the same as TokenPool.setAllowedFinalityConfig.
+      // Match TokenPool.setAllowedFinalityConfig, which stores the value without validation.
       tokenState.allowedFinalityConfig = profile.allowedFinalityConfig;
       tokenState.additionalPoolDataProvider = profile.additionalPoolDataProvider;
 
@@ -1126,12 +1091,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets the connection policy of tokens. Inline records are kept.
-  /// @dev A token that joins a policy gets a lane on each chain where the policy serves it, with no lane check. A token
-  /// cannot leave its policy while it is a subset token of a record of that policy, so a later join gives it no lane
-  /// that a first join would not give.
-  /// @param tokenPoliciesToSet The connection policy of each token, applied in order. Zero removes the token from its
-  /// policy.
+  /// @notice Assigns connection policies to tokens without changing their inline records.
+  /// @dev Policy assignment does not validate remote pool configuration. Remove a token from all subset lists before
+  /// changing its policy. This prevents rejoining the old policy from restoring its previous subset membership.
+  /// @param tokenPoliciesToSet The policy assignments to apply in order. A zero policy name removes the assignment.
   function applyTokenConnectionPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
   ) external onlyAuthorizedCallers {
@@ -1150,10 +1113,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets the remote pool policy of tokens. Inline records are kept. An inline record with
-  /// trustPolicyRemotePools on trusts the remote pools of the new policy.
-  /// @param tokenPoliciesToSet The remote pool policy of each token, applied in order. Zero removes the token from its
-  /// policy.
+  /// @notice Assigns remote pool policies to tokens without changing their inline records.
+  /// @dev Inline records with trustPolicyRemotePools enabled will trust pools from the new policy.
+  /// @param tokenPoliciesToSet The policy assignments to apply in order. A zero policy name removes the assignment.
   function applyTokenRemotePoolPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
   ) external onlyAuthorizedCallers {
@@ -1171,7 +1133,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev True if the token is a subset token of a record of the connection policy.
+  /// @dev Returns whether the token belongs to any subset list in the connection policy.
   function _isSubsetToken(
     address localToken,
     bytes32 policyName
@@ -1185,9 +1147,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return false;
   }
 
-  /// @dev The same check as the TokenPool constructor. The decimals function is optional in ERC20, so a token whose
-  /// call reverts keeps the given decimals. An address without code, or an answer that does not decode, reverts with
-  /// no error data, because try does not catch a failed decode.
+  /// @dev Checks decimals using the same rules as TokenPool. Since decimals is optional in ERC20, use the supplied
+  /// value if the call reverts. Calls to addresses without code and malformed return data still revert.
   function _validateDecimals(
     address localToken,
     uint8 localDecimals
@@ -1197,16 +1158,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     } catch {}
   }
 
-  /// @dev Zero means no provider. Any other provider needs code, because a call to an address without code reverts the
-  /// transfer.
+  /// @dev An unset provider is allowed. Configured providers must have code.
   function _validateProvider(
     address provider
   ) private view {
     if (provider != address(0) && provider.code.length == 0) revert ProviderHasNoCode(provider);
   }
 
-  /// @dev BurnToAddress accepts any address, the same as BurnToAddressMintTokenPool. Lock needs a lock box that
-  /// supports the token, the same as LockReleaseTokenPool. The other flavors need zero.
+  /// @dev Lock requires a LockBox that supports the token. BurnToAddress accepts any address, matching
+  /// BurnToAddressMintTokenPool. All other flavors require a zero address.
   function _validateLockOrBurnAddress(
     address localToken,
     IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor,
@@ -1226,13 +1186,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                       Connection config                      │
   // ================================================================
 
-  /// @notice Removes inline connection records, then sets inline connection records.
-  /// @dev After a removal, the token uses its connection policy on that chain, if the policy serves it there. So a
-  /// removal reverts if the policy gives the token other remote token bytes, because a send with a wrong remote token
-  /// loses its amount. A policy without a provider, a provider that reverts or has no code, and an all-zero answer do
-  /// not block the removal, because such a lane stops every send. An answer that does not decode as bytes reverts the
-  /// removal with no error data. The check reads the policy records and the provider at the time of the call, so it
-  /// covers only this call. A later policy or provider change can still change the remote token of the lane.
+  /// @notice Removes inline connection records, then adds or updates them.
+  /// @dev Removal falls back to the token's connection policy if the policy enables this lane. A valid remote token
+  /// resolved through that policy must match the inline address to avoid redirecting transfers. An unset or failing
+  /// provider does not block removal because outbound transfers would revert. Malformed return data still reverts.
+  /// This check does not prevent later policy or provider updates from changing the remote token.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineConnectionConfigUpdates(
@@ -1243,7 +1201,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = inlineConfigsToRemove[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
 
-      // A missing record reverts here, before the policy check can report a mismatch.
+      // Report a missing inline record before checking the policy's remote token.
       if (!s_inlineConnectionChains[localToken].contains(remoteChainSelector)) {
         revert PolicyConfig.InlineRecordNotFound(localToken, remoteChainSelector);
       }
@@ -1274,10 +1232,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Removes connection policy records, then removes connection policies, then sets connection policy records.
-  /// @dev The first record set under a new name creates the policy. Only a policy without tokens and records can be
-  /// removed, and its removal also removes its provider. A record set keeps the subset tokens of the record. A record
-  /// removal deletes them, so a record that is set again starts with none.
+  /// @notice Removes connection records and unused policies, then adds or updates connection records.
+  /// @dev Adding the first record creates a policy. Removing a policy requires no assigned tokens or remaining
+  /// records and also clears its provider. Updating a record preserves its subset list; removing it clears the list.
   /// @param policyConfigsToRemove The records to remove.
   /// @param policiesToRemove The policies to remove.
   /// @param policyConfigsToSet The records to set.
@@ -1292,7 +1249,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
       PolicyConfig._removePolicyRecord(s_connectionPolicies, policyName, remoteChainSelector);
       ConnectionPolicyRecord storage policyRecord = s_policyConnectionRecords[policyName][remoteChainSelector];
-      // Delete does not clear a set inside a struct, so each subset token is removed first.
+      // Remove each set entry before deleting the struct, since delete does not clear the set's internal mapping.
       address[] memory subsetTokens = policyRecord.subsetTokens.values();
       for (uint256 j = 0; j < subsetTokens.length; ++j) {
         policyRecord.subsetTokens.remove(subsetTokens[j]);
@@ -1313,7 +1270,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       uint64 remoteChainSelector = policyConfigsToSet[i].remoteChainSelector;
       bool onlySubsetTokens = policyConfigsToSet[i].onlySubsetTokens;
 
-      // A policy default record would open a lane to every chain that the Router serves.
+      // Require explicit chain configuration to avoid enabling connections to every chain supported by the Router.
       if (remoteChainSelector == PolicyConfig.DEFAULT_CHAIN_SELECTOR) {
         revert PolicyConfig.ZeroChainSelectorNotAllowed();
       }
@@ -1324,10 +1281,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Removes subset tokens, then adds subset tokens. A subset token has a lane on the chain of its record while
-  /// it uses the policy and the record has onlySubsetTokens on.
-  /// @dev An add needs a policy record with onlySubsetTokens on, and a token of the policy. A subset token cannot leave
-  /// the policy until its subset entries are removed.
+  /// @notice Removes tokens from connection policy subsets, then adds tokens to them.
+  /// @dev Additions require onlySubsetTokens to be enabled and the token to be assigned to the policy.
+  /// A token cannot leave its policy until it has been removed from every subset list.
   /// @param tokensToRemove The subset tokens to remove.
   /// @param tokensToAdd The subset tokens to add.
   function applySubsetTokenUpdates(
@@ -1366,10 +1322,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets the remote token address provider of connection policies. A new provider gives the remote token of
-  /// every lane of the policy at once.
-  /// @dev A provider needs code.
-  /// @param providersToSet The provider of each policy, applied in order. Zero removes the provider of the policy.
+  /// @notice Sets the remote token address provider for each connection policy.
+  /// @dev Updates affect all connections that use the policy, except those overridden by inline records.
+  /// @param providersToSet The provider updates to apply in order. A zero address removes the provider.
   function applyRemoteTokenAddressProviderUpdates(
     RemoteTokenAddressProviderArgs[] calldata providersToSet
   ) external onlyAuthorizedCallers {
@@ -1389,9 +1344,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                      Remote pool config                      │
   // ================================================================
 
-  /// @notice Removes inline remote pool records, then sets inline remote pool records. Keep an old remote pool until
-  /// every message that it sent is executed.
-  /// @dev An inline record that trusts no remote pool works outbound only, the same as TokenPool.
+  /// @notice Removes inline remote pool records, then adds or replaces them.
+  /// @dev Keep old remote pools trusted until all their inflight messages have executed.
+  /// An empty inline pool list still allows outbound transfers. Inbound transfers then require trustPolicyRemotePools
+  /// and a trusted policy pool.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineRemotePoolConfigUpdates(
@@ -1424,10 +1380,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Removes remote pool policy records, then removes remote pool policies, then sets remote pool policy
-  /// records. Keep an old remote pool until every message that it sent is executed.
-  /// @dev The first record set under a new name creates the policy. Only a policy without tokens and records can be
-  /// removed.
+  /// @notice Removes remote pool records and unused policies, then adds or replaces remote pool records.
+  /// @dev Keep old remote pools trusted until all their inflight messages have executed. Adding the first record
+  /// creates a policy. Removing a policy requires no assigned tokens or remaining records.
   /// @param policyConfigsToRemove The records to remove.
   /// @param policiesToRemove The policies to remove.
   /// @param policyConfigsToSet The records to set.
@@ -1457,11 +1412,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       uint64 remoteChainSelector = policyConfigsToSet[i].remoteChainSelector;
       bytes[] calldata remotePoolAddresses = policyConfigsToSet[i].remotePoolAddresses;
 
-      // A policy default record would trust its remote pools on every chain, also on a chain added later.
+      // Pool trust must be configured per chain, including chains added later.
       if (remoteChainSelector == PolicyConfig.DEFAULT_CHAIN_SELECTOR) {
         revert PolicyConfig.ZeroChainSelectorNotAllowed();
       }
-      // A policy record serves many tokens, so it must trust at least one remote pool.
+      // Require at least one pool so the policy does not disable inbound transfers for tokens using this record.
       if (remotePoolAddresses.length == 0) {
         revert PolicyRecordHasNoPools(policyName, remoteChainSelector);
       }
@@ -1493,8 +1448,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev An empty or duplicate remote pool address reverts, the same as TokenPool. remotePoolHashes holds the hashes
-  /// of the remote pools before index, and gets the hash of this remote pool at index.
+  /// @dev Rejects empty or duplicate pool addresses. Saves the pool's hash for later duplicate checks.
   function _validateRemotePool(
     uint64 remoteChainSelector,
     bytes calldata remotePoolAddress,
@@ -1509,8 +1463,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     remotePoolHashes[index] = remotePoolHash;
   }
 
-  /// @dev Replaces the remote pools of a policy record. The caller runs _validateRemotePoolAddresses first, so each
-  /// remote pool is not empty and is new to the cleared set.
+  /// @dev The caller must validate the addresses first.
   function _setPolicyRemotePools(
     RemotePoolRecord storage record,
     bytes[] calldata remotePoolAddresses
@@ -1522,8 +1475,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev Replaces every value of an inline record. The caller runs _validateRemotePools first, so each remote pool is
-  /// not empty and is new to the cleared set.
+  /// @dev The caller must validate the addresses first.
   function _setInlineRemotePoolRecord(
     RemotePoolRecord storage record,
     RemotePoolConfig calldata remotePoolConfig,
@@ -1550,7 +1502,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return remotePoolHash;
   }
 
-  /// @dev Delete does not clear a set or a mapping inside a struct, so each remote pool and its flag are removed first.
+  /// @dev Clear set entries and receive permissions individually; deleting the struct would leave mapping entries behind.
   function _clearRemotePools(
     RemotePoolRecord storage record
   ) private {
@@ -1565,9 +1517,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                            Pause                             │
   // ================================================================
 
-  /// @notice Turns the global pause on or off. The global pause stops every token on every chain in both directions.
-  /// The token and chain pause flags do not change.
-  /// @dev A call that changes nothing emits nothing.
+  /// @notice Pauses or unpauses all transfers without changing token or chain pause flags.
+  /// @dev Emits an event only when the pause state changes.
   /// @param isPaused True to pause, false to unpause.
   function setGlobalPause(
     bool isPaused
@@ -1578,10 +1529,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     emit GlobalPauseSet(isPaused);
   }
 
-  /// @notice Pauses or unpauses tokens on every chain. The other direction does not change.
-  /// @dev Any address is accepted, also before the token is registered. A token that does not change emits nothing.
+  /// @notice Pauses or unpauses token transfers in the specified direction on all chains.
+  /// @dev Tokens can be paused before registration. Emits an event only for tokens whose pause state changes.
   /// @param localTokens The tokens.
-  /// @param direction The direction to change.
+  /// @param direction Outbound, inbound, or both.
   /// @param isPaused True to pause, false to unpause.
   function setTokenPause(
     address[] calldata localTokens,
@@ -1600,10 +1551,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Pauses or unpauses remote chains for every token. The other direction does not change.
-  /// @dev Any chain is accepted, also one without lanes. A chain that does not change emits nothing.
+  /// @notice Pauses or unpauses transfers in the specified direction for all tokens on the given remote chains.
+  /// @dev Chains can be paused before any lanes are configured. Emits an event only for chains whose pause state changes.
   /// @param remoteChainSelectors The remote chains.
-  /// @param direction The direction to change.
+  /// @param direction Outbound, inbound, or both.
   /// @param isPaused True to pause, false to unpause.
   function setChainPause(
     uint64[] calldata remoteChainSelectors,
@@ -1622,7 +1573,6 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev Returns the pause flags after a change of the given direction.
   function _getPauseFlags(
     bool isOutboundPaused,
     bool isInboundPaused,

@@ -64,7 +64,7 @@ contract ConnectionPolicyStore_setTokenPause is ConnectionPolicyStoreSetup {
     localTokens[0] = s_token;
     localTokens[1] = s_otherToken;
 
-    // Only s_otherToken changes, so only s_otherToken emits.
+    // Only the token whose pause state changes should emit an event.
     vm.recordLogs();
     s_connectionStore.setTokenPause(localTokens, ConnectionPolicyStore.PauseDirection.Outbound, true);
 
@@ -85,7 +85,7 @@ contract ConnectionPolicyStore_setTokenPause is ConnectionPolicyStoreSetup {
     emit ConnectionPolicyStore.TokenPauseSet(newToken, true, true);
     s_connectionStore.setTokenPause(_arrayOf(newToken), ConnectionPolicyStore.PauseDirection.Both, true);
 
-    // A registration and a deregistration keep the pause flags.
+    // Registration and deregistration must preserve pause flags.
     _registerToken(newToken);
     _assertTokenPause(newToken, true, true);
     s_connectionStore.applyTokenProfileUpdates(_arrayOf(newToken), new PolicyConfig.TokenProfileArgs[](0));

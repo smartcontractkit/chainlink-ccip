@@ -36,7 +36,7 @@ contract ConnectionPolicyStore_applyRemoteTokenAddressProviderUpdates is Connect
 
     (, address remoteTokenAddressProvider,) = s_connectionStore.getConnectionPolicy(CONNECTION_POLICY);
     assertEq(s_newProvider, remoteTokenAddressProvider);
-    // The new provider gives the remote token of every lane of the policy at once.
+    // Both tokens resolve their remote address through the new provider.
     assertEq(s_newRemoteToken, _getLaneConnection(s_token, DEST_CHAIN_SELECTOR).remoteToken);
     IPoolConfigManager.OutboundLane memory lane =
       s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
@@ -52,7 +52,7 @@ contract ConnectionPolicyStore_applyRemoteTokenAddressProviderUpdates is Connect
 
     (, address remoteTokenAddressProvider,) = s_connectionStore.getConnectionPolicy(CONNECTION_POLICY);
     assertEq(address(0), remoteTokenAddressProvider);
-    // The lane stays, but a policy without a provider gives no remote token, so a send reverts.
+    // The connection still exists, but outbound transfers need a provider to resolve the remote token.
     IPoolConfigManager.LaneConnection memory connection = _getLaneConnection(s_token, DEST_CHAIN_SELECTOR);
     assertTrue(connection.hasConnection);
     assertEq(0, connection.remoteToken.length);

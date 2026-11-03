@@ -24,7 +24,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
 
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](3);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});
-    // A lane that does not exist keeps the later lanes in place.
+    // A missing lane must not shift later results.
     lanes[1] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
     lanes[2] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: DEST_CHAIN_SELECTOR});
 
@@ -52,7 +52,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     uint64[] memory remoteChainSelectors = _getRemoteChainSelectors(DEST_CHAIN_SELECTOR);
     s_connectionStore.setChainPause(remoteChainSelectors, ConnectionPolicyStore.PauseDirection.Inbound, true);
 
-    // s_otherToken has no lane, and its pause state still shows.
+    // Pause state is returned even when no connection exists.
     IPoolConfigManager.LaneConnection memory connection = _getLaneConnection(s_otherToken, DEST_CHAIN_SELECTOR);
 
     assertFalse(connection.hasConnection);
@@ -64,7 +64,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     assertTrue(connection.isOutboundPaused);
     assertTrue(connection.isInboundPaused);
 
-    // Each flag alone sets the effective pause of its direction.
+    // Clearing the global pause leaves the token's outbound pause and the chain's inbound pause active.
     s_connectionStore.setGlobalPause(false);
     connection = _getLaneConnection(s_otherToken, DEST_CHAIN_SELECTOR);
 
@@ -73,7 +73,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     assertTrue(connection.isInboundPaused);
   }
 
-  /// @notice A provider failure leaves the remote token empty, and the other values of the lane still show.
+  /// @notice Provider failures leave the remote token empty without hiding the rest of the lane configuration.
   function test_getLaneConnectionBatch_ProviderGivesNoRemoteToken() public {
     address remoteTokenAddressProvider = address(s_remoteTokenAddressProvider);
     bytes memory getRemoteTokenAddressCall =
@@ -82,24 +82,20 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     expectedConnection.hasConnection = true;
     expectedConnection.remotePools = _getRemotePoolConfig().remotePools;
 
-    // The provider reverts.
     vm.mockCallRevert(remoteTokenAddressProvider, getRemoteTokenAddressCall, "");
     _assertLaneConnection(expectedConnection);
 
-    // The provider gives empty bytes.
     vm.mockCall(remoteTokenAddressProvider, getRemoteTokenAddressCall, abi.encode(bytes("")));
     _assertLaneConnection(expectedConnection);
 
-    // The provider gives an all-zero answer.
     vm.mockCall(remoteTokenAddressProvider, getRemoteTokenAddressCall, abi.encode(abi.encode(address(0))));
     _assertLaneConnection(expectedConnection);
 
-    // The provider loses its code after the set.
+    // The provider had code when configured, but no longer does.
     vm.clearMockedCalls();
     vm.etch(remoteTokenAddressProvider, "");
     _assertLaneConnection(expectedConnection);
 
-    // The policy has no provider.
     _setRemoteTokenAddressProvider(CONNECTION_POLICY, address(0));
     _assertLaneConnection(expectedConnection);
   }
@@ -120,13 +116,13 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
 
   function test_getLaneConnectionBatch_TrustPolicyRemotePools() public {
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_otherRemotePool, true);
-    // s_otherToken has no remote pool policy, so its lane shows only its own remote pool.
+    // Opting in without an assigned policy still returns only the inline pool.
     _setInlineConnectionConfig(
       _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
     );
     _setInlineRemotePoolConfigTrustingPolicy(s_otherToken, s_otherRemotePool, true);
 
-    // The remote pools of the inline record come first, then those of the policy record.
+    // Inline pools precede policy pools.
     IPoolConfigManager.RemotePool[] memory expectedRemotePools = new IPoolConfigManager.RemotePool[](2);
     expectedRemotePools[0] =
       IPoolConfigManager.RemotePool({remotePoolAddress: s_otherRemotePool, allowLegacyPoolDataOnReceive: true});
@@ -139,7 +135,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     assertEq(1, connection.remotePools.length);
     assertEq(abi.encode(expectedRemotePools[0]), abi.encode(connection.remotePools[0]));
 
-    // A remote pool that both records list shows once, with the flag of the inline record that a transfer uses.
+    // A pool listed in both records appears once, with its inline legacy receive permission.
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_remotePool, true);
     connection = _getLaneConnection(s_token, DEST_CHAIN_SELECTOR);
     assertEq(1, connection.remotePools.length);
@@ -151,7 +147,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_otherRemotePool, true);
     bytes memory newRemotePool = abi.encode(makeAddr("newRemotePool"));
 
-    // A policy record change emits only the policy event, and the lane view of the token changes with it.
+    // Updating the policy changes the resolved view without emitting a token-specific event.
     vm.recordLogs();
     _setRemotePoolPolicyConfig(
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(newRemotePool))
@@ -167,8 +163,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
   }
 
   function test_getLaneConnectionBatch_TrustPolicyRemotePools_PolicyChainRecord() public {
-    // The policy record of DEST_CHAIN_SELECTOR trusts s_otherRemotePool, and the one of SOURCE_CHAIN_SELECTOR trusts
-    // s_remotePool.
+    // Configure different pools for the two chains to detect a lookup on the wrong chain.
     _setRemotePoolPolicyConfig(
       _getRemotePoolPolicyConfigArgs(
         REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(s_otherRemotePool)
@@ -180,7 +175,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     bytes memory legacyPool = abi.encode(makeAddr("legacyPool"));
     _setInlineRemotePoolConfigTrustingPolicy(s_token, legacyPool, true);
 
-    // The lane view shows the remote pools that the receive path trusts: those of the record of its own chain.
+    // The view and receive path must use the same chain's policy pools.
     IPoolConfigManager.RemotePool[] memory expectedRemotePools = new IPoolConfigManager.RemotePool[](2);
     expectedRemotePools[0] =
       IPoolConfigManager.RemotePool({remotePoolAddress: legacyPool, allowLegacyPoolDataOnReceive: true});
@@ -197,12 +192,11 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
   }
 
   function test_getLaneConnectionBatch_InlineRecordReplacesPolicyRecord() public {
-    // s_token has a remote pool policy. Its inline record lists s_otherRemotePool, and does not trust the policy.
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
     remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
-    // The lane view shows only the inline remote pool, and the receive path rejects the remote pool of the policy.
+    // Without the opt-in, neither the view nor the receive path includes policy pools.
     assertEq(
       abi.encode(remotePoolConfig.remotePools), abi.encode(_getLaneConnection(s_token, DEST_CHAIN_SELECTOR).remotePools)
     );
@@ -213,7 +207,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     );
     _resolveInboundLane(s_remotePool);
 
-    // The same holds after the policy record changes.
+    // Policy updates must not change the pools trusted by an overriding inline record.
     bytes memory chainRemotePool = abi.encode(makeAddr("chainRemotePool"));
     _setRemotePoolPolicyConfig(
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(chainRemotePool))
@@ -248,7 +242,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
       hex"01"
     );
 
-    // try does not catch a failed decode of the answer.
+    // ABI decoding errors are not caught by try/catch.
     vm.expectRevert(bytes(""));
     s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
   }
@@ -259,7 +253,7 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     assertEq(abi.encode(expectedConnection), abi.encode(_getLaneConnection(s_token, DEST_CHAIN_SELECTOR)));
   }
 
-  /// @dev Runs the receive path of s_token with long pool data from the source pool.
+  /// @dev Validates an inbound transfer using pool data that includes the source token.
   function _resolveInboundLane(
     bytes memory sourcePoolAddress
   ) private view {

@@ -34,8 +34,6 @@ contract ConnectionPolicyStore_hasLaneBatch is ConnectionPolicyStoreSetup {
     assertTrue(hasLanes[0]);
   }
 
-  /// @dev A policy lane, a chain without a record, a token without a policy, an inline lane, a subset record that
-  /// does not serve the token, and chain selector zero.
   function _getLanes() private view returns (IPoolConfigManager.LaneKey[] memory lanes) {
     lanes = new IPoolConfigManager.LaneKey[](6);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});

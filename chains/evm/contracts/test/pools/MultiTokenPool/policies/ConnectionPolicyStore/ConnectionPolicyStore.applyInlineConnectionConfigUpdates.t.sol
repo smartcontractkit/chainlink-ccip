@@ -17,7 +17,7 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
     ConnectionPolicyStore.InlineConnectionConfigArgs[] memory inlineConfigs =
       new ConnectionPolicyStore.InlineConnectionConfigArgs[](2);
     inlineConfigs[0] = _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, s_inlineRemoteToken)[0];
-    // A non-EVM remote token has another length.
+    // Remote token addresses need not use the EVM address length.
     inlineConfigs[1] = _getInlineConnectionConfigArgs(s_otherToken, SOURCE_CHAIN_SELECTOR, hex"01")[0];
 
     vm.expectEmit();
@@ -27,7 +27,6 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
     s_connectionStore.applyInlineConnectionConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
 
     assertEq(abi.encode(inlineConfigs), abi.encode(s_connectionStore.getInlineConnectionConfigs(s_otherToken)));
-    // A token without a connection policy has a lane on each chain of its inline records.
     assertTrue(s_connectionStore.hasLaneBatch(_getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR))[0]);
     assertTrue(s_connectionStore.hasLaneBatch(_getLaneKeys(s_otherToken, SOURCE_CHAIN_SELECTOR))[0]);
   }
@@ -47,7 +46,7 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
     ConnectionPolicyStore.InlineConnectionConfigArgs[] memory inlineConfigs =
       _getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, abi.encode(makeAddr("newRemoteToken")));
 
-    // A set alone replaces the record, with no check against the policy.
+    // Updating an inline address does not require it to match the policy's address.
     _setInlineConnectionConfig(inlineConfigs);
 
     assertEq(abi.encode(inlineConfigs), abi.encode(s_connectionStore.getInlineConnectionConfigs(s_token)));
@@ -72,7 +71,6 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
 
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 
-    // The policy serves the lane at once, with the same remote token.
     IPoolConfigManager.LaneConnection memory connection = _getLaneConnection(s_token, DEST_CHAIN_SELECTOR);
     assertTrue(connection.hasConnection);
     assertEq(abi.encode(s_token), connection.remoteToken);
@@ -83,7 +81,7 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, SOURCE_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, SOURCE_CHAIN_SELECTOR);
 
-    // The policy record serves only its subset tokens, and s_token is not one of them.
+    // The subset restriction excludes s_token from this policy connection.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
@@ -92,34 +90,30 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
     assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR))[0]);
   }
 
-  /// @notice A policy lane without a remote token stops every send, so it does not block the removal.
+  /// @notice Removal is allowed when the policy has no usable remote token because outbound transfers would revert.
   function test_applyInlineConnectionConfigUpdates_RemoveWhenPolicyGivesNoRemoteToken() public {
     address remoteTokenAddressProvider = address(s_remoteTokenAddressProvider);
     bytes memory getRemoteTokenAddressCall =
       abi.encodeCall(IRemoteTokenAddressProvider.getRemoteTokenAddress, (s_token, DEST_CHAIN_SELECTOR));
 
-    // The provider gives empty bytes.
     vm.mockCall(remoteTokenAddressProvider, getRemoteTokenAddressCall, abi.encode(bytes("")));
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 
-    // The provider gives an all-zero answer.
     vm.mockCall(remoteTokenAddressProvider, getRemoteTokenAddressCall, abi.encode(abi.encode(address(0))));
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 
-    // The provider reverts.
     vm.mockCallRevert(remoteTokenAddressProvider, getRemoteTokenAddressCall, "");
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 
-    // The provider loses its code after the set.
+    // The provider had code when configured, but no longer does.
     vm.clearMockedCalls();
     vm.etch(remoteTokenAddressProvider, "");
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
 
-    // The policy has no provider.
     _setRemoteTokenAddressProvider(CONNECTION_POLICY, address(0));
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
     _removeInlineConnectionConfig(s_token, DEST_CHAIN_SELECTOR);
@@ -143,7 +137,6 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
   function test_applyInlineConnectionConfigUpdates_RevertWhen_PolicyRemoteTokenMismatch() public {
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, s_inlineRemoteToken));
 
-    // The removal would give the lane the remote token of the policy, which differs.
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.PolicyRemoteTokenMismatch.selector, s_token, DEST_CHAIN_SELECTOR)
     );
@@ -151,7 +144,7 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
       _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineConnectionConfigArgs[](0)
     );
 
-    // The check runs before the sets of the same call, so a set of the same record does not help.
+    // Re-adding the inline record in the same call does not bypass the removal check.
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.PolicyRemoteTokenMismatch.selector, s_token, DEST_CHAIN_SELECTOR)
     );
@@ -169,7 +162,7 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
       hex"01"
     );
 
-    // try does not catch a failed decode of the answer.
+    // ABI decoding errors are not caught by try/catch.
     vm.expectRevert(bytes(""));
     s_connectionStore.applyInlineConnectionConfigUpdates(
       _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineConnectionConfigArgs[](0)
@@ -211,7 +204,7 @@ contract ConnectionPolicyStore_applyInlineConnectionConfigUpdates is ConnectionP
   }
 
   function test_applyInlineConnectionConfigUpdates_RevertWhen_InlineRecordNotFound() public {
-    // The policy serves s_token with another remote token, but the missing record reverts first.
+    // Report the missing inline record before the policy's mismatched remote token.
     vm.expectRevert(abi.encodeWithSelector(PolicyConfig.InlineRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
     s_connectionStore.applyInlineConnectionConfigUpdates(
       _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineConnectionConfigArgs[](0)

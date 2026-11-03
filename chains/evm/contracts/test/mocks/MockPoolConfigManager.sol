@@ -7,13 +7,13 @@ import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 
-/// @dev A pool config manager with settable return values. Records the finality, token args and fee flag of the last
+/// @dev A pool config manager with settable return values. Saves the finality, token args, and fee flag of the last
 /// validate call. Batch views repeat the set value for each queried lane or token.
 contract MockPoolConfigManager is IPoolConfigManager {
   IPoolConfigManager.OutboundLane internal s_outboundLane;
   IPoolConfigManager.ResolvedInboundTransfer internal s_inboundTransfer;
   IPoolConfigManager.TokenConfig internal s_tokenConfig;
-  /// @dev Encoded, because the legacy code generator cannot copy a struct array from memory to storage.
+  /// @dev Store ABI-encoded data because the legacy code generator cannot copy nested struct arrays into storage.
   bytes internal s_laneConnection;
   IPoolConfigManager.LaneFee internal s_laneFee;
   IPoolV2.TokenTransferFeeConfig internal s_feeConfig;

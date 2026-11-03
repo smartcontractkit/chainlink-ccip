@@ -28,7 +28,6 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
       new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs
     );
 
-    // The first record set under a new name creates the policy.
     _assertRemotePoolPolicy(OTHER_POLICY, 0, policyConfigs);
     (, bytes32[] memory remotePoolPolicyNames) = s_connectionStore.getPolicyNames();
     assertEq(2, remotePoolPolicyNames.length);
@@ -51,7 +50,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
     );
 
     _assertRemotePoolPolicy(REMOTE_POOL_POLICY, 1, policyConfigs);
-    // The change applies at once to every token of the policy, and the old remote pool is no longer trusted.
+    // Both tokens use the updated policy pools without changing their assignments.
     s_connectionStore.resolveInboundLane(
       s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
@@ -83,7 +82,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
       1,
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))
     );
-    // The record of another chain does not serve the chain, so the token has no remote pool record there at once.
+    // A record for another chain cannot replace the removed record.
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.RemotePoolRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR)
     );
@@ -100,7 +99,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
       recordsToRemove, new bytes32[](0), new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](0)
     );
 
-    // The policy stays with its token and no records, so the lane of the token has no remote pool record.
+    // Removing the last record preserves the policy assignment but leaves no trusted pools.
     _assertRemotePoolPolicy(REMOTE_POOL_POLICY, 1, new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](0));
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.RemotePoolRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR)
@@ -110,7 +109,6 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
   function test_applyRemotePoolPolicyConfigUpdates_RemovePolicy() public {
     _setTokenRemotePoolPolicy(s_token, bytes32(0));
-    // The record removals run before the policy removals, so one call can remove the records and the policy.
     PolicyConfig.PolicyRecordKey[] memory recordsToRemove =
       _getPolicyRecordKeys(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR);
     bytes32[] memory policiesToRemove = _getPolicyNames(REMOTE_POOL_POLICY);
@@ -141,7 +139,6 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
 
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(recordsToRemove, policiesToRemove, policyConfigs);
 
-    // The set runs last, so it creates the policy again with only the new remote pool.
     _assertRemotePoolPolicy(REMOTE_POOL_POLICY, 0, policyConfigs);
   }
 
@@ -162,7 +159,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
   }
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_ZeroChainSelectorNotAllowed() public {
-    // A remote pool policy has no policy default record.
+    // Remote pool policies require explicit chain selectors; they have no default record.
     vm.expectRevert(PolicyConfig.ZeroChainSelectorNotAllowed.selector);
     _setRemotePoolPolicyConfig(
       _getRemotePoolPolicyConfigArgs(
@@ -172,7 +169,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
   }
 
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_ZeroAddressInvalid() public {
-    // An empty first remote pool reverts, and so does an empty later remote pool.
+    // Validate empty addresses at every position in the list.
     bytes[] memory remotePoolAddresses = new bytes[](2);
     remotePoolAddresses[1] = s_remotePool;
     vm.expectRevert(ConnectionPolicyStore.ZeroAddressInvalid.selector);
