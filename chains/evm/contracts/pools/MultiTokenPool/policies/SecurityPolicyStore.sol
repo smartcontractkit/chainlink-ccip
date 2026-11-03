@@ -76,8 +76,12 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   );
   event TokenProfileSet(address indexed localToken, uint8 localDecimals);
   event TokenRemoved(address indexed localToken);
-  event TokenRateLimitPolicySet(address indexed localToken, bytes32 indexed policyName);
-  event TokenSecurityPolicySet(address indexed localToken, bytes32 indexed policyName);
+  event TokenRateLimitPolicySet(
+    address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName
+  );
+  event TokenSecurityPolicySet(
+    address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName
+  );
   event OutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event InboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
   event FastFinalityOutboundRateLimitConsumed(uint64 indexed remoteChainSelector, address token, uint256 amount);
@@ -831,9 +835,10 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
           revert InvalidRateLimitPolicyDecimals(policyName, policyDecimals, tokenState.localDecimals);
         }
       }
-      PolicyConfig._moveToken(s_rateLimitPolicies, tokenState.rateLimitPolicyName, policyName);
+      bytes32 oldPolicyName = tokenState.rateLimitPolicyName;
+      PolicyConfig._moveToken(s_rateLimitPolicies, oldPolicyName, policyName);
       tokenState.rateLimitPolicyName = policyName;
-      emit TokenRateLimitPolicySet(localToken, policyName);
+      emit TokenRateLimitPolicySet(localToken, oldPolicyName, policyName);
     }
   }
 
@@ -848,9 +853,10 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
-      PolicyConfig._moveToken(s_securityPolicies, tokenState.securityPolicyName, policyName);
+      bytes32 oldPolicyName = tokenState.securityPolicyName;
+      PolicyConfig._moveToken(s_securityPolicies, oldPolicyName, policyName);
       tokenState.securityPolicyName = policyName;
-      emit TokenSecurityPolicySet(localToken, policyName);
+      emit TokenSecurityPolicySet(localToken, oldPolicyName, policyName);
     }
   }
 

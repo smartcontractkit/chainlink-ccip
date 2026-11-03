@@ -27,9 +27,9 @@ contract FeePolicyStore_applyTokenDestOverheadPolicyUpdates is FeePolicyStoreSet
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_otherToken, policyName: DEST_OVERHEAD_POLICY});
 
     vm.expectEmit();
-    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, OTHER_POLICY);
+    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, DEST_OVERHEAD_POLICY, OTHER_POLICY);
     vm.expectEmit();
-    emit FeePolicyStore.TokenDestOverheadPolicySet(s_otherToken, DEST_OVERHEAD_POLICY);
+    emit FeePolicyStore.TokenDestOverheadPolicySet(s_otherToken, bytes32(0), DEST_OVERHEAD_POLICY);
     s_feeStore.applyTokenDestOverheadPolicyUpdates(tokenPolicies);
 
     (,, bytes32 destOverheadPolicyName) = s_feeStore.getTokenPolicies(s_token);
@@ -48,7 +48,7 @@ contract FeePolicyStore_applyTokenDestOverheadPolicyUpdates is FeePolicyStoreSet
 
   function test_applyTokenDestOverheadPolicyUpdates_ZeroPolicyNameClearsTokenPolicy() public {
     vm.expectEmit();
-    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, bytes32(0));
+    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, DEST_OVERHEAD_POLICY, bytes32(0));
     s_feeStore.applyTokenDestOverheadPolicyUpdates(_getTokenPolicyArgs(s_token, bytes32(0)));
 
     (,, bytes32 destOverheadPolicyName) = s_feeStore.getTokenPolicies(s_token);
@@ -59,7 +59,7 @@ contract FeePolicyStore_applyTokenDestOverheadPolicyUpdates is FeePolicyStoreSet
 
   function test_applyTokenDestOverheadPolicyUpdates_SamePolicy() public {
     vm.expectEmit();
-    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, DEST_OVERHEAD_POLICY);
+    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, DEST_OVERHEAD_POLICY, DEST_OVERHEAD_POLICY);
     s_feeStore.applyTokenDestOverheadPolicyUpdates(_getTokenPolicyArgs(s_token, DEST_OVERHEAD_POLICY));
 
     (uint32 tokenCount,) = s_feeStore.getDestOverheadPolicy(DEST_OVERHEAD_POLICY);
@@ -72,6 +72,10 @@ contract FeePolicyStore_applyTokenDestOverheadPolicyUpdates is FeePolicyStoreSet
     tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: OTHER_POLICY});
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: bytes32(0)});
 
+    vm.expectEmit();
+    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, DEST_OVERHEAD_POLICY, OTHER_POLICY);
+    vm.expectEmit();
+    emit FeePolicyStore.TokenDestOverheadPolicySet(s_token, OTHER_POLICY, bytes32(0));
     s_feeStore.applyTokenDestOverheadPolicyUpdates(tokenPolicies);
 
     (,, bytes32 destOverheadPolicyName) = s_feeStore.getTokenPolicies(s_token);

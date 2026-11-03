@@ -7,13 +7,14 @@ import {IPoolV2} from "../../interfaces/IPoolV2.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 
-/// @dev A pool config manager with settable return values. Records the finality, token args and fee flag of the last
+/// @dev A pool config manager with settable return values. Saves the finality, token args, and fee flag of the last
 /// validate call. Batch views repeat the set value for each queried lane or token.
 contract MockPoolConfigManager is IPoolConfigManager {
   IPoolConfigManager.OutboundLane internal s_outboundLane;
   IPoolConfigManager.ResolvedInboundTransfer internal s_inboundTransfer;
   IPoolConfigManager.TokenConfig internal s_tokenConfig;
-  IPoolConfigManager.LaneConnection internal s_laneConnection;
+  /// @dev Store ABI-encoded data because the legacy code generator cannot copy nested struct arrays into storage.
+  bytes internal s_laneConnection;
   IPoolConfigManager.LaneFee internal s_laneFee;
   IPoolV2.TokenTransferFeeConfig internal s_feeConfig;
   address[] internal s_outboundCCVs;
@@ -44,7 +45,7 @@ contract MockPoolConfigManager is IPoolConfigManager {
   function setLaneConnection(
     IPoolConfigManager.LaneConnection memory connection
   ) external {
-    s_laneConnection = connection;
+    s_laneConnection = abi.encode(connection);
   }
 
   function setLaneFee(
@@ -133,7 +134,7 @@ contract MockPoolConfigManager is IPoolConfigManager {
   ) external view returns (LaneConnection[] memory connections) {
     connections = new LaneConnection[](lanes.length);
     for (uint256 i = 0; i < lanes.length; ++i) {
-      connections[i] = s_laneConnection;
+      connections[i] = abi.decode(s_laneConnection, (LaneConnection));
     }
     return connections;
   }
