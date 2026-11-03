@@ -9,7 +9,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// each policy type, such as connection, rate limit and fee.
 /// @dev A token uses its inline record for the chain. If it has no inline record, it uses the record of its policy for
 /// the chain. If the per-chain record does not exist, it uses the default record of its policy. The connection policy
-/// type has no default records.
+/// type and the remote pool policy type have no default records.
 library PolicyConfig {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;

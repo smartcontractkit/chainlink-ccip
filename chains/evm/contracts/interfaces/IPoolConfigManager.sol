@@ -58,7 +58,7 @@ interface IPoolConfigManager {
     uint32 destGasOverhead; // ──╮ The destination token execution gas overhead.
     uint32 destBytesOverhead; // │ The destination token data byte overhead.
     uint16 tokenFeeBps; //       │ The fee deducted from the transferred asset, in basis points.
-    bool isEnabled; // ──────────╯ Whether pool fees are enabled. False requests default fees.
+    bool isEnabled; // ──────────╯ False if the lane has no fee. MultiTokenPool.getFee then reverts.
   }
 
   /// @notice Current buckets for both finality classes for one token and remote chain.
@@ -69,26 +69,25 @@ interface IPoolConfigManager {
     TokenBucket fastFinalityInbound; //  The inbound FTF bucket.
   }
 
-  /// @notice A trusted remote pool and its permission to send legacy pool data without token identity.
+  /// @notice A trusted remote pool of a lane.
   struct RemotePool {
-    bytes remotePoolAddress; // The encoded remote pool address.
+    bytes remotePoolAddress; //           The remote pool, abi encoded for EVM chains.
     bool allowLegacyPoolDataOnReceive; // True accepts legacy pool data from this pool.
   }
 
   /// @notice Resolved connection and effective pause state for one token and remote chain.
   struct LaneConnection {
-    bool hasConnection; // ───────────────╮ True if the token has a connection to the remote chain.
-    bool isOutboundPaused; //             │ Whether outbound transfers are paused.
-    bool isInboundPaused; //              │ Whether inbound transfers are paused.
-    bool isGloballyPaused; //             │ True if the global pause is on.
-    bool isTokenOutboundPaused; //        │ True if the token is paused outbound.
-    bool isTokenInboundPaused; //         │ True if the token is paused inbound.
-    bool isChainOutboundPaused; //        │ True if the remote chain is paused outbound.
-    bool isChainInboundPaused; //         │ True if the remote chain is paused inbound.
-    bool omitSourceTokenAddressOnSend; // │ True sends pool data without the source token.
-    bool useLegacyPoolDataOnSend; // ─────╯ True accepts pool data without the source token.
-    bytes remoteToken; //                   The encoded remote token. Empty if it cannot be resolved.
-    RemotePool[] remotePools; //                      The trusted pools and their individual legacy-data permissions.
+    bool hasConnection; // ──────────╮ True if the token has a connection to the remote chain.
+    bool isOutboundPaused; //        │ Whether outbound transfers are paused.
+    bool isInboundPaused; //         │ Whether inbound transfers are paused.
+    bool isGloballyPaused; //        │ True if the global pause is on.
+    bool isTokenOutboundPaused; //   │ True if the token is paused outbound.
+    bool isTokenInboundPaused; //    │ True if the token is paused inbound.
+    bool isChainOutboundPaused; //   │ True if the remote chain is paused outbound.
+    bool isChainInboundPaused; //    │ True if the remote chain is paused inbound.
+    bool useLegacyPoolDataOnSend; // ╯ True sends legacy pool data.
+    bytes remoteToken; //              The encoded remote token. Empty if it cannot be resolved.
+    RemotePool[] remotePools; //       The trusted remote pools, or an empty list if none exist.
   }
 
   /// @notice Resolved token-level configuration, independent of lane selection and pause state.
@@ -140,8 +139,8 @@ interface IPoolConfigManager {
   /// @dev Reverts if a token does not allow the requested finality, even when it has no lane.
   /// @param lanes The token and remote chain lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, lanes without an
-  /// enabled fee record and lanes without a dest overhead record return zeros with isEnabled false.
+  /// @return fees The fee parameters per lane, aligned with lanes by index. Lanes that do not exist, lanes without a
+  /// fee record and lanes without a destination overhead record return zeros with isEnabled false.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -150,7 +149,7 @@ interface IPoolConfigManager {
   /// @notice Returns the resolved lane fee configurations.
   /// @param lanes The token and remote chain lanes to query.
   /// @return feeConfigs The fee configuration per lane, aligned with lanes by index. Lanes that do not exist, lanes
-  /// without an enabled fee record and lanes without a dest overhead record return a disabled zero configuration.
+  /// without a fee record and lanes without a destination overhead record return zeros with isEnabled false.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs);

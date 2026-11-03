@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolConfigManager} from "../../../interfaces/IPoolConfigManager.sol";
 
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
+import {MultiTokenPool} from "../../../pools/MultiTokenPool/MultiTokenPool.sol";
 import {MultiTokenPoolSetup} from "./MultiTokenPoolSetup.t.sol";
 
 contract MultiTokenPool_getFee is MultiTokenPoolSetup {
@@ -39,5 +40,19 @@ contract MultiTokenPool_getFee is MultiTokenPoolSetup {
     vm.expectCall(address(s_poolConfigManager), abi.encodeCall(IPoolConfigManager.getFeeBatch, (lanes, finality)), 1);
 
     s_pool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), finality, "");
+  }
+
+  // Reverts
+
+  /// @notice The pool config manager gives isEnabled false for a lane without a fee. The pool reverts, so the OnRamp
+  /// never prices the token with the FeeQuoter.
+  function test_getFee_RevertWhen_LaneFeeNotFound() public {
+    IPoolConfigManager.LaneFee memory disabledFee;
+    s_poolConfigManager.setLaneFee(disabledFee);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiTokenPool.LaneFeeNotFound.selector, address(s_token), DEST_CHAIN_SELECTOR)
+    );
+    s_pool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), bytes4(0), "");
   }
 }

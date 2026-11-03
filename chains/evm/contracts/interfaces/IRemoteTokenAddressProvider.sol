@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 interface IRemoteTokenAddressProvider {
   /// @notice Returns the remote token address of a local token on a remote chain.
   /// @dev A wrong answer on send burns the amount, and the message can never succeed. For a token or chain that this
-  /// provider does not know, it must revert or return empty bytes. DO NOT return abi.encode(address(0)) as default.
+  /// provider does not know, it should revert or return empty bytes.
   /// On receive, the source token must equal the return value byte for byte.
   /// @param localToken The local token.
   /// @param remoteChainSelector The remote chain.

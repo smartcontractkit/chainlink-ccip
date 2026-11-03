@@ -52,38 +52,11 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
     assertTrue(fees[0].isEnabled);
   }
 
-  function test_getFeeBatch_DisabledFeeRecord() public {
-    FeePolicyStore.FeeConfig memory disabledFeeConfig;
-    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, disabledFeeConfig));
-
-    IPoolConfigManager.LaneFee[] memory fees =
-      s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
-
-    IPoolConfigManager.LaneFee memory disabledFee;
-    assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
-  }
-
-  function test_getFeeBatch_DisabledInlineRecordOverridesPolicy() public {
-    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, _getOtherFeeConfig()));
-    FeePolicyStore.FeeConfig memory disabledFeeConfig;
-    _setInlineFeeConfig(_getInlineFeeConfigArgs(s_token, DEST_CHAIN_SELECTOR, disabledFeeConfig));
-    IPoolConfigManager.LaneKey[] memory lanes = _getLaneKeys(s_token, DEST_CHAIN_SELECTOR);
-
-    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(lanes, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
-
-    IPoolConfigManager.LaneFee memory disabledFee;
-    assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
-
-    fees = s_feeStore.getFeeBatch(lanes, FinalityCodec._encodeBlockDepth(10));
-
-    assertEq(abi.encode(disabledFee), abi.encode(fees[0]));
-  }
-
-  function test_getFeeBatch_EnabledZeroFees() public {
-    FeePolicyStore.FeeConfig memory feeConfig;
-    feeConfig.isEnabled = true;
-    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, feeConfig));
-    IPoolConfigManager.LaneFee memory expectedFee = _getLaneFee(feeConfig, _getDestOverheadConfig());
+  function test_getFeeBatch_ZeroFees() public {
+    FeePolicyStore.FeeConfig memory zeroFeeConfig;
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, zeroFeeConfig));
+    // A zero fee record gives zero fees with isEnabled true and the overheads.
+    IPoolConfigManager.LaneFee memory expectedFee = _getLaneFee(zeroFeeConfig, _getDestOverheadConfig());
 
     IPoolConfigManager.LaneFee[] memory fees =
       s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
@@ -91,6 +64,22 @@ contract FeePolicyStore_getFeeBatch is FeePolicyStoreSetup {
     assertEq(abi.encode(expectedFee), abi.encode(fees[0]));
 
     fees = s_feeStore.getFeeBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), FinalityCodec._encodeBlockDepth(10));
+
+    assertEq(abi.encode(expectedFee), abi.encode(fees[0]));
+  }
+
+  function test_getFeeBatch_ZeroInlineRecordOverridesPolicy() public {
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, DEST_CHAIN_SELECTOR, _getOtherFeeConfig()));
+    FeePolicyStore.FeeConfig memory zeroFeeConfig;
+    _setInlineFeeConfig(_getInlineFeeConfigArgs(s_token, DEST_CHAIN_SELECTOR, zeroFeeConfig));
+    IPoolConfigManager.LaneKey[] memory lanes = _getLaneKeys(s_token, DEST_CHAIN_SELECTOR);
+    IPoolConfigManager.LaneFee memory expectedFee = _getLaneFee(zeroFeeConfig, _getDestOverheadConfig());
+
+    IPoolConfigManager.LaneFee[] memory fees = s_feeStore.getFeeBatch(lanes, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+
+    assertEq(abi.encode(expectedFee), abi.encode(fees[0]));
+
+    fees = s_feeStore.getFeeBatch(lanes, FinalityCodec._encodeBlockDepth(10));
 
     assertEq(abi.encode(expectedFee), abi.encode(fees[0]));
   }

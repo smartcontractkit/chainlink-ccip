@@ -13,7 +13,7 @@ contract SecurityPolicyStore_applyTokenSecurityPolicyUpdates is SecurityPolicySt
     _setSecurityPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _arrayOf(s_ccv1), _arrayOf(s_ccv2), s_hook);
 
     vm.expectEmit(address(s_store));
-    emit SecurityPolicyStore.TokenSecurityPolicySet(s_tokenA, DEFAULT_POLICY);
+    emit SecurityPolicyStore.TokenSecurityPolicySet(s_tokenA, bytes32(0), DEFAULT_POLICY);
     _setTokenSecurityPolicy(s_tokenA, DEFAULT_POLICY);
 
     (,,, bytes32 securityPolicyName) = s_store.getTokenPolicies(s_tokenA);
@@ -21,6 +21,8 @@ contract SecurityPolicyStore_applyTokenSecurityPolicyUpdates is SecurityPolicySt
     (uint32 tokenCount,) = s_store.getSecurityPolicy(DEFAULT_POLICY);
     assertEq(1, tokenCount);
 
+    vm.expectEmit(address(s_store));
+    emit SecurityPolicyStore.TokenSecurityPolicySet(s_tokenA, DEFAULT_POLICY, bytes32(0));
     _setTokenSecurityPolicy(s_tokenA, bytes32(0));
     (,,, securityPolicyName) = s_store.getTokenPolicies(s_tokenA);
     assertEq(bytes32(0), securityPolicyName);
