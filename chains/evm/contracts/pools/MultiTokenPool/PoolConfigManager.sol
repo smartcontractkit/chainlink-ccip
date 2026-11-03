@@ -23,6 +23,7 @@ import {Address} from "@openzeppelin/contracts@5.3.0/utils/Address.sol";
 contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControlDefaultAdminRules {
   error ZeroAddressInvalid();
   error CallerIsNotTokenPool(address caller, address localToken);
+  error PoolConfigManagerMismatch(address pool, address poolConfigManager);
 
   event StaticConfigSet(
     ITokenAdminRegistry tokenAdminRegistry,
@@ -754,7 +755,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   /// @notice Turns off the global pause. Paused tokens and chains stay paused.
   /// @dev Only callable by DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE.
   function unpauseGlobally() external {
-    _checkRoleOr(DEFAULT_ADMIN_ROLE, UNPAUSER_ROLE);
+    _checkRoleOr(DEFAULT_ADMIN_ROLE, PAUSER_ROLE);
     i_connectionStore.setGlobalPause(false);
   }
 
@@ -812,7 +813,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // ================================================================
 
   /// @notice Sends the token fees that a pool holds to a recipient. The pool sends its whole balance of each token.
-  /// @dev Only callable by FEE_COLLECTOR_ROLE. The pool accepts this call only from its pool config manager.
+  /// @dev Only callable by FEE_COLLECTOR_ROLE. The pool must name this contract as its pool config manager, so this
+  /// call reaches only the pools that this contract serves. The pool also accepts this call only from its pool config
+  /// manager.
   /// @param pool The pool that holds the fees.
   /// @param feeTokens The tokens to withdraw.
   /// @param recipient The receiver of the fees. Must not be zero.
@@ -821,6 +824,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     address[] calldata feeTokens,
     address recipient
   ) external onlyRole(FEE_COLLECTOR_ROLE) {
+    address poolConfigManager = pool.getPoolConfigManager();
+    if (poolConfigManager != address(this)) revert PoolConfigManagerMismatch(address(pool), poolConfigManager);
     pool.withdrawFeeTokens(feeTokens, recipient);
   }
 

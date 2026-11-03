@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.24;
+
+import {IPoolConfigManager} from "../../../../interfaces/IPoolConfigManager.sol";
+
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
+import {PolicyConfig} from "../../../../libraries/PolicyConfig.sol";
+import {Pool} from "../../../../libraries/Pool.sol";
+import {PoolConfigManager} from "../../../../pools/MultiTokenPool/PoolConfigManager.sol";
+import {PoolConfigManagerTransferSetup} from "./PoolConfigManagerTransferSetup.t.sol";
+
+/// @notice The manager resolves the lane, checks the pool data and converts the amount, then consumes the inbound rate
+/// limit of the local amount. The store-level rules are covered by the store tests, so these tests cover the
+/// orchestration: the converted amount, the returned profile and hook, and the caller check.
+contract PoolConfigManager_validateReleaseOrMint is PoolConfigManagerTransferSetup {
+  uint8 internal constant REMOTE_DECIMALS = 6;
+
+  address internal s_receiver = makeAddr("receiver");
+
+  /// @notice The manager converts the amount to local decimals before the inbound rate limit consumes it.
+  function test_validateReleaseOrMint() public {
+    _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
+    _setCaller(address(s_pool));
+
+    IPoolConfigManager.ResolvedInboundTransfer memory transfer = s_poolConfigManager.validateReleaseOrMint(
+      _getReleaseOrMintIn(
+        s_tokenA, DEST_CHAIN_SELECTOR, 1e6, abi.encode(uint256(REMOTE_DECIMALS), abi.encode(s_remoteTokenA), bytes(""))
+      ),
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
+
+    assertEq(1e18, transfer.localAmount);
+    assertEq(uint8(IPoolConfigManager.LockOrBurnFlavor.Burn), uint8(transfer.lockOrBurnFlavor));
+    assertEq(address(0), transfer.lockOrBurnAddress);
+    assertEq(address(0), transfer.hook);
+    assertEq(CAPACITY - 1e18, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).inbound.tokens);
+  }
+
+  /// @notice The lane carries the profile and the hook of the token.
+  function test_validateReleaseOrMint_ReturnsProfileAndHook() public {
+    address hook = makeAddr("hook");
+    address burnAddress = makeAddr("burnAddress");
+    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, new address[](0), new address[](0), hook);
+    _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
+    PolicyConfig.TokenProfileArgs memory tokenProfile = _getStoredTokenProfile(s_tokenA);
+    tokenProfile.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.BurnToAddress;
+    tokenProfile.lockOrBurnAddress = burnAddress;
+    _setTokenProfile(tokenProfile);
+    _setCaller(address(s_pool));
+
+    IPoolConfigManager.ResolvedInboundTransfer memory transfer = s_poolConfigManager.validateReleaseOrMint(
+      _getReleaseOrMintIn(s_tokenA, DEST_CHAIN_SELECTOR, 1e18, _getPoolData(s_remoteTokenA)),
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
+
+    assertEq(uint8(IPoolConfigManager.LockOrBurnFlavor.BurnToAddress), uint8(transfer.lockOrBurnFlavor));
+    assertEq(burnAddress, transfer.lockOrBurnAddress);
+    assertEq(hook, transfer.hook);
+  }
+
+  /// @notice The requested finality reaches the security store, which consumes the FTF inbound bucket. The default
+  /// inbound bucket keeps its tokens. The inbound path does not check the finality against the token profile.
+  function test_validateReleaseOrMint_FastFinality() public {
+    _setInlineRateLimitConfigByFinality(s_tokenA, CAPACITY, 2 * CAPACITY);
+    _setCaller(address(s_pool));
+
+    IPoolConfigManager.ResolvedInboundTransfer memory transfer = s_poolConfigManager.validateReleaseOrMint(
+      _getReleaseOrMintIn(s_tokenA, DEST_CHAIN_SELECTOR, 1e18, _getPoolData(s_remoteTokenA)), bytes4(uint32(10))
+    );
+
+    assertEq(1e18, transfer.localAmount);
+    IPoolConfigManager.LaneRateLimiterState memory state = _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR);
+    assertEq(2 * CAPACITY - 1e18, state.fastFinalityInbound.tokens);
+    assertEq(CAPACITY, state.inbound.tokens);
+  }
+
+  // Reverts
+
+  /// @notice Only the pool that the TokenAdminRegistry assigns to the token can consume its inbound rate limit.
+  function test_validateReleaseOrMint_RevertWhen_CallerIsNotTokenPool() public {
+    _setCaller(STRANGER);
+
+    vm.expectRevert(abi.encodeWithSelector(PoolConfigManager.CallerIsNotTokenPool.selector, STRANGER, s_tokenA));
+    s_poolConfigManager.validateReleaseOrMint(
+      _getReleaseOrMintIn(s_tokenA, DEST_CHAIN_SELECTOR, 1e18, _getPoolData(s_remoteTokenA)),
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
+  }
+
+  /// @dev A message from the remote pool.
+  function _getReleaseOrMintIn(
+    address localToken,
+    uint64 remoteChainSelector,
+    uint256 sourceAmount,
+    bytes memory sourcePoolData
+  ) internal view returns (Pool.ReleaseOrMintInV1 memory) {
+    return Pool.ReleaseOrMintInV1({
+      originalSender: abi.encode(OWNER),
+      remoteChainSelector: remoteChainSelector,
+      receiver: s_receiver,
+      sourceDenominatedAmount: sourceAmount,
+      localToken: localToken,
+      sourcePoolAddress: abi.encode(s_remotePool),
+      sourcePoolData: sourcePoolData,
+      offchainTokenData: ""
+    });
+  }
+}
