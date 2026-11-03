@@ -14,19 +14,18 @@ contract MultiTokenPool_getRequiredCCVs is MultiTokenPoolSetup {
     outboundCCVs[1] = makeAddr("outboundCCV2");
     address[] memory inboundCCVs = new address[](1);
     inboundCCVs[0] = makeAddr("inboundCCV");
-    s_poolConfigManager.setRequiredCCVs(outboundCCVs, inboundCCVs);
-
-    // The pool passes the requested finality to the pool config manager. Each direction uses a different value.
+    // Each direction uses a different finality, and each mock matches only the finality that the pool must forward.
     bytes4 outboundFinality = FinalityCodec._encodeBlockDepth(5);
-    _expectLaneVerificationCall(outboundFinality);
+    bytes4 inboundFinality = FinalityCodec.WAIT_FOR_SAFE_FLAG;
+    _mockLaneVerification(outboundFinality, outboundCCVs, inboundCCVs);
+    _mockLaneVerification(inboundFinality, outboundCCVs, inboundCCVs);
+
     assertEq(
       s_pool.getRequiredCCVs(
         address(s_token), DEST_CHAIN_SELECTOR, 1e18, outboundFinality, "", IPoolV2.MessageDirection.Outbound
       ),
       outboundCCVs
     );
-    bytes4 inboundFinality = FinalityCodec.WAIT_FOR_SAFE_FLAG;
-    _expectLaneVerificationCall(inboundFinality);
     assertEq(
       s_pool.getRequiredCCVs(
         address(s_token), DEST_CHAIN_SELECTOR, 1e18, inboundFinality, "", IPoolV2.MessageDirection.Inbound
@@ -35,15 +34,19 @@ contract MultiTokenPool_getRequiredCCVs is MultiTokenPoolSetup {
     );
   }
 
-  function _expectLaneVerificationCall(
-    bytes4 requestedFinalityConfig
+  function _mockLaneVerification(
+    bytes4 requestedFinalityConfig,
+    address[] memory outboundCCVs,
+    address[] memory inboundCCVs
   ) internal {
-    IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](1);
-    lanes[0] = IPoolConfigManager.LaneKey({localToken: address(s_token), remoteChainSelector: DEST_CHAIN_SELECTOR});
-    vm.expectCall(
-      address(s_poolConfigManager),
-      abi.encodeCall(IPoolConfigManager.getLaneVerificationBatch, (lanes, requestedFinalityConfig)),
-      1
+    address[][] memory outboundCCVLists = new address[][](1);
+    outboundCCVLists[0] = outboundCCVs;
+    address[][] memory inboundCCVLists = new address[][](1);
+    inboundCCVLists[0] = inboundCCVs;
+    vm.mockCall(
+      s_poolConfigManager,
+      abi.encodeCall(IPoolConfigManager.getLaneVerificationBatch, (_laneKeys(), requestedFinalityConfig)),
+      abi.encode(new address[](1), outboundCCVLists, inboundCCVLists)
     );
   }
 }

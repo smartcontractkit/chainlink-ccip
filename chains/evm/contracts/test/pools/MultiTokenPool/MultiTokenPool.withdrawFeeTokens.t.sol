@@ -17,7 +17,8 @@ contract MultiTokenPool_withdrawFeeTokens is MultiTokenPoolSetup {
     vm.expectEmit(address(s_pool));
     emit FeeTokenHandler.FeeTokenWithdrawn(recipient, address(s_token), feeAmount);
 
-    s_poolConfigManager.withdrawFeeTokens(s_pool, feeTokens, recipient);
+    vm.startPrank(s_poolConfigManager);
+    s_pool.withdrawFeeTokens(feeTokens, recipient);
 
     assertEq(s_token.balanceOf(recipient), feeAmount);
     assertEq(s_token.balanceOf(address(s_pool)), 0);

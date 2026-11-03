@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {ILockBox} from "../../../../../interfaces/ILockBox.sol";
 import {IPoolConfigManager} from "../../../../../interfaces/IPoolConfigManager.sol";
 
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
-import {ERC20LockBox} from "../../../../../pools/ERC20LockBox.sol";
 import {ConnectionPolicyStore} from "../../../../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
 import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
@@ -16,10 +16,13 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
 
   address internal s_newToken;
   address internal s_burnAddress = makeAddr("burnAddress");
+  /// @dev Has code. Each test mocks whether it supports s_newToken.
+  address internal s_lockBox = makeAddr("lockBox");
 
   function setUp() public override {
     super.setUp();
     s_newToken = address(_deployToken("NEW", NEW_TOKEN_DECIMALS));
+    vm.etch(s_lockBox, hex"00");
   }
 
   function test_applyTokenProfileUpdates() public {
@@ -78,7 +81,8 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
   function test_applyTokenProfileUpdates_LockFlavor() public {
     PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_newToken);
     profiles[0].lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Lock;
-    profiles[0].lockOrBurnAddress = address(new ERC20LockBox(s_newToken));
+    profiles[0].lockOrBurnAddress = s_lockBox;
+    _mockLockBoxSupportsToken(true);
 
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
 
@@ -189,7 +193,9 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
     address[] memory lockOrBurnAddresses = new address[](5);
     flavors[0] = IPoolConfigManager.LockOrBurnFlavor.Lock;
     flavors[1] = IPoolConfigManager.LockOrBurnFlavor.Lock;
-    lockOrBurnAddresses[1] = address(new ERC20LockBox(s_otherToken));
+    // A lock box that does not support the token.
+    lockOrBurnAddresses[1] = s_lockBox;
+    _mockLockBoxSupportsToken(false);
     flavors[2] = IPoolConfigManager.LockOrBurnFlavor.Burn;
     lockOrBurnAddresses[2] = s_burnAddress;
     flavors[3] = IPoolConfigManager.LockOrBurnFlavor.BurnFrom;
@@ -255,6 +261,12 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
 
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, STRANGER));
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
+  }
+
+  function _mockLockBoxSupportsToken(
+    bool isSupported
+  ) private {
+    vm.mockCall(s_lockBox, abi.encodeCall(ILockBox.isTokenSupported, (s_newToken)), abi.encode(isSupported));
   }
 
   function _expectTokenHasConfigRevert() private {

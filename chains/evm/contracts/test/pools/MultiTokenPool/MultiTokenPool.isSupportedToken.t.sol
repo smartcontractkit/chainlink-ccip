@@ -13,7 +13,7 @@ contract MultiTokenPool_isSupportedToken is MultiTokenPoolSetup {
   function test_isSupportedToken_FalseWhenNotRegistered() public {
     IPoolConfigManager.TokenConfig memory config = _defaultTokenConfig();
     config.isRegistered = false;
-    s_poolConfigManager.setTokenConfig(config);
+    _mockTokenConfig(config);
 
     assertFalse(s_pool.isSupportedToken(address(s_token)));
   }
@@ -21,7 +21,7 @@ contract MultiTokenPool_isSupportedToken is MultiTokenPoolSetup {
   function test_isSupportedToken_FalseWhenFlavorNotServed() public {
     IPoolConfigManager.TokenConfig memory config = _defaultTokenConfig();
     config.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Lock;
-    s_poolConfigManager.setTokenConfig(config);
+    _mockTokenConfig(config);
 
     assertFalse(s_pool.isSupportedToken(address(s_token)));
   }
