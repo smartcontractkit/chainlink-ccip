@@ -57,25 +57,21 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
   }
 
   function test_resolveOutboundLane_AdditionalPoolData() public {
-    _setAdditionalPoolDataProvider(s_token);
+    // A finality other than zero, so the test fails if the provider does not get the requested finality.
+    PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_token);
+    profiles[0].allowedFinalityConfig = ALLOWED_FINALITY;
+    profiles[0].additionalPoolDataProvider = s_additionalPoolDataProvider;
+    s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
     bytes memory tokenArgs = "tokenArgs";
     bytes memory additionalPoolData = abi.encode(keccak256("uid"));
-    vm.mockCall(
-      s_additionalPoolDataProvider,
-      abi.encodeCall(
-        IAdditionalPoolDataProvider.getAdditionalPoolData, (s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, tokenArgs)
-      ),
-      abi.encode(additionalPoolData)
+    bytes memory callData = abi.encodeCall(
+      IAdditionalPoolDataProvider.getAdditionalPoolData, (s_token, DEST_CHAIN_SELECTOR, REQUESTED_FINALITY, tokenArgs)
     );
+    vm.mockCall(s_additionalPoolDataProvider, callData, abi.encode(additionalPoolData));
 
-    vm.expectCall(
-      s_additionalPoolDataProvider,
-      abi.encodeCall(
-        IAdditionalPoolDataProvider.getAdditionalPoolData, (s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, tokenArgs)
-      )
-    );
+    vm.expectCall(s_additionalPoolDataProvider, callData);
     IPoolConfigManager.OutboundLane memory lane =
-      s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, tokenArgs);
+      s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, REQUESTED_FINALITY, tokenArgs);
 
     assertEq(_getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, additionalPoolData), lane.destPoolData);
   }
@@ -185,13 +181,10 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
   }
 
   function test_resolveOutboundLane_RevertWhen_ConnectionRecordNotFound() public {
-    // A record with onlySubsetTokens on, without s_token in its subset.
-    _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, true));
-    IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](4);
+    IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](3);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: DEST_CHAIN_SELECTOR});
-    lanes[1] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
-    lanes[2] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: OTHER_CHAIN_SELECTOR});
-    lanes[3] =
+    lanes[1] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: OTHER_CHAIN_SELECTOR});
+    lanes[2] =
       IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: PolicyConfig.DEFAULT_CHAIN_SELECTOR});
 
     for (uint256 i = 0; i < lanes.length; ++i) {
@@ -202,6 +195,18 @@ contract ConnectionPolicyStore_resolveOutboundLane is ConnectionPolicyStoreSetup
       );
       s_connectionStore.resolveOutboundLane(lanes[i].localToken, lanes[i].remoteChainSelector, WAIT_FOR_FINALITY, "");
     }
+  }
+
+  function test_resolveOutboundLane_RevertWhen_SubsetTokenNotFound() public {
+    // A record with onlySubsetTokens on, without s_token in its subset.
+    _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, true));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.SubsetTokenNotFound.selector, CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token
+      )
+    );
+    s_connectionStore.resolveOutboundLane(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "");
   }
 
   function test_resolveOutboundLane_RevertWhen_RemotePoolRecordNotFound() public {

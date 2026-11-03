@@ -210,6 +210,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev The length of pool data that holds only the decimals. Every TokenPool since 1.5.1 sends and parses it.
   uint256 private constant POOL_DATA_DECIMALS_LENGTH = 32;
+  /// @dev The shortest pool data that holds a source token. It is abi.encode of the decimals, a source token of 1 to 32
+  /// bytes and empty additional pool data.
+  uint256 private constant POOL_DATA_WITH_SOURCE_TOKEN_MIN_LENGTH = 192;
 
   /// @dev Each store keeps its own list of registered tokens, as the stores never call each other.
   EnumerableSet.AddressSet private s_tokens;
@@ -357,6 +360,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) private view returns (bool isInline, RemotePoolRecord storage record) {
     if (_resolveConnectionLevel(localToken, remoteChainSelector) == PolicyConfig.RecordLevel.None) {
+      // A policy record without the lane has onlySubsetTokens on, and the token is not a subset token.
+      bytes32 policyName = s_tokenStates[localToken].connectionPolicyName;
+      if (s_connectionPolicies.policies[policyName].remoteChainSelectors.contains(remoteChainSelector)) {
+        revert SubsetTokenNotFound(policyName, remoteChainSelector, localToken);
+      }
       revert ConnectionRecordNotFound(localToken, remoteChainSelector);
     }
 
@@ -576,6 +584,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (sourcePoolData.length == POOL_DATA_DECIMALS_LENGTH) {
       decodedDecimals = abi.decode(sourcePoolData, (uint256));
     } else {
+      // Shorter data cannot hold a source token. Without this check, abi.decode reverts on some of it with no error
+      // data.
+      if (sourcePoolData.length < POOL_DATA_WITH_SOURCE_TOKEN_MIN_LENGTH) revert InvalidSourcePoolData(sourcePoolData);
       (decodedDecimals, sourceToken, additionalPoolData) = abi.decode(sourcePoolData, (uint256, bytes, bytes));
       // abi.decode also accepts encodings that abi.encode never makes, such as offsets that overlap. Only the exact
       // bytes of abi.encode are valid, with a source token that is not empty.

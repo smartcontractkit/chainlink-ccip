@@ -343,6 +343,18 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     _resolveInboundLane(s_otherToken, s_remotePool, sourcePoolData, AMOUNT);
   }
 
+  function test_resolveInboundLane_RevertWhen_SubsetTokenNotFound() public {
+    // A record with onlySubsetTokens on, without s_token in its subset.
+    _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.SubsetTokenNotFound.selector, CONNECTION_POLICY, DEST_CHAIN_SELECTOR, s_token
+      )
+    );
+    _resolveInboundLane(s_token, s_remotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
+  }
+
   function test_resolveInboundLane_RevertWhen_RemotePoolRecordNotFound() public {
     _setTokenRemotePoolPolicy(s_token, bytes32(0));
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
@@ -465,7 +477,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
 
   function test_resolveInboundLane_RevertWhen_InvalidSourcePoolData() public {
     bytes memory validPoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
-    bytes[] memory sourcePoolDatas = new bytes[](5);
+    bytes[] memory sourcePoolDatas = new bytes[](6);
     // Decimals above 255, in both formats.
     sourcePoolDatas[0] = abi.encode(uint256(256));
     sourcePoolDatas[1] = abi.encode(uint256(256), abi.encode(s_token), "");
@@ -476,6 +488,8 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     // Both offsets point to the source token. abi.decode accepts it, but abi.encode never makes it.
     sourcePoolDatas[4] =
       abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x60), uint256(0x60), uint256(0x20), s_token);
+    // Too short to hold a source token. abi.decode alone reverts on it with no error data.
+    sourcePoolDatas[5] = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x40));
 
     for (uint256 i = 0; i < sourcePoolDatas.length; ++i) {
       vm.expectRevert(abi.encodeWithSelector(ConnectionPolicyStore.InvalidSourcePoolData.selector, sourcePoolDatas[i]));
@@ -484,8 +498,10 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_RevertWhen_PoolDataDoesNotDecode() public {
-    // Too short for the long format, so abi.decode reverts.
-    bytes memory sourcePoolData = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x40));
+    // Long enough for a source token, but the first offset points past the end, so abi.decode reverts.
+    bytes memory sourcePoolData = abi.encode(
+      uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x1000), uint256(0x80), uint256(0x20), bytes32(0), uint256(0)
+    );
 
     vm.expectRevert(bytes(""));
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
