@@ -8,9 +8,9 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {PolicyConfig} from "../../libraries/PolicyConfig.sol";
 import {Pool} from "../../libraries/Pool.sol";
+import {ConnectionPolicyStore} from "./policies/ConnectionPolicyStore.sol";
 import {FeePolicyStore} from "./policies/FeePolicyStore.sol";
 import {SecurityPolicyStore} from "./policies/SecurityPolicyStore.sol";
-import {ConnectionPolicyStore} from "./tmp/ConnectionPolicyStore.stub.sol";
 
 import {
   AccessControlDefaultAdminRules
@@ -127,8 +127,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // ================================================================
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store resolves the lane, the fee store computes the token fee, and the security store
-  /// consumes the outbound rate limit of the amount after the fee. Only the security store changes state.
+  /// @dev The connection store resolves the lane and builds the pool data. The fee store checks the pool data size and
+  /// computes the token fee. The security store consumes the outbound rate limit of the amount after the fee. Only the
+  /// security store changes state.
   function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
@@ -139,8 +140,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   ) external override returns (OutboundLane memory lane) {
     _onlyTokenPool(localToken);
     lane = i_connectionStore.resolveOutboundLane(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs);
-    lane.feeAmount =
-      i_feeStore.resolveTokenFee(localToken, remoteChainSelector, amount, requestedFinalityConfig, chargeTokenFee);
+    lane.feeAmount = i_feeStore.validateLockOrBurn(
+      localToken, remoteChainSelector, amount, requestedFinalityConfig, chargeTokenFee, lane.destPoolData.length
+    );
     lane.hook = i_securityStore.validateLockOrBurn(
       localToken, remoteChainSelector, amount - lane.feeAmount, requestedFinalityConfig
     );
