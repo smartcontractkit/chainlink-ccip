@@ -23,9 +23,9 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_otherToken, policyName: CONNECTION_POLICY});
 
     vm.expectEmit();
-    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, OTHER_POLICY);
+    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, CONNECTION_POLICY, OTHER_POLICY);
     vm.expectEmit();
-    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_otherToken, CONNECTION_POLICY);
+    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_otherToken, bytes32(0), CONNECTION_POLICY);
     s_connectionStore.applyTokenConnectionPolicyUpdates(tokenPolicies);
 
     (, bytes32 connectionPolicyName,) = s_connectionStore.getTokenPolicies(s_token);
@@ -57,7 +57,7 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
 
   function test_applyTokenConnectionPolicyUpdates_ZeroPolicyNameClearsTokenPolicy() public {
     vm.expectEmit();
-    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, bytes32(0));
+    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, CONNECTION_POLICY, bytes32(0));
     s_connectionStore.applyTokenConnectionPolicyUpdates(_getTokenPolicyArgs(s_token, bytes32(0)));
 
     (, bytes32 connectionPolicyName,) = s_connectionStore.getTokenPolicies(s_token);
@@ -69,7 +69,7 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
 
   function test_applyTokenConnectionPolicyUpdates_SamePolicy() public {
     vm.expectEmit();
-    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, CONNECTION_POLICY);
+    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, CONNECTION_POLICY, CONNECTION_POLICY);
     s_connectionStore.applyTokenConnectionPolicyUpdates(_getTokenPolicyArgs(s_token, CONNECTION_POLICY));
 
     (uint32 tokenCount,,) = s_connectionStore.getConnectionPolicy(CONNECTION_POLICY);
@@ -82,6 +82,10 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
     tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: OTHER_POLICY});
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: bytes32(0)});
 
+    vm.expectEmit();
+    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, CONNECTION_POLICY, OTHER_POLICY);
+    vm.expectEmit();
+    emit ConnectionPolicyStore.TokenConnectionPolicySet(s_token, OTHER_POLICY, bytes32(0));
     s_connectionStore.applyTokenConnectionPolicyUpdates(tokenPolicies);
 
     (, bytes32 connectionPolicyName,) = s_connectionStore.getTokenPolicies(s_token);

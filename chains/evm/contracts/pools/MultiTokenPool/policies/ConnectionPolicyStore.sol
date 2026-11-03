@@ -79,8 +79,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     address additionalPoolDataProvider
   );
   event TokenRemoved(address indexed localToken);
-  event TokenConnectionPolicySet(address indexed localToken, bytes32 indexed policyName);
-  event TokenRemotePoolPolicySet(address indexed localToken, bytes32 indexed policyName);
+  event TokenConnectionPolicySet(
+    address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName
+  );
+  event TokenRemotePoolPolicySet(
+    address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName
+  );
   event InlineRemotePoolConfigSet(
     address indexed localToken,
     uint64 indexed remoteChainSelector,
@@ -1125,7 +1129,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
       PolicyConfig._moveToken(s_connectionPolicies, oldPolicyName, policyName);
       tokenState.connectionPolicyName = policyName;
-      emit TokenConnectionPolicySet(localToken, policyName);
+      emit TokenConnectionPolicySet(localToken, oldPolicyName, policyName);
     }
   }
 
@@ -1142,10 +1146,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
+      bytes32 oldPolicyName = tokenState.remotePoolPolicyName;
 
-      PolicyConfig._moveToken(s_remotePoolPolicies, tokenState.remotePoolPolicyName, policyName);
+      PolicyConfig._moveToken(s_remotePoolPolicies, oldPolicyName, policyName);
       tokenState.remotePoolPolicyName = policyName;
-      emit TokenRemotePoolPolicySet(localToken, policyName);
+      emit TokenRemotePoolPolicySet(localToken, oldPolicyName, policyName);
     }
   }
 

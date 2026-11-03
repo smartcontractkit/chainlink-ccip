@@ -23,9 +23,9 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_otherToken, policyName: FEE_POLICY});
 
     vm.expectEmit();
-    emit FeePolicyStore.TokenFeePolicySet(s_token, OTHER_POLICY);
+    emit FeePolicyStore.TokenFeePolicySet(s_token, FEE_POLICY, OTHER_POLICY);
     vm.expectEmit();
-    emit FeePolicyStore.TokenFeePolicySet(s_otherToken, FEE_POLICY);
+    emit FeePolicyStore.TokenFeePolicySet(s_otherToken, bytes32(0), FEE_POLICY);
     s_feeStore.applyTokenFeePolicyUpdates(tokenPolicies);
 
     (, bytes32 feePolicyName,) = s_feeStore.getTokenPolicies(s_token);
@@ -45,7 +45,7 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
 
   function test_applyTokenFeePolicyUpdates_ZeroPolicyNameClearsTokenPolicy() public {
     vm.expectEmit();
-    emit FeePolicyStore.TokenFeePolicySet(s_token, bytes32(0));
+    emit FeePolicyStore.TokenFeePolicySet(s_token, FEE_POLICY, bytes32(0));
     s_feeStore.applyTokenFeePolicyUpdates(_getTokenPolicyArgs(s_token, bytes32(0)));
 
     (, bytes32 feePolicyName,) = s_feeStore.getTokenPolicies(s_token);
@@ -56,7 +56,7 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
 
   function test_applyTokenFeePolicyUpdates_SamePolicy() public {
     vm.expectEmit();
-    emit FeePolicyStore.TokenFeePolicySet(s_token, FEE_POLICY);
+    emit FeePolicyStore.TokenFeePolicySet(s_token, FEE_POLICY, FEE_POLICY);
     s_feeStore.applyTokenFeePolicyUpdates(_getTokenPolicyArgs(s_token, FEE_POLICY));
 
     (uint32 tokenCount,) = s_feeStore.getFeePolicy(FEE_POLICY);
@@ -69,6 +69,10 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
     tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: OTHER_POLICY});
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: bytes32(0)});
 
+    vm.expectEmit();
+    emit FeePolicyStore.TokenFeePolicySet(s_token, FEE_POLICY, OTHER_POLICY);
+    vm.expectEmit();
+    emit FeePolicyStore.TokenFeePolicySet(s_token, OTHER_POLICY, bytes32(0));
     s_feeStore.applyTokenFeePolicyUpdates(tokenPolicies);
 
     (, bytes32 feePolicyName,) = s_feeStore.getTokenPolicies(s_token);
@@ -98,7 +102,7 @@ contract FeePolicyStore_applyTokenFeePolicyUpdates is FeePolicyStoreSetup {
     s_feeStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit FeePolicyStore.TokenFeePolicySet(s_token, OTHER_POLICY);
+    emit FeePolicyStore.TokenFeePolicySet(s_token, FEE_POLICY, OTHER_POLICY);
     s_feeStore.applyTokenFeePolicyUpdates(_getTokenPolicyArgs(s_token, OTHER_POLICY));
 
     (PolicyConfig.RecordLevel[] memory feeLevels,) =

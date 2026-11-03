@@ -13,7 +13,7 @@ contract SecurityPolicyStore_applyTokenRateLimitPolicyUpdates is SecurityPolicyS
     _setRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
 
     vm.expectEmit(address(s_store));
-    emit SecurityPolicyStore.TokenRateLimitPolicySet(s_tokenA, DEFAULT_POLICY);
+    emit SecurityPolicyStore.TokenRateLimitPolicySet(s_tokenA, bytes32(0), DEFAULT_POLICY);
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
 
     (,, bytes32 rateLimitPolicyName,) = s_store.getTokenPolicies(s_tokenA);
@@ -21,6 +21,8 @@ contract SecurityPolicyStore_applyTokenRateLimitPolicyUpdates is SecurityPolicyS
     (uint32 tokenCount,,) = s_store.getRateLimitPolicy(DEFAULT_POLICY);
     assertEq(1, tokenCount);
 
+    vm.expectEmit(address(s_store));
+    emit SecurityPolicyStore.TokenRateLimitPolicySet(s_tokenA, DEFAULT_POLICY, bytes32(0));
     _setTokenRateLimitPolicy(s_tokenA, bytes32(0));
     (,, rateLimitPolicyName,) = s_store.getTokenPolicies(s_tokenA);
     assertEq(bytes32(0), rateLimitPolicyName);

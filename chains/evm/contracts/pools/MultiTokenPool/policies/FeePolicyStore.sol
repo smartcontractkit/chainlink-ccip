@@ -45,8 +45,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @dev A set of a new token also registers it.
   event TokenProfileSet(address indexed localToken);
   event TokenRemoved(address indexed localToken);
-  event TokenFeePolicySet(address indexed localToken, bytes32 indexed policyName);
-  event TokenDestOverheadPolicySet(address indexed localToken, bytes32 indexed policyName);
+  event TokenFeePolicySet(address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName);
+  event TokenDestOverheadPolicySet(
+    address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName
+  );
   event InlineDestOverheadConfigSet(
     address indexed localToken, uint64 indexed remoteChainSelector, DestOverheadConfig destOverheadConfig
   );
@@ -537,10 +539,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
+      bytes32 oldPolicyName = tokenState.feePolicyName;
 
-      PolicyConfig._moveToken(s_feePolicies, tokenState.feePolicyName, policyName);
+      PolicyConfig._moveToken(s_feePolicies, oldPolicyName, policyName);
       tokenState.feePolicyName = policyName;
-      emit TokenFeePolicySet(localToken, policyName);
+      emit TokenFeePolicySet(localToken, oldPolicyName, policyName);
     }
   }
 
@@ -556,10 +559,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
+      bytes32 oldPolicyName = tokenState.destOverheadPolicyName;
 
-      PolicyConfig._moveToken(s_destOverheadPolicies, tokenState.destOverheadPolicyName, policyName);
+      PolicyConfig._moveToken(s_destOverheadPolicies, oldPolicyName, policyName);
       tokenState.destOverheadPolicyName = policyName;
-      emit TokenDestOverheadPolicySet(localToken, policyName);
+      emit TokenDestOverheadPolicySet(localToken, oldPolicyName, policyName);
     }
   }
 
