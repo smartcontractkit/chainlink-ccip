@@ -7,7 +7,7 @@ import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 
 contract ConnectionPolicyStore_getTokenConfigBatch is ConnectionPolicyStoreSetup {
-  /// @dev OP Mainnet, a chain where only an inline record serves s_token.
+  /// @dev OP Mainnet, configured only through an inline connection.
   uint64 internal constant THIRD_CHAIN_SELECTOR = 3734403246176062136;
 
   function test_getTokenConfigBatch() public {
@@ -17,8 +17,7 @@ contract ConnectionPolicyStore_getTokenConfigBatch is ConnectionPolicyStoreSetup
     profiles[0].allowedFinalityConfig = ALLOWED_FINALITY;
     profiles[0].additionalPoolDataProvider = s_additionalPoolDataProvider;
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
-    // The policy serves s_token on DEST and SOURCE, and not on OTHER. An inline record covers SOURCE again, and
-    // another inline record adds THIRD.
+    // Overlap inline and policy chains to check deduplication, and exclude OTHER through its subset restriction.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, false));
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, OTHER_CHAIN_SELECTOR, true));
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, SOURCE_CHAIN_SELECTOR, abi.encode(s_token)));
@@ -38,7 +37,7 @@ contract ConnectionPolicyStore_getTokenConfigBatch is ConnectionPolicyStoreSetup
     expectedConfig.allowedFinalityConfig = profiles[0].allowedFinalityConfig;
     expectedConfig.lockOrBurnAddress = profiles[0].lockOrBurnAddress;
     expectedConfig.additionalPoolDataProvider = profiles[0].additionalPoolDataProvider;
-    // The inline chains come first, then the chains where only the policy serves the token.
+    // Inline chains precede policy chains, with no duplicates.
     expectedConfig.supportedChains = new uint64[](3);
     expectedConfig.supportedChains[0] = SOURCE_CHAIN_SELECTOR;
     expectedConfig.supportedChains[1] = THIRD_CHAIN_SELECTOR;
@@ -72,7 +71,7 @@ contract ConnectionPolicyStore_getTokenConfigBatch is ConnectionPolicyStoreSetup
 
     IPoolConfigManager.TokenConfig[] memory configs = s_connectionStore.getTokenConfigBatch(_arrayOf(s_otherToken));
 
-    // The store keeps the profile of a deregistered token, but this view treats the token as not registered.
+    // Unlike getTokenProfiles, this view returns zero values for deregistered tokens.
     IPoolConfigManager.TokenConfig memory emptyConfig;
     assertEq(abi.encode(emptyConfig), abi.encode(configs[0]));
   }

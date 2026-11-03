@@ -9,7 +9,7 @@ import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 
 contract ConnectionPolicyStore_checkRequestedFinalityBatch is ConnectionPolicyStoreSetup {
   function test_checkRequestedFinalityBatch() public view {
-    // Default finality is always allowed, also for a token that is not registered.
+    // Default finality is allowed even for unregistered tokens.
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](3);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});
     lanes[1] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: DEST_CHAIN_SELECTOR});
@@ -21,7 +21,7 @@ contract ConnectionPolicyStore_checkRequestedFinalityBatch is ConnectionPolicySt
   function test_checkRequestedFinalityBatch_FastFinality() public {
     _setAllowedFinality(s_token, ALLOWED_FINALITY);
     _setAllowedFinality(s_otherToken, ALLOWED_FINALITY);
-    // s_otherToken has no lane, and its allowed finality still applies.
+    // Finality restrictions apply even when the token has no connection.
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](2);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});
     lanes[1] = IPoolConfigManager.LaneKey({localToken: s_otherToken, remoteChainSelector: SOURCE_CHAIN_SELECTOR});
@@ -32,7 +32,7 @@ contract ConnectionPolicyStore_checkRequestedFinalityBatch is ConnectionPolicySt
   // Reverts
 
   function test_checkRequestedFinalityBatch_RevertWhen_InvalidRequestedFinality() public {
-    // s_token allows the request, and s_otherToken has no lane and allows default finality only. So the batch reverts.
+    // The second token rejects the request, so the whole batch must revert.
     _setAllowedFinality(s_token, ALLOWED_FINALITY);
     IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](2);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: s_token, remoteChainSelector: DEST_CHAIN_SELECTOR});
@@ -49,7 +49,7 @@ contract ConnectionPolicyStore_checkRequestedFinalityBatch is ConnectionPolicySt
     IPoolConfigManager.LaneKey[] memory lanes = _getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR);
     s_connectionStore.checkRequestedFinalityBatch(lanes, REQUESTED_FINALITY);
 
-    // A deregistered token keeps its profile, but it allows default finality only.
+    // Retained profile values must not allow fast finality after deregistration.
     s_connectionStore.applyTokenProfileUpdates(_arrayOf(s_otherToken), new PolicyConfig.TokenProfileArgs[](0));
 
     vm.expectRevert(

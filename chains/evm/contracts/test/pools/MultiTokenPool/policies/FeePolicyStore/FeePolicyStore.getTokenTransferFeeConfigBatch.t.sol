@@ -42,7 +42,7 @@ contract FeePolicyStore_getTokenTransferFeeConfigBatch is FeePolicyStoreSetup {
     IPoolV2.TokenTransferFeeConfig[] memory feeConfigs =
       s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
 
-    // A zero fee record gives zero fees with isEnabled true and the overheads.
+    // Zero fees do not disable the lane or remove its destination overheads.
     assertEq(abi.encode(_getTokenTransferFeeConfig(zeroFeeConfig, _getDestOverheadConfig())), abi.encode(feeConfigs[0]));
   }
 

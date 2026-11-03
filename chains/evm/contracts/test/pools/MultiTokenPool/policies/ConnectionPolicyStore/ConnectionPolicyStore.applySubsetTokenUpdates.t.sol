@@ -10,8 +10,7 @@ import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreSetup {
-  /// @dev CONNECTION_POLICY serves only its subset tokens on SOURCE_CHAIN_SELECTOR. REMOTE_POOL_POLICY has a record for
-  /// that chain.
+  /// @dev Restrict SOURCE_CHAIN_SELECTOR to subset tokens and configure its remote pools.
   function setUp() public override {
     super.setUp();
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, true));
@@ -38,7 +37,6 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
     assertEq(2, subsetTokens.length);
     assertEq(s_token, subsetTokens[0]);
     assertEq(s_otherToken, subsetTokens[1]);
-    // A subset token takes its remote token from the provider of the policy.
     IPoolConfigManager.OutboundLane memory lane =
       s_connectionStore.resolveOutboundLane(s_token, SOURCE_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
     assertEq(abi.encode(s_token), lane.remoteToken);
@@ -77,11 +75,10 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
   function test_applySubsetTokenUpdates_TokenLeavesPolicy() public {
     _addSubsetToken(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token);
 
-    // A subset token cannot leave the policy.
     vm.expectRevert(abi.encodeWithSelector(ConnectionPolicyStore.TokenHasConfig.selector, s_token));
     _setTokenConnectionPolicy(s_token, bytes32(0));
 
-    // After the removal of its subset entry it can leave, and the set does not keep it.
+    // Removing the subset entry allows the token to leave the policy.
     s_connectionStore.applySubsetTokenUpdates(
       _getSubsetTokenArgs(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token),
       new ConnectionPolicyStore.SubsetTokenArgs[](0)
@@ -90,7 +87,7 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
     (, address[] memory subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR);
     assertEq(0, subsetTokens.length);
 
-    // A join again gives no subset lane, the same as a first join.
+    // Rejoining must not restore the old subset membership.
     _setTokenConnectionPolicy(s_token, CONNECTION_POLICY);
     assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, SOURCE_CHAIN_SELECTOR))[0]);
   }
@@ -110,7 +107,7 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
   }
 
   function test_applySubsetTokenUpdates_RevertWhen_PolicyRecordNotFound() public {
-    // A connection policy has no policy default record, so chain selector zero never has a record.
+    // Connection policies have no default record at chain selector zero.
     uint64[] memory remoteChainSelectors = new uint64[](2);
     remoteChainSelectors[0] = OTHER_CHAIN_SELECTOR;
     remoteChainSelectors[1] = PolicyConfig.DEFAULT_CHAIN_SELECTOR;

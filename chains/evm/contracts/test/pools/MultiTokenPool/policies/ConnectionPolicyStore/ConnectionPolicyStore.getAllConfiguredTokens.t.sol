@@ -14,7 +14,6 @@ contract ConnectionPolicyStore_getAllConfiguredTokens is ConnectionPolicyStoreSe
     assertEq(allTokens, s_connectionStore.getAllConfiguredTokens(0, type(uint64).max));
     assertEq(_arrayOf(s_token), s_connectionStore.getAllConfiguredTokens(0, 1));
     assertEq(_arrayOf(s_otherToken), s_connectionStore.getAllConfiguredTokens(1, 1));
-    // A page that passes the end of the list returns the rest.
     assertEq(_arrayOf(s_otherToken), s_connectionStore.getAllConfiguredTokens(1, 10));
   }
 
@@ -30,7 +29,7 @@ contract ConnectionPolicyStore_getAllConfiguredTokens is ConnectionPolicyStoreSe
 
     s_connectionStore.applyTokenProfileUpdates(_arrayOf(s_otherToken), new PolicyConfig.TokenProfileArgs[](0));
 
-    // The last token moves into the place of the deregistered token.
+    // Removal moves the last token into the vacated position.
     address[] memory allTokens = new address[](2);
     allTokens[0] = s_token;
     allTokens[1] = newToken;

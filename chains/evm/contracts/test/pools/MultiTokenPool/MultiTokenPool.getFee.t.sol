@@ -44,8 +44,7 @@ contract MultiTokenPool_getFee is MultiTokenPoolSetup {
 
   // Reverts
 
-  /// @notice The pool config manager gives isEnabled false for a lane without a fee. The pool reverts, so the OnRamp
-  /// never prices the token with the FeeQuoter.
+  /// @notice Missing fee configuration must revert instead of requesting FeeQuoter's token transfer fees.
   function test_getFee_RevertWhen_LaneFeeNotFound() public {
     IPoolConfigManager.LaneFee memory disabledFee;
     s_poolConfigManager.setLaneFee(disabledFee);

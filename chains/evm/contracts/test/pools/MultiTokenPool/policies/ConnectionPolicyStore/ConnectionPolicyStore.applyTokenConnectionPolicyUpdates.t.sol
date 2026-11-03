@@ -10,7 +10,7 @@ import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPolicyStoreSetup {
-  /// @dev OTHER_POLICY serves every token of the policy on SOURCE_CHAIN_SELECTOR only.
+  /// @dev OTHER_POLICY enables SOURCE_CHAIN_SELECTOR for all assigned tokens.
   function setUp() public override {
     super.setUp();
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(OTHER_POLICY, SOURCE_CHAIN_SELECTOR, false));
@@ -36,7 +36,6 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
     assertEq(1, tokenCount);
     (tokenCount,,) = s_connectionStore.getConnectionPolicy(OTHER_POLICY);
     assertEq(1, tokenCount);
-    // The token uses the records of its new policy at once.
     bool[] memory hasLanes = s_connectionStore.hasLaneBatch(_getTokenLanes());
     assertFalse(hasLanes[0]);
     assertTrue(hasLanes[1]);
@@ -45,7 +44,7 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
   }
 
   function test_applyTokenConnectionPolicyUpdates_NoLaneCheck() public {
-    // s_otherToken has no remote pool record, but the store opens its lane anyway. Tooling checks the other records.
+    // Assigning a connection policy does not require a remote pool record.
     _setTokenConnectionPolicy(s_otherToken, CONNECTION_POLICY);
 
     assertTrue(s_connectionStore.hasLaneBatch(_getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR))[0]);
@@ -77,7 +76,7 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
   }
 
   function test_applyTokenConnectionPolicyUpdates_SameTokenTwice() public {
-    // Each item reads the policy that the item before it set, so the token counts stay correct.
+    // Sequential assignments for the same token must update each policy's token count correctly.
     PolicyConfig.TokenPolicyArgs[] memory tokenPolicies = new PolicyConfig.TokenPolicyArgs[](2);
     tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: OTHER_POLICY});
     tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: s_token, policyName: bytes32(0)});
@@ -103,7 +102,6 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
     _setTokenConnectionPolicy(s_token, OTHER_POLICY);
 
     assertEq(1, s_connectionStore.getInlineConnectionConfigs(s_token).length);
-    // The inline record still overrides the new policy on its chain.
     IPoolConfigManager.LaneConnection[] memory connections =
       s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, SOURCE_CHAIN_SELECTOR));
     assertEq(inlineRemoteToken, connections[0].remoteToken);
@@ -116,12 +114,11 @@ contract ConnectionPolicyStore_applyTokenConnectionPolicyUpdates is ConnectionPo
     _addSubsetToken(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token);
     bytes32[2] memory newPolicyNames = [bytes32(0), OTHER_POLICY];
 
-    // A subset token can neither leave its policy nor move to another policy.
     for (uint256 i = 0; i < newPolicyNames.length; ++i) {
       vm.expectRevert(abi.encodeWithSelector(ConnectionPolicyStore.TokenHasConfig.selector, s_token));
       _setTokenConnectionPolicy(s_token, newPolicyNames[i]);
     }
-    // A set of the same policy changes nothing, so it runs.
+    // Assigning the same policy is allowed because the token does not leave it.
     _setTokenConnectionPolicy(s_token, CONNECTION_POLICY);
   }
 

@@ -12,19 +12,17 @@ import {BaseERC20} from "../../../../../tokens/BaseERC20.sol";
 import {CrossChainToken} from "../../../../../tokens/CrossChainToken.sol";
 import {BaseTest} from "../../../../BaseTest.t.sol";
 
-/// @notice s_poolConfigManager is the only authorized caller and sends every call. s_token uses CONNECTION_POLICY and
-/// REMOTE_POOL_POLICY. CONNECTION_POLICY serves every token of the policy on DEST_CHAIN_SELECTOR, with
-/// s_remoteTokenAddressProvider. REMOTE_POOL_POLICY has a policy chain record on DEST_CHAIN_SELECTOR that trusts
-/// s_remotePool. s_otherToken is registered with no policy.
+/// @notice Register two tokens, configure a policy lane for s_token on DEST_CHAIN_SELECTOR, and authorize
+/// s_poolConfigManager. The lane uses s_remoteTokenAddressProvider and trusts s_remotePool; s_otherToken has no policy.
 contract ConnectionPolicyStoreSetup is BaseTest {
   bytes32 internal constant CONNECTION_POLICY = "CONNECTION_POLICY";
   bytes32 internal constant REMOTE_POOL_POLICY = "REMOTE_POOL_POLICY";
   bytes32 internal constant OTHER_POLICY = "OTHER_POLICY";
-  /// @dev A remote chain where the setup adds no record.
+  /// @dev A remote chain with no configuration in setUp.
   uint64 internal constant OTHER_CHAIN_SELECTOR = 4949039107694359620;
-  /// @dev An allowed FTF finality of 5 blocks.
+  /// @dev Minimum allowed fast finality of 5 blocks.
   bytes4 internal constant ALLOWED_FINALITY = bytes4(uint32(5));
-  /// @dev An FTF request of 10 blocks, which ALLOWED_FINALITY allows.
+  /// @dev A valid fast finality request of 10 blocks.
   bytes4 internal constant REQUESTED_FINALITY = bytes4(uint32(10));
 
   ConnectionPolicyStore internal s_connectionStore;
@@ -42,7 +40,7 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     s_otherToken = address(_deployToken("OTHER", USDC_TOKEN_DECIMALS));
     s_remoteTokenAddressProvider = new SameAddressRemoteTokenAddressProvider();
     s_connectionStore = new ConnectionPolicyStore(_arrayOf(s_poolConfigManager));
-    // A provider needs code. The tests mock each call to it.
+    // Configuration requires provider code even though the tests mock its responses.
     vm.etch(s_additionalPoolDataProvider, hex"00");
     vm.startPrank(s_poolConfigManager);
 
@@ -80,7 +78,6 @@ contract ConnectionPolicyStoreSetup is BaseTest {
   // │                          Arguments                           │
   // ================================================================
 
-  /// @dev A Burn token with the decimals of the token, default finality only and no additional pool data provider.
   function _getTokenProfileArgs(
     address localToken
   ) internal view returns (PolicyConfig.TokenProfileArgs[] memory profiles) {
@@ -152,7 +149,6 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     return providers;
   }
 
-  /// @dev Trusts s_remotePool, with the flags for legacy pool data off.
   function _getRemotePoolConfig() internal view returns (ConnectionPolicyStore.RemotePoolConfig memory) {
     IPoolConfigManager.RemotePool[] memory remotePools = new IPoolConfigManager.RemotePool[](1);
     remotePools[0].remotePoolAddress = s_remotePool;
@@ -235,8 +231,7 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     return s_connectionStore.getLaneConnectionBatch(_getLaneKeys(localToken, remoteChainSelector))[0];
   }
 
-  /// @dev The test profile compiles without via-ir, and the decoder of the getRemotePoolPolicy return is too deep for
-  /// the stack. So this reads only the token count from the raw return.
+  /// @dev Decode only the token count to avoid a stack-too-deep error in the test profile without via-ir.
   function _getRemotePoolPolicyTokenCount(
     bytes32 policyName
   ) internal view returns (uint32) {
@@ -246,8 +241,7 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     return abi.decode(returnData, (uint32));
   }
 
-  /// @dev The test profile compiles without via-ir, and the decoder of the getRemotePoolPolicy return is too deep for
-  /// the stack. So this compares the raw return.
+  /// @dev Compare encoded results to avoid a stack-too-deep error in the test profile without via-ir.
   function _assertRemotePoolPolicy(
     bytes32 policyName,
     uint32 tokenCount,
@@ -259,7 +253,6 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     assertEq(abi.encode(tokenCount, policyConfigs), returnData);
   }
 
-  /// @dev The pool data that a source multi-token pool sends with the source token.
   function _getSourcePoolData(
     uint8 sourceDecimals,
     address sourceToken,
@@ -347,8 +340,6 @@ contract ConnectionPolicyStoreSetup is BaseTest {
     s_connectionStore.applyInlineRemotePoolConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
   }
 
-  /// @dev Sets an inline record of the token on DEST_CHAIN_SELECTOR. It lists one remote pool and trusts the remote
-  /// pools of the policy record.
   function _setInlineRemotePoolConfigTrustingPolicy(
     address localToken,
     bytes memory remotePool,

@@ -30,7 +30,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     (, PolicyConfig.RecordLevel[] memory remotePoolLevels) =
       s_connectionStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(uint8(PolicyConfig.RecordLevel.Inline), uint8(remotePoolLevels[0]));
-    // The inline record overrides the policy, and each record trusts only its own remote pools.
+    // Each inline record overrides the policy and trusts only its configured pools.
     s_connectionStore.resolveInboundLane(
       s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, "", 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
@@ -53,7 +53,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     emit ConnectionPolicyStore.InlineRemotePoolConfigSet(s_token, DEST_CHAIN_SELECTOR, false, emptyRemotePoolConfig);
     s_connectionStore.applyInlineRemotePoolConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
 
-    // A record without remote pools works outbound only.
+    // An empty pool list still allows outbound transfers.
     IPoolConfigManager.OutboundLane memory lane =
       s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
     assertEq(_getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), lane.destPoolData);
@@ -84,7 +84,6 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     s_connectionStore.resolveInboundLane(
       s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, "", 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
-    // A set replaces the remote pools, so the old remote pool is no longer trusted.
     vm.expectRevert(
       abi.encodeWithSelector(
         ConnectionPolicyStore.InvalidSourcePoolAddress.selector, s_token, DEST_CHAIN_SELECTOR, s_remotePool
@@ -94,7 +93,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
       s_token, DEST_CHAIN_SELECTOR, s_remotePool, "", 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
 
-    // A set also replaces the flag of a remote pool that stays.
+    // Updating a pool that remains in the list must replace its legacy receive permission.
     newRemotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = false;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, newRemotePoolConfig));
 
@@ -118,7 +117,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     );
 
     assertEq(0, s_connectionStore.getInlineRemotePoolConfigs(s_token).length);
-    // The token falls back to its policy at once.
+    // Removing the inline record restores the policy configuration.
     (, PolicyConfig.RecordLevel[] memory remotePoolLevels) =
       s_connectionStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertEq(uint8(PolicyConfig.RecordLevel.PolicyChain), uint8(remotePoolLevels[0]));
@@ -129,7 +128,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
   }
 
   function test_applyInlineRemotePoolConfigUpdates_RemoveDeletesValues() public {
-    // s_otherToken has no remote pool policy, so after the removal its lane reads an empty record.
+    // With no policy to fall back to, removal leaves no remote pool configuration.
     _setInlineConnectionConfig(
       _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
     );
@@ -150,7 +149,6 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
   }
 
   function test_applyInlineRemotePoolConfigUpdates_RemoveRecordTrustingPolicy() public {
-    // The inline record has its own legacy pool and its own send flag, and it trusts the policy record.
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
     remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
     remotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
@@ -164,7 +162,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
       _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0)
     );
 
-    // The token uses the policy record alone: its send flag and its remote pools.
+    // Falling back to the policy clears the inline legacy settings.
     IPoolConfigManager.OutboundLane memory lane =
       s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
     assertEq(_getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), lane.destPoolData);
@@ -203,7 +201,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     s_connectionStore.applyInlineRemotePoolConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
 
     assertEq(abi.encode(inlineConfigs), abi.encode(s_connectionStore.getInlineRemotePoolConfigs(s_token)));
-    // The token trusts its own remote pool and the remote pool of the policy record.
+    // Opting in trusts both the inline and policy pools.
     s_connectionStore.resolveInboundLane(
       s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
@@ -211,7 +209,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
       s_token, DEST_CHAIN_SELECTOR, s_remotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
 
-    // A set with the flag off replaces it, so the remote pool of the policy is no longer trusted.
+    // Disabling trustPolicyRemotePools removes trust in pools listed only in the policy.
     inlineConfigs[0].trustPolicyRemotePools = false;
     s_connectionStore.applyInlineRemotePoolConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
 
@@ -243,7 +241,7 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](3);
     remotePoolConfig.remotePools[0].remotePoolAddress = s_remotePool;
     remotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
-    // A duplicate address reverts also with another flag.
+    // Different legacy flags do not make duplicate pool addresses valid.
     remotePoolConfig.remotePools[2].remotePoolAddress = s_remotePool;
     remotePoolConfig.remotePools[2].allowLegacyPoolDataOnReceive = true;
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =

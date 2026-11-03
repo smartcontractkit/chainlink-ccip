@@ -17,7 +17,6 @@ contract ConnectionPolicyStore_constructor is ConnectionPolicyStoreSetup {
     assertEq("ConnectionPolicyStore 2.1.0-dev", connectionStore.typeAndVersion());
     assertEq(OWNER, connectionStore.owner());
     assertEq(_arrayOf(s_poolConfigManager), connectionStore.getAllAuthorizedCallers());
-    // A new store starts with every pause off.
     IPoolConfigManager.LaneConnection[] memory connections =
       connectionStore.getLaneConnectionBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
     assertFalse(connections[0].isOutboundPaused);

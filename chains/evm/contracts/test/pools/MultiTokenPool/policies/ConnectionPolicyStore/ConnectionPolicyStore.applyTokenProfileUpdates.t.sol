@@ -47,7 +47,7 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
     assertEq(bytes32(0), connectionPolicyName);
     assertEq(bytes32(0), remotePoolPolicyName);
     assertEq(3, s_connectionStore.getAllConfiguredTokens(0, type(uint64).max).length);
-    // A registration opens no lane.
+    // Registering a token does not enable any connections.
     assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_newToken, DEST_CHAIN_SELECTOR))[0]);
   }
 
@@ -98,7 +98,7 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
   }
 
   function test_applyTokenProfileUpdates_TokenWithoutDecimals() public {
-    // The decimals function is optional in ERC20, so the given decimals are used.
+    // ERC20 decimals is optional, so use the supplied value if the call reverts.
     vm.mockCallRevert(s_newToken, abi.encodeCall(IERC20Metadata.decimals, ()), "");
     PolicyConfig.TokenProfileArgs[] memory profiles = new PolicyConfig.TokenProfileArgs[](1);
     profiles[0].localToken = s_newToken;
@@ -128,13 +128,13 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
 
     assertEq(abi.encode(_getStoredProfile(profiles[0], false, true, true)), abi.encode(_getTokenProfile(s_otherToken)));
 
-    // A token that is registered again keeps its pause flags.
+    // Re-registering a token must not clear its pause flags.
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
     assertEq(abi.encode(_getStoredProfile(profiles[0], true, true, true)), abi.encode(_getTokenProfile(s_otherToken)));
   }
 
   function test_applyTokenProfileUpdates_RemovalsRunFirst() public {
-    // A deregistration lets the same call register the token again with other decimals.
+    // Removing and re-registering a token allows new decimals in the same call.
     vm.mockCall(s_otherToken, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(NEW_TOKEN_DECIMALS));
     PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_otherToken);
 
@@ -171,7 +171,7 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
   }
 
   function test_applyTokenProfileUpdates_RevertWhen_InvalidDecimalArgs_RegisteredToken() public {
-    // The decimals of a registered token never change, also when decimals returns the new value.
+    // Stored decimals cannot change while registered, even if the token reports a different value.
     vm.mockCall(s_token, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(USDC_TOKEN_DECIMALS));
     PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_token);
 
@@ -184,7 +184,7 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
   }
 
   function test_applyTokenProfileUpdates_RevertWhen_InvalidLockOrBurnAddress() public {
-    // Lock needs a lock box that supports the token. The other burn flavors need zero.
+    // Lock requires a compatible LockBox. Burn, BurnFrom, and BurnWithFrom require a zero target address.
     IPoolConfigManager.LockOrBurnFlavor[] memory flavors = new IPoolConfigManager.LockOrBurnFlavor[](5);
     address[] memory lockOrBurnAddresses = new address[](5);
     flavors[0] = IPoolConfigManager.LockOrBurnFlavor.Lock;
@@ -226,7 +226,7 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
   }
 
   function test_applyTokenProfileUpdates_RevertWhen_TokenHasConfig() public {
-    // Each of the four kinds of config blocks the deregistration on its own.
+    // Each policy assignment and inline record independently prevents deregistration.
     _setTokenConnectionPolicy(s_otherToken, CONNECTION_POLICY);
     _expectTokenHasConfigRevert();
     _setTokenConnectionPolicy(s_otherToken, bytes32(0));

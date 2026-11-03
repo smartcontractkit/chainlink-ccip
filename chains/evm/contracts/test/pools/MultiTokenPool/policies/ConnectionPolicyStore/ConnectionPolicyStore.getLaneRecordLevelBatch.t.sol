@@ -8,8 +8,7 @@ import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 
 contract ConnectionPolicyStore_getLaneRecordLevelBatch is ConnectionPolicyStoreSetup {
   function test_getLaneRecordLevelBatch() public {
-    // SOURCE gets an inline connection record and a remote pool policy chain record. OTHER gets a subset record that
-    // does not serve s_token, and an inline remote pool record.
+    // Configure connection and remote pool records independently. The subset restriction excludes s_token on OTHER.
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, SOURCE_CHAIN_SELECTOR, abi.encode(s_token)));
     _setRemotePoolPolicyConfig(
       _getRemotePoolPolicyConfigArgs(REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_remotePool))
@@ -32,13 +31,12 @@ contract ConnectionPolicyStore_getLaneRecordLevelBatch is ConnectionPolicyStoreS
     assertEq(uint8(PolicyConfig.RecordLevel.PolicyChain), uint8(remotePoolLevels[0]));
     assertEq(uint8(PolicyConfig.RecordLevel.Inline), uint8(connectionLevels[1]));
     assertEq(uint8(PolicyConfig.RecordLevel.PolicyChain), uint8(remotePoolLevels[1]));
-    // The remote pool level resolves also where the token has no lane.
+    // Remote pool records resolve even without a connection.
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(connectionLevels[2]));
     assertEq(uint8(PolicyConfig.RecordLevel.Inline), uint8(remotePoolLevels[2]));
-    // s_otherToken has no policy and no inline record.
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(connectionLevels[3]));
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(remotePoolLevels[3]));
-    // No policy of this store has a policy default record, so chain selector zero never resolves to a record.
+    // Neither policy type supports a default record at chain selector zero.
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(connectionLevels[4]));
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(remotePoolLevels[4]));
   }
@@ -49,7 +47,7 @@ contract ConnectionPolicyStore_getLaneRecordLevelBatch is ConnectionPolicyStoreS
     (, PolicyConfig.RecordLevel[] memory remotePoolLevels) =
       s_connectionStore.getLaneRecordLevelBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
 
-    // The level is that of the inline record, also when it trusts the remote pools of the policy record.
+    // Trusting policy pools does not change the resolved record level from Inline.
     assertEq(uint8(PolicyConfig.RecordLevel.Inline), uint8(remotePoolLevels[0]));
   }
 }

@@ -65,7 +65,7 @@ contract FeePolicyStore_applyInlineFeeConfigUpdates is FeePolicyStoreSetup {
   // Reverts
 
   function test_applyInlineFeeConfigUpdates_RevertWhen_InvalidInlineFeeConfig() public {
-    // Each bps fee at BPS_DIVIDER.
+    // Neither finality class may charge 100% of the transferred tokens.
     FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](2);
     invalidFeeConfigs[0] = _getFeeConfig();
     invalidFeeConfigs[0].finalityTransferFeeBps = uint16(BPS_DIVIDER);

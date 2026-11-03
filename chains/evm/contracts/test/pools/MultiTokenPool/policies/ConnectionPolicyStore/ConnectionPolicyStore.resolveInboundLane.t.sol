@@ -39,12 +39,11 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_ConvertsDecimals() public view {
-    // From fewer remote decimals, the amount scales up.
     IPoolConfigManager.ResolvedInboundTransfer memory transfer =
       _resolveInboundLane(s_token, s_remotePool, _getSourcePoolData(6, s_token, ""), 1e6);
     assertEq(1e18, transfer.localAmount);
 
-    // From more remote decimals, the amount rounds down, so the pool never mints more than the remote chain sent.
+    // Converting to fewer decimals must round down.
     transfer = _resolveInboundLane(s_token, s_remotePool, _getSourcePoolData(20, s_token, ""), 1e20 + 99);
     assertEq(1e18, transfer.localAmount);
   }
@@ -53,7 +52,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     address remoteToken = makeAddr("remoteToken");
     _setInlineConnectionConfig(_getInlineConnectionConfigArgs(s_token, DEST_CHAIN_SELECTOR, abi.encode(remoteToken)));
 
-    // The source token must equal the inline remote token, so the provider of the policy is not asked.
+    // The inline remote token takes precedence without calling the policy's provider.
     vm.expectCall(
       address(s_remoteTokenAddressProvider),
       abi.encodeWithSelector(IRemoteTokenAddressProvider.getRemoteTokenAddress.selector),
@@ -66,34 +65,33 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_LegacyPoolData() public {
-    // s_remotePool has the flag on, and s_otherRemotePool has it off.
     _allowLegacyPoolDataOnReceive();
 
-    // A source without the source token does not depend on the remote token address provider.
+    // Legacy data has no source token to compare, so the remote token provider is not needed.
     vm.expectCall(
       address(s_remoteTokenAddressProvider),
       abi.encodeWithSelector(IRemoteTokenAddressProvider.getRemoteTokenAddress.selector),
       0
     );
-    // Pool data with the decimals only, as a legacy pool sends it.
+    // Legacy pool data with token decimals still requires amount conversion.
     IPoolConfigManager.ResolvedInboundTransfer memory transfer =
       _resolveInboundLane(s_token, s_remotePool, abi.encode(uint256(6)), 1e6);
     assertEq(1e18, transfer.localAmount);
 
-    // Empty pool data, as a pool older than 1.5.1 sends it, uses the local decimals.
+    // Older pools send no decimals, so the local decimals are used.
     transfer = _resolveInboundLane(s_token, s_remotePool, "", AMOUNT);
     assertEq(AMOUNT, transfer.localAmount);
   }
 
   function test_resolveInboundLane_TrustPolicyRemotePools() public {
-    // The inline record lists only s_otherRemotePool, as a legacy pool. The policy record gives s_remotePool.
+    // Accept legacy data from the inline pool while also trusting the policy pool.
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_otherRemotePool, true);
     bytes memory legacyPoolData = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS));
 
     _resolveInboundLane(s_token, s_remotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
     _resolveInboundLane(s_token, s_otherRemotePool, legacyPoolData, AMOUNT);
 
-    // The remote pool of the policy record keeps the flag of the policy record.
+    // Trusting the policy pool does not allow it to send legacy data.
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_token, DEST_CHAIN_SELECTOR)
     );
@@ -102,11 +100,11 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
 
   function test_resolveInboundLane_TrustPolicyRemotePools_InlineFlagWins() public {
     bytes memory legacyPoolData = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS));
-    // Both records list s_remotePool. The inline record has the flag on, and the policy record has it off.
+    // Both records list this pool; only the inline record allows legacy data.
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_remotePool, true);
     _resolveInboundLane(s_token, s_remotePool, legacyPoolData, AMOUNT);
 
-    // Another token of the policy keeps the flag of the policy record.
+    // The inline legacy permission must not affect another token assigned to the policy.
     _setTokenRemotePoolPolicy(s_otherToken, REMOTE_POOL_POLICY);
     _setInlineConnectionConfig(
       _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
@@ -118,7 +116,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_TrustPolicyRemotePools_NoInlineRemotePools() public {
-    // An inline record without remote pools still works inbound when it trusts the remote pools of the policy record.
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
     remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](0);
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory inlineConfigs =
@@ -132,8 +129,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_TrustPolicyRemotePools_PolicyRecordOfTheChain() public {
-    // The policy record of DEST_CHAIN_SELECTOR trusts s_remotePool, and the one of SOURCE_CHAIN_SELECTOR trusts
-    // s_otherRemotePool.
+    // Configure different pools for the two chains to detect a lookup on the wrong chain.
     _setRemotePoolPolicyConfig(
       _getRemotePoolPolicyConfigArgs(
         REMOTE_POOL_POLICY, SOURCE_CHAIN_SELECTOR, _getRemotePoolAddresses(s_otherRemotePool)
@@ -143,7 +139,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     _setInlineRemotePoolConfigTrustingPolicy(s_token, legacyPool, true);
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
 
-    // The inline record adds only the policy record of its own chain.
+    // Only the policy pools for this chain are trusted.
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -152,8 +148,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, s_otherRemotePool, sourcePoolData, AMOUNT);
 
-    // After the removal of the policy record, no other record of the policy serves the chain. The token trusts only
-    // the remote pools of its inline record.
+    // Removing the chain's policy record leaves only the inline pool trusted.
     s_connectionStore.applyRemotePoolPolicyConfigUpdates(
       _getPolicyRecordKeys(REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR),
       new bytes32[](0),
@@ -169,7 +164,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_TrustPolicyRemotePools_InlineRemotePoolStays() public {
-    // The inline record lists s_remotePool. Then the policy record replaces s_remotePool with s_otherRemotePool.
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_remotePool, false);
     _setRemotePoolPolicyConfig(
       _getRemotePoolPolicyConfigArgs(
@@ -177,8 +171,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
       )
     );
 
-    // A change of the policy record does not reach a remote pool that the inline record lists. The token trusts the new
-    // remote pool of the policy record at once.
+    // Removing a pool from the policy does not revoke trust granted by an inline record.
     _resolveInboundLane(s_token, s_remotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
     _resolveInboundLane(s_token, s_otherRemotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
     _setTokenRemotePoolPolicy(s_otherToken, REMOTE_POOL_POLICY);
@@ -203,7 +196,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     vm.mockCall(s_additionalPoolDataProvider, callData, abi.encode(true));
 
-    // The inbound side does not check the finality, so a token with default finality only still accepts it.
+    // The token's outbound finality restriction does not apply to inbound transfers.
     vm.expectCall(s_additionalPoolDataProvider, callData);
     IPoolConfigManager.ResolvedInboundTransfer memory transfer = s_connectionStore.resolveInboundLane(
       s_token,
@@ -219,19 +212,18 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
 
   function test_resolveInboundLane_AdditionalPoolDataProviderGetsEmptyData() public {
     _setAdditionalPoolDataProvider(s_token);
-    // s_remotePool has the flag on, and s_otherRemotePool has it off.
     _allowLegacyPoolDataOnReceive();
     bytes memory callData = abi.encodeCall(
       IAdditionalPoolDataProvider.isAdditionalPoolDataValid, (s_token, DEST_CHAIN_SELECTOR, WAIT_FOR_FINALITY, "")
     );
     vm.mockCall(s_additionalPoolDataProvider, callData, abi.encode(true));
 
-    // The provider decides whether a source without additional pool data is valid.
+    // The provider must validate empty additional data in all three pool data formats.
     vm.expectCall(s_additionalPoolDataProvider, callData, 3);
     // Legacy pool data of 32 and 0 bytes.
     _resolveInboundLane(s_token, s_remotePool, abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)), AMOUNT);
     _resolveInboundLane(s_token, s_remotePool, "", AMOUNT);
-    // Pool data with the source token, from a source token without a provider. The flag of the pool does not matter.
+    // Pool data containing a source token does not require legacy receive permission.
     _resolveInboundLane(s_token, s_otherRemotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
   }
 
@@ -246,7 +238,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     assertEq(AMOUNT, transfer.localAmount);
   }
 
-  /// @notice The pool data that a lockOrBurn builds passes the checks of a releaseOrMint for the same token.
   function testFuzz_resolveInboundLane_PoolDataFromResolveOutboundLane(
     bytes memory additionalPoolData,
     bytes memory tokenArgs,
@@ -281,7 +272,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     uint8 remoteDecimals,
     uint256 amount
   ) public view {
-    // Beyond a difference of 77 decimals, the conversion reverts.
+    // Keep the decimal difference within uint256 exponentiation limits.
     remoteDecimals = uint8(bound(remoteDecimals, 0, DEFAULT_TOKEN_DECIMALS + 77));
 
     uint256 expectedAmount;
@@ -344,7 +335,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_RevertWhen_SubsetTokenNotFound() public {
-    // A record with onlySubsetTokens on, without s_token in its subset.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
 
     vm.expectRevert(
@@ -376,7 +366,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, unknownPool, sourcePoolData, AMOUNT);
 
-    // An inline record without remote pools works outbound only.
+    // An empty inline pool list rejects all source pools when policy trust is disabled.
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
     remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](0);
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
@@ -388,7 +378,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
 
-    // An inline record that trusts the policy record still rejects a remote pool that neither record lists.
+    // Opting into policy pools must not allow a pool absent from both records.
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_otherRemotePool, false);
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -397,7 +387,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, unknownPool, sourcePoolData, AMOUNT);
 
-    // A token without a policy record for the chain trusts only the remote pools of its inline record.
+    // Without a policy record for this chain, only inline pools are trusted.
     _setTokenRemotePoolPolicy(s_token, bytes32(0));
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -419,7 +409,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
       _resolveInboundLane(s_token, s_remotePool, sourcePoolDatas[i], AMOUNT);
     }
 
-    // The flag of s_remotePool does not apply to s_otherRemotePool in the same record.
+    // Legacy receive permission applies only to the pool it is configured for.
     _allowLegacyPoolDataOnReceive();
     for (uint256 i = 0; i < sourcePoolDatas.length; ++i) {
       vm.expectRevert(
@@ -428,7 +418,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
       _resolveInboundLane(s_token, s_otherRemotePool, sourcePoolDatas[i], AMOUNT);
     }
 
-    // The flag of the inline record of s_token does not apply to the policy record that s_otherToken uses.
+    // An inline legacy permission must not affect other tokens using the same remote pool policy.
     _setTokenRemotePoolPolicy(s_otherToken, REMOTE_POOL_POLICY);
     _setInlineConnectionConfig(
       _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
@@ -444,8 +434,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_RevertWhen_SourceTokenMismatch() public {
-    // A trusted remote pool burned another token. A source token in the pool data is checked also from a remote pool
-    // that can send pool data without it.
+    // The source token is present, so it must match the configured remote token. Legacy permission does not skip this check.
     _allowLegacyPoolDataOnReceive();
     address otherSourceToken = makeAddr("otherSourceToken");
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, otherSourceToken, "");
@@ -461,7 +450,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
 
-    // The same check runs for a remote pool of the policy record that the inline record trusts.
+    // Source token validation also applies to pools trusted through the policy opt-in.
     _setInlineRemotePoolConfigTrustingPolicy(s_token, s_otherRemotePool, true);
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -481,14 +470,14 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     // Decimals above 255, in both formats.
     sourcePoolDatas[0] = abi.encode(uint256(256));
     sourcePoolDatas[1] = abi.encode(uint256(256), abi.encode(s_token), "");
-    // The long format with an empty source token.
+    // Multi-token pool data with an empty source token.
     sourcePoolDatas[2] = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), "", "");
-    // One byte more than abi.encode makes.
+    // Trailing data after a valid ABI encoding.
     sourcePoolDatas[3] = abi.encodePacked(validPoolData, bytes1(0));
-    // Both offsets point to the source token. abi.decode accepts it, but abi.encode never makes it.
+    // Overlapping offsets are decodable but not a canonical ABI encoding.
     sourcePoolDatas[4] =
       abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x60), uint256(0x60), uint256(0x20), s_token);
-    // Too short to hold a source token. abi.decode alone reverts on it with no error data.
+    // Truncated data must return InvalidSourcePoolData instead of an empty decoding error.
     sourcePoolDatas[5] = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x40));
 
     for (uint256 i = 0; i < sourcePoolDatas.length; ++i) {
@@ -498,7 +487,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_RevertWhen_PoolDataDoesNotDecode() public {
-    // Long enough for a source token, but the first offset points past the end, so abi.decode reverts.
+    // The length check passes, but an offset beyond the end must fail ABI decoding.
     bytes memory sourcePoolData = abi.encode(
       uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x1000), uint256(0x80), uint256(0x20), bytes32(0), uint256(0)
     );
@@ -510,7 +499,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   function test_resolveInboundLane_RevertWhen_InvalidRemoteToken() public {
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
 
-    // The provider gives an all-zero answer.
     vm.mockCall(
       address(s_remoteTokenAddressProvider),
       abi.encodeCall(IRemoteTokenAddressProvider.getRemoteTokenAddress, (s_token, DEST_CHAIN_SELECTOR)),
@@ -522,7 +510,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
 
-    // The policy has no provider.
     _setRemoteTokenAddressProvider(CONNECTION_POLICY, address(0));
 
     vm.expectRevert(
@@ -545,12 +532,10 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_RevertWhen_RemoteTokenAddressProviderHasNoCode() public {
-    // The provider loses its code after the set.
     vm.etch(address(s_remoteTokenAddressProvider), "");
     bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
 
-    // The empty answer fails the decode.
-    vm.expectRevert(bytes(""));
+    vm.expectRevert();
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
   }
 
@@ -563,7 +548,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     bytes[] memory additionalPoolDatas = new bytes[](2);
     additionalPoolDatas[0] = abi.encode(keccak256("otherUid"));
-    // A provider can reject a source without additional pool data.
+    // Legacy permission must not bypass additional pool data validation.
     additionalPoolDatas[1] = "";
 
     for (uint256 i = 0; i < additionalPoolDatas.length; ++i) {
@@ -578,7 +563,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
   }
 
   function test_resolveInboundLane_RevertWhen_OverflowDetected() public {
-    // More remote decimals: a difference above 77.
+    // Scaling down by more than 77 decimals overflows the divisor.
     uint8 remoteDecimals = DEFAULT_TOKEN_DECIMALS + 78;
     bytes memory sourcePoolData = _getSourcePoolData(remoteDecimals, s_token, "");
 
@@ -589,7 +574,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, AMOUNT);
 
-    // Fewer remote decimals: the product overflows.
+    // Scaling up can overflow even when the decimal difference is within range.
     uint256 amount = type(uint256).max / 1e18 + 1;
     sourcePoolData = _getSourcePoolData(0, s_token, "");
 
@@ -598,7 +583,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
     _resolveInboundLane(s_token, s_remotePool, sourcePoolData, amount);
 
-    // Fewer remote decimals: a difference above 77.
+    // Scaling up by more than 77 decimals overflows the multiplier.
     address largeDecimalsToken = address(_deployToken("LARGE", 78));
     _registerToken(largeDecimalsToken);
     _setInlineConnectionConfig(
@@ -624,8 +609,7 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     );
   }
 
-  /// @dev A remote pool of a policy record never accepts legacy pool data: not for a token that uses the policy record,
-  /// and not for a token whose inline record trusts it. Long pool data from it runs.
+  /// @dev Policy pools require a source token, whether trusted directly or through trustPolicyRemotePools.
   function _assertPolicyPoolRejectsLegacyPoolData(
     bytes memory policyRemotePool
   ) private {
@@ -647,14 +631,13 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     _resolveInboundLane(s_token, policyRemotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
   }
 
-  /// @dev Sets _getRemotePoolConfigWithFlag as an inline record of s_token.
   function _allowLegacyPoolDataOnReceive() private {
     _setInlineRemotePoolConfig(
       _getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, _getRemotePoolConfigWithFlag())
     );
   }
 
-  /// @dev s_remotePool can send pool data without the source token, and s_otherRemotePool cannot.
+  /// @dev Allow legacy data from s_remotePool only, with s_otherRemotePool as a control.
   function _getRemotePoolConfigWithFlag()
     private
     view
