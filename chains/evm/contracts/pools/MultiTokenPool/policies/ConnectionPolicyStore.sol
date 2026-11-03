@@ -292,10 +292,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       revert ChainIsPaused(remoteChainSelector, PauseDirection.Outbound);
     }
 
-    (bool isInline, RemotePoolRecord storage record) = _resolveLane(localToken, remoteChainSelector);
+    (PolicyConfig.RecordLevel connectionLevel, bool isInline, RemotePoolRecord storage record) =
+      _resolveLane(localToken, remoteChainSelector);
     FinalityCodec._ensureRequestedFinalityAllowed(requestedFinalityConfig, tokenState.allowedFinalityConfig);
 
-    lane.remoteToken = _resolveRemoteToken(localToken, remoteChainSelector);
+    lane.remoteToken = _resolveRemoteToken(localToken, remoteChainSelector, connectionLevel);
     lane.destPoolData = _encodePoolData(
       localToken,
       remoteChainSelector,
@@ -339,7 +340,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       revert ChainIsPaused(remoteChainSelector, PauseDirection.Inbound);
     }
 
-    (bool isInline, RemotePoolRecord storage record) = _resolveLane(localToken, remoteChainSelector);
+    // One more local here is stack too deep, so _checkPoolData resolves the connection level itself.
+    (, bool isInline, RemotePoolRecord storage record) = _resolveLane(localToken, remoteChainSelector);
     bool allowLegacyPoolDataOnReceive =
       _checkSourcePool(localToken, remoteChainSelector, isInline, record, sourcePoolAddress);
     uint8 remoteDecimals = _checkPoolData(
@@ -352,14 +354,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return transfer;
   }
 
-  /// @dev Returns the remote pool record of the lane, and true if it is inline. Only an inline record gives the flags
-  /// for legacy pool data to a transfer. Reverts if the token has no connection record or no remote pool record for
-  /// the chain.
+  /// @dev Returns the connection record level, the remote pool record of the lane, and true if the remote pool record
+  /// is inline. Only an inline remote pool record gives the flags for legacy pool data to a transfer. Reverts if the
+  /// token has no connection record or no remote pool record for the chain.
   function _resolveLane(
     address localToken,
     uint64 remoteChainSelector
-  ) private view returns (bool isInline, RemotePoolRecord storage record) {
-    if (_resolveConnectionLevel(localToken, remoteChainSelector) == PolicyConfig.RecordLevel.None) {
+  ) private view returns (PolicyConfig.RecordLevel connectionLevel, bool isInline, RemotePoolRecord storage record) {
+    connectionLevel = _resolveConnectionLevel(localToken, remoteChainSelector);
+    if (connectionLevel == PolicyConfig.RecordLevel.None) {
       // A policy record without the lane has onlySubsetTokens on, and the token is not a subset token.
       bytes32 policyName = s_tokenStates[localToken].connectionPolicyName;
       if (s_connectionPolicies.policies[policyName].remoteChainSelectors.contains(remoteChainSelector)) {
@@ -368,10 +371,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       revert ConnectionRecordNotFound(localToken, remoteChainSelector);
     }
 
-    PolicyConfig.RecordLevel level;
-    (level, record) = _resolveRemotePoolRecord(localToken, remoteChainSelector);
-    if (level == PolicyConfig.RecordLevel.None) revert RemotePoolRecordNotFound(localToken, remoteChainSelector);
-    return (level == PolicyConfig.RecordLevel.Inline, record);
+    PolicyConfig.RecordLevel remotePoolLevel;
+    (remotePoolLevel, record) = _resolveRemotePoolRecord(localToken, remoteChainSelector);
+    if (remotePoolLevel == PolicyConfig.RecordLevel.None) {
+      revert RemotePoolRecordNotFound(localToken, remoteChainSelector);
+    }
+    return (connectionLevel, remotePoolLevel == PolicyConfig.RecordLevel.Inline, record);
   }
 
   /// @dev Reverts if the lane does not trust the source pool. Returns the allowLegacyPoolDataOnReceive flag of the
@@ -398,17 +403,17 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     revert InvalidSourcePoolAddress(localToken, remoteChainSelector, sourcePoolAddress);
   }
 
-  /// @dev Returns the remote token of the connection record of the token. A connection policy record asks the
+  /// @dev Returns the remote token of the connection record at connectionLevel. A connection policy record asks the
   /// IRemoteTokenAddressProvider of the policy, and a revert of the provider stops the transfer. Reverts if the remote
   /// token is empty or all zero.
   function _resolveRemoteToken(
     address localToken,
-    uint64 remoteChainSelector
+    uint64 remoteChainSelector,
+    PolicyConfig.RecordLevel connectionLevel
   ) private view returns (bytes memory remoteToken) {
-    PolicyConfig.RecordLevel level = _resolveConnectionLevel(localToken, remoteChainSelector);
-    if (level == PolicyConfig.RecordLevel.Inline) {
+    if (connectionLevel == PolicyConfig.RecordLevel.Inline) {
       remoteToken = s_inlineRemoteTokens[localToken][remoteChainSelector];
-    } else if (level == PolicyConfig.RecordLevel.PolicyChain) {
+    } else if (connectionLevel == PolicyConfig.RecordLevel.PolicyChain) {
       bytes32 policyName = s_tokenStates[localToken].connectionPolicyName;
       address remoteTokenAddressProvider = s_remoteTokenAddressProviders[policyName];
       if (remoteTokenAddressProvider != address(0)) {
@@ -551,7 +556,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     } else {
       // Only this check needs the remote token, so a source that omits the source token does not depend on the
       // remote token address provider.
-      bytes memory remoteToken = _resolveRemoteToken(localToken, remoteChainSelector);
+      PolicyConfig.RecordLevel connectionLevel = _resolveConnectionLevel(localToken, remoteChainSelector);
+      bytes memory remoteToken = _resolveRemoteToken(localToken, remoteChainSelector, connectionLevel);
       if (keccak256(sourceToken) != keccak256(remoteToken)) {
         revert SourceTokenMismatch(localToken, remoteChainSelector, remoteToken, sourceToken);
       }
