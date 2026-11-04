@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	contract_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/create2_factory"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -54,12 +53,16 @@ func (a *EVMDeployChainContractsAdapter) GetDefaultDeployContractParams(_ uint64
 	return defaultDeployContractParams()
 }
 
+// ResolveDeployAddresses returns the CREATE2Factory address from the datastore.
+// It returns an error if the datastore has no CREATE2Factory for the chain.
+// It does not deploy a CREATE2Factory. A factory that this adapter deploys has an
+// address that depends on the deployer key nonce. Contracts that it deploys then
+// have addresses that are different from the same contracts on other chains.
 func (a *EVMDeployChainContractsAdapter) ResolveDeployAddresses(
 	e deployment.Environment,
 	chainSelector uint64,
 ) (ccvadapters.DeployChainResolvedAddresses, error) {
-	evmChain, ok := e.BlockChains.EVMChains()[chainSelector]
-	if !ok {
+	if _, ok := e.BlockChains.EVMChains()[chainSelector]; !ok {
 		return ccvadapters.DeployChainResolvedAddresses{}, fmt.Errorf("EVM chain not found for selector %d", chainSelector)
 	}
 
@@ -71,28 +74,14 @@ func (a *EVMDeployChainContractsAdapter) ResolveDeployAddresses(
 		create2_factory.Version,
 		"",
 	)
-	if ref.Address != "" {
-		return ccvadapters.DeployChainResolvedAddresses{DeployerContract: ref.Address}, nil
+	if ref.Address == "" {
+		return ccvadapters.DeployChainResolvedAddresses{}, fmt.Errorf(
+			"no %s %s found in datastore for chain %d: deploy the %s and add it to the datastore before you deploy chain contracts",
+			create2_factory.ContractType, create2_factory.Version, chainSelector, create2_factory.ContractType,
+		)
 	}
 
-	create2Ref, err := contract_utils.MaybeDeployContract(
-		e.OperationsBundle, create2_factory.Deploy, evmChain,
-		contract_utils.DeployInput[create2_factory.ConstructorArgs]{
-			TypeAndVersion: deployment.NewTypeAndVersion(create2_factory.ContractType, *create2_factory.Version),
-			ChainSelector:  chainSelector,
-			Args: create2_factory.ConstructorArgs{
-				AllowList: []common.Address{evmChain.DeployerKey.From},
-			},
-		}, nil,
-	)
-	if err != nil {
-		return ccvadapters.DeployChainResolvedAddresses{}, fmt.Errorf("failed to deploy CREATE2 factory on chain %d: %w", chainSelector, err)
-	}
-
-	return ccvadapters.DeployChainResolvedAddresses{
-		DeployerContract: create2Ref.Address,
-		NewAddressRefs:   []datastore.AddressRef{create2Ref},
-	}, nil
+	return ccvadapters.DeployChainResolvedAddresses{DeployerContract: ref.Address}, nil
 }
 
 func (a *EVMDeployChainContractsAdapter) BuildDeployContractParams(
