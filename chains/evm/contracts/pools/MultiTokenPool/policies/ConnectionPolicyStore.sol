@@ -1344,6 +1344,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                      Remote pool config                      │
   // ================================================================
 
+  // A configUpdate sets the pools, as opposed to using add and removes, as in TokenPool.addRemotePool and removeRemotePool.
+  // This is due to contract size limit. Wrongful removal of a remote pool is an availability risk.
+  // Wrongful add of a remote pool is a security risk, that is same when simply setting the pools.
+  // By using config set, we take on slightly higher availability risk during normal ops.
+  // We accept this tradeoff to stay within size limit.
+
   /// @notice Removes inline remote pool records, then adds or replaces them.
   /// @dev Keep old remote pools trusted until all their inflight messages have executed.
   /// An empty inline pool list still allows outbound transfers. Inbound transfers then require trustPolicyRemotePools
