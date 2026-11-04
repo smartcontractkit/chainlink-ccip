@@ -1257,6 +1257,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @notice Removes connection records and unused policies, then adds or updates connection records.
   /// @dev Adding the first record creates a policy. Removing a policy requires no assigned tokens or remaining
   /// records and also clears its provider. Updating a record preserves its subset list; removing it clears the list.
+  /// The removal clears the list in one loop, so its gas grows with the list size. Empty a large subset list in
+  /// batches with applySubsetTokenUpdates before removing the record.
   /// @param policyConfigsToRemove The records to remove.
   /// @param policiesToRemove The policies to remove.
   /// @param policyConfigsToSet The records to set.
