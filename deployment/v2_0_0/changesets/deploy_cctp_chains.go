@@ -35,6 +35,9 @@ type CCTPChainConfig struct {
 	DeployerContract string
 	// FastFinalityBps are the basis points charged for fast finality.
 	FastFinalityBps uint16
+	// AllowlistAdmin is the address allowed, besides the owner, to edit the CCTP verifier's allowlists.
+	// Optional: empty leaves the value the chain's CCTP verifier has now.
+	AllowlistAdmin string
 	// StorageLocations is the set of storage locations for the CCTPVerifier contract.
 	StorageLocations []string
 	// FeeAggregator is the address to which fees are withdrawn.
@@ -365,9 +368,16 @@ func makeApplyDeployCCTPChains(cctpChainRegistry *adapters.CCTPChainRegistry, mc
 				RemoteRegisteredPoolRefs: remoteRegisteredPoolRefs,
 			}
 			in := adapters.ConfigureCCTPChainForLanesInput{
-				ChainSelector: chainSel,
-				USDCToken:     chainCfg.USDCToken,
-				RemoteChains:  remoteChainConfigs,
+				ChainSelector:  chainSel,
+				USDCToken:      chainCfg.USDCToken,
+				RemoteChains:   remoteChainConfigs,
+				AllowlistAdmin: chainCfg.AllowlistAdmin,
+			}
+			// The fast finality fee is only set at deploy time otherwise, so a verifier that already exists keeps
+			// the one it was deployed with. A non-zero value is reconciled onto it.
+			if chainCfg.FastFinalityBps != 0 {
+				bps := chainCfg.FastFinalityBps
+				in.FastFinalityBps = &bps
 			}
 			configureCCTPChainForLanesReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adaptersByChain[chainSel].ConfigureCCTPChainForLanes(), dep, in)
 			if err != nil {
