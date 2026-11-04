@@ -14,8 +14,7 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
     _setInlineRateLimitConfig(s_tokenB, OTHER_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
   }
 
-  /// @notice CONFIG_ROLE updates one config of an inline record. The security store applies the call and emits the
-  /// event.
+  /// @notice Updates one bucket config in an inline record.
   function test_applyInlineRateLimitBucketUpdates() public {
     RateLimiter.Config memory config = _getRateLimitConfig(2 * CAPACITY);
 
@@ -30,7 +29,7 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
     );
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyInlineRateLimitBucketUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -42,7 +41,7 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyInlineRateLimitBucketUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(
@@ -68,7 +67,7 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
     });
   }
 
-  /// @dev Updates one config of an inline record.
+  /// @dev Updates one bucket config in an inline record.
   function _updateInlineRateLimitBucket(
     address localToken,
     uint64 remoteChainSelector,

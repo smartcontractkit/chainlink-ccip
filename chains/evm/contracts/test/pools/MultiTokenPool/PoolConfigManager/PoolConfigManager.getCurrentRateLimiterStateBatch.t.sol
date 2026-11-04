@@ -7,8 +7,8 @@ import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {PoolConfigManagerTransferSetup} from "./PoolConfigManagerTransferSetup.t.sol";
 
 contract PoolConfigManager_getCurrentRateLimiterStateBatch is PoolConfigManagerTransferSetup {
-  /// @notice Each lane gets its four buckets. A send draws only from the outbound bucket of its finality class. A token
-  /// without a lane gets zero buckets, also if a rate limit record would apply to it.
+  /// @notice Returns all four buckets for each lane. Sending consumes only the outbound bucket for the requested
+  /// finality. Missing lanes return zero values even when a rate limit record is configured.
   function test_getCurrentRateLimiterStateBatch() public {
     _setRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
     _setRateLimitPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));

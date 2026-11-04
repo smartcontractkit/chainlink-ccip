@@ -9,8 +9,8 @@ import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 contract PoolConfigManager_applySecurityPolicyConfigUpdates is PoolConfigManagerRolesSetup {
   address internal s_ccv = makeAddr("ccv");
 
-  /// @notice CONFIG_ROLE removes the last record of a policy, removes the policy and sets a record of another policy in
-  /// one call. The security store applies the call and emits the events.
+  /// @notice Removes the last record and its policy, then sets a record for another policy. The security store
+  /// emits the events.
   function test_applySecurityPolicyConfigUpdates() public {
     address[] memory ccvs = _arrayOf(s_ccv);
     _setSecurityPolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, ccvs, ccvs, address(0));
@@ -40,7 +40,7 @@ contract PoolConfigManager_applySecurityPolicyConfigUpdates is PoolConfigManager
     assertEq(_policyNamesOf(DEFAULT_POLICY), securityPolicyNames);
   }
 
-  /// @notice CONFIG_ROLE, POLICY_ROLE and the policy role of the type each pass alone.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applySecurityPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -53,7 +53,7 @@ contract PoolConfigManager_applySecurityPolicyConfigUpdates is PoolConfigManager
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applySecurityPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

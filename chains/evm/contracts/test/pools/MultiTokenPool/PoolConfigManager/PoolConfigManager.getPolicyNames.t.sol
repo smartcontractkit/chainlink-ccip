@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 contract PoolConfigManager_getPolicyNames is PoolConfigManagerSetup {
-  /// @notice The first record set under a new name adds the name to the list of its type only. A name used in two types
-  /// is in both lists. No token uses these new policies, and they are listed.
+  /// @notice Creating a policy adds its name only to the list for its type. Policies need no assigned tokens to
+  /// appear. The same name can appear in multiple lists.
   function test_getPolicyNames() public {
     _setFeePolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, _getFeeConfig(100, 10));
 

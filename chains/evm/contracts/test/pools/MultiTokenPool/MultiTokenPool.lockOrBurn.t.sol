@@ -15,7 +15,7 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     bytes4 finality = FinalityCodec._encodeBlockDepth(5);
     deal(address(s_token), address(s_pool), amount);
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _lockOrBurnIn(amount);
-    // The mock matches only the token, chain, amount, finality, token args and fee flag that the pool must forward.
+    // The mock matches only the token, chain, amount, finality, token args, and fee flag that the pool must forward.
     _mockValidateLockOrBurn(amount, finality, "args", true, _defaultOutboundLane());
 
     vm.startPrank(s_allowedOnRamp);

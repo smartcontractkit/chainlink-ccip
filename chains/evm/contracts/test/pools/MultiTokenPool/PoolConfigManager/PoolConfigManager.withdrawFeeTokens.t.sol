@@ -13,8 +13,7 @@ import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 contract PoolConfigManager_withdrawFeeTokens is PoolConfigManagerTransferSetup {
   address internal s_feeRecipient = makeAddr("feeRecipient");
 
-  /// @notice FEE_COLLECTOR_ROLE withdraws from a pool that names this PCM. The pool sends its whole balance of each
-  /// listed token.
+  /// @notice Withdraws each fee token's full balance from a pool configured to use this manager.
   function test_withdrawFeeTokens() public {
     deal(s_tokenB, address(s_pool), 5e18, true);
     _setCaller(_grantNewCaller(s_poolConfigManager.FEE_COLLECTOR_ROLE()));
@@ -29,8 +28,8 @@ contract PoolConfigManager_withdrawFeeTokens is PoolConfigManagerTransferSetup {
 
   // Reverts
 
-  /// @notice Only FEE_COLLECTOR_ROLE withdraws fees. Each other PCM role, the default admin included, and a caller
-  /// with no role revert.
+  /// @notice Only FEE_COLLECTOR_ROLE can withdraw fees. Other roles, including DEFAULT_ADMIN_ROLE, and callers
+  /// without roles are rejected.
   function test_withdrawFeeTokens_RevertWhen_MissingRole() public {
     bytes32[] memory allowedRoles = new bytes32[](1);
     allowedRoles[0] = s_poolConfigManager.FEE_COLLECTOR_ROLE();
@@ -43,8 +42,8 @@ contract PoolConfigManager_withdrawFeeTokens is PoolConfigManagerTransferSetup {
     );
   }
 
-  /// @notice The PCM serves only the pools that name it. A pool that names another PCM reverts with both addresses,
-  /// before the PCM calls its withdraw, so its fees stay.
+  /// @notice Rejects a pool configured to use another manager before calling withdrawFeeTokens. The error
+  /// identifies both the pool and its manager, and the pool keeps its fees.
   function test_withdrawFeeTokens_RevertWhen_PoolConfigManagerMismatch() public {
     address otherPoolConfigManager = makeAddr("otherPoolConfigManager");
     BurnMintMultiTokenPool otherPool =

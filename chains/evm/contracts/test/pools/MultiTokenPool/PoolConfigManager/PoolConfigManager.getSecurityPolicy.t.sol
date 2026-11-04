@@ -7,8 +7,8 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 /// @notice Tokens A and B use the DEFAULT security policy, which has a policy default record.
 contract PoolConfigManager_getSecurityPolicy is PoolConfigManagerSetup {
-  /// @notice Each policy returns its token count and its records in the shape of applySecurityPolicyConfigUpdates.
-  /// Chain selector zero is the policy default record.
+  /// @notice Returns the token count and records for each policy. Chain selector zero identifies the policy default
+  /// record.
   function test_getSecurityPolicy() public {
     address[] memory outboundCCVs = _arrayOf(makeAddr("outboundCCV"));
     address[] memory inboundCCVs = _arrayOf(makeAddr("inboundCCV"));

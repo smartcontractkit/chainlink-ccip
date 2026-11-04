@@ -9,7 +9,7 @@ import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolic
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 contract PoolConfigManager_getTokenConfigBatch is PoolConfigManagerSetup {
-  // Each type has a policy with its own name. So a view that mixes up two types shows a wrong name.
+  // Each policy type has a different name so swapped fields fail the assertions.
   bytes32 internal constant CONNECTION_POLICY = "CONNECTION";
   bytes32 internal constant REMOTE_POOL_POLICY = "REMOTE_POOL";
   bytes32 internal constant RATE_LIMIT_POLICY = "RATE_LIMIT";
@@ -46,7 +46,7 @@ contract PoolConfigManager_getTokenConfigBatch is PoolConfigManagerSetup {
     _setTokenConnectionPolicy(s_tokenC, CONNECTION_POLICY);
   }
 
-  /// @notice A registered token gets its profile and the chains of its lanes. A token that is not registered gets zero
+  /// @notice Returns the profile and enabled chains for each registered token. Unregistered tokens return zero
   /// values.
   function test_getTokenConfigBatch() public {
     address unknownToken = makeAddr("unknownToken");
@@ -70,8 +70,7 @@ contract PoolConfigManager_getTokenConfigBatch is PoolConfigManagerSetup {
     assertEq(0, configs[1].supportedChains.length);
   }
 
-  /// @notice Each token gets the name of its policy of each type. Zero means that the token has no policy of the type.
-  /// A token that is not registered gets zero names.
+  /// @notice Returns each token's policy names. Missing assignments and unregistered tokens return zero names.
   function test_getTokenConfigBatch_PolicyNames() public {
     address[] memory localTokens = new address[](4);
     localTokens[0] = s_tokenA;

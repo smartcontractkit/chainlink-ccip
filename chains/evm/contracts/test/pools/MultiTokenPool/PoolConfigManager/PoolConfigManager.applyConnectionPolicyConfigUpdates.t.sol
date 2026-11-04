@@ -9,8 +9,8 @@ import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 import {Errors} from "@openzeppelin/contracts@5.3.0/utils/Errors.sol";
 
 contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE removes the last record of a policy, removes the policy and sets a record of another policy in
-  /// one call. The connection store applies the call and emits the events.
+  /// @notice Removes the last record and its policy, then sets a record for another policy. The connection store
+  /// emits the events.
   function test_applyConnectionPolicyConfigUpdates() public {
     _setConnectionPolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, false);
     ConnectionPolicyStore.ConnectionPolicyConfigArgs[] memory policyConfigs =
@@ -33,8 +33,8 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
     assertEq(_policyNamesOf(DEFAULT_POLICY), connectionPolicyNames);
   }
 
-  /// @notice The PCM runs no lane check for a policy record. A set opens its chain for every token of the policy, and
-  /// no store lists those tokens. A removal opens no lane. Token B has no fee record on any chain.
+  /// @notice Policy updates do not check lane completeness because the stores do not track the tokens assigned to
+  /// each policy. Token B gains a lane despite having no fee record.
   function test_applyConnectionPolicyConfigUpdates_PolicyRecordsAreNotChecked() public {
     _setTokenFeePolicy(s_tokenB, bytes32(0));
     ConnectionPolicyStore.ConnectionPolicyConfigArgs[] memory policyConfigs =
@@ -52,7 +52,7 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
     assertFalse(_getLaneConnection(s_tokenB, DEST_CHAIN_SELECTOR).hasConnection);
   }
 
-  /// @notice CONFIG_ROLE, POLICY_ROLE and the policy role of the type each pass alone.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyConnectionPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -69,7 +69,7 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
 
   // Reverts
 
-  /// @notice A store revert reaches the caller unchanged, with the error and the arguments of the store.
+  /// @notice Store errors reach the caller with their arguments unchanged.
   function test_applyConnectionPolicyConfigUpdates_RevertWhen_PolicyNotFound() public {
     vm.expectRevert(
       abi.encodeWithSelector(PolicyConfig.PolicyNotFound.selector, OTHER_POLICY), address(s_connectionStore)
@@ -101,7 +101,7 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
     );
   }
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyConnectionPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

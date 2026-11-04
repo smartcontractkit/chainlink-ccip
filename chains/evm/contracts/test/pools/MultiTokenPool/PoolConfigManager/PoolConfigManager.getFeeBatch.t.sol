@@ -8,9 +8,8 @@ import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolic
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 contract PoolConfigManager_getFeeBatch is PoolConfigManagerSetup {
-  /// @notice Each lane gets the fee of its own records, aligned with the lanes by index. Token B reads the policy fee
-  /// record and its inline destination overhead record. Token A reads its inline fee record and the policy default
-  /// destination overhead record.
+  /// @notice Each result uses its resolved fee and overhead records. Token B uses policy fees and inline overheads.
+  /// Token A uses inline fees and policy default overheads.
   function test_getFeeBatch() public {
     _setFeePolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _getFeeConfig(100, 10));
     _setInlineDestOverheadConfig(s_tokenB, DEST_CHAIN_SELECTOR, 200_000, 256);
@@ -45,8 +44,8 @@ contract PoolConfigManager_getFeeBatch is PoolConfigManagerSetup {
     );
   }
 
-  /// @notice A fee record has no disabled state. A lane with a fee record and a destination overhead record is enabled,
-  /// also when every fee of the record is zero, and it shows the overheads. The DEFAULT fee record has zero fees.
+  /// @notice Zero fees remain enabled when both fee and destination overhead records exist. The result includes the
+  /// configured overheads.
   function test_getFeeBatch_ZeroFeesAreEnabled() public view {
     IPoolConfigManager.LaneFee memory fee = _getFee(s_tokenB, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
@@ -64,9 +63,9 @@ contract PoolConfigManager_getFeeBatch is PoolConfigManagerSetup {
     );
   }
 
-  /// @notice A lane without a fee record, or without a destination overhead record, gives zeros and isEnabled false.
-  /// The OnRamp then uses the FeeQuoter. Both tokens keep their lane and have a non-zero fee record or overhead record
-  /// of the other type, so only the missing record zeros the lane.
+  /// @notice Missing fee or destination overhead records return zero values with isEnabled set to false.
+  /// MultiTokenPool.getFee rejects this result with LaneFeeNotFound. Each token still has a lane and a nonzero
+  /// record of the other type.
   function test_getFeeBatch_MissingRecordGivesZeros() public {
     _setInlineDestOverheadConfig(s_tokenB, DEST_CHAIN_SELECTOR, 200_000, 256);
     _setTokenFeePolicy(s_tokenB, bytes32(0));
@@ -86,8 +85,8 @@ contract PoolConfigManager_getFeeBatch is PoolConfigManagerSetup {
     assertEq(abi.encode(zeroFee), abi.encode(fees[1]));
   }
 
-  /// @notice The PCM zeros a lane that does not exist. Token B has an inline fee record and an inline destination
-  /// overhead record on the other chain, and the fee store gives their values, but token B has no connection there.
+  /// @notice Fee and overhead records alone do not create a lane. The manager returns zero values for token B on
+  /// the other chain.
   function test_getFeeBatch_NoLaneIsZeroed() public {
     _setInlineFeeConfig(s_tokenB, OTHER_CHAIN_SELECTOR, _getFeeConfig(100, 10));
     _setInlineDestOverheadConfig(s_tokenB, OTHER_CHAIN_SELECTOR, 200_000, 256);
@@ -104,8 +103,8 @@ contract PoolConfigManager_getFeeBatch is PoolConfigManagerSetup {
     assertEq(abi.encode(zeroFee), abi.encode(fee));
   }
 
-  /// @notice The fee views read no remote pool record. A token without one still gets its fee. Its send then reverts in
-  /// lockOrBurn.
+  /// @notice Fee quotes do not require a remote pool record. Sending still reverts in lockOrBurn if that record is
+  /// missing.
   function test_getFeeBatch_WithoutRemotePoolRecord() public {
     FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig(100, 10);
     _setFeePolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, feeConfig);
@@ -116,7 +115,7 @@ contract PoolConfigManager_getFeeBatch is PoolConfigManagerSetup {
     assertTrue(fee.isEnabled);
   }
 
-  /// @notice An FTF request reads the FTF fields of the fee record, if the profile of the token allows the finality.
+  /// @notice FTF requests use the FTF fee fields when the token profile allows that finality.
   function test_getFeeBatch_FastFinality() public {
     FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig(100, 10);
     _setFeePolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, feeConfig);
@@ -129,8 +128,7 @@ contract PoolConfigManager_getFeeBatch is PoolConfigManagerSetup {
 
   // Reverts
 
-  /// @notice The finality check runs first, so a finality that is not allowed reverts also for a token without a lane,
-  /// the same as TokenPool.
+  /// @notice An unsupported finality request reverts even when the lane does not exist, as in TokenPool.
   function test_getFeeBatch_RevertWhen_InvalidRequestedFinalityWithoutLane() public {
     vm.expectRevert(
       abi.encodeWithSelector(FinalityCodec.InvalidRequestedFinality.selector, _getFastFinalityConfig(), bytes4(0))

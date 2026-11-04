@@ -7,18 +7,18 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 contract PoolConfigManager_getSubsetTokens is PoolConfigManagerSetup {
   address internal s_tokenC;
 
-  /// @dev The DEFAULT connection policy opens the other chain only for its subset tokens. Token C uses the DEFAULT
-  /// policy of every type, the same as token B.
+  /// @dev The DEFAULT connection policy restricts the other chain to subset tokens. Tokens B and C use the DEFAULT
+  /// policies.
   function setUp() public virtual override {
     super.setUp();
     _setConnectionPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, true);
-    // The merged store has no remote pool policy default record, so the other chain gets a chain record.
+    // Remote pool policies have no default records, so the other chain needs an explicit record.
     _setRemotePoolPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, _getRemotePoolAddresses(abi.encode(s_remotePool)));
     s_tokenC = _deployToken("C");
     _registerToken(s_tokenC);
   }
 
-  /// @notice A connection policy record returns its flag and its subset tokens. A record with the flag off and no
+  /// @notice Returns the onlySubsetTokens flag and the subset token list. A record with no restriction and no
   /// subset tokens returns false and an empty list.
   function test_getSubsetTokens() public {
     s_poolConfigManager.applySubsetTokenUpdates(

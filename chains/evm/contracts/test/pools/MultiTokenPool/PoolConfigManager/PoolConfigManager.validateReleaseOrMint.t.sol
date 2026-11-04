@@ -9,15 +9,14 @@ import {Pool} from "../../../../libraries/Pool.sol";
 import {PoolConfigManager} from "../../../../pools/MultiTokenPool/PoolConfigManager.sol";
 import {PoolConfigManagerTransferSetup} from "./PoolConfigManagerTransferSetup.t.sol";
 
-/// @notice The manager resolves the lane, checks the pool data and converts the amount, then consumes the inbound rate
-/// limit of the local amount. The store-level rules are covered by the store tests, so these tests cover the
-/// orchestration: the converted amount, the returned profile and hook, and the caller check.
+/// @notice Checks the converted amount, returned profile, hook, and caller authorization. Store tests cover the
+/// rules within each store.
 contract PoolConfigManager_validateReleaseOrMint is PoolConfigManagerTransferSetup {
   uint8 internal constant REMOTE_DECIMALS = 6;
 
   address internal s_receiver = makeAddr("receiver");
 
-  /// @notice The manager converts the amount to local decimals before the inbound rate limit consumes it.
+  /// @notice Converts the amount to local token decimals before applying the inbound rate limit.
   function test_validateReleaseOrMint() public {
     _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
     _setCaller(address(s_pool));
@@ -36,7 +35,7 @@ contract PoolConfigManager_validateReleaseOrMint is PoolConfigManagerTransferSet
     assertEq(CAPACITY - 1e18, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).inbound.tokens);
   }
 
-  /// @notice The lane carries the profile and the hook of the token.
+  /// @notice Returns the token profile and hook.
   function test_validateReleaseOrMint_ReturnsProfileAndHook() public {
     address hook = makeAddr("hook");
     address burnAddress = makeAddr("burnAddress");
@@ -58,8 +57,8 @@ contract PoolConfigManager_validateReleaseOrMint is PoolConfigManagerTransferSet
     assertEq(hook, transfer.hook);
   }
 
-  /// @notice The requested finality reaches the security store, which consumes the FTF inbound bucket. The default
-  /// inbound bucket keeps its tokens. The inbound path does not check the finality against the token profile.
+  /// @notice FTF transfers consume only the FTF inbound bucket. The default finality bucket is unchanged. Inbound
+  /// transfers do not check finality against the token profile.
   function test_validateReleaseOrMint_FastFinality() public {
     _setInlineRateLimitConfigByFinality(s_tokenA, CAPACITY, 2 * CAPACITY);
     _setCaller(address(s_pool));

@@ -21,8 +21,8 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     s_tokenD = _deployToken("D");
   }
 
-  /// @notice CONFIG_ROLE registers several tokens in all three stores in one call. The token list shows them after the
-  /// tokens of the setup.
+  /// @notice Registers multiple tokens in all three stores. The new tokens appear after those registered during
+  /// setup.
   function test_applyTokenProfileUpdates() public {
     PolicyConfig.TokenProfileArgs[] memory profiles = new PolicyConfig.TokenProfileArgs[](2);
     profiles[0] = _getTokenProfileArgs(s_tokenC);
@@ -72,8 +72,8 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     assertTrue(isRegistered);
   }
 
-  /// @notice A profile set of a registered token replaces its profile in all three stores. It keeps each policy of the
-  /// token.
+  /// @notice Updating a registered token replaces its profile in all three stores and preserves its policy
+  /// assignments.
   function test_applyTokenProfileUpdates_ProfileSetKeepsPolicies() public {
     address additionalPoolDataProvider = makeAddr("additionalPoolDataProvider");
     // The connection store accepts a provider only if it has code. No transfer runs here, so nothing calls it.
@@ -99,8 +99,7 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     _assertPolicyNames(_getTokenConfig(s_tokenB), DEFAULT_POLICY);
   }
 
-  /// @notice Earlier calls clear the policies of token B, and a later call deregisters it. All three stores deregister
-  /// the token.
+  /// @notice A token can be deregistered from all three stores after its policy assignments are removed.
   function test_applyTokenProfileUpdates_RemoveToken() public {
     _clearTokenPolicies(s_tokenB);
 
@@ -120,7 +119,7 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     assertFalse(isRegistered);
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyTokenProfileUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -132,9 +131,8 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
 
   // Reverts
 
-  /// @notice The connection store runs first, so a call that fails in more than one store reverts with the error of the
-  /// connection store. The connection store reverts for token C, whose decimals differ from decimals(). The security
-  /// store accepts token C. It reverts for token B, whose decimals are fixed, with other error arguments.
+  /// @notice The connection store runs first and rejects token C's supplied decimals. The security store would
+  /// accept token C but reject token B's decimal change. The caller receives the connection store error.
   function test_applyTokenProfileUpdates_RevertWhen_InvalidDecimalArgs() public {
     PolicyConfig.TokenProfileArgs[] memory profiles = new PolicyConfig.TokenProfileArgs[](2);
     profiles[0] = _getTokenProfileArgs(s_tokenC);
@@ -148,11 +146,9 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     s_poolConfigManager.applyTokenProfileUpdates(new address[](0), profiles);
   }
 
-  /// @notice The stores apply the call in the order connection store, fee store, security store. Token B has no
-  /// connection policy and no remote pool policy, so the connection store deregisters it. Then the fee store reverts,
-  /// because token B still has a fee policy. After token B leaves its fee and destination overhead policies, the fee
-  /// store deregisters it too, and the security store reverts for its rate limit policy. Each error reaches the caller
-  /// unchanged. The whole call reverts, so the connection store and the fee store keep token B.
+  /// @notice Deregistration is atomic across all three stores. The fee store first rejects token B's remaining fee
+  /// configuration. After those assignments are removed, the security store rejects its remaining policy assignments.
+  /// Each error reaches the caller unchanged, and earlier store changes are reverted.
   function test_applyTokenProfileUpdates_RevertWhen_TokenHasConfig() public {
     _setTokenConnectionPolicy(s_tokenB, bytes32(0));
     _setTokenRemotePoolPolicy(s_tokenB, bytes32(0));
@@ -172,7 +168,7 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     assertTrue(isRegistered);
   }
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyTokenProfileUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(
@@ -195,8 +191,7 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     assertEq(policyName, tokenConfig.securityPolicyName);
   }
 
-  /// @dev Takes the token out of its policy of each type. The connection policy goes first, as in the rollback of the
-  /// token expansion workflow.
+  /// @dev Removes all policy assignments, starting with the connection policy.
   function _clearTokenPolicies(
     address localToken
   ) internal {

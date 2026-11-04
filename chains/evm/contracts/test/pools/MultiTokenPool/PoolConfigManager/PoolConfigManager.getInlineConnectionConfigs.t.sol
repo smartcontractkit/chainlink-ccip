@@ -8,15 +8,14 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 /// policy, which serves the destination chain. An inline connection record always gives its token a lane, so no
 /// inline connection record exists on a chain without a lane.
 contract PoolConfigManager_getInlineConnectionConfigs is PoolConfigManagerSetup {
-  /// @dev The merged store has no remote pool policy default record, so the other chain gets a chain record. Every
-  /// test that opens an inline connection on the other chain needs it.
+  /// @dev Remote pool policies have no default records. Add an explicit record before creating lanes on the other
+  /// chain.
   function setUp() public virtual override {
     super.setUp();
     _setRemotePoolPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, _getRemotePoolAddresses(abi.encode(s_remotePool)));
   }
 
-  /// @notice The view returns each inline connection record of the token in the shape of
-  /// applyInlineConnectionConfigUpdates, in the order of the sets. A remote token in another encoding shows unchanged.
+  /// @notice Returns both inline connection records. Remote token bytes are returned unchanged.
   function test_getInlineConnectionConfigs() public {
     bytes memory otherRemoteToken = abi.encodePacked(keccak256("otherRemoteToken"));
     _setInlineConnectionConfig(s_tokenA, OTHER_CHAIN_SELECTOR, otherRemoteToken);

@@ -18,14 +18,14 @@ contract PoolConfigManager_pauseGlobally is PoolConfigManagerRolesSetup {
     assertTrue(_getLaneConnection(s_tokenB, DEST_CHAIN_SELECTOR).isGloballyPaused);
   }
 
-  /// @notice The default admin and PAUSER_ROLE each pass alone.
+  /// @notice Either DEFAULT_ADMIN_ROLE or PAUSER_ROLE authorizes the call on its own.
   function test_pauseGlobally_AllowedRoles() public {
     _assertRolesPass(abi.encodeCall(PoolConfigManager.pauseGlobally, ()), _getPauseRoles());
   }
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_pauseGlobally_RevertWhen_MissingRole() public {
     _assertRolesRevert(abi.encodeCall(PoolConfigManager.pauseGlobally, ()), _getPauseRoles());
   }

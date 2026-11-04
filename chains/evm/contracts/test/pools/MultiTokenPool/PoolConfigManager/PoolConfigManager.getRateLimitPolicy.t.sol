@@ -9,11 +9,11 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 /// @notice Tokens A and B use the DEFAULT rate limit policy, which has a policy default record and the decimals of the
 /// test tokens.
 contract PoolConfigManager_getRateLimitPolicy is PoolConfigManagerSetup {
-  /// @dev Decimals that differ from the test tokens. So the view shows the decimals of the policy, not of a token.
+  /// @dev Use different decimals to check that the view returns policy decimals rather than token decimals.
   uint8 internal constant OTHER_DECIMALS = 6;
 
-  /// @notice Each policy returns its token count, its decimals and its records in the shape of
-  /// applyRateLimitPolicyConfigUpdates. Chain selector zero is the policy default record.
+  /// @notice Returns the token count, decimals, and records for each policy. Chain selector zero identifies the
+  /// policy default record.
   function test_getRateLimitPolicy() public {
     RateLimiter.Config memory rateLimitConfig = _getRateLimitConfig(CAPACITY);
     _setRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, rateLimitConfig);

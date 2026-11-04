@@ -6,8 +6,8 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 /// @notice Token B uses the DEFAULT connection policy. Token A has no connection policy.
 contract PoolConfigManager_getConnectionPolicy is PoolConfigManagerSetup {
-  /// @notice Each policy returns its token count, its remote token address provider and its records. The records have
-  /// the shape of applyConnectionPolicyConfigUpdates. A policy without a provider returns zero as the provider.
+  /// @notice Returns the token count, remote token address provider, and records for each policy. A missing
+  /// provider returns the zero address.
   function test_getConnectionPolicy() public {
     address remoteTokenAddressProvider = makeAddr("remoteTokenAddressProvider");
     // A provider needs code.

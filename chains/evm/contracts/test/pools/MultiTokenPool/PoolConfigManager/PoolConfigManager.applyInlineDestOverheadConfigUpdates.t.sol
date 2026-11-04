@@ -8,8 +8,7 @@ import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolic
 import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 
 contract PoolConfigManager_applyInlineDestOverheadConfigUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE removes an inline record and sets another in one call. The fee store applies the call and
-  /// emits the events.
+  /// @notice Removes one inline record and sets another in the same call. The fee store emits the events.
   function test_applyInlineDestOverheadConfigUpdates() public {
     _setInlineDestOverheadConfig(s_tokenB, OTHER_CHAIN_SELECTOR, 300_000, 320);
     FeePolicyStore.InlineDestOverheadConfigArgs[] memory inlineConfigs =
@@ -34,7 +33,7 @@ contract PoolConfigManager_applyInlineDestOverheadConfigUpdates is PoolConfigMan
     assertEq(1, s_poolConfigManager.getInlineDestOverheadConfigs(s_tokenA).length);
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyInlineDestOverheadConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -47,7 +46,7 @@ contract PoolConfigManager_applyInlineDestOverheadConfigUpdates is PoolConfigMan
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyInlineDestOverheadConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

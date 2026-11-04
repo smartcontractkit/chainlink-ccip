@@ -18,8 +18,8 @@ import {
 } from "@openzeppelin/contracts@5.3.0/access/extensions/AccessControlDefaultAdminRules.sol";
 import {Address} from "@openzeppelin/contracts@5.3.0/utils/Address.sol";
 
-/// @notice Entry point to configure the tokens of multi-token pools and to read their config.
-/// @dev This contract holds roles, not config, so it can be replaced without copying state.
+/// @notice Configures tokens and resolves token configuration for multi-token pools.
+/// @dev Token configuration stays in the policy stores when this manager is replaced.
 contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControlDefaultAdminRules {
   error ZeroAddressInvalid();
   error CallerIsNotTokenPool(address caller, address localToken);
@@ -36,49 +36,45 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // │                            Roles                             │
   // ================================================================
 
-  // AccessControlDefaultAdminRules provides DEFAULT_ADMIN_ROLE, the delayed default-admin transfer and the role
-  // administration functions. This contract only adds its own roles and the checks that gate each function.
+  // AccessControlDefaultAdminRules manages DEFAULT_ADMIN_ROLE, admin transfers, and role administration.
 
-  /// @notice Can make every config write that POLICY_ROLE or TOKEN_MANAGER_ROLE can make. It cannot pause, unpause or
-  /// withdraw fees.
+  /// @notice Can update all token and policy configuration. Cannot pause, unpause, or withdraw fees.
   bytes32 public constant CONFIG_ROLE = keccak256("CONFIG_ROLE");
-  /// @notice Can make every config write that the policy role of any type can make.
+  /// @notice Can update policies of every type.
   bytes32 public constant POLICY_ROLE = keccak256("POLICY_ROLE");
-  /// @notice Sets and removes connection policy records, removes connection policies, sets the remote token address
-  /// providers of connection policies, and adds and removes subset tokens.
+  /// @notice Manages connection policies, their remote token address providers, and their subset tokens.
   bytes32 public constant CONNECTION_POLICY_ROLE = keccak256("CONNECTION_POLICY_ROLE");
-  /// @notice Sets and removes remote pool policy records, and removes remote pool policies.
+  /// @notice Sets and removes remote pool policy records and policies.
   bytes32 public constant REMOTE_POOL_POLICY_ROLE = keccak256("REMOTE_POOL_POLICY_ROLE");
-  /// @notice Sets and removes rate limit policy records, updates their configs, and removes rate limit policies.
+  /// @notice Sets and removes rate limit policy records and policies. Can also update individual bucket configs.
   bytes32 public constant RATE_LIMIT_POLICY_ROLE = keccak256("RATE_LIMIT_POLICY_ROLE");
-  /// @notice Sets and removes fee policy records, and removes fee policies.
+  /// @notice Sets and removes fee policy records and policies.
   bytes32 public constant FEE_POLICY_ROLE = keccak256("FEE_POLICY_ROLE");
-  /// @notice Sets and removes destination overhead policy records, and removes destination overhead policies.
+  /// @notice Sets and removes destination overhead policy records and policies.
   bytes32 public constant DEST_OVERHEAD_POLICY_ROLE = keccak256("DEST_OVERHEAD_POLICY_ROLE");
-  /// @notice Sets and removes security policy records, and removes security policies.
+  /// @notice Sets and removes security policy records and policies.
   bytes32 public constant SECURITY_POLICY_ROLE = keccak256("SECURITY_POLICY_ROLE");
-  /// @notice Registers and deregisters tokens, sets their profiles and their policies, sets and removes their inline
-  /// records of every type, and updates the configs of their inline rate limit records.
+  /// @notice Registers and deregisters tokens. Sets their profiles, policy assignments, and inline records.
+  /// Can also remove inline records and update individual inline bucket configs.
   bytes32 public constant TOKEN_MANAGER_ROLE = keccak256("TOKEN_MANAGER_ROLE");
-  /// @notice Pauses tokens and chains, and turns on the global pause.
+  /// @notice Sets token, chain, and global pause flags.
   bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-  /// @notice Unpauses tokens and chains, and turns off the global pause. An unpause lets transfers start again, so this
-  /// role is separate from pausing.
+  /// @notice Clears token, chain, and global pause flags.
   bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
-  /// @notice Withdraws the token fees that a pool holds.
+  /// @notice Withdraws token fees from pools.
   bytes32 public constant FEE_COLLECTOR_ROLE = keccak256("FEE_COLLECTOR_ROLE");
 
   // ================================================================
   // │                        Static config                         │
   // ================================================================
 
-  /// @dev The registry decides which pool can call the validate functions for a token.
+  /// @dev Identifies the pool that can validate transfers for each token.
   ITokenAdminRegistry private immutable i_tokenAdminRegistry;
-  /// @dev Holds the connection and remote pool types, the token profiles and the pause state.
+  /// @dev Stores connection and remote pool config, token profiles, and pause state.
   ConnectionPolicyStore private immutable i_connectionStore;
-  /// @dev Holds the fee and destination overhead types.
+  /// @dev Stores fee and destination overhead config.
   FeePolicyStore private immutable i_feeStore;
-  /// @dev Holds the rate limit and security types and the live buckets.
+  /// @dev Stores rate limit and security config, including live bucket state.
   SecurityPolicyStore private immutable i_securityStore;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
@@ -106,11 +102,10 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @notice Returns the static config of this pool config manager.
-  /// @return tokenAdminRegistry The TokenAdminRegistry that names the pool of each token.
-  /// @return connectionStore The store of the connection and remote pool types, the token profiles and the pause
-  /// state.
-  /// @return feeStore The store of the fee and destination overhead types.
-  /// @return securityStore The store of the rate limit and security types and the live buckets.
+  /// @return tokenAdminRegistry The registry that assigns a pool to each token.
+  /// @return connectionStore The store for connection and remote pool config, token profiles, and pause state.
+  /// @return feeStore The store for fee and destination overhead config.
+  /// @return securityStore The store for rate limit and security config, including live bucket state.
   function getStaticConfig()
     external
     view
@@ -129,9 +124,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // ================================================================
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store resolves the lane and builds the pool data. The fee store checks the pool data size and
-  /// computes the token fee. The security store consumes the outbound rate limit of the amount after the fee. Only the
-  /// security store changes state.
+  /// @dev The connection store resolves the lane and builds the pool data. The fee store checks the pool data size
+  /// and computes the token fee. The security store consumes outbound rate limit capacity for the amount after
+  /// fees. Only the security store changes state.
   function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
@@ -152,8 +147,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store resolves the lane, checks the pool data and converts the amount. The security store
-  /// then consumes the inbound rate limit of the amount in local decimals. Only the security store changes state.
+  /// @dev The connection store resolves the lane, checks the pool data, and converts the amount to local decimals.
+  /// The security store consumes inbound rate limit capacity for that amount. Only the security store changes
+  /// state.
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     bytes4 requestedFinalityConfig
@@ -180,8 +176,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // ================================================================
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store checks the requested finality, then the fee store builds the fees. A lane that does
-  /// not exist is zeroed.
+  /// @dev Checks the requested finality before reading fees. Returns zero values for lanes that do not exist.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -198,8 +193,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store identifies existing lanes, then the fee store builds the fee configs. A lane that does
-  /// not exist is zeroed.
+  /// @dev Returns fee configs from the fee store. Returns zero values for lanes that do not exist.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view override returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs) {
@@ -214,8 +208,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev Ignores the pause state. The connection store identifies existing lanes, then the security store gives the
-  /// buckets. A lane that does not exist gets zero buckets. SecurityPolicyStore documents the bucket semantics.
+  /// @dev Returns bucket state regardless of pauses. Returns zero values for lanes that do not exist.
+  /// See SecurityPolicyStore.getCurrentRateLimiterStateBatch for refill and config change behavior.
   function getCurrentRateLimiterStateBatch(
     LaneKey[] calldata lanes
   ) external view override returns (LaneRateLimiterState[] memory states) {
@@ -230,8 +224,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev Forwards to ConnectionPolicyStore.getLaneConnectionBatch, which documents the rules, also for a token
-  /// without a lane.
+  /// @dev See ConnectionPolicyStore.getLaneConnectionBatch for resolution rules, including lanes that do not exist.
   function getLaneConnectionBatch(
     LaneKey[] calldata lanes
   ) external view override returns (LaneConnection[] memory connections) {
@@ -239,8 +232,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The requested finality is unused. The connection store identifies existing lanes, then the security store
-  /// gives the hook and the CCV lists. A lane that does not exist gets zero values.
+  /// @dev Ignores the requested finality. Returns the hook and CCV lists from the security store.
+  /// Returns a zero hook and empty CCV lists for lanes that do not exist.
   function getLaneVerificationBatch(
     LaneKey[] calldata lanes,
     bytes4 // requestedFinalityConfig
@@ -263,8 +256,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store gives the profile and the lanes; the fee and security stores add their policy names. A
-  /// token that is not registered gets zero values.
+  /// @dev Combines the token profile and lanes from the connection store with policy names from all three stores.
+  /// Returns zero values for unregistered tokens.
   function getTokenConfigBatch(
     address[] calldata localTokens
   ) external view override returns (TokenConfig[] memory configs) {
@@ -295,12 +288,10 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     return address(i_tokenAdminRegistry);
   }
 
-  /// @notice Returns the level of the record that each type would use for each lane, following the resolution of a
-  /// transfer. Never reverts.
+  /// @notice Returns the record level that each config type would use to resolve a transfer on each lane.
   /// @dev The connection level shows whether the lane exists. Connection and remote pool policies have no default
-  /// records, so their levels are never PolicyDefault. An inline remote pool record may also trust policy pools; its
-  /// level stays Inline. Chain selector zero gives None for every type. Each returned array is aligned with lanes by
-  /// index.
+  /// records, so their levels are never PolicyDefault. An inline remote pool record can also trust policy pools.
+  /// Its level remains Inline. Chain selector zero returns None for every type. Results follow the input lane order.
   /// @param lanes The token and remote chain lanes to query.
   /// @return connectionLevels The level of the connection record.
   /// @return remotePoolLevels The level of the remote pool record.
@@ -328,11 +319,11 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     return (connectionLevels, remotePoolLevels, rateLimitLevels, feeLevels, destOverheadLevels, securityLevels);
   }
 
-  // These views forward the call with _forwardView, so each one has the parameters and returns of its store function
-  // and no names, because the forward does not read them. The store function documents the result.
+  // Forwarded views use the same parameter and return types as the store functions. Names are omitted because
+  // _forwardView passes the call data and return data through unchanged. See each store function for return details.
 
-  /// @notice Returns the flag and the subset tokens of a connection policy record. Forwards to
-  /// ConnectionPolicyStore.getSubsetTokens. Never reverts.
+  /// @notice Returns the subset restriction and token list for a connection policy record.
+  /// @dev See ConnectionPolicyStore.getSubsetTokens.
   function getSubsetTokens(
     bytes32, // policyName
     uint64 // remoteChainSelector
@@ -340,108 +331,106 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     _forwardView(address(i_connectionStore));
   }
 
-  /// @notice Returns the records of a connection policy, in the shape of applyConnectionPolicyConfigUpdates. Forwards
-  /// to ConnectionPolicyStore.getConnectionPolicy. Never reverts.
+  /// @notice Returns the token count, remote token address provider, and records of a connection policy.
+  /// @dev See ConnectionPolicyStore.getConnectionPolicy.
   function getConnectionPolicy(
     bytes32 // policyName
   ) external view returns (uint32, address, ConnectionPolicyStore.ConnectionPolicyConfigArgs[] memory) {
     _forwardView(address(i_connectionStore));
   }
 
-  /// @notice Returns the records of a remote pool policy, in the shape of applyRemotePoolPolicyConfigUpdates.
-  /// Forwards to ConnectionPolicyStore.getRemotePoolPolicy. Never reverts.
+  /// @notice Returns the token count and records of a remote pool policy.
+  /// @dev See ConnectionPolicyStore.getRemotePoolPolicy.
   function getRemotePoolPolicy(
     bytes32 // policyName
   ) external view returns (uint32, ConnectionPolicyStore.RemotePoolPolicyConfigArgs[] memory) {
     _forwardView(address(i_connectionStore));
   }
 
-  /// @notice Returns the records of a rate limit policy, in the shape of applyRateLimitPolicyConfigUpdates.
-  /// Forwards to SecurityPolicyStore.getRateLimitPolicy. Never reverts.
+  /// @notice Returns the token count, decimals, and records of a rate limit policy.
+  /// @dev See SecurityPolicyStore.getRateLimitPolicy.
   function getRateLimitPolicy(
     bytes32 // policyName
   ) external view returns (uint32, uint8, SecurityPolicyStore.RateLimitPolicyConfigArgs[] memory) {
     _forwardView(address(i_securityStore));
   }
 
-  /// @notice Returns the records of a fee policy, in the shape of applyFeePolicyConfigUpdates. Forwards to
-  /// FeePolicyStore.getFeePolicy. Never reverts.
+  /// @notice Returns the token count and records of a fee policy.
+  /// @dev See FeePolicyStore.getFeePolicy.
   function getFeePolicy(
     bytes32 // policyName
   ) external view returns (uint32, FeePolicyStore.FeePolicyConfigArgs[] memory) {
     _forwardView(address(i_feeStore));
   }
 
-  /// @notice Returns the records of a destination overhead policy, in the shape of
-  /// applyDestOverheadPolicyConfigUpdates. Forwards to FeePolicyStore.getDestOverheadPolicy. Never reverts.
+  /// @notice Returns the token count and records of a destination overhead policy.
+  /// @dev See FeePolicyStore.getDestOverheadPolicy.
   function getDestOverheadPolicy(
     bytes32 // policyName
   ) external view returns (uint32, FeePolicyStore.DestOverheadPolicyConfigArgs[] memory) {
     _forwardView(address(i_feeStore));
   }
 
-  /// @notice Returns the records of a security policy, in the shape of applySecurityPolicyConfigUpdates. Forwards to
-  /// SecurityPolicyStore.getSecurityPolicy. Never reverts.
+  /// @notice Returns the token count and records of a security policy.
+  /// @dev See SecurityPolicyStore.getSecurityPolicy.
   function getSecurityPolicy(
     bytes32 // policyName
   ) external view returns (uint32, SecurityPolicyStore.SecurityPolicyConfigArgs[] memory) {
     _forwardView(address(i_securityStore));
   }
 
-  // Each inline record view lists every inline record of its type for a token, also on a chain where the token has no
-  // lane. A store view with the same signature builds the list.
+  // Inline record views include records on chains where the token has no lane.
 
-  /// @notice Returns the inline connection records of a token, in the shape of applyInlineConnectionConfigUpdates.
-  /// Forwards to ConnectionPolicyStore.getInlineConnectionConfigs. Never reverts.
+  /// @notice Returns all inline connection records for a token.
+  /// @dev See ConnectionPolicyStore.getInlineConnectionConfigs.
   function getInlineConnectionConfigs(
     address // localToken
   ) external view returns (ConnectionPolicyStore.InlineConnectionConfigArgs[] memory) {
     _forwardView(address(i_connectionStore));
   }
 
-  /// @notice Returns the inline remote pool records of a token, in the shape of applyInlineRemotePoolConfigUpdates.
-  /// Forwards to ConnectionPolicyStore.getInlineRemotePoolConfigs. Never reverts.
+  /// @notice Returns all inline remote pool records for a token.
+  /// @dev See ConnectionPolicyStore.getInlineRemotePoolConfigs.
   function getInlineRemotePoolConfigs(
     address // localToken
   ) external view returns (ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory) {
     _forwardView(address(i_connectionStore));
   }
 
-  /// @notice Returns the inline rate limit records of a token, in the shape of applyInlineRateLimitConfigUpdates.
-  /// Forwards to SecurityPolicyStore.getInlineRateLimitConfigs. Never reverts. Each record shows the config of its
-  /// buckets.
+  /// @notice Returns all inline rate limit records for a token, including each bucket's config.
+  /// @dev See SecurityPolicyStore.getInlineRateLimitConfigs.
   function getInlineRateLimitConfigs(
     address // localToken
   ) external view returns (SecurityPolicyStore.InlineRateLimitConfigArgs[] memory) {
     _forwardView(address(i_securityStore));
   }
 
-  /// @notice Returns the inline fee records of a token, in the shape of applyInlineFeeConfigUpdates. Forwards to
-  /// FeePolicyStore.getInlineFeeConfigs. Never reverts.
+  /// @notice Returns all inline fee records for a token.
+  /// @dev See FeePolicyStore.getInlineFeeConfigs.
   function getInlineFeeConfigs(
     address // localToken
   ) external view returns (FeePolicyStore.InlineFeeConfigArgs[] memory) {
     _forwardView(address(i_feeStore));
   }
 
-  /// @notice Returns the inline destination overhead records of a token, in the shape of
-  /// applyInlineDestOverheadConfigUpdates. Forwards to FeePolicyStore.getInlineDestOverheadConfigs. Never reverts.
+  /// @notice Returns all inline destination overhead records for a token.
+  /// @dev See FeePolicyStore.getInlineDestOverheadConfigs.
   function getInlineDestOverheadConfigs(
     address // localToken
   ) external view returns (FeePolicyStore.InlineDestOverheadConfigArgs[] memory) {
     _forwardView(address(i_feeStore));
   }
 
-  /// @notice Returns the inline security records of a token, in the shape of applyInlineSecurityConfigUpdates.
-  /// Forwards to SecurityPolicyStore.getInlineSecurityConfigs. Never reverts.
+  /// @notice Returns all inline security records for a token.
+  /// @dev See SecurityPolicyStore.getInlineSecurityConfigs.
   function getInlineSecurityConfigs(
     address // localToken
   ) external view returns (SecurityPolicyStore.InlineSecurityConfigArgs[] memory) {
     _forwardView(address(i_securityStore));
   }
 
-  /// @notice Returns the name of every policy of each type. Never reverts.
-  /// @dev The lists include policies that no token uses and policies with no records.
+  /// @notice Returns the names of all policies, grouped by type.
+  /// @dev Includes policies with no assigned tokens or records.
   /// @return connectionPolicyNames The names of the connection policies.
   /// @return remotePoolPolicyNames The names of the remote pool policies.
   /// @return rateLimitPolicyNames The names of the rate limit policies.
@@ -477,15 +466,14 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // │                         Config writes                        │
   // ================================================================
 
-  // Each config write has a store function with the same signature, so its call data is also a valid call to that
-  // store function. Address.functionCall returns each store revert that has data unchanged. A revert without data
-  // becomes FailedCall.
+  // Config writes use the same signatures as the store functions so they can forward msg.data unchanged.
+  // Address.functionCall propagates revert data. An empty revert becomes FailedCall.
 
-  /// @notice Deregisters tokens, then sets the profile of tokens. All three stores apply the call. See
-  /// ConnectionPolicyStore.applyTokenProfileUpdates, FeePolicyStore.applyTokenProfileUpdates and
+  /// @notice Deregisters tokens, then sets token profiles in all three stores. See
+  /// ConnectionPolicyStore.applyTokenProfileUpdates, FeePolicyStore.applyTokenProfileUpdates, and
   /// SecurityPolicyStore.applyTokenProfileUpdates.
-  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. The connection store runs first, so a token that fails
-  /// in more than one store reverts with the error of the first of them.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. Stores are called in connection, fee, and security order.
+  /// A revert from any store reverts the whole call.
   function applyTokenProfileUpdates(
     address[] calldata, // tokensToRemove
     PolicyConfig.TokenProfileArgs[] calldata // profilesToSet
@@ -497,9 +485,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_securityStore), callData);
   }
 
-  /// @notice Sets the connection policy of tokens. See ConnectionPolicyStore.applyTokenConnectionPolicyUpdates.
-  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. The lanes that the new policy opens are not checked, the
-  /// same as for a connection policy record.
+  /// @notice Assigns connection policies to tokens. See ConnectionPolicyStore.applyTokenConnectionPolicyUpdates.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
+  /// Does not check the lanes opened by a new policy assignment.
   function applyTokenConnectionPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
   ) external {
@@ -507,7 +495,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_connectionStore), msg.data);
   }
 
-  /// @notice Sets the remote pool policy of tokens. See ConnectionPolicyStore.applyTokenRemotePoolPolicyUpdates.
+  /// @notice Assigns remote pool policies to tokens. See ConnectionPolicyStore.applyTokenRemotePoolPolicyUpdates.
   /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
   function applyTokenRemotePoolPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
@@ -516,7 +504,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_connectionStore), msg.data);
   }
 
-  /// @notice Sets the rate limit policy of tokens. See SecurityPolicyStore.applyTokenRateLimitPolicyUpdates.
+  /// @notice Assigns rate limit policies to tokens. See SecurityPolicyStore.applyTokenRateLimitPolicyUpdates.
   /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
   function applyTokenRateLimitPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
@@ -525,7 +513,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_securityStore), msg.data);
   }
 
-  /// @notice Sets the fee policy of tokens. See FeePolicyStore.applyTokenFeePolicyUpdates.
+  /// @notice Assigns fee policies to tokens. See FeePolicyStore.applyTokenFeePolicyUpdates.
   /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
   function applyTokenFeePolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
@@ -534,7 +522,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_feeStore), msg.data);
   }
 
-  /// @notice Sets the destination overhead policy of tokens. See FeePolicyStore.applyTokenDestOverheadPolicyUpdates.
+  /// @notice Assigns destination overhead policies to tokens.
+  /// See FeePolicyStore.applyTokenDestOverheadPolicyUpdates.
   /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
   function applyTokenDestOverheadPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
@@ -543,7 +532,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_feeStore), msg.data);
   }
 
-  /// @notice Sets the security policy of tokens. See SecurityPolicyStore.applyTokenSecurityPolicyUpdates.
+  /// @notice Assigns security policies to tokens. See SecurityPolicyStore.applyTokenSecurityPolicyUpdates.
   /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
   function applyTokenSecurityPolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata // tokenPoliciesToSet
@@ -554,8 +543,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Removes and sets connection policy records, and removes connection policies. See
   /// ConnectionPolicyStore.applyConnectionPolicyConfigUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or CONNECTION_POLICY_ROLE. A policy record is not checked, because
-  /// no store lists the tokens that it serves.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or CONNECTION_POLICY_ROLE. Does not check lanes opened by policy
+  /// records because the stores do not track the list of tokens assigned to each policy.
   function applyConnectionPolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
     bytes32[] calldata, // policiesToRemove
@@ -566,9 +555,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @notice Removes and sets inline connection records. See ConnectionPolicyStore.applyInlineConnectionConfigUpdates.
-  /// Each inline record that is set opens a lane, so the token must have a record of each other type for the chain
-  /// after the call.
-  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. Reverts for the first type that a token misses.
+  /// Checks that each configured lane has a record of every other config type.
+  /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE. Reverts on the first missing record.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineConnectionConfigUpdates(
     LaneKey[] calldata, // inlineConfigsToRemove
@@ -581,10 +569,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     }
   }
 
-  /// @notice Removes and adds subset tokens. See ConnectionPolicyStore.applySubsetTokenUpdates. Each subset token that
-  /// is added opens a lane, so the token must have a record of each other type for the chain after the call.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or CONNECTION_POLICY_ROLE. Reverts for the first type that a token
-  /// misses.
+  /// @notice Removes and adds subset tokens. See ConnectionPolicyStore.applySubsetTokenUpdates.
+  /// Checks that each added token has a record of every other config type for the chain.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or CONNECTION_POLICY_ROLE. Reverts on the first missing record.
   /// @param tokensToAdd The subset tokens to add.
   function applySubsetTokenUpdates(
     ConnectionPolicyStore.SubsetTokenArgs[] calldata, // tokensToRemove
@@ -599,8 +586,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Sets the remote token address providers of connection policies. See
   /// ConnectionPolicyStore.applyRemoteTokenAddressProviderUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or CONNECTION_POLICY_ROLE. A provider set opens no lane, so the
-  /// lane check does not run.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or CONNECTION_POLICY_ROLE.
+  /// Changing a provider does not open a lane, so no lane check is required.
   function applyRemoteTokenAddressProviderUpdates(
     ConnectionPolicyStore.RemoteTokenAddressProviderArgs[] calldata // providersToSet
   ) external {
@@ -610,7 +597,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Removes and sets remote pool policy records, and removes remote pool policies. See
   /// ConnectionPolicyStore.applyRemotePoolPolicyConfigUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or REMOTE_POOL_POLICY_ROLE.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or REMOTE_POOL_POLICY_ROLE.
   function applyRemotePoolPolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
     bytes32[] calldata, // policiesToRemove
@@ -632,7 +619,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Removes and sets rate limit policy records, and removes rate limit policies. See
   /// SecurityPolicyStore.applyRateLimitPolicyConfigUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or RATE_LIMIT_POLICY_ROLE.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or RATE_LIMIT_POLICY_ROLE.
   function applyRateLimitPolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
     bytes32[] calldata, // policiesToRemove
@@ -642,9 +629,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_securityStore), msg.data);
   }
 
-  /// @notice Updates one config of existing rate limit policy records. See
+  /// @notice Updates individual bucket configs in existing rate limit policy records. See
   /// SecurityPolicyStore.applyRateLimitPolicyBucketUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or RATE_LIMIT_POLICY_ROLE.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or RATE_LIMIT_POLICY_ROLE.
   function applyRateLimitPolicyBucketUpdates(
     SecurityPolicyStore.RateLimitPolicyBucketArgs[] calldata // bucketConfigsToSet
   ) external {
@@ -662,7 +649,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     Address.functionCall(address(i_securityStore), msg.data);
   }
 
-  /// @notice Updates one config of existing inline rate limit records. See
+  /// @notice Updates individual bucket configs in existing inline rate limit records. See
   /// SecurityPolicyStore.applyInlineRateLimitBucketUpdates.
   /// @dev Only callable by CONFIG_ROLE or TOKEN_MANAGER_ROLE.
   function applyInlineRateLimitBucketUpdates(
@@ -674,7 +661,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Removes and sets fee policy records, and removes fee policies. See
   /// FeePolicyStore.applyFeePolicyConfigUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or FEE_POLICY_ROLE.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or FEE_POLICY_ROLE.
   function applyFeePolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
     bytes32[] calldata, // policiesToRemove
@@ -696,7 +683,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Removes and sets destination overhead policy records, and removes destination overhead policies. See
   /// FeePolicyStore.applyDestOverheadPolicyConfigUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or DEST_OVERHEAD_POLICY_ROLE.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or DEST_OVERHEAD_POLICY_ROLE.
   function applyDestOverheadPolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
     bytes32[] calldata, // policiesToRemove
@@ -719,7 +706,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Removes and sets security policy records, and removes security policies. See
   /// SecurityPolicyStore.applySecurityPolicyConfigUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE or SECURITY_POLICY_ROLE.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or SECURITY_POLICY_ROLE.
   function applySecurityPolicyConfigUpdates(
     PolicyConfig.PolicyRecordKey[] calldata, // policyConfigsToRemove
     bytes32[] calldata, // policiesToRemove
@@ -745,8 +732,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Turns on the global pause. It stops every token on every chain in both directions. The pause flags of
   /// tokens and chains do not change.
-  /// @dev Only callable by DEFAULT_ADMIN_ROLE or PAUSER_ROLE. So the default admin can stop all transfers in an
-  /// emergency without first granting itself a role.
+  /// @dev Only callable by DEFAULT_ADMIN_ROLE or PAUSER_ROLE. The default admin can stop transfers in an emergency
+  /// without first granting itself PAUSER_ROLE.
   function pauseGlobally() external {
     _checkRoleOr(DEFAULT_ADMIN_ROLE, PAUSER_ROLE);
     i_connectionStore.setGlobalPause(true);
@@ -759,7 +746,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     i_connectionStore.setGlobalPause(false);
   }
 
-  /// @notice Pauses tokens in one direction or in both directions. Any address can be paused, also before the token is
+  /// @notice Pauses tokens in one or both directions. Any address can be paused, even before the token is
   /// registered.
   /// @dev Only callable by DEFAULT_ADMIN_ROLE or PAUSER_ROLE.
   /// @param localTokens The tokens to pause.
@@ -772,7 +759,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     i_connectionStore.setTokenPause(localTokens, direction, true);
   }
 
-  /// @notice Unpauses tokens in one direction or in both directions.
+  /// @notice Unpauses tokens in one or both directions.
   /// @dev Only callable by DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE.
   /// @param localTokens The tokens to unpause.
   /// @param direction The direction to unpause, or Both.
@@ -784,7 +771,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     i_connectionStore.setTokenPause(localTokens, direction, false);
   }
 
-  /// @notice Pauses remote chains for every token, in one direction or in both directions.
+  /// @notice Pauses remote chains for every token, in one or both directions.
   /// @dev Only callable by DEFAULT_ADMIN_ROLE or PAUSER_ROLE.
   /// @param remoteChainSelectors The remote chains to pause.
   /// @param direction The direction to pause, or Both.
@@ -796,7 +783,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     i_connectionStore.setChainPause(remoteChainSelectors, direction, true);
   }
 
-  /// @notice Unpauses remote chains in one direction or in both directions.
+  /// @notice Unpauses remote chains in one or both directions.
   /// @dev Only callable by DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE.
   /// @param remoteChainSelectors The remote chains to unpause.
   /// @param direction The direction to unpause, or Both.
@@ -812,13 +799,12 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // │                            Fees                              │
   // ================================================================
 
-  /// @notice Sends the token fees that a pool holds to a recipient. The pool sends its whole balance of each token.
-  /// @dev Only callable by FEE_COLLECTOR_ROLE. The pool must name this contract as its pool config manager, so this
-  /// call reaches only the pools that this contract serves. The pool also accepts this call only from its pool config
-  /// manager.
+  /// @notice Withdraws the pool's full balance of each fee token to the recipient.
+  /// @dev Only callable by FEE_COLLECTOR_ROLE. The pool must use this contract as its pool config manager.
+  /// The pool also checks that only its pool config manager can withdraw fees.
   /// @param pool The pool that holds the fees.
   /// @param feeTokens The tokens to withdraw.
-  /// @param recipient The receiver of the fees. Must not be zero.
+  /// @param recipient The fee recipient. Must not be the zero address.
   function withdrawFeeTokens(
     IMultiTokenPool pool,
     address[] calldata feeTokens,
@@ -833,17 +819,16 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // │                           Helpers                            │
   // ================================================================
 
-  /// @dev The validate functions consume rate limits. The token admin decides which pool may do that.
+  /// @dev Only the token's registered pool can consume its rate limits.
   function _onlyTokenPool(
     address localToken
   ) private view {
     if (msg.sender != i_tokenAdminRegistry.getPool(localToken)) revert CallerIsNotTokenPool(msg.sender, localToken);
   }
 
-  /// @dev The one check that reads all three stores. It runs after each write that opens a lane: an inline connection
-  /// record set and a subset token add. Off-chain tooling checks the other writes, such as a connection policy record
-  /// set. The connection store checks the remote pool record, then the fee store checks its records, then the security
-  /// store checks its records.
+  /// @dev Checks all three stores after setting an inline connection record or adding a subset token.
+  /// Other writes, including connection policy changes, require checks in off-chain tooling.
+  /// Records are checked in connection store, fee store, and security store order.
   function _checkLane(
     address localToken,
     uint64 remoteChainSelector
@@ -853,9 +838,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     i_securityStore.checkLaneRecords(localToken, remoteChainSelector);
   }
 
-  /// @dev Ends the call with the unchanged return data of the store view that has the signature of the called view.
-  /// Both views return the same types, so the data is also valid here and this contract needs no ABI coder for those
-  /// types. Only assembly can return raw bytes from a function with typed returns.
+  /// @dev Ends the external call with the store's raw return data. The manager and store functions must have matching
+  /// signatures and return types. Assembly avoids decoding and encoding the same values again.
   function _forwardView(
     address store
   ) private view {
@@ -865,14 +849,14 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     }
   }
 
-  /// @dev Passes for CONFIG_ROLE, POLICY_ROLE or the policy role of the type.
+  /// @dev Requires CONFIG_ROLE, POLICY_ROLE, or the supplied policy role.
   function _checkPolicyRoles(
     bytes32 typePolicyRole
   ) private view {
     if (!hasRole(CONFIG_ROLE, msg.sender)) _checkRoleOr(POLICY_ROLE, typePolicyRole);
   }
 
-  /// @dev Passes for either role. A failed check names the second role.
+  /// @dev Requires either role. The revert error identifies otherRole.
   function _checkRoleOr(
     bytes32 role,
     bytes32 otherRole

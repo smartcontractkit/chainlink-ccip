@@ -8,8 +8,8 @@ import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolic
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 contract PoolConfigManager_getTokenTransferFeeConfigBatch is PoolConfigManagerSetup {
-  /// @notice A lane gets its fee record and its destination overhead record. A token without a lane gets a disabled
-  /// zero config, also if a fee record would apply to it.
+  /// @notice Returns resolved fees and destination overheads. Missing lanes return a disabled config with zero
+  /// values even when fee records exist.
   function test_getTokenTransferFeeConfigBatch() public {
     FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig(100, 10);
     _setFeePolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, feeConfig);

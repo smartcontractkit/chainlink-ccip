@@ -10,9 +10,8 @@ import {PoolConfigManager} from "../../../../pools/MultiTokenPool/PoolConfigMana
 import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
 import {PoolConfigManagerTransferSetup} from "./PoolConfigManagerTransferSetup.t.sol";
 
-/// @notice The manager resolves the lane, computes the token fee and consumes the outbound rate limit of the amount
-/// after the fee. The store-level rules are covered by the store tests, so these tests cover the orchestration: the
-/// arguments that reach each store, the returned lane, the fee deduction and the caller check.
+/// @notice Checks store arguments, returned lane data, fee deduction, and caller authorization. Store tests cover
+/// the rules within each store.
 contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup {
   uint256 internal constant AMOUNT = 1e18;
 
@@ -24,9 +23,8 @@ contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup 
     vm.etch(s_additionalPoolDataProvider, hex"00");
   }
 
-  /// @notice Token A has an inline connection record, so the lane carries its remote token and the pool data of the
-  /// token. The DEFAULT fee record has zero fees and the security record is empty, so the fee is zero and there is no
-  /// hook.
+  /// @notice Token A uses its inline remote token address and pool data. The default fee record charges no fees,
+  /// and the security record has no hook.
   function test_validateLockOrBurn() public {
     _setCaller(address(s_pool));
 
@@ -42,7 +40,7 @@ contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup 
     assertEq(address(0), lane.hook);
   }
 
-  /// @notice The security store consumes the outbound rate limit of the amount after the token fee.
+  /// @notice Outbound rate limits apply to the amount after the token fee.
   function test_validateLockOrBurn_ConsumesRateLimitAfterFee() public {
     _setInlineFeeConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getFeeConfig(0, 1000));
     _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
@@ -56,7 +54,7 @@ contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup 
     assertEq(CAPACITY - 9e17, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).outbound.tokens);
   }
 
-  /// @notice The V1 path charges no token fee, so the outbound rate limit consumes the whole amount.
+  /// @notice The V1 path charges no token fee, so rate limits apply to the full amount.
   function test_validateLockOrBurn_WithoutTokenFee() public {
     _setInlineFeeConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getFeeConfig(0, 1000));
     _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
@@ -70,9 +68,9 @@ contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup 
     assertEq(CAPACITY - AMOUNT, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).outbound.tokens);
   }
 
-  /// @notice The requested finality and the token args reach each store. The connection store passes them to the
-  /// additional pool data provider. The fee store takes the FTF fee bps, and the security store consumes the FTF
-  /// outbound bucket of the amount after that fee. The default outbound bucket keeps its tokens.
+  /// @notice The requested finality reaches all three stores. Token arguments reach the additional pool data
+  /// provider. The fee store applies the FTF fee, and the security store consumes the FTF outbound bucket for the
+  /// remaining amount. The default finality bucket is unchanged.
   function test_validateLockOrBurn_FastFinality() public {
     bytes4 requestedFinalityConfig = bytes4(uint32(10));
     bytes memory tokenArgs = abi.encode("tokenArgs");
@@ -109,7 +107,7 @@ contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup 
     assertEq(CAPACITY, state.outbound.tokens);
   }
 
-  /// @notice The lane carries the hook of the security record.
+  /// @notice Returns the hook from the resolved security record.
   function test_validateLockOrBurn_ReturnsHook() public {
     address hook = makeAddr("hook");
     _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, new address[](0), new address[](0), hook);
@@ -134,8 +132,8 @@ contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup 
     );
   }
 
-  /// @notice The PCM passes the length of the pool data to the fee store, which rejects pool data longer than the
-  /// destination bytes overhead. The additional pool data makes the pool data 224 bytes long.
+  /// @notice The fee store rejects pool data that exceeds the destination bytes overhead. Additional pool data
+  /// increases the total length to 224 bytes.
   function test_validateLockOrBurn_RevertWhen_PoolDataTooLarge() public {
     _setAdditionalPoolDataProvider(s_tokenA, s_additionalPoolDataProvider);
     vm.mockCall(

@@ -20,7 +20,7 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     );
     s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
-    // The pool approved itself for the maximum on first need.
+    // The first transfer sets the maximum allowance for the pool.
     assertEq(s_token.allowance(address(s_pool), address(s_pool)), type(uint256).max);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
@@ -49,7 +49,7 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     vm.startPrank(s_allowedOnRamp);
     s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
-    // The tokens moved to an address that can never move them, they are not burned.
+    // The tokens are sent to the configured burn address without reducing the total supply.
     assertEq(s_token.balanceOf(burnAddress), amount);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }

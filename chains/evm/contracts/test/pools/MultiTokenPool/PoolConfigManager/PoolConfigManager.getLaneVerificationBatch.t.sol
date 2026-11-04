@@ -6,7 +6,7 @@ import {IPoolConfigManager} from "../../../../interfaces/IPoolConfigManager.sol"
 import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
-/// @notice Token A has an inline security record to the destination chain, with a hook, one outbound CCV and one
+/// @notice Token A has an inline security record for the destination chain with a hook, one outbound CCV, and one
 /// inbound CCV.
 contract PoolConfigManager_getLaneVerificationBatch is PoolConfigManagerSetup {
   address internal s_hook = makeAddr("hook");
@@ -20,8 +20,8 @@ contract PoolConfigManager_getLaneVerificationBatch is PoolConfigManagerSetup {
     _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, s_outboundCCVs, s_inboundCCVs, s_hook);
   }
 
-  /// @notice Each lane gets the values of the security record that its token uses. A token without a lane gets zero
-  /// values, also if a security record would apply to it.
+  /// @notice Returns the resolved security config for each lane. Missing lanes return zero values even when a
+  /// security record is configured.
   function test_getLaneVerificationBatch() public {
     _setSecurityPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, s_outboundCCVs, s_inboundCCVs, s_hook);
 
@@ -45,9 +45,8 @@ contract PoolConfigManager_getLaneVerificationBatch is PoolConfigManagerSetup {
     assertEq(0, laneInboundCCVs[2].length);
   }
 
-  /// @notice The finality does not change the result. Token A allows default finality only. The view still accepts
-  /// an FTF block depth and the safe flag. It also accepts a block depth with the safe flag. FinalityCodec rejects that
-  /// value as a request.
+  /// @notice This view ignores requested finality. It returns the same security config for default finality, FTF,
+  /// and requests that FinalityCodec would reject.
   function test_getLaneVerificationBatch_FinalityHasNoEffect() public view {
     bytes4[3] memory finalities =
       [_getFastFinalityConfig(), FinalityCodec.WAIT_FOR_SAFE_FLAG, FinalityCodec._encodeBlockDepthAndSafeFlag(10)];

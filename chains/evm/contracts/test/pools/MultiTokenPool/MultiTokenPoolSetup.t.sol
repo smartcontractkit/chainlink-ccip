@@ -15,8 +15,7 @@ contract MultiTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
   BurnMintMultiTokenPool internal s_pool;
 
-  /// @dev Has code, and each test mocks the calls that the pool makes with their exact calldata. A call with other
-  /// arguments matches no mock and reverts, so the tests also check what the pool forwards.
+  /// @dev Tests mock calls with exact calldata. Unmatched calls revert, so the mocks also check forwarded arguments.
   address internal s_poolConfigManager = makeAddr("poolConfigManager");
   address internal s_allowedOffRamp = makeAddr("allowed_offRamp");
   address internal s_allowedOnRamp = makeAddr("allowed_onRamp");

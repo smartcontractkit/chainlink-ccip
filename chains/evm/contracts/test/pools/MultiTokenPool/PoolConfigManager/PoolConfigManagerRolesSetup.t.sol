@@ -5,11 +5,10 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 import {IAccessControl} from "@openzeppelin/contracts@5.3.0/access/IAccessControl.sol";
 
-/// @notice Table-driven role checks. A role test passes the call data of one PCM function and the roles that may call
-/// it. The last role of the list is the role that _checkRoleOr names in its error.
+/// @notice Checks each allowed and disallowed role independently. Tests supply call data and the allowed roles. The
+/// last allowed role is the one reported by _checkRoleOr on failure.
 abstract contract PoolConfigManagerRolesSetup is PoolConfigManagerSetup {
-  /// @dev Grants one role to a new caller. The address depends only on the role. The caller of the test must be the
-  /// default admin.
+  /// @dev Grants one role to a caller whose address is derived from that role. Must be called by the default admin.
   function _grantNewCaller(
     bytes32 role
   ) internal returns (address caller) {
@@ -25,7 +24,7 @@ abstract contract PoolConfigManagerRolesSetup is PoolConfigManagerSetup {
     return abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, caller, role);
   }
 
-  /// @dev CONFIG_ROLE, POLICY_ROLE and the policy role of the type.
+  /// @dev CONFIG_ROLE, POLICY_ROLE, and the supplied policy role.
   function _getPolicyWriteRoles(
     bytes32 typePolicyRole
   ) internal view returns (bytes32[] memory roles) {
@@ -48,8 +47,8 @@ abstract contract PoolConfigManagerRolesSetup is PoolConfigManagerSetup {
     return _rolesOf(s_poolConfigManager.DEFAULT_ADMIN_ROLE(), s_poolConfigManager.UNPAUSER_ROLE());
   }
 
-  /// @dev For each allowed role, a caller that holds only that role makes the call, and the call passes. The owner
-  /// loses CONFIG_ROLE first, so it holds only DEFAULT_ADMIN_ROLE and stands for that role.
+  /// @dev Checks that each allowed role authorizes the call on its own. Revokes CONFIG_ROLE from the owner to
+  /// test DEFAULT_ADMIN_ROLE alone.
   function _assertRolesPass(
     bytes memory callData,
     bytes32[] memory allowedRoles
@@ -64,9 +63,8 @@ abstract contract PoolConfigManagerRolesSetup is PoolConfigManagerSetup {
     }
   }
 
-  /// @dev For each PCM role outside the allowed roles, a caller that holds only that role reverts. So does a caller
-  /// with no role. The error names the last allowed role. The owner loses CONFIG_ROLE first, so it stands for
-  /// DEFAULT_ADMIN_ROLE.
+  /// @dev Calls with a disallowed role or no role must revert. The error must identify the last allowed role.
+  /// Revokes CONFIG_ROLE from the owner to test DEFAULT_ADMIN_ROLE alone.
   function _assertRolesRevert(
     bytes memory callData,
     bytes32[] memory allowedRoles
@@ -93,7 +91,8 @@ abstract contract PoolConfigManagerRolesSetup is PoolConfigManagerSetup {
     _setCaller(OWNER);
   }
 
-  /// @dev The owner for DEFAULT_ADMIN_ROLE, which grantRole cannot give, and a new caller for each other role.
+  /// @dev Uses the owner for DEFAULT_ADMIN_ROLE because grantRole cannot assign it. Creates a separate caller for
+  /// each other role.
   function _getCallerOf(
     bytes32 role
   ) private returns (address) {

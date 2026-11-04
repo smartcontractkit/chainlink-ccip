@@ -24,7 +24,7 @@ contract PoolConfigManager_unpauseChains is PoolConfigManagerRolesSetup {
     assertFalse(_getLaneConnection(s_tokenB, DEST_CHAIN_SELECTOR).isChainInboundPaused);
   }
 
-  /// @notice The default admin and UNPAUSER_ROLE each pass alone.
+  /// @notice Either DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE authorizes the call on its own.
   function test_unpauseChains_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -36,7 +36,7 @@ contract PoolConfigManager_unpauseChains is PoolConfigManagerRolesSetup {
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_unpauseChains_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

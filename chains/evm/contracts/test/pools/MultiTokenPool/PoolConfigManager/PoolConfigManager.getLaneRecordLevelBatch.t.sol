@@ -29,8 +29,8 @@ contract PoolConfigManager_getLaneRecordLevelBatch is PoolConfigManagerTransferS
     _registerPool(s_tokenC);
   }
 
-  /// @notice The view merges the level arrays of the three stores. The records of token B are set so that each of the
-  /// six arrays has its own pair of levels on the two lanes. So an array in a wrong return slot fails the test.
+  /// @notice Each lane has a distinct combination of record levels. Swapping returned arrays must fail the
+  /// assertions.
   function test_getLaneRecordLevelBatch() public {
     _setInlineConnectionConfig(s_tokenB, DEST_CHAIN_SELECTOR, abi.encode(makeAddr("remoteTokenB")));
     _setInlineRemotePoolConfig(s_tokenB, OTHER_CHAIN_SELECTOR, _getRemotePoolConfig());
@@ -59,10 +59,9 @@ contract PoolConfigManager_getLaneRecordLevelBatch is PoolConfigManagerTransferS
     assertEq(abi.encode(_levelsOf(POLICY_DEFAULT, POLICY_CHAIN)), abi.encode(securityLevels), "security");
   }
 
-  /// @notice A type with level None has no record, and a transfer reverts with the error of that type. A token policy
-  /// set changes the levels at once. Each step gives token C a policy of the type that the transfer named. Then the
-  /// transfer names the next type with level None, in the order of the send: remote pool, fee, destination overhead,
-  /// security, rate limit.
+  /// @notice A missing record returns None and causes transfer validation to revert. Assigning the missing policy
+  /// updates the reported level immediately. Validation then reaches the next missing record: remote pool, fee,
+  /// destination overhead, security, and rate limit.
   function test_getLaneRecordLevelBatch_NoneMatchesTransferRevert() public {
     _setTokenRemotePoolPolicy(s_tokenC, bytes32(0));
     _setTokenRateLimitPolicy(s_tokenC, bytes32(0));

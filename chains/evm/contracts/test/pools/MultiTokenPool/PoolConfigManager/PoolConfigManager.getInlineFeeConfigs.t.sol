@@ -6,11 +6,10 @@ import {IPoolConfigManager} from "../../../../interfaces/IPoolConfigManager.sol"
 import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
-/// @notice Tokens A and B use the DEFAULT fee policy, which has a disabled policy default record. Token B has a lane to
-/// the destination chain and no lane to the other chain.
+/// @notice Tokens A and B use the DEFAULT fee policy, which has a default record with zero fees. Token B has a lane
+/// to the destination chain and no lane to the other chain.
 contract PoolConfigManager_getInlineFeeConfigs is PoolConfigManagerSetup {
-  /// @notice The view returns each inline fee record of the token in the shape of applyInlineFeeConfigUpdates, in the
-  /// order of the sets. A record on a chain with a lane and a zero record on a chain without a lane both show.
+  /// @notice Returns both inline fee records, including the record with zero fees on a chain without a lane.
   function test_getInlineFeeConfigs() public {
     FeePolicyStore.InlineFeeConfigArgs[] memory expectedConfigs = new FeePolicyStore.InlineFeeConfigArgs[](2);
     expectedConfigs[0] = _getInlineFeeConfigArgs(s_tokenB, DEST_CHAIN_SELECTOR, 100, 10);
@@ -26,7 +25,7 @@ contract PoolConfigManager_getInlineFeeConfigs is PoolConfigManagerSetup {
     assertEq(abi.encode(expectedConfigs), abi.encode(s_poolConfigManager.getInlineFeeConfigs(s_tokenB)));
   }
 
-  /// @dev An enabled record. The FTF values are twice the default finality values.
+  /// @dev FTF fees are twice the default finality fees.
   function _getInlineFeeConfigArgs(
     address localToken,
     uint64 remoteChainSelector,

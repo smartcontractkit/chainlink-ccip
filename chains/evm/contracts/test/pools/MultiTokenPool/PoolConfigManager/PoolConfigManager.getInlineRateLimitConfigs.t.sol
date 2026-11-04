@@ -10,9 +10,8 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 /// @notice Tokens A and B use the DEFAULT rate limit policy, which has a policy default record. Token B has a lane to
 /// the destination chain and no lane to the other chain.
 contract PoolConfigManager_getInlineRateLimitConfigs is PoolConfigManagerSetup {
-  /// @notice The view returns each inline rate limit record of the token in the shape of
-  /// applyInlineRateLimitConfigUpdates, in the order of the sets. Each of the four configs keeps its place. A record on
-  /// a chain with a lane and a record on a chain without a lane both show.
+  /// @notice Returns all four bucket configs for each inline record, including records on chains without a lane.
+  /// Each config remains in the field for its direction and finality.
   function test_getInlineRateLimitConfigs() public {
     SecurityPolicyStore.InlineRateLimitConfigArgs[] memory expectedConfigs =
       new SecurityPolicyStore.InlineRateLimitConfigArgs[](2);
@@ -23,7 +22,7 @@ contract PoolConfigManager_getInlineRateLimitConfigs is PoolConfigManagerSetup {
     assertEq(abi.encode(expectedConfigs), abi.encode(s_poolConfigManager.getInlineRateLimitConfigs(s_tokenB)));
   }
 
-  /// @dev Four different configs, so each one shows in its own place. The FTF inbound config is disabled.
+  /// @dev Different values ensure swapped bucket configs fail the assertions. The FTF inbound config is disabled.
   function _getInlineRateLimitConfigArgs(
     address localToken,
     uint64 remoteChainSelector,

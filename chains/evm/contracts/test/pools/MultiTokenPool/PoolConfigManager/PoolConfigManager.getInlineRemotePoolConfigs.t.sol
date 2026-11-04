@@ -9,9 +9,7 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 /// @notice Tokens A and B use the DEFAULT remote pool policy, which has a record on the destination chain. Token B has
 /// a lane to the destination chain and no lane to the other chain.
 contract PoolConfigManager_getInlineRemotePoolConfigs is PoolConfigManagerSetup {
-  /// @notice The view returns each inline remote pool record of the token in the shape of
-  /// applyInlineRemotePoolConfigUpdates, in the order of the sets. A record on a chain with a lane and a record on a
-  /// chain without a lane both show.
+  /// @notice Returns both inline remote pool records, including the record for a chain without a lane.
   function test_getInlineRemotePoolConfigs() public {
     ConnectionPolicyStore.InlineRemotePoolConfigArgs[] memory expectedConfigs =
       new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](2);
@@ -21,14 +19,14 @@ contract PoolConfigManager_getInlineRemotePoolConfigs is PoolConfigManagerSetup 
     expectedConfigs[1].remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](0);
     _applyInlineRemotePoolConfigs(expectedConfigs);
 
-    // The raw return data is compared, because decoding this nested type here is too deep for the legacy codegen.
+    // Compare raw return data to avoid a stack-too-deep error when decoding the nested records.
     (bool success, bytes memory returnData) = address(s_poolConfigManager)
       .staticcall(abi.encodeCall(s_poolConfigManager.getInlineRemotePoolConfigs, (s_tokenB)));
     assertTrue(success);
     assertEq(abi.encode(expectedConfigs), returnData);
   }
 
-  /// @dev A record with allowLegacyPoolDataOnReceive on and the remote pool.
+  /// @dev Trusts the remote pool and enables allowLegacyPoolDataOnReceive.
   function _getInlineRemotePoolConfigArgs(
     address localToken,
     uint64 remoteChainSelector

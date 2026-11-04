@@ -7,8 +7,8 @@ import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolic
 import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 
 contract PoolConfigManager_applyTokenFeePolicyUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE sets the fee policy of several tokens in one call. Token A moves to the OTHER policy, and
-  /// token B leaves its policy. The fee store applies the call and emits the events.
+  /// @notice A batch assigns token A to OTHER_POLICY and removes token B's policy assignment. The fee store emits
+  /// both changes.
   function test_applyTokenFeePolicyUpdates() public {
     _setFeePolicyConfig(OTHER_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _getFeeConfig(100, 10));
     PolicyConfig.TokenPolicyArgs[] memory tokenPolicies = new PolicyConfig.TokenPolicyArgs[](2);
@@ -25,7 +25,7 @@ contract PoolConfigManager_applyTokenFeePolicyUpdates is PoolConfigManagerRolesS
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).feePolicyName);
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyTokenFeePolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenFeePolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
@@ -35,7 +35,7 @@ contract PoolConfigManager_applyTokenFeePolicyUpdates is PoolConfigManagerRolesS
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyTokenFeePolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenFeePolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),

@@ -22,7 +22,7 @@ contract PoolConfigManager_unpauseTokens is PoolConfigManagerRolesSetup {
     assertFalse(_getLaneConnection(s_tokenB, DEST_CHAIN_SELECTOR).isTokenOutboundPaused);
   }
 
-  /// @notice The default admin and UNPAUSER_ROLE each pass alone.
+  /// @notice Either DEFAULT_ADMIN_ROLE or UNPAUSER_ROLE authorizes the call on its own.
   function test_unpauseTokens_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -34,7 +34,7 @@ contract PoolConfigManager_unpauseTokens is PoolConfigManagerRolesSetup {
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_unpauseTokens_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

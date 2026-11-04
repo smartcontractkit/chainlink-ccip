@@ -8,8 +8,7 @@ import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolic
 import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 
 contract PoolConfigManager_applyInlineFeeConfigUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE removes an inline record and sets another in one call. The fee store applies the call
-  /// and emits the events.
+  /// @notice Removes one inline record and sets another in the same call. The fee store emits the events.
   function test_applyInlineFeeConfigUpdates() public {
     FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig(10, 5);
     _setInlineFeeConfig(s_tokenB, OTHER_CHAIN_SELECTOR, feeConfig);
@@ -28,7 +27,7 @@ contract PoolConfigManager_applyInlineFeeConfigUpdates is PoolConfigManagerRoles
     assertEq(1, s_poolConfigManager.getInlineFeeConfigs(s_tokenA).length);
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyInlineFeeConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -41,7 +40,7 @@ contract PoolConfigManager_applyInlineFeeConfigUpdates is PoolConfigManagerRoles
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyInlineFeeConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

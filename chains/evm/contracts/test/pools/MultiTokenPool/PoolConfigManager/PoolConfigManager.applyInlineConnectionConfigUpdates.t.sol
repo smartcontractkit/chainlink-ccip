@@ -13,15 +13,15 @@ import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManagerRolesSetup {
   address internal s_remoteTokenB = makeAddr("remoteTokenB");
 
-  /// @dev A remote pool policy has no default record, so the DEFAULT policy needs a record on the other chain for the
-  /// lane check of the inline records that the tests set there.
+  /// @dev Remote pool policies have no default records. Add an explicit record so lanes on the other chain pass
+  /// validation.
   function setUp() public virtual override {
     super.setUp();
     _setRemotePoolPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, _getRemotePoolAddresses(abi.encode(s_remotePool)));
   }
 
-  /// @notice CONFIG_ROLE sets inline records of several tokens in one call. Each inline record opens a lane. Each token
-  /// has a record of every other type on the other chain, so the lane check passes for each record.
+  /// @notice Creates lanes for multiple tokens in one call. Each token has the other records required for its new
+  /// lane.
   function test_applyInlineConnectionConfigUpdates() public {
     ConnectionPolicyStore.InlineConnectionConfigArgs[] memory inlineConfigs =
       new ConnectionPolicyStore.InlineConnectionConfigArgs[](2);
@@ -42,8 +42,8 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     assertEq(abi.encode(s_remoteTokenB), _getLaneConnection(s_tokenB, OTHER_CHAIN_SELECTOR).remoteToken);
   }
 
-  /// @notice A removal opens no lane, so the lane check does not run for it. Token A has no fee record when its inline
-  /// record is removed.
+  /// @notice Removing an inline connection does not check lane completeness. Token A can remove its connection
+  /// despite having no fee record.
   function test_applyInlineConnectionConfigUpdates_RemovalsAreNotChecked() public {
     _setTokenFeePolicy(s_tokenA, bytes32(0));
 
@@ -56,7 +56,7 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     assertFalse(_getLaneConnection(s_tokenA, DEST_CHAIN_SELECTOR).hasConnection);
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyInlineConnectionConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -69,8 +69,7 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
 
   // Reverts
 
-  /// @notice The lane check runs after the forward. An unknown token has no remote pool record, so a lane check before
-  /// the forward would revert with RemotePoolRecordNotFound.
+  /// @notice The connection store rejects an unregistered token before the manager checks for a remote pool record.
   function test_applyInlineConnectionConfigUpdates_RevertWhen_StoreRevertsBeforeLaneCheck() public {
     address unknownToken = makeAddr("unknownToken");
     ConnectionPolicyStore.InlineConnectionConfigArgs[] memory inlineConfigs =
@@ -83,7 +82,7 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     s_poolConfigManager.applyInlineConnectionConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
   }
 
-  /// @notice The lane check reverts for the first type that the token misses. The remote pool type is checked first.
+  /// @notice Lane validation reports the first missing record. The remote pool record is checked first.
   function test_applyInlineConnectionConfigUpdates_RevertWhen_RemotePoolRecordNotFound() public {
     _setRecordPolicies(s_tokenB, bytes32(0), bytes32(0), bytes32(0), bytes32(0), bytes32(0));
 
@@ -141,8 +140,7 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     );
   }
 
-  /// @notice The lane check runs for each inline record of the call. The record of token A passes, and token B misses
-  /// a fee record.
+  /// @notice Every inline connection is checked. Token A has all required records, but token B has no fee record.
   function test_applyInlineConnectionConfigUpdates_RevertWhen_LaterInlineConfigMissesRecord() public {
     _setRecordPolicies(s_tokenB, DEFAULT_POLICY, bytes32(0), DEFAULT_POLICY, DEFAULT_POLICY, DEFAULT_POLICY);
     ConnectionPolicyStore.InlineConnectionConfigArgs[] memory inlineConfigs =
@@ -156,7 +154,7 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     s_poolConfigManager.applyInlineConnectionConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
   }
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyInlineConnectionConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(
@@ -167,9 +165,8 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     );
   }
 
-  /// @dev Sets the policies of the five types that the lane check reads, in the order of the check. Each DEFAULT policy
-  /// has a policy default record, so it gives the token a record on every chain. Zero gives the token no record of that
-  /// type.
+  /// @dev Assigns policies in lane validation order. The remote pool policy has an explicit chain record; the other
+  /// policies use default records. A zero policy name leaves that record type missing.
   function _setRecordPolicies(
     address localToken,
     bytes32 remotePoolPolicyName,

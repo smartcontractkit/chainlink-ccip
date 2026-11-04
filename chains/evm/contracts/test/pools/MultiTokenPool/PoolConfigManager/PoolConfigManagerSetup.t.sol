@@ -17,14 +17,12 @@ import {SecurityPolicyStore} from "../../../../pools/MultiTokenPool/policies/Sec
 import {TokenFixture} from "../../../TokenFixture.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
-/// @notice The config-only base: the pool config manager and the three stores, with no pool. The DEFAULT policy exists
-/// for each type. The rate limit policy has the decimals of the test tokens. The connection policy has a policy chain
-/// record to the destination chain for all its tokens, and a SameAddressRemoteTokenAddressProvider, so it gives each
-/// token its own address as the remote token. Each other DEFAULT policy has a policy default record. The remote pool
-/// chain record trusts the remote pool. The destination overhead default record has the default gas and the minimum
-/// bytes. The other default records have disabled rate limits, zero fees, no CCVs and no hook. Token A uses an inline
-/// connection record to the destination chain and the DEFAULT policy of the other types. Token B uses the DEFAULT policy
-/// of every type. Both tokens allow default finality only. The test contract owner holds CONFIG_ROLE.
+/// @notice Sets up the manager and three policy stores without a pool. Each policy type has a DEFAULT policy. The
+/// connection and remote pool policies have records for the destination chain. The other policy types use default
+/// records. The connection policy uses SameAddressRemoteTokenAddressProvider.
+/// @dev Rate limits are disabled, fees are zero, and security records have no CCVs or hook. Destination overheads
+/// use the default gas and minimum bytes. Token A uses an inline connection and the other DEFAULT policies. Token B
+/// uses every DEFAULT policy. Both tokens allow only default finality. The test contract owner holds CONFIG_ROLE.
 contract PoolConfigManagerSetup is TokenFixture {
   bytes32 internal constant DEFAULT_POLICY = "DEFAULT";
   bytes32 internal constant OTHER_POLICY = "OTHER";
@@ -82,7 +80,7 @@ contract PoolConfigManagerSetup is TokenFixture {
   // │                         Arguments                            │
   // ================================================================
 
-  /// @dev A Burn token with the default decimals, default finality only and no additional pool data provider.
+  /// @dev A Burn token with the default decimals, default finality only, and no additional pool data provider.
   function _getTokenProfileArgs(
     address localToken
   ) internal pure returns (PolicyConfig.TokenProfileArgs memory) {
@@ -146,7 +144,7 @@ contract PoolConfigManagerSetup is TokenFixture {
     return address(_deployCrossChainToken(tokenName, DEFAULT_TOKEN_DECIMALS));
   }
 
-  /// @dev Adds the policy records of the remote pool, rate limit, fee, destination overhead and security types. The
+  /// @dev Adds the policy records of the remote pool, rate limit, fee, destination overhead, and security types. The
   /// remote pool policy has no default record, so its record is on the destination chain. The rate limits are disabled,
   /// the fees are zero, the overheads are the default gas and the minimum bytes, and the security record is empty.
   /// The first record creates each policy.
@@ -174,8 +172,7 @@ contract PoolConfigManagerSetup is TokenFixture {
     s_poolConfigManager.applyTokenProfileUpdates(new address[](0), profiles);
   }
 
-  /// @dev Registers a token with the default profile and the DEFAULT policy of every type. The connection policy comes
-  /// last, as in the token expansion workflow.
+  /// @dev Registers a token with the default profile and policies. Assigns the connection policy last.
   function _registerToken(
     address localToken
   ) internal {
@@ -230,7 +227,7 @@ contract PoolConfigManagerSetup is TokenFixture {
     s_poolConfigManager.applyTokenSecurityPolicyUpdates(_tokenPoliciesOf(localToken, policyName));
   }
 
-  /// @dev Reads the profile of a registered token from the connection store, in the shape of applyTokenProfileUpdates.
+  /// @dev Returns the registered token profile as arguments for applyTokenProfileUpdates.
   function _getStoredTokenProfile(
     address localToken
   ) internal view returns (PolicyConfig.TokenProfileArgs memory tokenProfile) {

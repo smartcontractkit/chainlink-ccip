@@ -7,9 +7,9 @@ import {ConnectionPolicyStore} from "../../../../pools/MultiTokenPool/policies/C
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 contract PoolConfigManager_getLaneConnectionBatch is PoolConfigManagerSetup {
-  /// @notice The view forwards to the connection store. A lane gets its connection record, its remote pool record and
-  /// the effective pause state. A token without a lane gets the pause state and zero record values. Token A reads its
-  /// inline remote token, token B the answer of the provider of its policy.
+  /// @notice Returns connection config, remote pool config, and effective pause state for each lane. Missing lanes
+  /// still return their pause state. Token A uses its inline remote token address. Token B uses its policy's
+  /// provider.
   function test_getLaneConnectionBatch() public {
     s_poolConfigManager.pauseTokens(_arrayOf(s_tokenB), ConnectionPolicyStore.PauseDirection.Outbound);
 

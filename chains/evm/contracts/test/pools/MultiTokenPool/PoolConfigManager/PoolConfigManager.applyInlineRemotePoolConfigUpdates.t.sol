@@ -9,8 +9,7 @@ import {ConnectionPolicyStore} from "../../../../pools/MultiTokenPool/policies/C
 import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 
 contract PoolConfigManager_applyInlineRemotePoolConfigUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE removes an inline record and sets another in one call. The connection store applies the call
-  /// and emits the events.
+  /// @notice Removes one inline record and sets another in the same call. The connection store emits the events.
   function test_applyInlineRemotePoolConfigUpdates() public {
     ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
     _setInlineRemotePoolConfig(s_tokenB, OTHER_CHAIN_SELECTOR, remotePoolConfig);
@@ -36,7 +35,7 @@ contract PoolConfigManager_applyInlineRemotePoolConfigUpdates is PoolConfigManag
     assertEq(uint8(PolicyConfig.RecordLevel.Inline), uint8(remotePoolLevels[0]));
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyInlineRemotePoolConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -49,7 +48,7 @@ contract PoolConfigManager_applyInlineRemotePoolConfigUpdates is PoolConfigManag
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyInlineRemotePoolConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

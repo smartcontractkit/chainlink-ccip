@@ -7,8 +7,8 @@ import {ConnectionPolicyStore} from "../../../../pools/MultiTokenPool/policies/C
 import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 
 contract PoolConfigManager_applyRemotePoolPolicyConfigUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE removes the last record of a policy, removes the policy and sets a record of another policy in
-  /// one call. The connection store applies the call and emits the events.
+  /// @notice Removes the last record and its policy, then sets a record for another policy. The connection store
+  /// emits the events.
   function test_applyRemotePoolPolicyConfigUpdates() public {
     bytes[] memory remotePoolAddresses = _getRemotePoolAddresses(abi.encode(s_remotePool));
     _setRemotePoolPolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, remotePoolAddresses);
@@ -32,7 +32,7 @@ contract PoolConfigManager_applyRemotePoolPolicyConfigUpdates is PoolConfigManag
     assertEq(_policyNamesOf(DEFAULT_POLICY), remotePoolPolicyNames);
   }
 
-  /// @notice CONFIG_ROLE, POLICY_ROLE and the policy role of the type each pass alone.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyRemotePoolPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -49,7 +49,7 @@ contract PoolConfigManager_applyRemotePoolPolicyConfigUpdates is PoolConfigManag
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

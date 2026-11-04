@@ -7,8 +7,8 @@ import {SecurityPolicyStore} from "../../../../pools/MultiTokenPool/policies/Sec
 import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 
 contract PoolConfigManager_applyTokenSecurityPolicyUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE sets the security policy of several tokens in one call. Token A moves to the OTHER policy, and
-  /// token B leaves its policy. The security store applies the call and emits the events.
+  /// @notice A batch assigns token A to OTHER_POLICY and removes token B's policy assignment. The security store
+  /// emits both changes.
   function test_applyTokenSecurityPolicyUpdates() public {
     _setSecurityPolicyConfig(
       OTHER_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, new address[](0), new address[](0), address(0)
@@ -27,7 +27,7 @@ contract PoolConfigManager_applyTokenSecurityPolicyUpdates is PoolConfigManagerR
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).securityPolicyName);
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyTokenSecurityPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenSecurityPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
@@ -37,7 +37,7 @@ contract PoolConfigManager_applyTokenSecurityPolicyUpdates is PoolConfigManagerR
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyTokenSecurityPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenSecurityPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),

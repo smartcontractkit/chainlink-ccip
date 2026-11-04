@@ -7,8 +7,8 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 /// @notice Tokens A and B use the DEFAULT destination overhead policy, which has a policy default record.
 contract PoolConfigManager_getDestOverheadPolicy is PoolConfigManagerSetup {
-  /// @notice Each policy returns its token count and its records in the shape of applyDestOverheadPolicyConfigUpdates.
-  /// Chain selector zero is the policy default record.
+  /// @notice Returns the token count and records for each policy. Chain selector zero identifies the policy default
+  /// record.
   function test_getDestOverheadPolicy() public {
     _setDestOverheadPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, 300_000, 320);
     _setDestOverheadPolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, 400_000, 352);

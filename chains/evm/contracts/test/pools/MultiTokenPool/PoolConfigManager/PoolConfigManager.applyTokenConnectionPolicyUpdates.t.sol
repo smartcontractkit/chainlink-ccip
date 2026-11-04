@@ -14,8 +14,8 @@ contract PoolConfigManager_applyTokenConnectionPolicyUpdates is PoolConfigManage
     s_tokenC = _deployToken("C");
   }
 
-  /// @notice CONFIG_ROLE sets the connection policy of several tokens in one call. Token A joins the OTHER policy, and
-  /// token B leaves its policy. The connection store applies the call and emits the events.
+  /// @notice A batch assigns token A to OTHER_POLICY and removes token B's policy assignment. The connection store
+  /// emits both changes.
   function test_applyTokenConnectionPolicyUpdates() public {
     _setConnectionPolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, false);
     PolicyConfig.TokenPolicyArgs[] memory tokenPolicies = new PolicyConfig.TokenPolicyArgs[](2);
@@ -32,8 +32,8 @@ contract PoolConfigManager_applyTokenConnectionPolicyUpdates is PoolConfigManage
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).connectionPolicyName);
   }
 
-  /// @notice The PCM runs no lane check when a token gets a connection policy, the same as for a connection policy
-  /// record. Token C has no policy of another type, so the new lane has no remote pool record.
+  /// @notice Assigning a connection policy does not check lane completeness. Token C gains a lane despite having no
+  /// remote pool record.
   function test_applyTokenConnectionPolicyUpdates_LanesAreNotChecked() public {
     _setTokenProfile(_getTokenProfileArgs(s_tokenC));
 
@@ -45,7 +45,7 @@ contract PoolConfigManager_applyTokenConnectionPolicyUpdates is PoolConfigManage
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(remotePoolLevels[0]));
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyTokenConnectionPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenConnectionPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
@@ -55,7 +55,7 @@ contract PoolConfigManager_applyTokenConnectionPolicyUpdates is PoolConfigManage
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyTokenConnectionPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenConnectionPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),

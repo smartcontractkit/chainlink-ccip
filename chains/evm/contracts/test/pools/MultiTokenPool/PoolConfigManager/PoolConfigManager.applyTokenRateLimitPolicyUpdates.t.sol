@@ -8,8 +8,8 @@ import {SecurityPolicyStore} from "../../../../pools/MultiTokenPool/policies/Sec
 import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 
 contract PoolConfigManager_applyTokenRateLimitPolicyUpdates is PoolConfigManagerRolesSetup {
-  /// @notice CONFIG_ROLE sets the rate limit policy of several tokens in one call. Token A moves to the OTHER policy,
-  /// and token B leaves its policy. The security store applies the call and emits the events.
+  /// @notice A batch assigns token A to OTHER_POLICY and removes token B's policy assignment. The security store
+  /// emits both changes.
   function test_applyTokenRateLimitPolicyUpdates() public {
     RateLimiter.Config memory disabledConfig;
     _setRateLimitPolicyConfig(OTHER_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, disabledConfig);
@@ -27,7 +27,7 @@ contract PoolConfigManager_applyTokenRateLimitPolicyUpdates is PoolConfigManager
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).rateLimitPolicyName);
   }
 
-  /// @notice CONFIG_ROLE and TOKEN_MANAGER_ROLE each pass alone.
+  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
   function test_applyTokenRateLimitPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenRateLimitPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
@@ -37,7 +37,7 @@ contract PoolConfigManager_applyTokenRateLimitPolicyUpdates is PoolConfigManager
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyTokenRateLimitPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenRateLimitPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),

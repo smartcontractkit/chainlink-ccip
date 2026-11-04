@@ -14,8 +14,7 @@ contract PoolConfigManager_applyRemoteTokenAddressProviderUpdates is PoolConfigM
     vm.etch(s_provider, hex"00");
   }
 
-  /// @notice CONFIG_ROLE sets the providers of several policies in one call. The connection store applies the call and
-  /// emits the events.
+  /// @notice Updates providers for multiple policies in one call. The connection store emits the events.
   function test_applyRemoteTokenAddressProviderUpdates() public {
     _setConnectionPolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, false);
     ConnectionPolicyStore.RemoteTokenAddressProviderArgs[] memory providersToSet =
@@ -35,7 +34,7 @@ contract PoolConfigManager_applyRemoteTokenAddressProviderUpdates is PoolConfigM
     assertEq(s_provider, storedProvider);
   }
 
-  /// @notice CONFIG_ROLE, POLICY_ROLE and the policy role of the type each pass alone.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyRemoteTokenAddressProviderUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -48,7 +47,7 @@ contract PoolConfigManager_applyRemoteTokenAddressProviderUpdates is PoolConfigM
 
   // Reverts
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applyRemoteTokenAddressProviderUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

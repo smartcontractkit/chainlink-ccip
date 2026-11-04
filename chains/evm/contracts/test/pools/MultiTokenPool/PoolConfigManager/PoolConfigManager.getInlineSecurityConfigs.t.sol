@@ -11,9 +11,7 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 contract PoolConfigManager_getInlineSecurityConfigs is PoolConfigManagerSetup {
   address internal s_hook = makeAddr("hook");
 
-  /// @notice The view returns each inline security record of the token in the shape of
-  /// applyInlineSecurityConfigUpdates, in the order of the sets. A record on a chain with a lane and a record on a
-  /// chain without a lane both show.
+  /// @notice Returns both inline security records, including the record for a chain without a lane.
   function test_getInlineSecurityConfigs() public {
     SecurityPolicyStore.InlineSecurityConfigArgs[] memory expectedConfigs =
       new SecurityPolicyStore.InlineSecurityConfigArgs[](2);
@@ -30,7 +28,7 @@ contract PoolConfigManager_getInlineSecurityConfigs is PoolConfigManagerSetup {
     assertEq(abi.encode(expectedConfigs), abi.encode(s_poolConfigManager.getInlineSecurityConfigs(s_tokenB)));
   }
 
-  /// @dev Two outbound CCVs, one inbound CCV that stands for the default CCVs of the ramps, and the hook.
+  /// @dev Two outbound CCVs, the placeholder for default inbound CCVs, and a hook.
   function _getInlineSecurityConfigArgs(
     address localToken,
     uint64 remoteChainSelector

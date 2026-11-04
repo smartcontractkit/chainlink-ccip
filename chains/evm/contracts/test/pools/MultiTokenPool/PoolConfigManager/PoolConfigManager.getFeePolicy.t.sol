@@ -7,8 +7,8 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 /// @notice Tokens A and B use the DEFAULT fee policy, which has a policy default record.
 contract PoolConfigManager_getFeePolicy is PoolConfigManagerSetup {
-  /// @notice Each policy returns its token count and its records in the shape of applyFeePolicyConfigUpdates. Chain
-  /// selector zero is the policy default record.
+  /// @notice Returns the token count and records for each policy. Chain selector zero identifies the policy default
+  /// record.
   function test_getFeePolicy() public {
     FeePolicyStore.FeeConfig memory feeConfig = _getFeeConfig(100, 10);
     _setFeePolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, feeConfig);

@@ -5,12 +5,12 @@ import {PoolConfigManager} from "../../../../pools/MultiTokenPool/PoolConfigMana
 import {ConnectionPolicyStore} from "../../../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
-/// @notice Tokens A and B use the DEFAULT remote pool policy, which has a record on the destination chain. The tests
-/// compare the whole answer of the view as bytes, and read the token count from its first word. The compiler without
-/// via-IR runs out of stack when this test contract decodes RemotePoolPolicyConfigArgs[].
+/// @notice Tokens A and B use the DEFAULT remote pool policy, which has a record for the destination chain.
+/// @dev Compare raw return data because decoding nested records exceeds the stack limit without viaIR. The first
+/// word contains the token count.
 contract PoolConfigManager_getRemotePoolPolicy is PoolConfigManagerSetup {
-  /// @notice Each policy returns its token count and its records in the shape of applyRemotePoolPolicyConfigUpdates.
-  /// @dev The merged store has no remote pool policy default record, so every record is a chain record.
+  /// @notice Returns the token count and records for each policy.
+  /// @dev Remote pool policies have no default records, so each record is for a specific chain.
   function test_getRemotePoolPolicy() public {
     bytes[] memory policyPoolAddresses = _getRemotePoolAddresses(abi.encode(makeAddr("policyPool")));
     _setRemotePoolPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, policyPoolAddresses);
@@ -28,7 +28,7 @@ contract PoolConfigManager_getRemotePoolPolicy is PoolConfigManagerSetup {
     assertEq(abi.encode(uint32(0), expectedConfigs), _getRemotePoolPolicyAnswer(OTHER_POLICY));
   }
 
-  /// @dev The answer of the view as bytes. The call must succeed.
+  /// @dev Returns the raw response from a successful view call.
   function _getRemotePoolPolicyAnswer(
     bytes32 policyName
   ) internal view returns (bytes memory answer) {

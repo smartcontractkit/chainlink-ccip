@@ -10,8 +10,8 @@ import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetup {
   address internal s_tokenC;
 
-  /// @dev The DEFAULT connection policy opens the other chain only for its subset tokens. Token C uses the DEFAULT
-  /// policy of every type, the same as token B.
+  /// @dev The DEFAULT connection policy restricts the other chain to subset tokens. Tokens B and C use the DEFAULT
+  /// policies.
   function setUp() public virtual override {
     super.setUp();
     _setConnectionPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, true);
@@ -22,8 +22,7 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     _registerToken(s_tokenC);
   }
 
-  /// @notice Each subset token of the call gets a lane on the other chain. Each token has a record of every other type
-  /// there, so the lane check passes for each add.
+  /// @notice Adding subset tokens enables their lanes on the other chain. Each token has all required records.
   function test_applySubsetTokenUpdates() public {
     ConnectionPolicyStore.SubsetTokenArgs[] memory tokensToAdd = new ConnectionPolicyStore.SubsetTokenArgs[](2);
     tokensToAdd[0] = _getSubsetTokenArgs(s_tokenB);
@@ -39,8 +38,8 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     assertTrue(_getLaneConnection(s_tokenC, OTHER_CHAIN_SELECTOR).hasConnection);
   }
 
-  /// @notice A removal closes a lane, so the lane check does not run for it. Token B has no fee record when it leaves
-  /// the subset.
+  /// @notice Removing a subset token does not check lane completeness. Token B can leave the subset despite having
+  /// no fee record.
   function test_applySubsetTokenUpdates_RemovalsAreNotChecked() public {
     _addSubsetToken(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, s_tokenB);
     _setTokenFeePolicy(s_tokenB, bytes32(0));
@@ -54,7 +53,7 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     assertFalse(_getLaneConnection(s_tokenB, OTHER_CHAIN_SELECTOR).hasConnection);
   }
 
-  /// @notice CONFIG_ROLE, POLICY_ROLE and the policy role of the type each pass alone.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applySubsetTokenUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -67,8 +66,8 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
 
   // Reverts
 
-  /// @notice The lane check runs after the forward. An unknown token has no remote pool record, so a lane check before
-  /// the forward would revert with RemotePoolRecordNotFound.
+  /// @notice The connection store rejects a token not assigned to the policy before the manager checks for a remote
+  /// pool record.
   function test_applySubsetTokenUpdates_RevertWhen_StoreRevertsBeforeLaneCheck() public {
     address unknownToken = makeAddr("unknownToken");
     ConnectionPolicyStore.SubsetTokenArgs[] memory tokensToAdd = new ConnectionPolicyStore.SubsetTokenArgs[](1);
@@ -80,8 +79,8 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     s_poolConfigManager.applySubsetTokenUpdates(new ConnectionPolicyStore.SubsetTokenArgs[](0), tokensToAdd);
   }
 
-  /// @notice A subset token add opens a lane, so the lane check reverts for the first type that the token misses.
-  /// Token B misses the fee type and the security type.
+  /// @notice Lane validation reports the first missing record. Token B has no fee or security record, so the fee
+  /// check reverts first.
   function test_applySubsetTokenUpdates_RevertWhen_FeeRecordNotFound() public {
     _setTokenFeePolicy(s_tokenB, bytes32(0));
     _setTokenSecurityPolicy(s_tokenB, bytes32(0));
@@ -92,7 +91,7 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     s_poolConfigManager.applySubsetTokenUpdates(new ConnectionPolicyStore.SubsetTokenArgs[](0), tokensToAdd);
   }
 
-  /// @notice The security store runs the last part of the lane check. Token B has every record but a security record.
+  /// @notice The security check runs last. Token B has every required record except its security record.
   function test_applySubsetTokenUpdates_RevertWhen_SecurityRecordNotFound() public {
     _setTokenSecurityPolicy(s_tokenB, bytes32(0));
     ConnectionPolicyStore.SubsetTokenArgs[] memory tokensToAdd = new ConnectionPolicyStore.SubsetTokenArgs[](1);
@@ -104,8 +103,8 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     s_poolConfigManager.applySubsetTokenUpdates(new ConnectionPolicyStore.SubsetTokenArgs[](0), tokensToAdd);
   }
 
-  /// @notice The lane check runs for each added token, not only the first. Token C has every record. Token B, added
-  /// second, misses a destination overhead record, so the revert names token B.
+  /// @notice Every added token is checked. Token C has all required records. Token B is added second and has no
+  /// destination overhead record, so the error identifies token B.
   function test_applySubsetTokenUpdates_RevertWhen_LaterTokenMissesRecord() public {
     _setTokenDestOverheadPolicy(s_tokenB, bytes32(0));
     ConnectionPolicyStore.SubsetTokenArgs[] memory tokensToAdd = new ConnectionPolicyStore.SubsetTokenArgs[](2);
@@ -118,7 +117,7 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     s_poolConfigManager.applySubsetTokenUpdates(new ConnectionPolicyStore.SubsetTokenArgs[](0), tokensToAdd);
   }
 
-  /// @notice Each other PCM role and a caller with no role revert. The error names the second role of the check.
+  /// @notice Calls without an allowed role revert.
   function test_applySubsetTokenUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

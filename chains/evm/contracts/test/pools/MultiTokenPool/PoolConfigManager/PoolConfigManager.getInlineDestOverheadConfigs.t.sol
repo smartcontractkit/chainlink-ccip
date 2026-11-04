@@ -9,9 +9,7 @@ import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 /// @notice Tokens A and B use the DEFAULT destination overhead policy, which has a policy default record. Token B has a
 /// lane to the destination chain and no lane to the other chain.
 contract PoolConfigManager_getInlineDestOverheadConfigs is PoolConfigManagerSetup {
-  /// @notice The view returns each inline destination overhead record of the token in the shape of
-  /// applyInlineDestOverheadConfigUpdates, in the order of the sets. A record on a chain with a lane and a record on a
-  /// chain without a lane both show.
+  /// @notice Returns both inline destination overhead records, including the record for a chain without a lane.
   function test_getInlineDestOverheadConfigs() public {
     FeePolicyStore.InlineDestOverheadConfigArgs[] memory expectedConfigs =
       new FeePolicyStore.InlineDestOverheadConfigArgs[](2);
