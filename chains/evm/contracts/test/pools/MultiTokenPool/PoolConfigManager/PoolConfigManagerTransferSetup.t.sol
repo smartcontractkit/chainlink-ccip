@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPoolConfigManager} from "../../../../interfaces/IPoolConfigManager.sol";
 
+import {PolicyConfig} from "../../../../libraries/PolicyConfig.sol";
 import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
 import {BurnMintMultiTokenPool} from "../../../../pools/MultiTokenPool/BurnMintMultiTokenPool.sol";
 import {SecurityPolicyStore} from "../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
@@ -13,11 +14,15 @@ import {PoolConfigManagerRolesSetup} from "./PoolConfigManagerRolesSetup.t.sol";
 abstract contract PoolConfigManagerTransferSetup is PoolConfigManagerRolesSetup {
   BurnMintMultiTokenPool internal s_pool;
 
+  address internal s_additionalPoolDataProvider = makeAddr("additionalPoolDataProvider");
+
   function setUp() public virtual override {
     super.setUp();
     s_pool = new BurnMintMultiTokenPool(address(s_mockRMNRemote), address(s_sourceRouter), address(s_poolConfigManager));
     _registerPool(s_tokenA);
     _registerPool(s_tokenB);
+    // The connection store accepts a provider only if it has code. The tests mock each call to it.
+    vm.etch(s_additionalPoolDataProvider, hex"00");
   }
 
   function _registerPool(
@@ -57,5 +62,15 @@ abstract contract PoolConfigManagerTransferSetup is PoolConfigManagerRolesSetup 
       })
     });
     s_poolConfigManager.applyInlineRateLimitConfigUpdates(new IPoolConfigManager.LaneKey[](0), inlineConfigs);
+  }
+
+  /// @dev Sets the additional pool data provider and keeps the other values of the token profile.
+  function _setAdditionalPoolDataProvider(
+    address localToken,
+    address additionalPoolDataProvider
+  ) internal {
+    PolicyConfig.TokenProfileArgs memory tokenProfile = _getStoredTokenProfile(localToken);
+    tokenProfile.additionalPoolDataProvider = additionalPoolDataProvider;
+    _setTokenProfile(tokenProfile);
   }
 }

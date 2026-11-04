@@ -5,7 +5,6 @@ import {IAdditionalPoolDataProvider} from "../../../../interfaces/IAdditionalPoo
 import {IPoolConfigManager} from "../../../../interfaces/IPoolConfigManager.sol";
 
 import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
-import {PolicyConfig} from "../../../../libraries/PolicyConfig.sol";
 import {PoolConfigManager} from "../../../../pools/MultiTokenPool/PoolConfigManager.sol";
 import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
 import {PoolConfigManagerTransferSetup} from "./PoolConfigManagerTransferSetup.t.sol";
@@ -14,14 +13,6 @@ import {PoolConfigManagerTransferSetup} from "./PoolConfigManagerTransferSetup.t
 /// the rules within each store.
 contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup {
   uint256 internal constant AMOUNT = 1e18;
-
-  address internal s_additionalPoolDataProvider = makeAddr("additionalPoolDataProvider");
-
-  /// @dev The connection store accepts a provider only if it has code. The tests mock each call to it.
-  function setUp() public virtual override {
-    super.setUp();
-    vm.etch(s_additionalPoolDataProvider, hex"00");
-  }
 
   /// @notice Token A uses its inline remote token address and pool data. The default fee record charges no fees,
   /// and the security record has no hook.
@@ -151,15 +142,5 @@ contract PoolConfigManager_validateLockOrBurn is PoolConfigManagerTransferSetup 
     s_poolConfigManager.validateLockOrBurn(
       s_tokenA, DEST_CHAIN_SELECTOR, AMOUNT, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", true
     );
-  }
-
-  /// @dev Sets the additional pool data provider and keeps the other values of the token profile.
-  function _setAdditionalPoolDataProvider(
-    address localToken,
-    address additionalPoolDataProvider
-  ) internal {
-    PolicyConfig.TokenProfileArgs memory tokenProfile = _getStoredTokenProfile(localToken);
-    tokenProfile.additionalPoolDataProvider = additionalPoolDataProvider;
-    _setTokenProfile(tokenProfile);
   }
 }

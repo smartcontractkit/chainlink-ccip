@@ -26,6 +26,13 @@ import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/Aut
 contract PoolConfigManagerSetup is TokenFixture {
   bytes32 internal constant DEFAULT_POLICY = "DEFAULT";
   bytes32 internal constant OTHER_POLICY = "OTHER";
+  // Each policy type has a different name so swapped fields fail the assertions.
+  bytes32 internal constant CONNECTION_POLICY = "CONNECTION";
+  bytes32 internal constant REMOTE_POOL_POLICY = "REMOTE_POOL";
+  bytes32 internal constant RATE_LIMIT_POLICY = "RATE_LIMIT";
+  bytes32 internal constant FEE_POLICY = "FEE";
+  bytes32 internal constant DEST_OVERHEAD_POLICY = "DEST_OVERHEAD";
+  bytes32 internal constant SECURITY_POLICY = "SECURITY";
   /// @dev A third chain, Arbitrum One, for records that the setup does not add.
   uint64 internal constant OTHER_CHAIN_SELECTOR = 4949039107694359620;
   uint32 internal constant MIN_DEST_BYTES_OVERHEAD = 192;
@@ -161,6 +168,24 @@ contract PoolConfigManagerSetup is TokenFixture {
       policyName, defaultChainSelector, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, MIN_DEST_BYTES_OVERHEAD
     );
     _setSecurityPolicyConfig(policyName, defaultChainSelector, new address[](0), new address[](0), address(0));
+  }
+
+  /// @dev Creates one policy of each type, named after its type, with no tokens. The connection policy has a record
+  /// for the other chain. The other policies have the records of the DEFAULT policies.
+  function _addPolicyOfEachType() internal {
+    RateLimiter.Config memory disabledRateLimitConfig;
+    FeePolicyStore.FeeConfig memory zeroFeeConfig;
+    uint64 defaultChainSelector = PolicyConfig.DEFAULT_CHAIN_SELECTOR;
+    _setConnectionPolicyConfig(CONNECTION_POLICY, OTHER_CHAIN_SELECTOR, false);
+    _setRemotePoolPolicyConfig(
+      REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(abi.encode(s_remotePool))
+    );
+    _setRateLimitPolicyConfig(RATE_LIMIT_POLICY, defaultChainSelector, disabledRateLimitConfig);
+    _setFeePolicyConfig(FEE_POLICY, defaultChainSelector, zeroFeeConfig);
+    _setDestOverheadPolicyConfig(
+      DEST_OVERHEAD_POLICY, defaultChainSelector, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, MIN_DEST_BYTES_OVERHEAD
+    );
+    _setSecurityPolicyConfig(SECURITY_POLICY, defaultChainSelector, new address[](0), new address[](0), address(0));
   }
 
   /// @dev Sets the profile of one token.
@@ -496,17 +521,6 @@ contract PoolConfigManagerSetup is TokenFixture {
   ) internal pure returns (PolicyConfig.TokenPolicyArgs[] memory tokenPolicies) {
     tokenPolicies = new PolicyConfig.TokenPolicyArgs[](1);
     tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: localToken, policyName: policyName});
-    return tokenPolicies;
-  }
-
-  function _tokenPoliciesOf(
-    address firstToken,
-    address secondToken,
-    bytes32 policyName
-  ) internal pure returns (PolicyConfig.TokenPolicyArgs[] memory tokenPolicies) {
-    tokenPolicies = new PolicyConfig.TokenPolicyArgs[](2);
-    tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: firstToken, policyName: policyName});
-    tokenPolicies[1] = PolicyConfig.TokenPolicyArgs({localToken: secondToken, policyName: policyName});
     return tokenPolicies;
   }
 

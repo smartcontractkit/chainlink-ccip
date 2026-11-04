@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IAdditionalPoolDataProvider} from "../../../../interfaces/IAdditionalPoolDataProvider.sol";
 import {IPoolConfigManager} from "../../../../interfaces/IPoolConfigManager.sol";
 
 import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
@@ -57,14 +58,23 @@ contract PoolConfigManager_validateReleaseOrMint is PoolConfigManagerTransferSet
     assertEq(hook, transfer.hook);
   }
 
-  /// @notice FTF transfers consume only the FTF inbound bucket. The default finality bucket is unchanged. Inbound
-  /// transfers do not check finality against the token profile.
+  /// @notice The requested finality reaches the additional pool data provider. FTF transfers consume only the FTF
+  /// inbound bucket. The default finality bucket is unchanged. Inbound transfers do not check finality against the
+  /// token profile.
   function test_validateReleaseOrMint_FastFinality() public {
+    bytes4 requestedFinalityConfig = bytes4(uint32(10));
+    _setAdditionalPoolDataProvider(s_tokenA, s_additionalPoolDataProvider);
     _setInlineRateLimitConfigByFinality(s_tokenA, CAPACITY, 2 * CAPACITY);
+    bytes memory providerCallData = abi.encodeCall(
+      IAdditionalPoolDataProvider.isAdditionalPoolDataValid,
+      (s_tokenA, DEST_CHAIN_SELECTOR, requestedFinalityConfig, bytes(""))
+    );
+    vm.mockCall(s_additionalPoolDataProvider, providerCallData, abi.encode(true));
     _setCaller(address(s_pool));
 
+    vm.expectCall(s_additionalPoolDataProvider, providerCallData);
     IPoolConfigManager.ResolvedInboundTransfer memory transfer = s_poolConfigManager.validateReleaseOrMint(
-      _getReleaseOrMintIn(s_tokenA, DEST_CHAIN_SELECTOR, 1e18, _getPoolData(s_remoteTokenA)), bytes4(uint32(10))
+      _getReleaseOrMintIn(s_tokenA, DEST_CHAIN_SELECTOR, 1e18, _getPoolData(s_remoteTokenA)), requestedFinalityConfig
     );
 
     assertEq(1e18, transfer.localAmount);

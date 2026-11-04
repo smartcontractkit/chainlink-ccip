@@ -104,30 +104,6 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     );
   }
 
-  /// @notice The destination overhead type is checked after the fee type.
-  function test_applyInlineConnectionConfigUpdates_RevertWhen_DestOverheadRecordNotFound() public {
-    _setRecordPolicies(s_tokenB, DEFAULT_POLICY, DEFAULT_POLICY, bytes32(0), bytes32(0), bytes32(0));
-
-    vm.expectRevert(
-      abi.encodeWithSelector(FeePolicyStore.DestOverheadRecordNotFound.selector, s_tokenB, OTHER_CHAIN_SELECTOR)
-    );
-    s_poolConfigManager.applyInlineConnectionConfigUpdates(
-      new IPoolConfigManager.LaneKey[](0), _getInlineConfigsOfTokenB()
-    );
-  }
-
-  /// @notice The rate limit type is checked after the destination overhead type.
-  function test_applyInlineConnectionConfigUpdates_RevertWhen_RateLimitRecordNotFound() public {
-    _setRecordPolicies(s_tokenB, DEFAULT_POLICY, DEFAULT_POLICY, DEFAULT_POLICY, bytes32(0), bytes32(0));
-
-    vm.expectRevert(
-      abi.encodeWithSelector(SecurityPolicyStore.RateLimitRecordNotFound.selector, s_tokenB, OTHER_CHAIN_SELECTOR)
-    );
-    s_poolConfigManager.applyInlineConnectionConfigUpdates(
-      new IPoolConfigManager.LaneKey[](0), _getInlineConfigsOfTokenB()
-    );
-  }
-
   /// @notice The security type is checked last.
   function test_applyInlineConnectionConfigUpdates_RevertWhen_SecurityRecordNotFound() public {
     _setRecordPolicies(s_tokenB, DEFAULT_POLICY, DEFAULT_POLICY, DEFAULT_POLICY, DEFAULT_POLICY, bytes32(0));

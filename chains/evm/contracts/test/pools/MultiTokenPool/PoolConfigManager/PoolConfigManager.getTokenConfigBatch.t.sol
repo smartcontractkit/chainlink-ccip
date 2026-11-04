@@ -3,38 +3,16 @@ pragma solidity ^0.8.24;
 
 import {IPoolConfigManager} from "../../../../interfaces/IPoolConfigManager.sol";
 
-import {PolicyConfig} from "../../../../libraries/PolicyConfig.sol";
-import {RateLimiter} from "../../../../libraries/RateLimiter.sol";
-import {FeePolicyStore} from "../../../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
+import {FinalityCodec} from "../../../../libraries/FinalityCodec.sol";
 import {PoolConfigManagerSetup} from "./PoolConfigManagerSetup.t.sol";
 
 contract PoolConfigManager_getTokenConfigBatch is PoolConfigManagerSetup {
-  // Each policy type has a different name so swapped fields fail the assertions.
-  bytes32 internal constant CONNECTION_POLICY = "CONNECTION";
-  bytes32 internal constant REMOTE_POOL_POLICY = "REMOTE_POOL";
-  bytes32 internal constant RATE_LIMIT_POLICY = "RATE_LIMIT";
-  bytes32 internal constant FEE_POLICY = "FEE";
-  bytes32 internal constant DEST_OVERHEAD_POLICY = "DEST_OVERHEAD";
-  bytes32 internal constant SECURITY_POLICY = "SECURITY";
-
   address internal s_tokenC;
 
-  /// @dev Creates the policy of each type with its own name. Token C uses these policies.
+  /// @dev Token C uses the policy of each type that is named after its type.
   function setUp() public virtual override {
     super.setUp();
-    RateLimiter.Config memory disabledRateLimitConfig;
-    FeePolicyStore.FeeConfig memory zeroFeeConfig;
-    uint64 defaultChainSelector = PolicyConfig.DEFAULT_CHAIN_SELECTOR;
-    _setConnectionPolicyConfig(CONNECTION_POLICY, OTHER_CHAIN_SELECTOR, false);
-    _setRemotePoolPolicyConfig(
-      REMOTE_POOL_POLICY, DEST_CHAIN_SELECTOR, _getRemotePoolAddresses(abi.encode(s_remotePool))
-    );
-    _setRateLimitPolicyConfig(RATE_LIMIT_POLICY, defaultChainSelector, disabledRateLimitConfig);
-    _setFeePolicyConfig(FEE_POLICY, defaultChainSelector, zeroFeeConfig);
-    _setDestOverheadPolicyConfig(
-      DEST_OVERHEAD_POLICY, defaultChainSelector, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, MIN_DEST_BYTES_OVERHEAD
-    );
-    _setSecurityPolicyConfig(SECURITY_POLICY, defaultChainSelector, new address[](0), new address[](0), address(0));
+    _addPolicyOfEachType();
 
     s_tokenC = _deployToken("C");
     _setTokenProfile(_getTokenProfileArgs(s_tokenC));
@@ -59,7 +37,7 @@ contract PoolConfigManager_getTokenConfigBatch is PoolConfigManagerSetup {
     assertTrue(configs[0].isRegistered);
     assertEq(DEFAULT_TOKEN_DECIMALS, configs[0].localDecimals);
     assertEq(uint8(IPoolConfigManager.LockOrBurnFlavor.Burn), uint8(configs[0].lockOrBurnFlavor));
-    assertEq(bytes4(0), configs[0].allowedFinalityConfig);
+    assertEq(FinalityCodec.WAIT_FOR_FINALITY_FLAG, configs[0].allowedFinalityConfig);
     assertEq(address(0), configs[0].lockOrBurnAddress);
     assertEq(address(0), configs[0].additionalPoolDataProvider);
     assertEq(1, configs[0].supportedChains.length);

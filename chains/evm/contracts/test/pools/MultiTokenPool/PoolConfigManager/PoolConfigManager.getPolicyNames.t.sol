@@ -7,23 +7,22 @@ contract PoolConfigManager_getPolicyNames is PoolConfigManagerSetup {
   /// @notice Creating a policy adds its name only to the list for its type. Policies need no assigned tokens to
   /// appear. The same name can appear in multiple lists.
   function test_getPolicyNames() public {
-    _setFeePolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, _getFeeConfig(100, 10));
+    _addPolicyOfEachType();
 
-    bytes32[] memory defaultOnly = _namesOf(DEFAULT_POLICY);
-    bytes32[] memory defaultAndOther = _namesOf(DEFAULT_POLICY, OTHER_POLICY);
-    _assertPolicyNames(defaultOnly, defaultOnly, defaultOnly, defaultAndOther, defaultOnly, defaultOnly);
-
-    _setConnectionPolicyConfig(OTHER_POLICY, OTHER_CHAIN_SELECTOR, false);
-
-    _assertPolicyNames(defaultAndOther, defaultOnly, defaultOnly, defaultAndOther, defaultOnly, defaultOnly);
-  }
-
-  function _namesOf(
-    bytes32 policyName
-  ) internal pure returns (bytes32[] memory policyNames) {
-    policyNames = new bytes32[](1);
-    policyNames[0] = policyName;
-    return policyNames;
+    (
+      bytes32[] memory connectionPolicyNames,
+      bytes32[] memory remotePoolPolicyNames,
+      bytes32[] memory rateLimitPolicyNames,
+      bytes32[] memory feePolicyNames,
+      bytes32[] memory destOverheadPolicyNames,
+      bytes32[] memory securityPolicyNames
+    ) = s_poolConfigManager.getPolicyNames();
+    assertEq(_namesOf(DEFAULT_POLICY, CONNECTION_POLICY), connectionPolicyNames);
+    assertEq(_namesOf(DEFAULT_POLICY, REMOTE_POOL_POLICY), remotePoolPolicyNames);
+    assertEq(_namesOf(DEFAULT_POLICY, RATE_LIMIT_POLICY), rateLimitPolicyNames);
+    assertEq(_namesOf(DEFAULT_POLICY, FEE_POLICY), feePolicyNames);
+    assertEq(_namesOf(DEFAULT_POLICY, DEST_OVERHEAD_POLICY), destOverheadPolicyNames);
+    assertEq(_namesOf(DEFAULT_POLICY, SECURITY_POLICY), securityPolicyNames);
   }
 
   function _namesOf(
@@ -34,30 +33,5 @@ contract PoolConfigManager_getPolicyNames is PoolConfigManagerSetup {
     policyNames[0] = firstPolicyName;
     policyNames[1] = secondPolicyName;
     return policyNames;
-  }
-
-  /// @dev Checks the names of each type, in the order of the view.
-  function _assertPolicyNames(
-    bytes32[] memory expectedConnectionPolicyNames,
-    bytes32[] memory expectedRemotePoolPolicyNames,
-    bytes32[] memory expectedRateLimitPolicyNames,
-    bytes32[] memory expectedFeePolicyNames,
-    bytes32[] memory expectedDestOverheadPolicyNames,
-    bytes32[] memory expectedSecurityPolicyNames
-  ) internal view {
-    (
-      bytes32[] memory connectionPolicyNames,
-      bytes32[] memory remotePoolPolicyNames,
-      bytes32[] memory rateLimitPolicyNames,
-      bytes32[] memory feePolicyNames,
-      bytes32[] memory destOverheadPolicyNames,
-      bytes32[] memory securityPolicyNames
-    ) = s_poolConfigManager.getPolicyNames();
-    assertEq(expectedConnectionPolicyNames, connectionPolicyNames);
-    assertEq(expectedRemotePoolPolicyNames, remotePoolPolicyNames);
-    assertEq(expectedRateLimitPolicyNames, rateLimitPolicyNames);
-    assertEq(expectedFeePolicyNames, feePolicyNames);
-    assertEq(expectedDestOverheadPolicyNames, destOverheadPolicyNames);
-    assertEq(expectedSecurityPolicyNames, securityPolicyNames);
   }
 }
