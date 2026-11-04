@@ -6,20 +6,18 @@ import {IRemoteTokenAddressProvider} from "../../../../../interfaces/IRemoteToke
 
 import {FinalityCodec} from "../../../../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
-import {
-  SameAddressRemoteTokenAddressProvider
-} from "../../../../../pools/MultiTokenPool/SameAddressRemoteTokenAddressProvider.sol";
 import {ConnectionPolicyStore} from "../../../../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
 import {ConnectionPolicyStoreSetup} from "./ConnectionPolicyStoreSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract ConnectionPolicyStore_applyRemoteTokenAddressProviderUpdates is ConnectionPolicyStoreSetup {
-  address internal s_newProvider;
+  /// @dev A provider needs code. The tests mock each call to it.
+  address internal s_newProvider = makeAddr("newProvider");
   bytes internal s_newRemoteToken = abi.encode(makeAddr("newRemoteToken"));
 
   function setUp() public override {
     super.setUp();
-    s_newProvider = address(new SameAddressRemoteTokenAddressProvider());
+    vm.etch(s_newProvider, hex"00");
     vm.mockCall(
       s_newProvider,
       abi.encodeCall(IRemoteTokenAddressProvider.getRemoteTokenAddress, (s_token, DEST_CHAIN_SELECTOR)),

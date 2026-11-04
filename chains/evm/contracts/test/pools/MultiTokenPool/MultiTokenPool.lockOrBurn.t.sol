@@ -12,23 +12,21 @@ import {MultiTokenPoolSetup} from "./MultiTokenPoolSetup.t.sol";
 contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
   function test_lockOrBurn() public {
     uint256 amount = 20_000e18;
+    bytes4 finality = FinalityCodec._encodeBlockDepth(5);
     deal(address(s_token), address(s_pool), amount);
-
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _lockOrBurnIn(amount);
+    // The mock matches only the token, chain, amount, finality, token args, and fee flag that the pool must forward.
+    _mockValidateLockOrBurn(amount, finality, "args", true, _defaultOutboundLane());
 
     vm.startPrank(s_allowedOnRamp);
-
     vm.expectCall(address(s_token), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount));
-
     vm.expectEmit();
     emit MultiTokenPool.LockedOrBurned(DEST_CHAIN_SELECTOR, address(s_token), s_allowedOnRamp, amount);
 
     (Pool.LockOrBurnOutV1 memory lockOrBurnOut, uint256 destTokenAmount) =
-      s_pool.lockOrBurn(lockOrBurnIn, FinalityCodec._encodeBlockDepth(5), "args");
+      s_pool.lockOrBurn(lockOrBurnIn, finality, "args");
 
     assertEq(destTokenAmount, amount);
-    assertEq(s_poolConfigManager.lastRequestedFinalityConfig(), FinalityCodec._encodeBlockDepth(5));
-    assertEq(s_poolConfigManager.lastTokenArgs(), "args");
     assertEq(lockOrBurnOut.destTokenAddress, abi.encode(s_remoteToken));
     assertEq(lockOrBurnOut.destPoolData, DEST_POOL_DATA);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
@@ -38,35 +36,33 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     uint256 amount = 20_000e18;
     uint256 feeAmount = amount / 20;
     deal(address(s_token), address(s_pool), amount);
-
     IPoolConfigManager.OutboundLane memory lane = _defaultOutboundLane();
     lane.feeAmount = feeAmount;
-    s_poolConfigManager.setOutboundLane(lane);
+    _mockValidateLockOrBurn(amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", true, lane);
 
     vm.startPrank(s_allowedOnRamp);
     vm.expectCall(address(s_token), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount - feeAmount));
     vm.expectEmit();
     emit MultiTokenPool.LockedOrBurned(DEST_CHAIN_SELECTOR, address(s_token), s_allowedOnRamp, amount - feeAmount);
+
     (, uint256 destTokenAmount) = s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
     assertEq(destTokenAmount, amount - feeAmount);
     // The pool keeps the fee and burns the rest.
     assertEq(s_token.balanceOf(address(s_pool)), feeAmount);
-    assertTrue(s_poolConfigManager.lastChargeTokenFee());
   }
 
   function test_lockOrBurn_LegacyPathChargesNoFee() public {
     uint256 amount = 20_000e18;
     deal(address(s_token), address(s_pool), amount);
+    // The legacy path asks for no token fee with default finality and no token args. Only this mock matches.
+    _mockValidateLockOrBurn(amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", false, _defaultOutboundLane());
 
-    // The default lane has a zero fee, which the pool config manager returns when chargeTokenFee is false.
     vm.startPrank(s_allowedOnRamp);
     vm.expectCall(address(s_token), abi.encodeWithSelector(bytes4(keccak256("burn(uint256)")), amount));
     Pool.LockOrBurnOutV1 memory lockOrBurnOut = s_pool.lockOrBurn(_lockOrBurnIn(amount));
 
     assertEq(lockOrBurnOut.destTokenAddress, abi.encode(s_remoteToken));
-    assertFalse(s_poolConfigManager.lastChargeTokenFee());
-    assertEq(s_poolConfigManager.lastRequestedFinalityConfig(), FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     // The full amount is burned and the pool keeps nothing.
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
@@ -76,14 +72,12 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     uint256 feeAmount = amount / 20;
     bytes4 finality = FinalityCodec._encodeBlockDepth(5);
     deal(address(s_token), address(s_pool), amount);
-
     address hook = makeAddr("hook");
     vm.etch(hook, bytes("fake bytecode"));
     IPoolConfigManager.OutboundLane memory lane = _defaultOutboundLane();
     lane.hook = hook;
     lane.feeAmount = feeAmount;
-    s_poolConfigManager.setOutboundLane(lane);
-
+    _mockValidateLockOrBurn(amount, finality, "args", true, lane);
     Pool.LockOrBurnInV1 memory lockOrBurnIn = _lockOrBurnIn(amount);
 
     vm.startPrank(s_allowedOnRamp);
@@ -93,6 +87,8 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     );
     s_pool.lockOrBurn(lockOrBurnIn, finality, "args");
   }
+
+  // Reverts
 
   function test_lockOrBurn_RevertWhen_CursedByRMN() public {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
@@ -111,7 +107,7 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
   function test_lockOrBurn_RevertWhen_UnsupportedLockOrBurnFlavor() public {
     IPoolConfigManager.OutboundLane memory lane = _defaultOutboundLane();
     lane.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Lock;
-    s_poolConfigManager.setOutboundLane(lane);
+    _mockValidateLockOrBurn(1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", true, lane);
 
     vm.startPrank(s_allowedOnRamp);
     vm.expectRevert(
