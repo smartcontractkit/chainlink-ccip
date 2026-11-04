@@ -26,12 +26,28 @@ contract PoolConfigManager_getSubsetTokens is PoolConfigManagerSetup {
     );
 
     (bool onlySubsetTokens, address[] memory subsetTokens) =
-      s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR);
+      s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, 0, type(uint64).max);
     assertTrue(onlySubsetTokens);
     assertEq(_getTokensBAndC(), subsetTokens);
 
-    (onlySubsetTokens, subsetTokens) = s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, DEST_CHAIN_SELECTOR);
+    (onlySubsetTokens, subsetTokens) =
+      s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, 0, type(uint64).max);
     assertFalse(onlySubsetTokens);
+    assertEq(0, subsetTokens.length);
+  }
+
+  function test_getSubsetTokens_Pagination() public {
+    s_poolConfigManager.applySubsetTokenUpdates(
+      new ConnectionPolicyStore.SubsetTokenArgs[](0), _getSubsetTokenArgs(_getTokensBAndC())
+    );
+
+    (bool onlySubsetTokens, address[] memory subsetTokens) =
+      s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, 1, 1);
+    assertTrue(onlySubsetTokens);
+    assertEq(_arrayOf(s_tokenC), subsetTokens);
+
+    (onlySubsetTokens, subsetTokens) = s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, 2, 1);
+    assertTrue(onlySubsetTokens);
     assertEq(0, subsetTokens.length);
   }
 

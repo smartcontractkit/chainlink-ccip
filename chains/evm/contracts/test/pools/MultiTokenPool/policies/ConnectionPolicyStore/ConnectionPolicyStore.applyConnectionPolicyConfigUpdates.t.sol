@@ -71,7 +71,7 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
 
     (bool onlySubsetTokens, address[] memory subsetTokens) =
-      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR);
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, 0, type(uint64).max);
     assertTrue(onlySubsetTokens);
     assertEq(_arrayOf(s_token), subsetTokens);
     assertTrue(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR))[0]);
@@ -115,13 +115,13 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
     );
 
     (bool onlySubsetTokens, address[] memory subsetTokens) =
-      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR);
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, 0, type(uint64).max);
     assertFalse(onlySubsetTokens);
     assertEq(0, subsetTokens.length);
 
     // Recreating the record must not restore its old subset list.
     _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
-    (, subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR);
+    (, subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, 0, type(uint64).max);
     assertEq(0, subsetTokens.length);
     assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR))[0]);
   }
@@ -162,7 +162,8 @@ contract ConnectionPolicyStore_applyConnectionPolicyConfigUpdates is ConnectionP
 
     (, ConnectionPolicyStore.ConnectionPolicyConfigArgs[] memory storedConfigs) = _getConnectionPolicyRecords();
     assertEq(abi.encode(policyConfigs), abi.encode(storedConfigs));
-    (, address[] memory subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR);
+    (, address[] memory subsetTokens) =
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, 0, type(uint64).max);
     assertEq(0, subsetTokens.length);
   }
 

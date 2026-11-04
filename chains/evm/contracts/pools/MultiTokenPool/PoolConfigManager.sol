@@ -175,6 +175,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // │                            Views                             │
   // ================================================================
 
+  // Batch getters do not need pages. Callers can split token and lane inputs into smaller batches.
+
   /// @inheritdoc IPoolConfigManager
   /// @dev Checks the requested finality before reading fees. Returns zero values for lanes that do not exist.
   function getFeeBatch(
@@ -186,7 +188,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     fees = i_feeStore.getFeeBatch(lanes, requestedFinalityConfig);
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
-        delete fees[i];
+        delete fees[i]; // Preserves lane indices and sets isEnabled = false to indicate no fee record.
       }
     }
     return fees;
@@ -322,14 +324,19 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // Forwarded views use the same parameter and return types as the store functions. Names are omitted because
   // _forwardView passes the call data and return data through unchanged. See each store function for return details.
 
-  /// @notice Returns the subset restriction and token list for a connection policy record.
+  /// @notice Returns the subset restriction and one page of tokens for a connection policy record.
   /// @dev See ConnectionPolicyStore.getSubsetTokens.
   function getSubsetTokens(
     bytes32, // policyName
-    uint64 // remoteChainSelector
+    uint64, // remoteChainSelector
+    uint64, // startIndex
+    uint64 // maxCount
   ) external view returns (bool, address[] memory) {
     _forwardView(address(i_connectionStore));
   }
+
+  // Policy and inline config getters do not use pages. Each policy or token is expected to cover a small
+  // number of chains. Remote pool and CCV lists per chain are also expected to be small.
 
   /// @notice Returns the token count, remote token address provider, and records of a connection policy.
   /// @dev See ConnectionPolicyStore.getConnectionPolicy.
@@ -430,7 +437,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @notice Returns the names of all policies, grouped by type.
-  /// @dev Includes policies with no assigned tokens or records.
+  /// @dev This getter does not use pages. Policies are expected to be shared by many tokens.
+  /// Use inline records for settings that apply to one token. This keeps the policy list small.
+  /// Includes policies with no assigned tokens or records.
   /// @return connectionPolicyNames The names of the connection policies.
   /// @return remotePoolPolicyNames The names of the remote pool policies.
   /// @return rateLimitPolicyNames The names of the rate limit policies.

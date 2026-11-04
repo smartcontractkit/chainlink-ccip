@@ -32,7 +32,7 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
     s_connectionStore.applySubsetTokenUpdates(new ConnectionPolicyStore.SubsetTokenArgs[](0), tokensToAdd);
 
     (bool onlySubsetTokens, address[] memory subsetTokens) =
-      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR);
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, 0, type(uint64).max);
     assertTrue(onlySubsetTokens);
     assertEq(2, subsetTokens.length);
     assertEq(s_token, subsetTokens[0]);
@@ -52,7 +52,8 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
       new ConnectionPolicyStore.SubsetTokenArgs[](0)
     );
 
-    (, address[] memory subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR);
+    (, address[] memory subsetTokens) =
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, 0, type(uint64).max);
     assertEq(0, subsetTokens.length);
     assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, SOURCE_CHAIN_SELECTOR))[0]);
   }
@@ -68,7 +69,8 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
     emit ConnectionPolicyStore.SubsetTokenAdded(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, s_token);
     s_connectionStore.applySubsetTokenUpdates(subsetTokenArgs, subsetTokenArgs);
 
-    (, address[] memory subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR);
+    (, address[] memory subsetTokens) =
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, 0, type(uint64).max);
     assertEq(_arrayOf(s_token), subsetTokens);
   }
 
@@ -84,7 +86,8 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
       new ConnectionPolicyStore.SubsetTokenArgs[](0)
     );
     _setTokenConnectionPolicy(s_token, bytes32(0));
-    (, address[] memory subsetTokens) = s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR);
+    (, address[] memory subsetTokens) =
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, SOURCE_CHAIN_SELECTOR, 0, type(uint64).max);
     assertEq(0, subsetTokens.length);
 
     // Rejoining must not restore the old subset membership.

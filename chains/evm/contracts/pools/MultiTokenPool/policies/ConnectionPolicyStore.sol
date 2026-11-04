@@ -927,17 +927,39 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (policy.tokenCount, s_remoteTokenAddressProviders[policyName], policyConfigs);
   }
 
-  /// @notice Returns the subset restriction and token list for a connection policy on a remote chain.
+  /// @notice Returns the subset restriction and one page of tokens for a connection policy on a remote chain.
+  /// @dev Subset lists can grow with the token count, so this getter uses pages.
+  /// Removing a token can change the order. Query pages at the same block to avoid skipping tokens.
   /// @param policyName The connection policy.
   /// @param remoteChainSelector The chain of the policy record.
-  /// @return onlySubsetTokens Whether the policy restricts this chain to subsetTokens. False if no record exists.
-  /// @return subsetTokens The token list used when onlySubsetTokens is true. Retained but ignored when false.
+  /// @param startIndex The position of the first token to return.
+  /// @param maxCount The maximum number of tokens to return.
+  /// @return onlySubsetTokens Whether the policy restricts this chain to its subset list. False if no record exists.
+  /// @return subsetTokens Up to maxCount subset tokens starting at startIndex. Retained but ignored when
+  /// onlySubsetTokens is false.
   function getSubsetTokens(
     bytes32 policyName,
-    uint64 remoteChainSelector
+    uint64 remoteChainSelector,
+    uint64 startIndex,
+    uint64 maxCount
   ) external view returns (bool onlySubsetTokens, address[] memory subsetTokens) {
     ConnectionPolicyRecord storage policyRecord = s_policyConnectionRecords[policyName][remoteChainSelector];
-    return (policyRecord.onlySubsetTokens, policyRecord.subsetTokens.values());
+    onlySubsetTokens = policyRecord.onlySubsetTokens;
+    uint256 length = policyRecord.subsetTokens.length();
+    if (startIndex >= length) {
+      return (onlySubsetTokens, subsetTokens);
+    }
+
+    uint256 count = maxCount;
+    if (count + startIndex > length) {
+      count = length - startIndex;
+    }
+
+    subsetTokens = new address[](count);
+    for (uint256 i = 0; i < count; ++i) {
+      subsetTokens[i] = policyRecord.subsetTokens.at(startIndex + i);
+    }
+    return (onlySubsetTokens, subsetTokens);
   }
 
   /// @notice Returns the token count and the records of a remote pool policy.
