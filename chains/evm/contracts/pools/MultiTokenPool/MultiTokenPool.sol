@@ -20,7 +20,7 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 /// @notice Base abstract class with common functions for all multi-token pools. A multi-token pool serves as isolated
 /// place for holding many tokens and token specific logic that may execute as tokens move across the bridge. All token
 /// and lane config lives in the pool config manager, which the pool calls through IPoolConfigManager.
-/// @dev The pool runs the checks that a pool config manager cannot skip: the RMN curse, the ramp caller and the lock or
+/// @dev The pool runs the checks that a pool config manager cannot skip: the RMN curse, the ramp caller, and the lock or
 /// burn flavor. The pool config manager resolves the lane. It builds and checks the pool data, which includes the
 /// source token and the additional pool data. It also charges the token fee and consumes the rate limits.
 /// @dev This pool supports different decimals on different chains but using this feature could impact the total number
@@ -41,6 +41,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   error CallerIsNotARampOnRouter(address caller);
   error CallerIsNotPoolConfigManager(address caller);
   error UnsupportedLockOrBurnFlavor(address token, IPoolConfigManager.LockOrBurnFlavor flavor);
+  error LaneFeeNotFound(address localToken, uint64 destChainSelector);
 
   event LockedOrBurned(uint64 indexed remoteChainSelector, address indexed token, address sender, uint256 amount);
   event ReleasedOrMinted(
@@ -150,7 +151,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   /// @notice Validates the lock or burn input, then locks or burns the amount after the token fee. Validates
   /// - RMN curse status
   /// - if the sender is a valid onRamp
-  /// - the token, lane, pause, finality, token fee and rate limits, in the pool config manager
+  /// - the token, lane, pause, finality, token fee, and rate limits, in the pool config manager
   /// - if the pool serves the flavor of the token
   /// - preflight checks hook (if configured)
   /// @dev These checks are essential security checks. An override that skips one would allow for various exploits.
@@ -228,7 +229,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   /// @dev Validates the release or mint input for correctness on
   /// - RMN curse status
   /// - if the sender is a valid offRamp
-  /// - the token, lane, pause, source pool, source pool data and rate limits, in the pool config manager
+  /// - the token, lane, pause, source pool, source pool data, and rate limits, in the pool config manager
   /// - if the pool serves the flavor of the token
   /// - postflight checks hook (if configured)
   /// These checks are essential security checks. An override that skips one would allow for various exploits.
@@ -421,8 +422,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev Reverts if the token profile does not allow the requested finality. If the fee config is disabled, returns
-  /// zeros with isEnabled false to signal the OnRamp to use FeeQuoter defaults.
+  /// @dev Reverts if the requested finality is not allowed or the lane has no fee configuration. This prevents the
+  /// OnRamp from falling back to FeeQuoter's token transfer fees.
   function getFee(
     address localToken,
     uint64 destChainSelector,
@@ -438,6 +439,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   {
     IPoolConfigManager.LaneFee memory fee =
       s_poolConfigManager.getFeeBatch(_laneKeys(localToken, destChainSelector), requestedFinalityConfig)[0];
+    if (!fee.isEnabled) revert LaneFeeNotFound(localToken, destChainSelector);
     return (fee.feeUSDCents, fee.destGasOverhead, fee.destBytesOverhead, fee.tokenFeeBps, fee.isEnabled);
   }
 

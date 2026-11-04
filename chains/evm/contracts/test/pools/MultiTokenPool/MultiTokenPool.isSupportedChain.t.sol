@@ -15,7 +15,7 @@ contract MultiTokenPool_isSupportedChain is MultiTokenPoolSetup {
     IPoolConfigManager.LaneConnection memory connection = _defaultLaneConnection();
     connection.hasConnection = false;
     connection.remoteToken = "";
-    s_poolConfigManager.setLaneConnection(connection);
+    _mockLaneConnection(connection);
 
     assertFalse(s_pool.isSupportedChain(address(s_token), DEST_CHAIN_SELECTOR));
   }

@@ -12,7 +12,7 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
   function test_lockOrBurn_BurnFrom() public {
     uint256 amount = 20_000e18;
     deal(address(s_token), address(s_pool), amount);
-    _setFlavor(IPoolConfigManager.LockOrBurnFlavor.BurnFrom, address(0));
+    _mockFlavor(amount, IPoolConfigManager.LockOrBurnFlavor.BurnFrom, address(0));
 
     vm.startPrank(s_allowedOnRamp);
     vm.expectCall(
@@ -20,7 +20,7 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     );
     s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
-    // The pool approved itself for the maximum on first need.
+    // The first transfer sets the maximum allowance for the pool.
     assertEq(s_token.allowance(address(s_pool), address(s_pool)), type(uint256).max);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
@@ -28,7 +28,7 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
   function test_lockOrBurn_BurnWithFrom() public {
     uint256 amount = 20_000e18;
     deal(address(s_token), address(s_pool), amount);
-    _setFlavor(IPoolConfigManager.LockOrBurnFlavor.BurnWithFrom, address(0));
+    _mockFlavor(amount, IPoolConfigManager.LockOrBurnFlavor.BurnWithFrom, address(0));
 
     vm.startPrank(s_allowedOnRamp);
     vm.expectCall(
@@ -44,23 +44,24 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     uint256 amount = 20_000e18;
     address burnAddress = makeAddr("burnAddress");
     deal(address(s_token), address(s_pool), amount);
-    _setFlavor(IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, burnAddress);
+    _mockFlavor(amount, IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, burnAddress);
 
     vm.startPrank(s_allowedOnRamp);
     s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
 
-    // The tokens moved to an address that can never move them, they are not burned.
+    // The tokens are sent to the configured burn address without reducing the total supply.
     assertEq(s_token.balanceOf(burnAddress), amount);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
 
-  function _setFlavor(
+  function _mockFlavor(
+    uint256 amount,
     IPoolConfigManager.LockOrBurnFlavor flavor,
     address lockOrBurnAddress
   ) internal {
     IPoolConfigManager.OutboundLane memory lane = _defaultOutboundLane();
     lane.lockOrBurnFlavor = flavor;
     lane.lockOrBurnAddress = lockOrBurnAddress;
-    s_poolConfigManager.setOutboundLane(lane);
+    _mockValidateLockOrBurn(amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "", true, lane);
   }
 }

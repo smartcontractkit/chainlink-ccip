@@ -7,15 +7,15 @@ import {ITypeAndVersion} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../../libraries/PolicyConfig.sol";
+import {Pool} from "../../../libraries/Pool.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/EnumerableSet.sol";
 
 /// @notice Stores the FeePolicy and the DestinationOverheadPolicy for a PoolConfigManager.
 /// @dev Only authorized pool config managers write to this store.
-/// A fee record holds the USD fees and the token fees to be charged at lockOrBurn. A disabled fee record makes the
-/// OnRamp use the FeeQuoter. A destination overhead record holds the gas and the bytes needed for releaseOrMint on the
-/// destination chain.
+/// Fee records define the USD and token fees charged for outbound transfers. Zero fees are valid. Destination
+/// overhead records define the gas and pool data overheads charged for execution on the destination chain.
 contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -33,17 +33,22 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   error TokenHasConfig(address localToken);
   error FeeRecordNotFound(address localToken, uint64 remoteChainSelector);
   error DestOverheadRecordNotFound(address localToken, uint64 remoteChainSelector);
+  error PoolDataTooLarge(
+    address localToken, uint64 remoteChainSelector, uint256 destPoolDataLength, uint32 destBytesOverhead
+  );
 
   event InlineFeeConfigSet(address indexed localToken, uint64 indexed remoteChainSelector, FeeConfig feeConfig);
   event InlineFeeConfigRemoved(address indexed localToken, uint64 indexed remoteChainSelector);
   event FeePolicyConfigSet(bytes32 indexed policyName, uint64 indexed remoteChainSelector, FeeConfig feeConfig);
   event FeePolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
   event FeePolicyRemoved(bytes32 indexed policyName);
-  /// @dev A set of a new token also registers it.
+  /// @dev Setting a profile for a new token also registers it.
   event TokenProfileSet(address indexed localToken);
   event TokenRemoved(address indexed localToken);
-  event TokenFeePolicySet(address indexed localToken, bytes32 indexed policyName);
-  event TokenDestOverheadPolicySet(address indexed localToken, bytes32 indexed policyName);
+  event TokenFeePolicySet(address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName);
+  event TokenDestOverheadPolicySet(
+    address indexed localToken, bytes32 indexed oldPolicyName, bytes32 indexed newPolicyName
+  );
   event InlineDestOverheadConfigSet(
     address indexed localToken, uint64 indexed remoteChainSelector, DestOverheadConfig destOverheadConfig
   );
@@ -59,14 +64,13 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint32 finalityFeeUSDCents; // ───────╮ Fee for a transfer with default finality, in multiples of 0.01 USD.
     uint32 fastFinalityFeeUSDCents; //    │ Fee for an FTF transfer, in multiples of 0.01 USD.
     uint16 finalityTransferFeeBps; //     │ Token fee for a transfer with default finality, in basis points.
-    uint16 fastFinalityTransferFeeBps; // │ Token fee for an FTF transfer, in basis points.
-    bool isEnabled; // ───────────────────╯ False makes the OnRamp use the FeeQuoter.
+    uint16 fastFinalityTransferFeeBps; // ╯ Token fee for an FTF transfer, in basis points.
   }
 
   /// @dev The values of a dest overhead record.
   struct DestOverheadConfig {
     uint32 destGasOverhead; // ──╮ Gas for releaseOrMint on the destination chain. Not zero.
-    uint32 destBytesOverhead; // ╯ Data availability bytes of the pool data. At least 192.
+    uint32 destBytesOverhead; // ╯ Bytes charged for data availability and maximum pool data length. At least 32.
   }
 
   /// @dev FeeConfig with its policy record key.
@@ -105,12 +109,6 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev The division factor for bps. Each bps fee must be below it.
   uint256 private constant BPS_DIVIDER = 10_000;
-  /// @dev Minimum ABI pool data size:
-  /// 32 bytes for token decimals.
-  /// 64 bytes for offsets to the source token and additional data.
-  /// 64 bytes for the source token length and encoded EVM address.
-  /// 32 bytes for the length of empty additional data.
-  uint32 private constant MIN_DEST_BYTES_OVERHEAD = 192;
 
   /// @dev Each store keeps its own list of registered tokens, as the stores never call each other.
   EnumerableSet.AddressSet private s_tokens;
@@ -156,23 +154,30 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                         Transfer fee                         │
   // ================================================================
 
-  /// @notice Returns the token fee of a lockOrBurn.
-  /// @dev Reverts if the token has no fee record or no dest overhead record for the chain.
+  /// @notice Validates the outbound fee configuration and pool data length. Returns the token fee.
+  /// @dev Requires both fee and destination overhead records. Pool data must fit within destBytesOverhead, including
+  /// on the V1 path where no token fee is charged.
   /// @param localToken The local token.
   /// @param remoteChainSelector The destination chain.
-  /// @param amount The amount before the token fee.
+  /// @param amount The transfer amount before deducting the token fee.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
   /// @param chargeTokenFee False for the V1 path, which charges no token fee.
-  /// @return feeAmount The token fee in local token units. Zero if the fee record is disabled.
-  function resolveTokenFee(
+  /// @param destPoolDataLength The length in bytes of the pool data returned by lockOrBurn.
+  /// @return feeAmount The token fee in local token units. Zero if chargeTokenFee is false.
+  function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
     uint256 amount,
     bytes4 requestedFinalityConfig,
-    bool chargeTokenFee
+    bool chargeTokenFee,
+    uint256 destPoolDataLength
   ) external view returns (uint256 feeAmount) {
-    FeeConfig storage feeConfig = _getLaneFeeConfig(localToken, remoteChainSelector);
-    if (!chargeTokenFee || !feeConfig.isEnabled) {
+    (FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
+      _getLaneRecords(localToken, remoteChainSelector);
+    if (destPoolDataLength > destOverheadConfig.destBytesOverhead) {
+      revert PoolDataTooLarge(localToken, remoteChainSelector, destPoolDataLength, destOverheadConfig.destBytesOverhead);
+    }
+    if (!chargeTokenFee) {
       return 0;
     }
 
@@ -182,20 +187,20 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (amount * feeConfig.finalityTransferFeeBps) / BPS_DIVIDER;
   }
 
-  /// @dev Returns the fee record. Reverts if the fee record or the dest overhead record is missing.
-  function _getLaneFeeConfig(
+  /// @dev Returns the fee and destination overhead records. Reverts if either is missing.
+  function _getLaneRecords(
     address localToken,
     uint64 remoteChainSelector
-  ) private view returns (FeeConfig storage feeConfig) {
+  ) private view returns (FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) {
     PolicyConfig.RecordLevel level;
 
     (level, feeConfig) = _resolveFeeConfig(localToken, remoteChainSelector);
     if (level == PolicyConfig.RecordLevel.None) revert FeeRecordNotFound(localToken, remoteChainSelector);
 
-    (level,) = _resolveDestOverheadConfig(localToken, remoteChainSelector);
+    (level, destOverheadConfig) = _resolveDestOverheadConfig(localToken, remoteChainSelector);
     if (level == PolicyConfig.RecordLevel.None) revert DestOverheadRecordNotFound(localToken, remoteChainSelector);
 
-    return feeConfig;
+    return (feeConfig, destOverheadConfig);
   }
 
   /// @dev Returns the fee record of the token for the chain, and its level. An inline record overrides the policy. For
@@ -250,11 +255,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // ================================================================
 
   /// @notice Returns the fee of each lane for the requested finality.
-  /// @dev Does not check that the lane exists. The PoolConfigManager zeros a lane that does not exist.
+  /// @dev Does not check whether a connection exists. The PoolConfigManager clears results for missing lanes.
   /// @param lanes The lanes to query.
   /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees The fee per lane, aligned with lanes by index. Zero with isEnabled false for a lane that has no
-  /// enabled fee record or has no dest overhead record.
+  /// @return fees Fee parameters in the same order as lanes. Returns zero values with isEnabled false if either the
+  /// fee or destination overhead record is missing.
   function getFeeBatch(
     IPoolConfigManager.LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -263,9 +268,9 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     fees = new IPoolConfigManager.LaneFee[](lanes.length);
 
     for (uint256 i = 0; i < lanes.length; ++i) {
-      (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
-        _resolveEnabledFee(lanes[i]);
-      if (!isEnabled) continue;
+      (bool hasRecords, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
+        _resolveLaneRecords(lanes[i]);
+      if (!hasRecords) continue;
 
       fees[i] = IPoolConfigManager.LaneFee({
         feeUSDCents: isFastFinality ? feeConfig.fastFinalityFeeUSDCents : feeConfig.finalityFeeUSDCents,
@@ -279,19 +284,19 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Returns the fee config of each lane, for IPoolConfigManager.getTokenTransferFeeConfigBatch.
-  /// @dev Does not check that the lane exists. The PoolConfigManager zeros a lane that does not exist.
+  /// @dev Does not check whether a connection exists. The PoolConfigManager clears results for missing lanes.
   /// @param lanes The lanes to query.
-  /// @return feeConfigs The fee config per lane, aligned with lanes by index. A disabled zero config for a lane that
-  /// has no enabled fee record or has no dest overhead record.
+  /// @return feeConfigs Fee configurations in the same order as lanes. Returns zero values with isEnabled false if
+  /// either the fee or destination overhead record is missing.
   function getTokenTransferFeeConfigBatch(
     IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs) {
     feeConfigs = new IPoolV2.TokenTransferFeeConfig[](lanes.length);
 
     for (uint256 i = 0; i < lanes.length; ++i) {
-      (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
-        _resolveEnabledFee(lanes[i]);
-      if (!isEnabled) continue;
+      (bool hasRecords, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
+        _resolveLaneRecords(lanes[i]);
+      if (!hasRecords) continue;
 
       feeConfigs[i] = IPoolV2.TokenTransferFeeConfig({
         destGasOverhead: destOverheadConfig.destGasOverhead,
@@ -314,7 +319,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     address localToken,
     uint64 remoteChainSelector
   ) external view {
-    _getLaneFeeConfig(localToken, remoteChainSelector);
+    _getLaneRecords(localToken, remoteChainSelector);
   }
 
   /// @notice Returns the record levels that each lane would use, also for a lane that does not exist yet.
@@ -340,19 +345,18 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (feeLevels, destOverheadLevels);
   }
 
-  /// @dev Returns both records, and whether the lane has an enabled fee record and a dest overhead record.
-  function _resolveEnabledFee(
+  /// @dev Returns the fee and destination overhead records, and whether both exist.
+  function _resolveLaneRecords(
     IPoolConfigManager.LaneKey calldata lane
-  ) private view returns (bool isEnabled, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) {
+  ) private view returns (bool hasRecords, FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) {
     PolicyConfig.RecordLevel feeLevel;
     (feeLevel, feeConfig) = _resolveFeeConfig(lane.localToken, lane.remoteChainSelector);
 
     PolicyConfig.RecordLevel destOverheadLevel;
     (destOverheadLevel, destOverheadConfig) = _resolveDestOverheadConfig(lane.localToken, lane.remoteChainSelector);
 
-    isEnabled = feeLevel != PolicyConfig.RecordLevel.None && feeConfig.isEnabled
-      && destOverheadLevel != PolicyConfig.RecordLevel.None;
-    return (isEnabled, feeConfig, destOverheadConfig);
+    hasRecords = feeLevel != PolicyConfig.RecordLevel.None && destOverheadLevel != PolicyConfig.RecordLevel.None;
+    return (hasRecords, feeConfig, destOverheadConfig);
   }
 
   // ================================================================
@@ -535,10 +539,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
+      bytes32 oldPolicyName = tokenState.feePolicyName;
 
-      PolicyConfig._moveToken(s_feePolicies, tokenState.feePolicyName, policyName);
+      PolicyConfig._moveToken(s_feePolicies, oldPolicyName, policyName);
       tokenState.feePolicyName = policyName;
-      emit TokenFeePolicySet(localToken, policyName);
+      emit TokenFeePolicySet(localToken, oldPolicyName, policyName);
     }
   }
 
@@ -554,10 +559,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
       TokenState storage tokenState = s_tokenStates[localToken];
+      bytes32 oldPolicyName = tokenState.destOverheadPolicyName;
 
-      PolicyConfig._moveToken(s_destOverheadPolicies, tokenState.destOverheadPolicyName, policyName);
+      PolicyConfig._moveToken(s_destOverheadPolicies, oldPolicyName, policyName);
       tokenState.destOverheadPolicyName = policyName;
-      emit TokenDestOverheadPolicySet(localToken, policyName);
+      emit TokenDestOverheadPolicySet(localToken, oldPolicyName, policyName);
     }
   }
 
@@ -633,15 +639,10 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev Each bps fee must be below BPS_DIVIDER, the same as TokenPool. A disabled config must be all zero, so no fee
-  /// value stays hidden in storage.
+  /// @dev Token fees must be less than 100% of the transfer amount, as in TokenPool.
   function _isValidFeeConfig(
     FeeConfig calldata feeConfig
   ) private pure returns (bool) {
-    if (!feeConfig.isEnabled) {
-      return feeConfig.finalityFeeUSDCents == 0 && feeConfig.fastFinalityFeeUSDCents == 0
-        && feeConfig.finalityTransferFeeBps == 0 && feeConfig.fastFinalityTransferFeeBps == 0;
-    }
     return feeConfig.finalityTransferFeeBps < BPS_DIVIDER && feeConfig.fastFinalityTransferFeeBps < BPS_DIVIDER;
   }
 
@@ -722,11 +723,12 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev The gas overhead must be non-zero, the same as TokenPool. The bytes overhead must be at least
-  /// MIN_DEST_BYTES_OVERHEAD.
+  /// @dev Requires nonzero gas overhead and enough bytes for legacy pool data, matching TokenPool and FeeQuoter.
+  /// Larger payloads require a higher destBytesOverhead; validateLockOrBurn checks the actual length.
   function _isValidDestOverheadConfig(
     DestOverheadConfig calldata destOverheadConfig
   ) private pure returns (bool) {
-    return destOverheadConfig.destGasOverhead != 0 && destOverheadConfig.destBytesOverhead >= MIN_DEST_BYTES_OVERHEAD;
+    return destOverheadConfig.destGasOverhead != 0
+      && destOverheadConfig.destBytesOverhead >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
   }
 }

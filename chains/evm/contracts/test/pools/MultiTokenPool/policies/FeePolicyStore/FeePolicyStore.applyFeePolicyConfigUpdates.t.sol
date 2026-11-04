@@ -66,17 +66,15 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
   }
 
   function test_applyFeePolicyConfigUpdates_BoundaryValues() public {
-    // A disabled record with zero in every field, and an enabled record with the highest fees.
-    FeePolicyStore.FeeConfig memory disabledFeeConfig;
+    FeePolicyStore.FeeConfig memory zeroFeeConfig;
     FeePolicyStore.FeeConfig memory maxFeeConfig = FeePolicyStore.FeeConfig({
       finalityFeeUSDCents: type(uint32).max,
       fastFinalityFeeUSDCents: type(uint32).max,
       finalityTransferFeeBps: uint16(BPS_DIVIDER - 1),
-      fastFinalityTransferFeeBps: uint16(BPS_DIVIDER - 1),
-      isEnabled: true
+      fastFinalityTransferFeeBps: uint16(BPS_DIVIDER - 1)
     });
     FeePolicyStore.FeePolicyConfigArgs[] memory policyConfigs = new FeePolicyStore.FeePolicyConfigArgs[](2);
-    policyConfigs[0] = _getFeePolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, disabledFeeConfig)[0];
+    policyConfigs[0] = _getFeePolicyConfigArgs(OTHER_POLICY, DEST_CHAIN_SELECTOR, zeroFeeConfig)[0];
     policyConfigs[1] = _getFeePolicyConfigArgs(OTHER_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, maxFeeConfig)[0];
 
     s_feeStore.applyFeePolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), policyConfigs);
@@ -129,7 +127,7 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(feeLevels[0]));
 
     vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
-    s_feeStore.resolveTokenFee(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true);
+    s_feeStore.validateLockOrBurn(s_token, DEST_CHAIN_SELECTOR, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, true, 0);
     vm.expectRevert(abi.encodeWithSelector(FeePolicyStore.FeeRecordNotFound.selector, s_token, DEST_CHAIN_SELECTOR));
     s_feeStore.checkLaneRecords(s_token, DEST_CHAIN_SELECTOR);
   }
@@ -181,16 +179,12 @@ contract FeePolicyStore_applyFeePolicyConfigUpdates is FeePolicyStoreSetup {
   // Reverts
 
   function test_applyFeePolicyConfigUpdates_RevertWhen_InvalidFeePolicyConfig() public {
-    // Four disabled configs with one non-zero field each, and two bps fees at BPS_DIVIDER.
-    FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](6);
-    invalidFeeConfigs[0].finalityFeeUSDCents = 1;
-    invalidFeeConfigs[1].fastFinalityFeeUSDCents = 1;
-    invalidFeeConfigs[2].finalityTransferFeeBps = 1;
-    invalidFeeConfigs[3].fastFinalityTransferFeeBps = 1;
-    invalidFeeConfigs[4] = _getFeeConfig();
-    invalidFeeConfigs[4].finalityTransferFeeBps = uint16(BPS_DIVIDER);
-    invalidFeeConfigs[5] = _getFeeConfig();
-    invalidFeeConfigs[5].fastFinalityTransferFeeBps = uint16(BPS_DIVIDER);
+    // Neither finality class may charge 100% of the transferred tokens.
+    FeePolicyStore.FeeConfig[] memory invalidFeeConfigs = new FeePolicyStore.FeeConfig[](2);
+    invalidFeeConfigs[0] = _getFeeConfig();
+    invalidFeeConfigs[0].finalityTransferFeeBps = uint16(BPS_DIVIDER);
+    invalidFeeConfigs[1] = _getFeeConfig();
+    invalidFeeConfigs[1].fastFinalityTransferFeeBps = uint16(BPS_DIVIDER);
 
     for (uint256 i = 0; i < invalidFeeConfigs.length; ++i) {
       FeePolicyStore.FeePolicyConfigArgs[] memory policyConfigs =

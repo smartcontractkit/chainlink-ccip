@@ -35,15 +35,15 @@ contract FeePolicyStore_getTokenTransferFeeConfigBatch is FeePolicyStoreSetup {
     );
   }
 
-  function test_getTokenTransferFeeConfigBatch_DisabledFeeRecord() public {
-    FeePolicyStore.FeeConfig memory disabledFeeRecord;
-    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, disabledFeeRecord));
+  function test_getTokenTransferFeeConfigBatch_ZeroFees() public {
+    FeePolicyStore.FeeConfig memory zeroFeeConfig;
+    _setFeePolicyConfig(_getFeePolicyConfigArgs(FEE_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, zeroFeeConfig));
 
     IPoolV2.TokenTransferFeeConfig[] memory feeConfigs =
       s_feeStore.getTokenTransferFeeConfigBatch(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR));
 
-    IPoolV2.TokenTransferFeeConfig memory disabledFeeConfig;
-    assertEq(abi.encode(disabledFeeConfig), abi.encode(feeConfigs[0]));
+    // Zero fees do not disable the lane or remove its destination overheads.
+    assertEq(abi.encode(_getTokenTransferFeeConfig(zeroFeeConfig, _getDestOverheadConfig())), abi.encode(feeConfigs[0]));
   }
 
   function test_getTokenTransferFeeConfigBatch_NoFeeRecord() public {

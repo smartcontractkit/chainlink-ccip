@@ -4,18 +4,22 @@ pragma solidity ^0.8.24;
 import {IPoolConfigManager} from "../../../interfaces/IPoolConfigManager.sol";
 
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
+import {MultiTokenPool} from "../../../pools/MultiTokenPool/MultiTokenPool.sol";
 import {MultiTokenPoolSetup} from "./MultiTokenPoolSetup.t.sol";
 
 contract MultiTokenPool_getFee is MultiTokenPoolSetup {
   function test_getFee() public {
-    s_poolConfigManager.setLaneFee(
+    // The mock matches only the lane and the requested finality that the pool must forward.
+    bytes4 finality = FinalityCodec._encodeBlockDepth(5);
+    _mockLaneFee(
+      finality,
       IPoolConfigManager.LaneFee({
         feeUSDCents: 100, destGasOverhead: 200_000, destBytesOverhead: 256, tokenFeeBps: 10, isEnabled: true
       })
     );
 
     (uint256 feeUSDCents, uint32 destGasOverhead, uint32 destBytesOverhead, uint16 tokenFeeBps, bool isEnabled) =
-      s_pool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), bytes4(0), "");
+      s_pool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), finality, "");
 
     assertEq(feeUSDCents, 100);
     assertEq(destGasOverhead, 200_000);
@@ -24,20 +28,29 @@ contract MultiTokenPool_getFee is MultiTokenPoolSetup {
     assertTrue(isEnabled);
   }
 
-  /// @notice The pool passes the requested finality to the pool config manager, which uses it to pick the fast finality
-  /// fee.
-  function test_getFee_ForwardsRequestedFinality() public {
-    s_poolConfigManager.setLaneFee(
-      IPoolConfigManager.LaneFee({
-        feeUSDCents: 100, destGasOverhead: 200_000, destBytesOverhead: 256, tokenFeeBps: 10, isEnabled: true
-      })
+  // Reverts
+
+  /// @notice Missing fee configuration must revert instead of requesting FeeQuoter's token transfer fees.
+  function test_getFee_RevertWhen_LaneFeeNotFound() public {
+    IPoolConfigManager.LaneFee memory noFee;
+    _mockLaneFee(FinalityCodec.WAIT_FOR_FINALITY_FLAG, noFee);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(MultiTokenPool.LaneFeeNotFound.selector, address(s_token), DEST_CHAIN_SELECTOR)
     );
+    s_pool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
+  }
 
-    bytes4 finality = FinalityCodec._encodeBlockDepth(5);
-    IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](1);
-    lanes[0] = IPoolConfigManager.LaneKey({localToken: address(s_token), remoteChainSelector: DEST_CHAIN_SELECTOR});
-    vm.expectCall(address(s_poolConfigManager), abi.encodeCall(IPoolConfigManager.getFeeBatch, (lanes, finality)), 1);
-
-    s_pool.getFee(address(s_token), DEST_CHAIN_SELECTOR, 1e18, address(0), finality, "");
+  function _mockLaneFee(
+    bytes4 requestedFinalityConfig,
+    IPoolConfigManager.LaneFee memory fee
+  ) internal {
+    IPoolConfigManager.LaneFee[] memory fees = new IPoolConfigManager.LaneFee[](1);
+    fees[0] = fee;
+    vm.mockCall(
+      s_poolConfigManager,
+      abi.encodeCall(IPoolConfigManager.getFeeBatch, (_laneKeys(), requestedFinalityConfig)),
+      abi.encode(fees)
+    );
   }
 }
