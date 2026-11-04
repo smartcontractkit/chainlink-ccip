@@ -409,19 +409,13 @@ func TestDeployChainContracts_Apply_PerChainDeployFlagsAreUsed(t *testing.T) {
 type capturingDeployAdapter struct {
 	buildInputsByChain  map[uint64]adapters.BuildDeployContractParamsInput
 	deployInputsByChain map[uint64]adapters.DeployChainContractsInput
-	resolveErrByChain   map[uint64]error
-	resolvedChains      []uint64
 }
 
 func (c *capturingDeployAdapter) GetDefaultDeployContractParams(_ uint64) adapters.DeployContractParams {
 	return adapters.DeployContractParams{}
 }
 
-func (c *capturingDeployAdapter) ResolveDeployAddresses(_ deployment.Environment, sel uint64) (adapters.DeployChainResolvedAddresses, error) {
-	c.resolvedChains = append(c.resolvedChains, sel)
-	if err, ok := c.resolveErrByChain[sel]; ok {
-		return adapters.DeployChainResolvedAddresses{}, err
-	}
+func (c *capturingDeployAdapter) ResolveDeployAddresses(_ deployment.Environment, _ uint64) (adapters.DeployChainResolvedAddresses, error) {
 	return adapters.DeployChainResolvedAddresses{DeployerContract: "0x0000000000000000000000000000000000001234"}, nil
 }
 
@@ -444,57 +438,6 @@ func (c *capturingDeployAdapter) DeployChainContracts() *cldf_ops.Sequence[adapt
 			return adapters.DeployChainContractsOutput{}, nil
 		},
 	)
-}
-
-func TestDeployChainContracts_Apply_ResolveErrorStopsBeforeAnyDeployment(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-	sel2 := chainsel.TEST_90000002.Selector
-	env := newDeployTestEnv(t, []uint64{sel1, sel2})
-
-	captureAdapter := &capturingDeployAdapter{
-		buildInputsByChain:  make(map[uint64]adapters.BuildDeployContractParamsInput),
-		deployInputsByChain: make(map[uint64]adapters.DeployChainContractsInput),
-		resolveErrByChain:   map[uint64]error{sel2: fmt.Errorf("no CREATE2Factory")},
-	}
-	registry := adapters.NewDeployChainContractsRegistry()
-	registry.Register(chainsel.FamilyEVM, captureAdapter)
-
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
-	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-		MCMS: mcms.Input{},
-		Cfg:  newDeployChainContractsCfg(sel1, sel2),
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no CREATE2Factory")
-	assert.Empty(t, captureAdapter.deployInputsByChain, "no chain must be deployed when the resolution of one chain fails")
-}
-
-func TestDeployChainContracts_Apply_DeployerContractOverrideSkipsResolve(t *testing.T) {
-	sel1 := chainsel.TEST_90000001.Selector
-	env := newDeployTestEnv(t, []uint64{sel1})
-
-	captureAdapter := &capturingDeployAdapter{
-		buildInputsByChain:  make(map[uint64]adapters.BuildDeployContractParamsInput),
-		deployInputsByChain: make(map[uint64]adapters.DeployChainContractsInput),
-		resolveErrByChain:   map[uint64]error{sel1: fmt.Errorf("no CREATE2Factory")},
-	}
-	registry := adapters.NewDeployChainContractsRegistry()
-	registry.Register(chainsel.FamilyEVM, captureAdapter)
-
-	override := "0x0000000000000000000000000000000000005678"
-	cfg := newDeployChainContractsCfg(sel1)
-	cfg.ChainOverrides = map[uint64]changesets.DeployChainContractsPerChainCfg{
-		sel1: {DeployerContract: &override, DeployerKeyOwned: true},
-	}
-
-	cs := changesets.DeployChainContracts(registry, newTestChainFamilyRegistry())
-	_, err := cs.Apply(env, cs_core.WithMCMS[changesets.DeployChainContractsCfg]{
-		MCMS: mcms.Input{},
-		Cfg:  cfg,
-	})
-	require.NoError(t, err)
-	assert.Empty(t, captureAdapter.resolvedChains)
-	assert.Equal(t, override, captureAdapter.deployInputsByChain[sel1].DeployerContract)
 }
 
 func TestDeployChainContracts_Apply_AdapterErrorPropagated(t *testing.T) {

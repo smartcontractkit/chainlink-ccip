@@ -95,26 +95,6 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry, chain
 		var allReports []operations.Report[any, any]
 		var allBatchOps []mcmstypes.BatchOperation
 
-		// Resolve the deploy addresses for all chains before the first deployment.
-		// A chain that does not have its prerequisite contracts stops the changeset
-		// before it sends transactions to any chain.
-		resolvedByChain := make(map[uint64]adapters.DeployChainResolvedAddresses, len(cfg.Cfg.ChainSelectors))
-		for _, sel := range cfg.Cfg.ChainSelectors {
-			if cfg.Cfg.resolvePerChainCfg(sel).DeployerContract != nil {
-				resolvedByChain[sel] = adapters.DeployChainResolvedAddresses{}
-				continue
-			}
-			adapter, err := registry.GetByChain(sel)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deploy adapter for chain %d: %w", sel, err)
-			}
-			resolved, resolveErr := adapter.ResolveDeployAddresses(e, sel)
-			if resolveErr != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve deploy addresses on chain %d: %w", sel, resolveErr)
-			}
-			resolvedByChain[sel] = resolved
-		}
-
 		for _, sel := range cfg.Cfg.ChainSelectors {
 			adapter, err := registry.GetByChain(sel)
 			if err != nil {
@@ -131,7 +111,10 @@ func DeployChainContracts(registry *adapters.DeployChainContractsRegistry, chain
 
 			perChainCfg := cfg.Cfg.resolvePerChainCfg(sel)
 
-			resolved := resolvedByChain[sel]
+			resolved, resolveErr := adapter.ResolveDeployAddresses(e, sel)
+			if resolveErr != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to resolve deploy addresses on chain %d: %w", sel, resolveErr)
+			}
 
 			contractParams, err := adapter.BuildDeployContractParams(adapters.BuildDeployContractParamsInput{
 				ChainSelector:      sel,
