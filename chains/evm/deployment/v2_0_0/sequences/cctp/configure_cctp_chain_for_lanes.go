@@ -178,6 +178,25 @@ var ConfigureCCTPChainForLanes = cldf_ops.NewSequence(
 		}
 		writes = append(writes, finalityWrites...)
 
+		// The fast finality fee is only set at deploy time otherwise; a verifier that already exists keeps
+		// whatever it was deployed with, so an explicit value is reconciled here.
+		// The allowlist admin is reconciled the same way, in the same write.
+		var allowlistAdmin *common.Address
+		if input.AllowlistAdmin != "" {
+			if !common.IsHexAddress(input.AllowlistAdmin) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid AllowlistAdmin %q on chain %d", input.AllowlistAdmin, chain.Selector)
+			}
+			addr := common.HexToAddress(input.AllowlistAdmin)
+			allowlistAdmin = &addr
+		}
+		if input.FastFinalityBps != nil || allowlistAdmin != nil {
+			dynamicConfigWrites, err := applyCCTPVerifierDynamicConfig(b, chain, cctpVerifierAddress, input.FastFinalityBps, allowlistAdmin)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			writes = append(writes, dynamicConfigWrites...)
+		}
+
 		// CCTP V2 token pool: set domains
 		cctpV2DomainUpdates, err := buildCCTPV2PoolDomainUpdates(dep, input)
 		if err != nil {
@@ -850,6 +869,44 @@ func applyCCTPVerifierFinality(b cldf_ops.Bundle, chain evm.Chain, verifierAddre
 		return nil, fmt.Errorf("failed to set allowed finality config on CCTPVerifier: %w", err)
 	}
 	return []contract_utils.WriteOutput{setFinalityReport.Output}, nil
+}
+
+// applyCCTPVerifierDynamicConfig sets the CCTPVerifier's fast finality fee (in basis points) and allowlist admin
+// when they differ from the ones on chain; a nil value leaves that field alone. The rest of the dynamic config is
+// read back and written unchanged, because setDynamicConfig replaces the whole struct.
+func applyCCTPVerifierDynamicConfig(b cldf_ops.Bundle, chain evm.Chain, verifierAddress common.Address, fastFinalityBps *uint16, allowlistAdmin *common.Address) ([]contract_utils.WriteOutput, error) {
+	currentReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.GetDynamicConfig, chain, contract_utils.FunctionInput[struct{}]{
+		ChainSelector: chain.Selector,
+		Address:       verifierAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dynamic config from CCTPVerifier: %w", err)
+	}
+	return desiredDynamicConfigWrites(b, chain, verifierAddress, currentReport.Output, fastFinalityBps, allowlistAdmin)
+}
+
+// desiredDynamicConfigWrites returns the write that moves the dynamic config to the desired fast finality fee and
+// allowlist admin, or none when it already is there.
+func desiredDynamicConfigWrites(b cldf_ops.Bundle, chain evm.Chain, verifierAddress common.Address, current cctp_verifier.DynamicConfig, fastFinalityBps *uint16, allowlistAdmin *common.Address) ([]contract_utils.WriteOutput, error) {
+	next := current
+	if fastFinalityBps != nil {
+		next.FastFinalityBps = *fastFinalityBps
+	}
+	if allowlistAdmin != nil {
+		next.AllowlistAdmin = *allowlistAdmin
+	}
+	if next == current {
+		return nil, nil
+	}
+	setReport, err := cldf_ops.ExecuteOperation(b, cctp_verifier.SetDynamicConfig, chain, contract_utils.FunctionInput[cctp_verifier.DynamicConfig]{
+		ChainSelector: chain.Selector,
+		Address:       verifierAddress,
+		Args:          next,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set dynamic config on CCTPVerifier: %w", err)
+	}
+	return []contract_utils.WriteOutput{setReport.Output}, nil
 }
 
 // applyCCTPV2PoolSetDomainsWrites sets domains on the CCTP V2 token pool,

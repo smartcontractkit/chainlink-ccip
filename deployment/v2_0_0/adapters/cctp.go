@@ -62,6 +62,12 @@ type ConfigureCCTPChainForLanesInput struct {
 	USDCToken string
 	// RemoteChains is the set of remote chains to configure.
 	RemoteChains map[uint64]RemoteCCTPChainConfig
+	// FastFinalityBps are the basis points charged for fast finality. Optional: nil leaves the value
+	// the chain has now. Chain families without a configurable fast finality fee ignore it.
+	FastFinalityBps *uint16
+	// AllowlistAdmin is the address allowed, besides the owner, to edit the CCTP verifier's allowlists.
+	// Optional: empty leaves the value the chain has now. Chain families without one ignore it.
+	AllowlistAdmin string
 }
 
 // DeployCCTPInput specifies the input for the DeployCCTPChain sequence.
