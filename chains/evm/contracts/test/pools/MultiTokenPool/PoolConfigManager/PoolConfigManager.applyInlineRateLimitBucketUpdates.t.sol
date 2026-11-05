@@ -29,13 +29,13 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
     );
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineRateLimitBucketUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
         PoolConfigManager.applyInlineRateLimitBucketUpdates, (new SecurityPolicyStore.InlineRateLimitBucketArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 
@@ -47,7 +47,7 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
       abi.encodeCall(
         PoolConfigManager.applyInlineRateLimitBucketUpdates, (new SecurityPolicyStore.InlineRateLimitBucketArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 

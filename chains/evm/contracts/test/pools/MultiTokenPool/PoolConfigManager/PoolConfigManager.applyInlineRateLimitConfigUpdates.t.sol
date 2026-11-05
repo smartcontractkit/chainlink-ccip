@@ -32,14 +32,14 @@ contract PoolConfigManager_applyInlineRateLimitConfigUpdates is PoolConfigManage
     assertEq(1, s_poolConfigManager.getInlineRateLimitConfigs(s_tokenA).length);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineRateLimitConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
         PoolConfigManager.applyInlineRateLimitConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new SecurityPolicyStore.InlineRateLimitConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 
@@ -52,7 +52,7 @@ contract PoolConfigManager_applyInlineRateLimitConfigUpdates is PoolConfigManage
         PoolConfigManager.applyInlineRateLimitConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new SecurityPolicyStore.InlineRateLimitConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 

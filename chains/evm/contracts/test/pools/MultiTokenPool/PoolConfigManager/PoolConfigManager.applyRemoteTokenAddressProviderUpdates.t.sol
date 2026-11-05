@@ -41,7 +41,7 @@ contract PoolConfigManager_applyRemoteTokenAddressProviderUpdates is PoolConfigM
         PoolConfigManager.applyRemoteTokenAddressProviderUpdates,
         (new ConnectionPolicyStore.RemoteTokenAddressProviderArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 
@@ -54,7 +54,7 @@ contract PoolConfigManager_applyRemoteTokenAddressProviderUpdates is PoolConfigM
         PoolConfigManager.applyRemoteTokenAddressProviderUpdates,
         (new ConnectionPolicyStore.RemoteTokenAddressProviderArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 

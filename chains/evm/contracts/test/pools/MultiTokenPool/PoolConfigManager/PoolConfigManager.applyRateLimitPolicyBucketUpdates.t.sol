@@ -38,7 +38,7 @@ contract PoolConfigManager_applyRateLimitPolicyBucketUpdates is PoolConfigManage
       abi.encodeCall(
         PoolConfigManager.applyRateLimitPolicyBucketUpdates, (new SecurityPolicyStore.RateLimitPolicyBucketArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 
@@ -50,7 +50,7 @@ contract PoolConfigManager_applyRateLimitPolicyBucketUpdates is PoolConfigManage
       abi.encodeCall(
         PoolConfigManager.applyRateLimitPolicyBucketUpdates, (new SecurityPolicyStore.RateLimitPolicyBucketArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 

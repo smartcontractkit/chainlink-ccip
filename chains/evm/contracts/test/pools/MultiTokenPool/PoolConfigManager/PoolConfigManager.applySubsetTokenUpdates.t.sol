@@ -60,7 +60,7 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
         PoolConfigManager.applySubsetTokenUpdates,
         (new ConnectionPolicyStore.SubsetTokenArgs[](0), new ConnectionPolicyStore.SubsetTokenArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 
@@ -124,7 +124,7 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
         PoolConfigManager.applySubsetTokenUpdates,
         (new ConnectionPolicyStore.SubsetTokenArgs[](0), new ConnectionPolicyStore.SubsetTokenArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 

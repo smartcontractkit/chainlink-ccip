@@ -35,14 +35,14 @@ contract PoolConfigManager_applyInlineRemotePoolConfigUpdates is PoolConfigManag
     assertEq(uint8(PolicyConfig.RecordLevel.Inline), uint8(remotePoolLevels[0]));
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineRemotePoolConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
         PoolConfigManager.applyInlineRemotePoolConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.REMOTE_POOL_ROLE())
     );
   }
 
@@ -55,7 +55,7 @@ contract PoolConfigManager_applyInlineRemotePoolConfigUpdates is PoolConfigManag
         PoolConfigManager.applyInlineRemotePoolConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.REMOTE_POOL_ROLE())
     );
   }
 }

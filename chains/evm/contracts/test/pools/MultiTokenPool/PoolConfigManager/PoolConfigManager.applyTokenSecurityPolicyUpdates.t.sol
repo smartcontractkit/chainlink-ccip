@@ -27,11 +27,11 @@ contract PoolConfigManager_applyTokenSecurityPolicyUpdates is PoolConfigManagerR
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).securityPolicyName);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyTokenSecurityPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenSecurityPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.SECURITY_ROLE())
     );
   }
 
@@ -41,7 +41,7 @@ contract PoolConfigManager_applyTokenSecurityPolicyUpdates is PoolConfigManagerR
   function test_applyTokenSecurityPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenSecurityPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.SECURITY_ROLE())
     );
   }
 }

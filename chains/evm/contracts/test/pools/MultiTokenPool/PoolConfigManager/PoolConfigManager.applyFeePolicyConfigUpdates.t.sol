@@ -38,7 +38,7 @@ contract PoolConfigManager_applyFeePolicyConfigUpdates is PoolConfigManagerRoles
         PoolConfigManager.applyFeePolicyConfigUpdates,
         (new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new FeePolicyStore.FeePolicyConfigArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.FEE_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.FEE_ROLE())
     );
   }
 
@@ -51,7 +51,7 @@ contract PoolConfigManager_applyFeePolicyConfigUpdates is PoolConfigManagerRoles
         PoolConfigManager.applyFeePolicyConfigUpdates,
         (new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new FeePolicyStore.FeePolicyConfigArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.FEE_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.FEE_ROLE())
     );
   }
 }

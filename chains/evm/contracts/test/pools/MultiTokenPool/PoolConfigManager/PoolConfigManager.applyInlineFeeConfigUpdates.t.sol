@@ -27,14 +27,14 @@ contract PoolConfigManager_applyInlineFeeConfigUpdates is PoolConfigManagerRoles
     assertEq(1, s_poolConfigManager.getInlineFeeConfigs(s_tokenA).length);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineFeeConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
         PoolConfigManager.applyInlineFeeConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new FeePolicyStore.InlineFeeConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.FEE_ROLE())
     );
   }
 
@@ -47,7 +47,7 @@ contract PoolConfigManager_applyInlineFeeConfigUpdates is PoolConfigManagerRoles
         PoolConfigManager.applyInlineFeeConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new FeePolicyStore.InlineFeeConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.FEE_ROLE())
     );
   }
 }

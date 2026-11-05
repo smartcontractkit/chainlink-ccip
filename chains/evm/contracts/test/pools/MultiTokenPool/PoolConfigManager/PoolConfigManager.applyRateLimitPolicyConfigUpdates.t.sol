@@ -48,7 +48,7 @@ contract PoolConfigManager_applyRateLimitPolicyConfigUpdates is PoolConfigManage
           new SecurityPolicyStore.RateLimitPolicyConfigArgs[](0)
         )
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 
@@ -65,7 +65,7 @@ contract PoolConfigManager_applyRateLimitPolicyConfigUpdates is PoolConfigManage
           new SecurityPolicyStore.RateLimitPolicyConfigArgs[](0)
         )
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 

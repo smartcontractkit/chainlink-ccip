@@ -63,7 +63,7 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
           new ConnectionPolicyStore.ConnectionPolicyConfigArgs[](0)
         )
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 
@@ -112,7 +112,7 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
           new ConnectionPolicyStore.ConnectionPolicyConfigArgs[](0)
         )
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 

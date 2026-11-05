@@ -56,14 +56,14 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
     assertFalse(_getLaneConnection(s_tokenA, DEST_CHAIN_SELECTOR).hasConnection);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineConnectionConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
         PoolConfigManager.applyInlineConnectionConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new ConnectionPolicyStore.InlineConnectionConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 
@@ -137,7 +137,7 @@ contract PoolConfigManager_applyInlineConnectionConfigUpdates is PoolConfigManag
         PoolConfigManager.applyInlineConnectionConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new ConnectionPolicyStore.InlineConnectionConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.CONNECTION_ROLE())
     );
   }
 
