@@ -24,18 +24,29 @@ abstract contract PoolConfigManagerRolesSetup is PoolConfigManagerSetup {
     return abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, caller, role);
   }
 
-  /// @dev CONFIG_ROLE, POLICY_ROLE, and the supplied policy role.
+  /// @dev CONFIG_ROLE, POLICY_ROLE, and the role of the type.
   function _getPolicyWriteRoles(
-    bytes32 typePolicyRole
+    bytes32 typeRole
   ) internal view returns (bytes32[] memory roles) {
     roles = new bytes32[](3);
     roles[0] = s_poolConfigManager.CONFIG_ROLE();
     roles[1] = s_poolConfigManager.POLICY_ROLE();
-    roles[2] = typePolicyRole;
+    roles[2] = typeRole;
     return roles;
   }
 
-  function _getTokenWriteRoles() internal view returns (bytes32[] memory) {
+  /// @dev CONFIG_ROLE, TOKEN_MANAGER_ROLE, and the role of the type.
+  function _getTokenWriteRoles(
+    bytes32 typeRole
+  ) internal view returns (bytes32[] memory roles) {
+    roles = new bytes32[](3);
+    roles[0] = s_poolConfigManager.CONFIG_ROLE();
+    roles[1] = s_poolConfigManager.TOKEN_MANAGER_ROLE();
+    roles[2] = typeRole;
+    return roles;
+  }
+
+  function _getProfileWriteRoles() internal view returns (bytes32[] memory) {
     return _rolesOf(s_poolConfigManager.CONFIG_ROLE(), s_poolConfigManager.TOKEN_MANAGER_ROLE());
   }
 
@@ -105,12 +116,12 @@ abstract contract PoolConfigManagerRolesSetup is PoolConfigManagerSetup {
     roles[0] = s_poolConfigManager.DEFAULT_ADMIN_ROLE();
     roles[1] = s_poolConfigManager.CONFIG_ROLE();
     roles[2] = s_poolConfigManager.POLICY_ROLE();
-    roles[3] = s_poolConfigManager.CONNECTION_POLICY_ROLE();
-    roles[4] = s_poolConfigManager.REMOTE_POOL_POLICY_ROLE();
-    roles[5] = s_poolConfigManager.RATE_LIMIT_POLICY_ROLE();
-    roles[6] = s_poolConfigManager.FEE_POLICY_ROLE();
-    roles[7] = s_poolConfigManager.DEST_OVERHEAD_POLICY_ROLE();
-    roles[8] = s_poolConfigManager.SECURITY_POLICY_ROLE();
+    roles[3] = s_poolConfigManager.CONNECTION_ROLE();
+    roles[4] = s_poolConfigManager.REMOTE_POOL_ROLE();
+    roles[5] = s_poolConfigManager.RATE_LIMIT_ROLE();
+    roles[6] = s_poolConfigManager.FEE_ROLE();
+    roles[7] = s_poolConfigManager.DEST_OVERHEAD_ROLE();
+    roles[8] = s_poolConfigManager.SECURITY_ROLE();
     roles[9] = s_poolConfigManager.TOKEN_MANAGER_ROLE();
     roles[10] = s_poolConfigManager.PAUSER_ROLE();
     roles[11] = s_poolConfigManager.UNPAUSER_ROLE();

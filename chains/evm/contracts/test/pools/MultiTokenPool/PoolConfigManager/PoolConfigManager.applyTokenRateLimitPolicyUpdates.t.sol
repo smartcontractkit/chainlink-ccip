@@ -27,11 +27,11 @@ contract PoolConfigManager_applyTokenRateLimitPolicyUpdates is PoolConfigManager
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).rateLimitPolicyName);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyTokenRateLimitPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenRateLimitPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 
@@ -41,7 +41,7 @@ contract PoolConfigManager_applyTokenRateLimitPolicyUpdates is PoolConfigManager
   function test_applyTokenRateLimitPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenRateLimitPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.RATE_LIMIT_ROLE())
     );
   }
 }

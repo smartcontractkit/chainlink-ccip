@@ -36,14 +36,14 @@ contract PoolConfigManager_applyInlineSecurityConfigUpdates is PoolConfigManager
     assertEq(1, s_poolConfigManager.getInlineSecurityConfigs(s_tokenA).length);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineSecurityConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
         PoolConfigManager.applyInlineSecurityConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new SecurityPolicyStore.InlineSecurityConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.SECURITY_ROLE())
     );
   }
 
@@ -56,7 +56,7 @@ contract PoolConfigManager_applyInlineSecurityConfigUpdates is PoolConfigManager
         PoolConfigManager.applyInlineSecurityConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new SecurityPolicyStore.InlineSecurityConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.SECURITY_ROLE())
     );
   }
 }

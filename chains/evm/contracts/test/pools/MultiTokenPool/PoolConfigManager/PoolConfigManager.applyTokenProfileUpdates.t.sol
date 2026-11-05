@@ -125,7 +125,7 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
       abi.encodeCall(
         PoolConfigManager.applyTokenProfileUpdates, (new address[](0), new PolicyConfig.TokenProfileArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getProfileWriteRoles()
     );
   }
 
@@ -174,7 +174,7 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
       abi.encodeCall(
         PoolConfigManager.applyTokenProfileUpdates, (new address[](0), new PolicyConfig.TokenProfileArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getProfileWriteRoles()
     );
   }
 

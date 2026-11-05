@@ -25,11 +25,11 @@ contract PoolConfigManager_applyTokenRemotePoolPolicyUpdates is PoolConfigManage
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).remotePoolPolicyName);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyTokenRemotePoolPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenRemotePoolPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.REMOTE_POOL_ROLE())
     );
   }
 
@@ -39,7 +39,7 @@ contract PoolConfigManager_applyTokenRemotePoolPolicyUpdates is PoolConfigManage
   function test_applyTokenRemotePoolPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenRemotePoolPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.REMOTE_POOL_ROLE())
     );
   }
 }

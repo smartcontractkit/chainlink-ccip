@@ -47,7 +47,7 @@ contract PoolConfigManager_applySecurityPolicyConfigUpdates is PoolConfigManager
         PoolConfigManager.applySecurityPolicyConfigUpdates,
         (new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new SecurityPolicyStore.SecurityPolicyConfigArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.SECURITY_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.SECURITY_ROLE())
     );
   }
 
@@ -60,7 +60,7 @@ contract PoolConfigManager_applySecurityPolicyConfigUpdates is PoolConfigManager
         PoolConfigManager.applySecurityPolicyConfigUpdates,
         (new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new SecurityPolicyStore.SecurityPolicyConfigArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.SECURITY_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.SECURITY_ROLE())
     );
   }
 }

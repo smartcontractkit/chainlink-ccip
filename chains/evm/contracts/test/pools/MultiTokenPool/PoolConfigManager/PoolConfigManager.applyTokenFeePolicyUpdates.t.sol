@@ -25,11 +25,11 @@ contract PoolConfigManager_applyTokenFeePolicyUpdates is PoolConfigManagerRolesS
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).feePolicyName);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyTokenFeePolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenFeePolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.FEE_ROLE())
     );
   }
 
@@ -39,7 +39,7 @@ contract PoolConfigManager_applyTokenFeePolicyUpdates is PoolConfigManagerRolesS
   function test_applyTokenFeePolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenFeePolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.FEE_ROLE())
     );
   }
 }

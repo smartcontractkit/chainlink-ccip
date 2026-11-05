@@ -43,7 +43,7 @@ contract PoolConfigManager_applyRemotePoolPolicyConfigUpdates is PoolConfigManag
           new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](0)
         )
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.REMOTE_POOL_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.REMOTE_POOL_ROLE())
     );
   }
 
@@ -60,7 +60,7 @@ contract PoolConfigManager_applyRemotePoolPolicyConfigUpdates is PoolConfigManag
           new ConnectionPolicyStore.RemotePoolPolicyConfigArgs[](0)
         )
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.REMOTE_POOL_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.REMOTE_POOL_ROLE())
     );
   }
 }

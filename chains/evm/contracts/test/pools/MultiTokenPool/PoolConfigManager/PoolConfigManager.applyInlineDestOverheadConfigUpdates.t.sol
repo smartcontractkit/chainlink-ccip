@@ -33,14 +33,14 @@ contract PoolConfigManager_applyInlineDestOverheadConfigUpdates is PoolConfigMan
     assertEq(1, s_poolConfigManager.getInlineDestOverheadConfigs(s_tokenA).length);
   }
 
-  /// @notice Either CONFIG_ROLE or TOKEN_MANAGER_ROLE authorizes the call on its own.
+  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineDestOverheadConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
         PoolConfigManager.applyInlineDestOverheadConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new FeePolicyStore.InlineDestOverheadConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.DEST_OVERHEAD_ROLE())
     );
   }
 
@@ -53,7 +53,7 @@ contract PoolConfigManager_applyInlineDestOverheadConfigUpdates is PoolConfigMan
         PoolConfigManager.applyInlineDestOverheadConfigUpdates,
         (new IPoolConfigManager.LaneKey[](0), new FeePolicyStore.InlineDestOverheadConfigArgs[](0))
       ),
-      _getTokenWriteRoles()
+      _getTokenWriteRoles(s_poolConfigManager.DEST_OVERHEAD_ROLE())
     );
   }
 }

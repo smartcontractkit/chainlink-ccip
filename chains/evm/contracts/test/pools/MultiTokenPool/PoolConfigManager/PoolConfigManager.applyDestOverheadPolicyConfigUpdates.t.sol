@@ -44,7 +44,7 @@ contract PoolConfigManager_applyDestOverheadPolicyConfigUpdates is PoolConfigMan
         PoolConfigManager.applyDestOverheadPolicyConfigUpdates,
         (new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new FeePolicyStore.DestOverheadPolicyConfigArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.DEST_OVERHEAD_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.DEST_OVERHEAD_ROLE())
     );
   }
 
@@ -57,7 +57,7 @@ contract PoolConfigManager_applyDestOverheadPolicyConfigUpdates is PoolConfigMan
         PoolConfigManager.applyDestOverheadPolicyConfigUpdates,
         (new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), new FeePolicyStore.DestOverheadPolicyConfigArgs[](0))
       ),
-      _getPolicyWriteRoles(s_poolConfigManager.DEST_OVERHEAD_POLICY_ROLE())
+      _getPolicyWriteRoles(s_poolConfigManager.DEST_OVERHEAD_ROLE())
     );
   }
 }
