@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {FinalityCodec} from "../../../../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
@@ -8,7 +9,7 @@ import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 contract SecurityPolicyStore_applyTokenProfileUpdates is SecurityPolicyStoreSetup {
-  /// @notice A set of a new token registers it. The token has no policy, and a deregistration clears its decimals.
+  /// @notice Registering a token does not assign a policy. Deregistering it preserves its decimals.
   function test_applyTokenProfileUpdates_RegistersAndDeregistersToken() public {
     address newToken = makeAddr("newToken");
     PolicyConfig.TokenProfileArgs[] memory profiles = new PolicyConfig.TokenProfileArgs[](1);
@@ -30,6 +31,29 @@ contract SecurityPolicyStore_applyTokenProfileUpdates is SecurityPolicyStoreSetu
     assertFalse(isRegistered);
     // The decimals stay after a deregistration.
     assertEq(DEFAULT_TOKEN_DECIMALS, localDecimals);
+  }
+
+  /// @notice Deregistering a token preserves its rate limit buckets.
+  /// Registering it again with the same configuration reuses those buckets.
+  function test_applyTokenProfileUpdates_DeregistrationKeepsBuckets() public {
+    _setRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
+    _setSecurityPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
+    _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
+    _setTokenSecurityPolicy(s_tokenA, DEFAULT_POLICY);
+
+    vm.prank(s_poolConfigManager);
+    s_store.validateLockOrBurn(s_tokenA, DEST_CHAIN_SELECTOR, 400e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+
+    _setTokenRateLimitPolicy(s_tokenA, bytes32(0));
+    _setTokenSecurityPolicy(s_tokenA, bytes32(0));
+    _applyTokenProfileUpdates(_arrayOf(s_tokenA), new PolicyConfig.TokenProfileArgs[](0));
+
+    PolicyConfig.TokenProfileArgs[] memory profiles = new PolicyConfig.TokenProfileArgs[](1);
+    profiles[0] = _getTokenProfile(s_tokenA);
+    _applyTokenProfileUpdates(new address[](0), profiles);
+    _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
+
+    assertEq(CAPACITY - 400e18, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).outbound.tokens);
   }
 
   // Reverts

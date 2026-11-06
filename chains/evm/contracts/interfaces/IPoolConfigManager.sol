@@ -6,7 +6,7 @@ import {IPoolV2} from "./IPoolV2.sol";
 import {Pool} from "../libraries/Pool.sol";
 
 /// @notice Transfer validation and resolved configuration views for multi-token pools.
-/// @dev Rate-limit consumption is restricted to authorized callers.
+/// @dev Rate-limit consumption is restricted to the token's registered pool.
 interface IPoolConfigManager {
   /// @notice The token operation used on send. Burn flavors mint on receive; Lock releases tokens on receive.
   enum LockOrBurnFlavor {

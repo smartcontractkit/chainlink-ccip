@@ -71,11 +71,7 @@ contract MultiTokenPoolHooks_setPolicyEngine is MultiTokenPoolHooksSetup {
     s_hooks.setPolicyEngine(revertingPolicyEngine);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        MultiTokenPoolHooks.PolicyEngineDetachReverted.selector,
-        revertingPolicyEngine,
-        abi.encodeWithSelector(MockPolicyEngineRevertingDetach.DetachNotSupported.selector)
-      )
+      abi.encodeWithSelector(MultiTokenPoolHooks.PolicyEngineDetachReverted.selector, revertingPolicyEngine)
     );
     s_hooks.setPolicyEngine(s_policyEngine);
   }
@@ -85,7 +81,7 @@ contract MultiTokenPoolHooks_setPolicyEngine is MultiTokenPoolHooksSetup {
     s_hooks.setPolicyEngine(noDetachPolicyEngine);
 
     vm.expectRevert(
-      abi.encodeWithSelector(MultiTokenPoolHooks.PolicyEngineDetachReverted.selector, noDetachPolicyEngine, "")
+      abi.encodeWithSelector(MultiTokenPoolHooks.PolicyEngineDetachReverted.selector, noDetachPolicyEngine)
     );
     s_hooks.setPolicyEngine(s_policyEngine);
   }

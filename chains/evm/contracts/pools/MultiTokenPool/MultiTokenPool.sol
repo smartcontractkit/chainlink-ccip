@@ -373,6 +373,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IMultiTokenPool
+  /// @dev Reverts if the remote token address provider returns data that cannot be decoded as bytes.
   function getRemoteToken(
     address localToken,
     uint64 remoteChainSelector
