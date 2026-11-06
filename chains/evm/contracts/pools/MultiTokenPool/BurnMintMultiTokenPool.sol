@@ -17,6 +17,8 @@ import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC
 contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
+  error InvalidBurnAddress(address token, address burnAddress);
+
   function typeAndVersion() external pure virtual override returns (string memory) {
     return "BurnMintMultiTokenPool 2.1.0-dev";
   }
@@ -50,6 +52,11 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
     if (flavor == IPoolConfigManager.LockOrBurnFlavor.Burn) {
       IBurnMintERC20(token).burn(amount);
     } else if (flavor == IPoolConfigManager.LockOrBurnFlavor.BurnToAddress) {
+      // The config store cannot reject this pool as a target, as it does not know which pool serves the token.
+      // Tokens sent to this pool would stay here and be swept as fees while the destination mints.
+      if (lockOrBurnAddress == address(0) || lockOrBurnAddress == address(this)) {
+        revert InvalidBurnAddress(token, lockOrBurnAddress);
+      }
       IERC20(token).safeTransfer(lockOrBurnAddress, amount);
     } else if (
       flavor == IPoolConfigManager.LockOrBurnFlavor.BurnFrom

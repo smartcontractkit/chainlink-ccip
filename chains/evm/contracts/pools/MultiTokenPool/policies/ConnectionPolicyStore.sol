@@ -37,7 +37,6 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   error TokenHasConfig(address localToken);
   error ProviderHasNoCode(address provider);
   error PolicyRemoteTokenMismatch(address localToken, uint64 remoteChainSelector);
-  error OnlySubsetTokensNotSet(bytes32 policyName, uint64 remoteChainSelector);
   error TokenNotInPolicy(address localToken, bytes32 policyName);
   error SubsetTokenAlreadyAdded(bytes32 policyName, uint64 remoteChainSelector, address localToken);
   error SubsetTokenNotFound(bytes32 policyName, uint64 remoteChainSelector, address localToken);
@@ -49,6 +48,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   error InvalidSourcePoolAddress(address localToken, uint64 remoteChainSelector, bytes sourcePoolAddress);
   error InvalidSourcePoolData(bytes sourcePoolData);
   error LegacyPoolDataNotAllowed(address localToken, uint64 remoteChainSelector);
+  error LegacyRemotePoolRecord(address localToken, uint64 remoteChainSelector);
   error SourceTokenMismatch(
     address localToken, uint64 remoteChainSelector, bytes expectedSourceToken, bytes actualSourceToken
   );
@@ -1187,8 +1187,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (provider != address(0) && provider.code.length == 0) revert ProviderHasNoCode(provider);
   }
 
-  /// @dev Lock requires a LockBox that supports the token. BurnToAddress accepts any address, matching
-  /// BurnToAddressMintTokenPool. All other flavors require a zero address.
+  /// @dev Lock requires a LockBox that supports the token. BurnToAddress requires a non-zero address. All other flavors
+  /// require a zero address.
   function _validateLockOrBurnAddress(
     address localToken,
     IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor,
@@ -1198,8 +1198,13 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (lockOrBurnAddress == address(0) || !ILockBox(lockOrBurnAddress).isTokenSupported(localToken)) {
         revert InvalidLockOrBurnAddress(localToken, lockOrBurnFlavor, lockOrBurnAddress);
       }
-    } else if (lockOrBurnFlavor != IPoolConfigManager.LockOrBurnFlavor.BurnToAddress && lockOrBurnAddress != address(0))
-    {
+    } else if (lockOrBurnFlavor == IPoolConfigManager.LockOrBurnFlavor.BurnToAddress) {
+      // Most tokens reject a transfer to zero, which would make every send revert. The pool rejects its own address
+      // at send time.
+      if (lockOrBurnAddress == address(0)) {
+        revert InvalidLockOrBurnAddress(localToken, lockOrBurnFlavor, lockOrBurnAddress);
+      }
+    } else if (lockOrBurnAddress != address(0)) {
       revert InvalidLockOrBurnAddress(localToken, lockOrBurnFlavor, lockOrBurnAddress);
     }
   }
@@ -1378,6 +1383,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @dev Keep old remote pools trusted until all their inflight messages have executed.
   /// An empty inline pool list still allows outbound transfers. Inbound transfers then require trustPolicyRemotePools
   /// and a trusted policy pool.
+  /// Removal reverts while the record has a legacy flag set. Clear the flags with a set first.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineRemotePoolConfigUpdates(
@@ -1388,8 +1394,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = inlineConfigsToRemove[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
 
+      RemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       PolicyConfig._removeInlineRecord(s_inlineRemotePoolChains[localToken], localToken, remoteChainSelector);
-      _clearRemotePools(s_inlineRemotePoolRecords[localToken][remoteChainSelector]);
+      // Policy records have no legacy flags, so falling back to the policy would send long pool data to a legacy
+      // remote pool, which can never release or mint it. Clearing the flags first confirms the remote pool is upgraded.
+      if (_hasLegacyFlag(record)) revert LegacyRemotePoolRecord(localToken, remoteChainSelector);
+      _clearRemotePools(record);
       delete s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       emit InlineRemotePoolConfigRemoved(localToken, remoteChainSelector);
     }
@@ -1530,6 +1540,18 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     record.remotePoolHashes.add(remotePoolHash);
     s_remotePoolAddresses[remotePoolHash] = remotePoolAddress;
     return remotePoolHash;
+  }
+
+  /// @dev Returns true if the record sends legacy pool data or accepts it from any of its pools.
+  function _hasLegacyFlag(
+    RemotePoolRecord storage record
+  ) private view returns (bool) {
+    if (record.useLegacyPoolDataOnSend) return true;
+    bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
+    for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
+      if (record.allowLegacyPoolDataOnReceive[remotePoolHashes[i]]) return true;
+    }
+    return false;
   }
 
   /// @dev Clear set entries and receive permissions individually; deleting the struct would leave mapping entries behind.
