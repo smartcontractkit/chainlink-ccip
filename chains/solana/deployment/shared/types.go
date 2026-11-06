@@ -88,7 +88,7 @@ var (
 	BPFUpgradeable       deployment.ContractType = "BPFUpgradeable"
 	SVMSignerRegistry    deployment.ContractType = "SVMSignerRegistry"
 	// CLL Identifier
-	CLLMetadata = "CLL"
+	CLLMetadata = "CLLCCIP"
 
 	// Aptos
 	AptosMCMSType               deployment.ContractType = "AptosManyChainMultisig"
