@@ -479,8 +479,10 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   // ================================================================
 
   /// @inheritdoc IMultiTokenPool
-  /// @dev Transfers the full balance of each token. Only fees stay on this contract, as _lockOrBurn moves the rest of
-  /// each transfer out in the same call.
+  /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
+  /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
+  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract
+  /// balance is safe and clears only accrued fees.
   function withdrawFeeTokens(
     address[] calldata feeTokens,
     address recipient

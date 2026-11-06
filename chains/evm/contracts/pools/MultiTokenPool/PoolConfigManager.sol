@@ -433,9 +433,9 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @notice Returns the names of all policies, grouped by type.
-  /// @dev This getter does not use pages, as the number of policies is expected to stay small. Policies are meant to be
-  /// shared by many tokens, single token settings should use inline records. Includes policies without tokens or
-  /// records.
+  /// @dev This getter does not use pages. Policies are expected to be shared by many tokens.
+  /// Use inline records for settings that apply to one token. This keeps the policy list small.
+  /// Includes policies with no assigned tokens or records.
   /// @return connectionPolicyNames The names of the connection policies.
   /// @return remotePoolPolicyNames The names of the remote pool policies.
   /// @return rateLimitPolicyNames The names of the rate limit policies.

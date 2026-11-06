@@ -138,7 +138,6 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, remotePoolConfig));
     // Removal requires the legacy flags to be cleared first.
     remotePoolConfig.useLegacyPoolDataOnSend = false;
-    remotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = false;
     _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
     s_connectionStore.applyInlineRemotePoolConfigUpdates(
@@ -282,29 +281,24 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
 
   /// @dev Policy records have no legacy flags, so removing a legacy record would switch the lane to long pool data.
   function test_applyInlineRemotePoolConfigUpdates_RevertWhen_LegacyRemotePoolRecord() public {
-    // Each legacy flag blocks removal on its own. The receive flag is on the second pool, so every pool is checked.
-    ConnectionPolicyStore.RemotePoolConfig[] memory legacyConfigs = new ConnectionPolicyStore.RemotePoolConfig[](2);
-    legacyConfigs[0] = _getRemotePoolConfig();
-    legacyConfigs[0].useLegacyPoolDataOnSend = true;
-    legacyConfigs[1] = _getRemotePoolConfig();
-    legacyConfigs[1].remotePools = new IPoolConfigManager.RemotePool[](2);
-    legacyConfigs[1].remotePools[0].remotePoolAddress = s_remotePool;
-    legacyConfigs[1].remotePools[1].remotePoolAddress = s_otherRemotePool;
-    legacyConfigs[1].remotePools[1].allowLegacyPoolDataOnReceive = true;
+    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
+    remotePoolConfig.remotePools = new IPoolConfigManager.RemotePool[](2);
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_remotePool;
+    remotePoolConfig.remotePools[1].remotePoolAddress = s_otherRemotePool;
+    remotePoolConfig.remotePools[1].allowLegacyPoolDataOnReceive = true;
+    remotePoolConfig.useLegacyPoolDataOnSend = true;
+    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
 
-    for (uint256 i = 0; i < legacyConfigs.length; ++i) {
-      _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, legacyConfigs[i]));
+    vm.expectRevert(
+      abi.encodeWithSelector(ConnectionPolicyStore.LegacyRemotePoolRecord.selector, s_token, DEST_CHAIN_SELECTOR)
+    );
+    s_connectionStore.applyInlineRemotePoolConfigUpdates(
+      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0)
+    );
 
-      vm.expectRevert(
-        abi.encodeWithSelector(ConnectionPolicyStore.LegacyRemotePoolRecord.selector, s_token, DEST_CHAIN_SELECTOR)
-      );
-      s_connectionStore.applyInlineRemotePoolConfigUpdates(
-        _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0)
-      );
-    }
-
-    // Clearing the flags allows removal.
-    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, _getRemotePoolConfig()));
+    // Clearing the send flag allows removal, even with a receive flag still set.
+    remotePoolConfig.useLegacyPoolDataOnSend = false;
+    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_token, DEST_CHAIN_SELECTOR, remotePoolConfig));
     s_connectionStore.applyInlineRemotePoolConfigUpdates(
       _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0)
     );

@@ -1387,7 +1387,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @dev Keep old remote pools trusted until all their inflight messages have executed.
   /// An empty inline pool list still allows outbound transfers. Inbound transfers then require trustPolicyRemotePools
   /// and a trusted policy pool.
-  /// Removing a record with legacy flags set reverts, clear the flags first.
+  /// Removing a record with useLegacyPoolDataOnSend set reverts, clear it first. After removal, legacy pool data from
+  /// the record's pools is no longer accepted, so wait for inflight legacy messages to execute before removing it.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineRemotePoolConfigUpdates(
@@ -1401,9 +1402,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       RemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       PolicyConfig._removeInlineRecord(s_inlineRemotePoolChains[localToken], localToken, remoteChainSelector);
       // Policy records don't support legacy pool data. Falling back to the policy while the remote pool is still legacy
-      // would send messages it can't process and reject inflight legacy messages. Clearing the flags first confirms
-      // the remote pool has been upgraded.
-      if (_hasLegacyFlag(record)) revert LegacyRemotePoolRecord(localToken, remoteChainSelector);
+      // would burn or lock tokens for messages it can't process. Clearing the flag first confirms the remote pool has
+      // been upgraded.
+      if (record.useLegacyPoolDataOnSend) revert LegacyRemotePoolRecord(localToken, remoteChainSelector);
       _clearRemotePools(record);
       delete s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       emit InlineRemotePoolConfigRemoved(localToken, remoteChainSelector);
@@ -1545,18 +1546,6 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     record.remotePoolHashes.add(remotePoolHash);
     s_remotePoolAddresses[remotePoolHash] = remotePoolAddress;
     return remotePoolHash;
-  }
-
-  /// @dev Returns true if the record sends legacy pool data or accepts it from any of its pools.
-  function _hasLegacyFlag(
-    RemotePoolRecord storage record
-  ) private view returns (bool) {
-    if (record.useLegacyPoolDataOnSend) return true;
-    bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
-    for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
-      if (record.allowLegacyPoolDataOnReceive[remotePoolHashes[i]]) return true;
-    }
-    return false;
   }
 
   /// @dev Deleting the struct does not clear the set or the mapping, so each entry is removed individually.
