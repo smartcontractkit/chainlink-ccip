@@ -129,8 +129,7 @@ interface IPoolConfigManager {
 
   /// @notice Checks the inbound lane, the source pool, and the pool data. Converts the amount to local decimals and
   /// consumes the inbound rate limit.
-  /// @dev Reverts if the transfer is paused or the lane is not fully configured. The requested finality is only used to
-  /// pick the rate limit bucket, it is not checked against the allowed finality.
+  /// @dev Reverts if the transfer is paused or the lane is not fully configured.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
   /// @return transfer The converted amount, the token's lock or burn config, and the postflight hook.

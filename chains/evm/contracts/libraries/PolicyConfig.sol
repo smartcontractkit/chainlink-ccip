@@ -202,8 +202,7 @@ library PolicyConfig {
     if (oldPolicyName == newPolicyName) {
       return;
     }
-    // These should never fail for a correctly stored policy name, but give a clear error instead of an underflow if
-    // they do.
+
     if (oldPolicyName != bytes32(0)) {
       if (!s_policies.policyNames.contains(oldPolicyName)) {
         revert PolicyNotFound(oldPolicyName);
