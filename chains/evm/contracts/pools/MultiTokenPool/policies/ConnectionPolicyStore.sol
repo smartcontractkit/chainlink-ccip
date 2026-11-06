@@ -1306,7 +1306,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Removes tokens from connection policy subsets, then adds tokens to them.
-  /// @dev Additions require onlySubsetTokens to be enabled and the token to be assigned to the policy.
+  /// @dev Additions require the policy record to exist and the token to be assigned to the policy. Tokens can be added
+  /// before onlySubsetTokens is enabled, so the subset can be filled without closing any lane.
   /// A token cannot leave its policy until it has been removed from every subset list.
   /// @param tokensToRemove The subset tokens to remove.
   /// @param tokensToAdd The subset tokens to add.
@@ -1334,7 +1335,6 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
         revert PolicyConfig.PolicyRecordNotFound(policyName, remoteChainSelector);
       }
       ConnectionPolicyRecord storage policyRecord = s_policyConnectionRecords[policyName][remoteChainSelector];
-      if (!policyRecord.onlySubsetTokens) revert OnlySubsetTokensNotSet(policyName, remoteChainSelector);
       if (s_tokenStates[localToken].connectionPolicyName != policyName) {
         revert TokenNotInPolicy(localToken, policyName);
       }
