@@ -19,12 +19,12 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
 
   error AllowListNotEnabled();
   error SenderNotAllowed(address sender);
-  error PolicyEngineDetachReverted(IPolicyEngine oldPolicyEngine, bytes err);
+  error PolicyEngineDetachReverted(IPolicyEngine oldPolicyEngine);
 
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event PolicyEngineAttached(IPolicyEngine indexed policyEngine);
-  event PolicyEngineDetachFailed(IPolicyEngine indexed policyEngine, bytes reason);
+  event PolicyEngineDetachFailed(IPolicyEngine indexed policyEngine);
 
   /// @dev The immutable flag that indicates if the allowlist is access-controlled.
   bool private immutable i_allowlistEnabled;
@@ -76,7 +76,8 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
   }
 
   /// @inheritdoc IMultiTokenPoolHooks
-  /// @dev Performs policy engine validation for inbound transfers.
+  /// @dev Performs policy engine validation for inbound transfers. The v2 OffRamp passes empty offchainTokenData, so
+  /// the policy engine context is empty.
   function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256, // localAmount
@@ -186,11 +187,12 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
     if (address(newPolicyEngine) == address(oldPolicyEngine)) return;
 
     if (address(oldPolicyEngine) != address(0)) {
-      // Guarding detach reverts to offer escape hatch from adversarial policy engine instances.
+      // Do not copy revert data.
+      // A large payload could exhaust gas and prevent the owner from replacing the policy engine.
       try oldPolicyEngine.detach() {}
-      catch (bytes memory err) {
-        if (!allowFailedDetach) revert PolicyEngineDetachReverted(oldPolicyEngine, err);
-        emit PolicyEngineDetachFailed(oldPolicyEngine, err);
+      catch {
+        if (!allowFailedDetach) revert PolicyEngineDetachReverted(oldPolicyEngine);
+        emit PolicyEngineDetachFailed(oldPolicyEngine);
       }
     }
 

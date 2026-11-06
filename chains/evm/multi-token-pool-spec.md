@@ -59,7 +59,7 @@ OnRamp / OffRamp -- transfer call --> BurnMintMultiTokenPool
 | Security store | Stores rate limit and security records, including live rate limit buckets. |
 
 - The PCM is the only contract the issuer calls for daily pool operation. It stores no token or policy configuration.
-- Each store accepts writes only from authorized callers, which are PCMs.
+- Each store accepts writes only from authorized callers. Its owner must authorize only PCMs.
 - Each configuration type belongs to one store. Stores do not call each other.
 - Each store keeps its own registered-token list. The PCM registers or deregisters a token in all three stores in one
   transaction.
@@ -173,7 +173,8 @@ provider.
 
 Remote tokens must use the encoding that the remote MTTP uses for source tokens. On EVM chains, this is
 `abi.encode(address)`. As in `TokenPool`, the store does not validate the address encoding of inline records or provider
-responses.
+responses. The v2 OnRamp accepts a raw 20-byte EVM address on send. With this encoding, inbound transfers with a source
+token in their pool data revert with `SourceTokenMismatch`.
 
 The remote token must contain at least one non-zero byte. An empty or all-zero inline value reverts on write. The store
 also checks the resolved remote token on every send and on receives that include a source token.
@@ -911,6 +912,8 @@ lists. Its allowlist applies to every token using it.
 `IMultiTokenPoolHooks` uses the same selectors and calldata for the two checks as `IAdvancedPoolHooks`.
 `AdvancedPoolHooksExtractor` can decode them unchanged, so one policy engine can serve single-token pools and MTTPs.
 The payload includes `localToken`. A policy engine that keys state by the sender must key that state by `localToken`.
+As in `AdvancedPoolHooks`, the payload context is the token args on send and `offchainTokenData` on receive. The v2
+OffRamp passes empty `offchainTokenData`, so the context is always empty on receive.
 
 | Hook | Compatibility |
 | --- | --- |
@@ -1099,7 +1102,7 @@ The four burn flavors match the corresponding single-token burn and mint pools.
 | Flavor | Burn address |
 | --- | --- |
 | `Burn`, `BurnFrom`, or `BurnWithFrom` | Zero |
-| `BurnToAddress` | The burn address; any address is accepted, as in `BurnToAddressMintTokenPool`. |
+| `BurnToAddress` | Use an address from which the tokens cannot be transferred. The contract accepts any address, as in `BurnToAddressMintTokenPool`. |
 
 `BurnMintMultiTokenPool` supports all four burn flavors. `BurnFrom` and `BurnWithFrom` use the pool's allowance to
 itself. Before burning, the pool grants itself the maximum allowance if the current allowance is insufficient.
@@ -1236,7 +1239,11 @@ The PCM has no pool list. TAR `PoolSet` events identify registered tokens' pools
 
 ## Workflows
 
-These workflows describe configuration changes and operator checks. Each step identifies the signer and call.
+All configuration steps use one issuer operator with `CONFIG_ROLE` on each chain. Give the same operator
+`PAUSER_ROLE` and `UNPAUSER_ROLE` when it also runs pause and resume steps. The narrower configuration roles are
+optional. Use separate issuer signers only when the security team requires separation.
+
+A step names any additional owner or admin permission it needs. These permissions can belong to the same signer.
 Unless a step says otherwise, the issuer signs the steps for one chain in one batch. No batch spans chains.
 
 ### Workflow rules
@@ -1282,6 +1289,7 @@ In a hub-and-spoke deployment, spokes have lanes only to the hub.
 
 Tooling must validate the planned remote token mappings before any of these changes:
 
+- Setting an inline connection.
 - Assigning a connection policy to a token.
 - Setting a connection policy record.
 - Adding a subset token.
@@ -1321,10 +1329,10 @@ before unpausing.
 
 For a lane whose remote token still uses a non-MTTP pool:
 
-1. **`TOKEN_MANAGER_ROLE`:** set an inline remote pool record with `useLegacyPoolDataOnSend` enabled. Keep it enabled at least
+1. **`CONFIG_ROLE`:** set an inline remote pool record with `useLegacyPoolDataOnSend` enabled. Keep it enabled at least
    until the remote TAR names an MTTP, following the order in [token pool migration](#token-pool-migration).
-2. **`TOKEN_MANAGER_ROLE`:** set `destBytesOverhead` to 32. Do not use a remote pool policy record for this lane.
-3. **`REMOTE_POOL_ROLE`:** do not create a policy record for a chain that has no MTTP.
+2. **`CONFIG_ROLE`:** set `destBytesOverhead` to 32. Do not use a remote pool policy record for this lane.
+3. **`CONFIG_ROLE`:** do not create a policy record for a chain that has no MTTP.
 
 Before enabling legacy send, tooling must check that the remote mapping for each token and chain points back to the
 correct local token. A legacy pool must list a remote MTTP only when its token migrates to that MTTP.
@@ -1340,7 +1348,7 @@ Before a chain switches a token to an MTTP:
 
    | Source pool | Signer | Configuration to update |
    | --- | --- | --- |
-   | MTTP | `TOKEN_MANAGER_ROLE` or `DEST_OVERHEAD_ROLE` | PCM destination overhead record |
+   | MTTP | `CONFIG_ROLE` | PCM destination overhead record |
    | Legacy pool with an enabled `IPoolV2.getFee` configuration | Legacy pool owner | Pool fee configuration |
    | Legacy pool priced by the FeeQuoter | CCIP owner | FeeQuoter token transfer configuration |
 
@@ -1380,6 +1388,9 @@ token's TAR pool:
    accepts that format before any pool sends it.
 6. **Pool owner or token admin:** switch the pool's PCM or the token's TAR pool only after the applicable preparation
    above is complete.
+7. **Store owners:** once no pool uses the old PCM, remove it from each store's authorized callers with
+   `applyAuthorizedCallerUpdates`.
+   Until then, the old PCM's role holders can still change configuration and pause state.
 
 A pool replacement that keeps its PCM and stores needs no configuration copy. A PCM replacement that keeps its stores
 also needs no configuration copy; an account with `DEFAULT_ADMIN_ROLE` must still grant roles again.
@@ -1392,39 +1403,44 @@ For a Router change:
 
 #### Changing connections
 
-Use the [remote token checks](#checking-remote-tokens) before changes that expose a token to a policy connection or
-change its provider's response.
+Use the [remote token checks](#checking-remote-tokens) before each change listed there.
 
-To replace an inline connection, **`TOKEN_MANAGER_ROLE`** sets the record directly without removing it first. To remove it
+To replace an inline connection, **`CONFIG_ROLE`** sets the record directly without removing it first. To remove it
 and adopt a different remote token from the policy:
 
 1. Complete any required changes to the token's connection policy, policy records, or provider in earlier calls.
-2. **`TOKEN_MANAGER_ROLE`:** set the inline record to the remote token bytes returned by the policy.
-3. **`TOKEN_MANAGER_ROLE`:** remove the inline record. The removal check now compares matching bytes.
+2. **`CONFIG_ROLE`:** set the inline record to the remote token bytes returned by the policy.
+3. **`CONFIG_ROLE`:** remove the inline record. The removal check now compares matching bytes.
 
 Before moving a token to another connection policy or clearing its assignment, identify every lane that would close,
 even temporarily. Complete steps 1 and 2 of [closing a token lane](#closing-a-token-lane) for those lanes. Then:
 
-1. **`CONNECTION_ROLE`:** remove the token from every subset of its current policy.
-2. **`TOKEN_MANAGER_ROLE`:** change or clear the connection policy assignment.
+1. **`CONFIG_ROLE`:** remove the token from every subset of its current policy.
+2. **`CONFIG_ROLE`:** change or clear the connection policy assignment.
 
-To set a remote token address provider, **`CONNECTION_ROLE`** first creates the policy if it does not exist, then calls
+To set a remote token address provider, **`CONFIG_ROLE`** first creates the policy if it does not exist, then calls
 `applyRemoteTokenAddressProviderUpdates`. Zero removes the provider. Changes to policy records do not change it.
 
 #### Closing a token lane
 
 For a token lane between MTTPs:
 
-1. **`TOKEN_MANAGER_ROLE` on both chains:** stop both outbound finality classes with inline rate limit records. Keep inbound
+1. **`CONFIG_ROLE` on both chains:** stop both outbound finality classes with inline rate limit records. Keep inbound
    transfers available while messages remain in flight.
 2. **Tooling:** wait for all messages in both directions to execute, including failed messages. Read destination
    execution state as described in [message execution and retries](#message-execution-and-retries).
-3. **`CONNECTION_ROLE` on each chain:** close any policy connection for the token:
+3. **`CONFIG_ROLE` on each chain:** close any policy connection for the token:
    - If `onlySubsetTokens` is enabled and the token is in the subset, remove it from the subset.
-   - If the record serves all policy tokens, enable `onlySubsetTokens` and add every other policy token in one batch.
-4. **`TOKEN_MANAGER_ROLE` on each chain:** remove any inline connection after the policy no longer serves the token on that
+   - If the record serves all policy tokens, move this token's other policy lanes to inline connections. Use the
+     resolved remote token for each lane. Remove this token from every subset of its connection policy, including
+     stored subsets with `onlySubsetTokens` disabled. Then clear its connection policy with
+     `applyTokenConnectionPolicyUpdates`. Submit these changes in one batch.
+4. **`CONFIG_ROLE` on each chain:** remove any inline connection after the policy no longer serves the token on that
    lane. An inline connection would otherwise keep the lane open.
 5. **Tooling:** verify that `getLaneConnectionBatch` reports `hasConnection` false on both chains.
+
+After clearing the assignment, the token's remaining connections use inline records. Changes to the old connection
+policy or its provider no longer affect those connections.
 
 No connection removal may precede step 2. Removing a connection also blocks pending inbound messages, and the
 contract does not check that those messages have completed.
@@ -1435,7 +1451,7 @@ To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
 
 1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist.
 2. **Hook owner:** authorize every pool that serves a token using the new hook.
-3. **`SECURITY_ROLE`:** point the affected security records to the new hook.
+3. **`CONFIG_ROLE`:** point the affected security records to the new hook.
 
 Authorization is also required when reusing `AdvancedPoolHooks` or `MultiTokenPoolHooks` with a new pool. Authorize the
 new pool before it handles transfers.
@@ -1448,7 +1464,7 @@ to execute before changing that inbound list. A policy record change affects eve
 
 If a message fails because its additional pool data provider rejects empty data:
 
-1. **`TOKEN_MANAGER_ROLE`:** set a provider that accepts empty data from that chain, or remove the provider.
+1. **`CONFIG_ROLE`:** set a provider that accepts empty data from that chain, or remove the provider.
 2. **Any party:** retry the message under the rules in [message execution and retries](#message-execution-and-retries).
 
 Migrated tokens and tokens with legacy lanes must remain compatible with empty data permanently.
@@ -1481,18 +1497,18 @@ The chain order does not matter.
 2. **Role admin of T:** grant the MTTP mint and burn roles, for example with `grantMintAndBurnRoles(mttp)`.
 3. **Owner or CCIP admin of T:** call `registerAdminViaOwner(T)` or `registerAdminViaGetCCIPAdmin(T)` on the registry
    module. Then the **token admin** calls `TAR.acceptAdminRole(T)`.
-4. **`TOKEN_MANAGER_ROLE`:** register T with `applyTokenProfileUpdates([], [profileOfT])`. Then assign its five
+4. **`CONFIG_ROLE`:** register T with `applyTokenProfileUpdates([], [profileOfT])`. Then assign its five
    non-connection policies through:
    - `applyTokenRemotePoolPolicyUpdates`
    - `applyTokenRateLimitPolicyUpdates`
    - `applyTokenFeePolicyUpdates`
    - `applyTokenDestOverheadPolicyUpdates`
    - `applyTokenSecurityPolicyUpdates`
-5. **`TOKEN_MANAGER_ROLE`:** set any inline records, with inline connections last. Then assign T's connection policy through
+5. **`CONFIG_ROLE`:** set any inline records, with inline connections last. Then assign T's connection policy through
    `applyTokenConnectionPolicyUpdates`.
    - Inline connections run the lane check, so all other record types must already exist through step 4 or this step.
    - The connection policy assignment opens its lanes immediately, without a lane check.
-   - For each required chain with `onlySubsetTokens` enabled, **`CONNECTION_ROLE`** adds T through
+   - For each required chain with `onlySubsetTokens` enabled, **`CONFIG_ROLE`** adds T through
      `applySubsetTokenUpdates`. This runs the lane check.
    - Before step 5, tooling verifies that the remote token exists and is the same asset for every lane the step
      will open. Policy views must show records for every chain in the connection policy, or defaults where supported.
@@ -1549,7 +1565,7 @@ When the spoke is ready:
 
 1. Run steps 1–6 for T on the spoke.
 2. Run phase 2 checks there, except the paired `hasConnection` check, which must wait for the hub update.
-3. Tooling checks T's remote token on the hub. **`CONNECTION_ROLE`** then adds T to the subset with
+3. Tooling checks T's remote token on the hub. **`CONFIG_ROLE`** then adds T to the subset with
    `applySubsetTokenUpdates`, which runs the lane check. This matches step 18 of [chain expansion](#chain-expansion).
 4. Run phase 2 checks on the hub for this lane.
 5. Run phase 3 on the spoke.
@@ -1583,7 +1599,7 @@ which starts full.
 **Before step 7:**
 
 1. Keep T paused and call `TAR.setPool(T, address(0))`.
-2. **`CONNECTION_ROLE`:** remove T from each subset added in step 5 through `applySubsetTokenUpdates`.
+2. **`CONFIG_ROLE`:** remove T from each subset added in step 5 through `applySubsetTokenUpdates`.
 3. Clear T's connection policy.
 4. Remove its inline records and clear its other policies.
 5. Deregister T.
@@ -1619,15 +1635,15 @@ Complete this phase before opening the hub's lanes.
    one, such as `SameAddressRemoteTokenAddressProvider`.
 2. **Deployer:** authorize the PCM on all three stores with `applyAuthorizedCallerUpdates`. Transfer the pool and
    stores to the issuer admin, who accepts ownership.
-3. **`DEFAULT_ADMIN_ROLE`:** use `grantRole` to assign the same roles as on the other spokes.
-4. **`POLICY_ROLE` or the role of each type:** create the policies:
+3. **`DEFAULT_ADMIN_ROLE`:** use `grantRole` to set up the issuer operator as described in [Workflows](#workflows).
+4. **`CONFIG_ROLE`:** create the policies:
    - **Remote pool:** a hub record containing `abi.encode(hubMttp)`. Policy records have no legacy flags, so this lane
      sends and accepts only long data.
    - **Rate limit, fee, destination overhead, and security:** hub records or policy defaults. Allow 192 bytes plus
      the largest padded provider output among the tokens. Less space causes long-format sends to revert.
    - **Connection:** a hub record with `onlySubsetTokens` disabled, since every token on the new chain uses the hub.
      Set its provider with `applyRemoteTokenAddressProviderUpdates`; it must resolve tokens on the hub.
-5. **`TOKEN_MANAGER_ROLE`:** register the selected tokens with `applyTokenProfileUpdates`, then assign their policies, with
+5. **`CONFIG_ROLE`:** register the selected tokens with `applyTokenProfileUpdates`, then assign their policies, with
    connection last. The connection assignment opens hub lanes without a lane check.
 6. **Role admin of each token:** grant the MTTP mint and burn roles.
 7. **Owner of each token, then token admin:** register the TAR admin, call `acceptAdminRole`, then
@@ -1639,15 +1655,15 @@ Run steps 8–13 in one batch.
 
 8. **`PAUSER_ROLE`:** call `pauseChains([newChain], Both)`. No traffic uses this chain yet. The pause allows inspection of
    the open lanes before sends begin.
-9. **`REMOTE_POOL_ROLE`:** use `applyRemotePoolPolicyConfigUpdates` to add a record for the new chain to each selected
+9. **`CONFIG_ROLE`:** use `applyRemotePoolPolicyConfigUpdates` to add a record for the new chain to each selected
    token's remote pool policy. List `abi.encode(newChainMttp)`. Remote pool policies have no defaults.
-10. **`RATE_LIMIT_ROLE`, `FEE_ROLE`, `DEST_OVERHEAD_ROLE`, and `SECURITY_ROLE`:** add a record for the new chain
-    where no default exists or different values are needed.
+10. **`CONFIG_ROLE`:** check the rate limit, fee, destination overhead, and security policies for the new chain.
+    Add a chain record if no default exists or different values are needed.
 11. **Provider owner:** ensure the connection provider resolves tokens on the new chain.
     `SameAddressRemoteTokenAddressProvider` needs no change.
-12. **`CONNECTION_ROLE`:** use `applyConnectionPolicyConfigUpdates` to create a record for the new chain with
+12. **`CONFIG_ROLE`:** use `applyConnectionPolicyConfigUpdates` to create a record for the new chain with
     `onlySubsetTokens` enabled. Its subset is initially empty.
-13. **`CONNECTION_ROLE`:** add the selected tokens with `applySubsetTokenUpdates`. The PCM checks each lane.
+13. **`CONFIG_ROLE`:** add the selected tokens with `applySubsetTokenUpdates`. The PCM checks each lane.
 
 Steps 9 and 10 do not open lanes. Only connection records do.
 
@@ -1689,7 +1705,7 @@ issuer's first MTTP deployment, apply these rules:
   pool with `allowLegacyPoolDataOnReceive` enabled, and enable `useLegacyPoolDataOnSend`.
 - The policy record lists only that chain's MTTP. Since it must contain a pool, do not create it until an MTTP exists.
   Until then, inline records provide all trust.
-- **`REMOTE_POOL_ROLE`** creates the policy record before the spoke switches its first token. **`TOKEN_MANAGER_ROLE`** must
+- **`CONFIG_ROLE`** creates the policy record before the spoke switches its first token. **`CONFIG_ROLE`** must
   then enable `trustPolicyRemotePools` on each migrating token's inline record.
 - Before each spoke switch, tooling checks that the token's hub-side `getLaneConnectionBatch` includes the spoke MTTP.
 - Follow [token pool migration](#token-pool-migration) for each token. The hub switches first; the remote spoke switches
@@ -1760,7 +1776,7 @@ on both chains and wait for all in-flight messages before removing any connectio
 | Source configuration owners | Before switching a chain, set the destination gas estimates under [setting transfer budgets](#setting-transfer-budgets). This includes legacy sources priced through the pool or FeeQuoter. |
 | CCIP ops and MTTP owner | Keep every OffRamp with pending messages on the MTTP's Router. |
 | Legacy pool owner | Upgrade every 1.5.0 pool to 1.5.1 or later before phase 2, including chains that will remain legacy. See [the upgrade procedure](#upgrade-pools-older-than-151). |
-| `TOKEN_MANAGER_ROLE` | Use no additional pool data provider, or one that accepts empty data. This remains a permanent requirement. |
+| `CONFIG_ROLE` | Use no additional pool data provider, or one that accepts empty data. This remains a permanent requirement. |
 | Issuer | Before phase 1, choose fees for each token on every lane, including lanes to legacy pools. Fees can be zero. |
 | Hook owner | Ensure each legacy hook's `getThresholdAmount` returns 0. MTTP has no threshold amount and cannot copy threshold CCV lists. |
 
@@ -1773,16 +1789,16 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
 
 1. **Deployer and `DEFAULT_ADMIN_ROLE`:** deploy the five contracts, authorize the PCM, transfer ownership, and grant roles
    as in [chain expansion](#chain-expansion).
-2. **`FEE_ROLE`, `DEST_OVERHEAD_ROLE`, and `SECURITY_ROLE`:** create policy defaults:
+2. **`CONFIG_ROLE`:** create policy defaults:
    - Fee: the issuer's chosen fees.
    - Destination overhead: the measured MTTP receive gas and 32 bytes. The byte limit prevents long-format sends
      while the destination is still legacy.
    - Security: empty CCV lists and no hook.
-3. **`TOKEN_MANAGER_ROLE`:** register the tokens with `applyTokenProfileUpdates`. Copy each legacy pool's decimals, pool
+3. **`CONFIG_ROLE`:** register the tokens with `applyTokenProfileUpdates`. Copy each legacy pool's decimals, pool
    flavor, burn address, and allowed finality. Assign the three policies with `applyTokenFeePolicyUpdates`,
    `applyTokenDestOverheadPolicyUpdates`, and `applyTokenSecurityPolicyUpdates`.
    Keep the additional pool data provider unset or compatible with empty data permanently.
-4. **`TOKEN_MANAGER_ROLE`:** copy each token's legacy configuration into inline records for every remote chain, in this
+4. **`CONFIG_ROLE`:** copy each token's legacy configuration into inline records for every remote chain, in this
    order:
 
    | Type | Values to copy or set |
@@ -1820,14 +1836,14 @@ Start only after phase 1 is complete on every chain.
    - Start with one token on one chain and test both directions.
    - Switch the other tokens on that chain in one batch, then proceed to the next chain.
    - Any chain order can work without a pause because both sides trust old and new pools. The order must match
-     step 4's `allowLegacyPoolDataOnReceive` values. If it changes, **`TOKEN_MANAGER_ROLE`** on both chains must first
+     step 4's `allowLegacyPoolDataOnReceive` values. If it changes, **`CONFIG_ROLE`** on both chains must first
      update those values. Tooling then repeats the pre-switch checks before the switch.
 
    For each lane where this chain switches second, include these actions in its switch batch:
 
-   1. **`TOKEN_MANAGER_ROLE`:** set an inline destination overhead record toward the first chain. Use 192 bytes plus padded
+   1. **`CONFIG_ROLE`:** set an inline destination overhead record toward the first chain. Use 192 bytes plus padded
       provider data, and the `destGasOverhead` from step 2.
-   2. **`TOKEN_MANAGER_ROLE`:** disable `useLegacyPoolDataOnSend` for that lane.
+   2. **`CONFIG_ROLE`:** disable `useLegacyPoolDataOnSend` for that lane.
 
    The first chain already accepts long data. This ordering prevents legacy-format MTTP messages from the second
    chain, so the first chain never needs a receive exception for that MTTP.
@@ -1866,7 +1882,7 @@ For a 1.5.0 pool on chain C:
 6. **Role admin of the token on C:** revoke the 1.5.0 pool's mint and burn roles after the switch. Do not keep it for
    rollback.
    The OffRamp uses the TAR pool at execution time, so it no longer executes on that old pool.
-7. **`TOKEN_MANAGER_ROLE` on remote chains with phase 1 records already configured:** add C's new pool to the token's inline
+7. **`CONFIG_ROLE` on remote chains with phase 1 records already configured:** add C's new pool to the token's inline
    remote pool record with `allowLegacyPoolDataOnReceive` enabled. Keep the old pool permanently; its messages never expire.
 
 #### Migration phase 3: Finish each lane
@@ -1877,14 +1893,14 @@ issuer has ruled out rollback on both chains. Every step below applies to that t
 - **F** is the chain that switched first on this lane.
 - **S** is the chain that switched second and disabled `useLegacyPoolDataOnSend` for this lane during the switch.
 
-10. **`TOKEN_MANAGER_ROLE` on F:** disable `useLegacyPoolDataOnSend` toward S, preserving every pool and every other flag.
+10. **`CONFIG_ROLE` on F:** disable `useLegacyPoolDataOnSend` toward S, preserving every pool and every other flag.
     In the same batch, first set the inline destination overhead record as in step 8. New messages from F now include
     the source token and additional pool data.
 11. Wait until all legacy-format messages that F's MTTP sent for this token on this lane have executed on S.
     This covers every such message from F's switch through step 10, including failed messages. Check destination
     execution state as described in the [workflow rules](#message-execution-and-retries).
     Legacy-pool messages do not need to finish before this step; their receive permission remains enabled.
-12. **`TOKEN_MANAGER_ROLE` on S:** disable `allowLegacyPoolDataOnReceive` for F's MTTP. Keep every legacy pool with
+12. **`CONFIG_ROLE` on S:** disable `allowLegacyPoolDataOnReceive` for F's MTTP. Keep every legacy pool with
     `allowLegacyPoolDataOnReceive` enabled permanently. F needs no equivalent change because S's MTTP never had that
     permission on F.
 13. **Role admin of each token:** once rollback is ruled out, revoke the legacy pool's mint and burn roles. The owner
@@ -1904,14 +1920,14 @@ After step 12, retain inline remote pool records for chains with legacy pool his
 | Failed message awaiting retry | The TAR pool at retry time executes it under the configuration then in effect. |
 
 S disables `useLegacyPoolDataOnSend` at its switch. F keeps it enabled until step 10, after rollback is ruled out. If a
-legacy-format MTTP message unexpectedly fails after step 12, **`TOKEN_MANAGER_ROLE`** re-enables
-`allowLegacyPoolDataOnReceive` for that MTTP. Any party retries the message. **`TOKEN_MANAGER_ROLE`** then disables it again.
+legacy-format MTTP message unexpectedly fails after step 12, **`CONFIG_ROLE`** re-enables
+`allowLegacyPoolDataOnReceive` for that MTTP. Any party retries the message. **`CONFIG_ROLE`** then disables it again.
 
 Other requirements for pending messages:
 
 - **Additional data:** legacy pools, legacy-format MTTP sends, and source tokens without providers supply empty data.
   A migrated token can have no additional pool data provider. If configured, the provider must accept empty data from
-  each relevant chain. A rejecting provider blocks retries until `TOKEN_MANAGER_ROLE` replaces or removes it.
+  each relevant chain. A rejecting provider blocks retries until `CONFIG_ROLE` replaces or removes it.
 - **Gas:** messages sent before the switch may have been priced for the legacy pool's lower receive cost. Execution
   must have enough transaction gas for the MTTP. If execution fails, tooling must list the message and retry through
   `OffRamp.execute` with enough gas. The source quote does not cap the pool call's gas.
@@ -1976,9 +1992,9 @@ F before S switches. The **token admin** can then call `TAR.setPool(token, legac
 
 Otherwise, use this order:
 
-1. **`TOKEN_MANAGER_ROLE` locally:** enable `allowLegacyPoolDataOnReceive` for the remote MTTP. The local MTTP must accept
+1. **`CONFIG_ROLE` locally:** enable `allowLegacyPoolDataOnReceive` for the remote MTTP. The local MTTP must accept
    the legacy data introduced in rollback step 2 until the TAR switches.
-2. **`TOKEN_MANAGER_ROLE` remotely:** enable `useLegacyPoolDataOnSend` toward this chain for the token. In the same batch, set
+2. **`CONFIG_ROLE` remotely:** enable `useLegacyPoolDataOnSend` toward this chain for the token. In the same batch, set
    an inline destination overhead record with `destBytesOverhead` equal to 32. The eventual legacy destination needs
    this format and byte limit.
 3. Wait for all long-format messages from that remote MTTP to execute locally. Check execution state as in migration
@@ -1987,7 +2003,7 @@ Otherwise, use this order:
    Otherwise, its mint calls will fail.
 5. **Token admin:** call `TAR.setPool(token, legacyPool)`. Pending messages now execute on the legacy pool, which trusts
    the remote MTTPs.
-6. After returning to the MTTP, **`TOKEN_MANAGER_ROLE` remotely:** first raise the byte allowance, then disable
+6. After returning to the MTTP, **`CONFIG_ROLE` remotely:** first raise the byte allowance, then disable
    `useLegacyPoolDataOnSend`, as in migration step 10. Locally, drain legacy-format MTTP messages and disable
    `allowLegacyPoolDataOnReceive` from rollback step 1, as in migration steps 11 and 12.
 
@@ -2006,25 +2022,25 @@ precedence. Removing one immediately selects the policy record for that chain.
 
 For one chain, follow this order. Each step can be a separate call.
 
-1. **`TOKEN_MANAGER_ROLE`:** assign the connection policy with `applyTokenConnectionPolicyUpdates`.
+1. **`CONFIG_ROLE`:** assign the connection policy with `applyTokenConnectionPolicyUpdates`.
    - Before assignment, tooling must check every chain where the policy will serve the token without an inline
      connection. Assignment opens those lanes without a lane check.
-   - Where `onlySubsetTokens` is enabled, **`CONNECTION_ROLE`** must add the token with `applySubsetTokenUpdates`.
+   - Where `onlySubsetTokens` is enabled, **`CONFIG_ROLE`** must add the token with `applySubsetTokenUpdates`.
      This runs the lane check. Without membership, step 2 closes that lane.
-2. **`TOKEN_MANAGER_ROLE`:** remove the inline connection.
+2. **`CONFIG_ROLE`:** remove the inline connection.
    - The store rejects removal if the policy resolves different remote token bytes.
    - Tooling must reject removal if `getLaneConnectionBatch` would report `hasConnection` false afterward. Keep the
      lane open.
-3. **`TOKEN_MANAGER_ROLE`:** assign the rate limit, fee, destination overhead, and security policies. Then remove those
+3. **`CONFIG_ROLE`:** assign the rate limit, fee, destination overhead, and security policies. Then remove those
    inline records. Before each removal, **tooling** checks that the selected policy record has the required values
    for that token and chain.
    - Removing an inline rate limit record deletes its buckets. The policy buckets start full, so the move can allow
      an additional amount equal to each bucket's capacity.
    - For a remote chain still using a non-MTTP pool, retain an inline destination overhead record with 32 bytes. If
      none exists, set it before assigning the destination overhead policy.
-4. **`TOKEN_MANAGER_ROLE`:** assign the remote pool policy with `applyTokenRemotePoolPolicyUpdates`. Before this step,
+4. **`CONFIG_ROLE`:** assign the remote pool policy with `applyTokenRemotePoolPolicyUpdates`. Before this step,
    **tooling** checks that its chain record includes every remote MTTP the token needs.
-5. **`TOKEN_MANAGER_ROLE`:** handle the inline remote pool record according to the remote token's history:
+5. **`CONFIG_ROLE`:** handle the inline remote pool record according to the remote token's history:
 
    | Remote chain | Action |
    | --- | --- |
@@ -2033,7 +2049,7 @@ For one chain, follow this order. Each step can be a separate call.
 
    For an inline record retained in this step, preserve the token's `useLegacyPoolDataOnSend` value. If the remote token
    uses a pool in the policy record, enable `trustPolicyRemotePools`. Otherwise, keep it disabled.
-6. **`TOKEN_MANAGER_ROLE`:** if an inline record still lists the remote MTTP, remove that entry after every legacy-format
+6. **`CONFIG_ROLE`:** if an inline record still lists the remote MTTP, remove that entry after every legacy-format
    message from it has executed.
 
 Before enabling `trustPolicyRemotePools`, tooling must confirm that the assigned policy has a record for the chain.
@@ -2086,11 +2102,11 @@ Every unpause must wait for all checks in step 5.
    | Version 1.5.0, no replacement available | Tooling first saves its remote token and rate limit configurations. The pool owner then removes X through `applyChainUpdates` with `allowed` false. |
 
    Each legacy pool needs its own call, possibly from a different owner. Its path remains open until that call.
-3. **`REMOTE_POOL_ROLE`:** update each policy chain record for X that lists P to remove it. If P is its only pool,
+3. **`CONFIG_ROLE`:** update each policy chain record for X that lists P to remove it. If P is its only pool,
    remove the record;
    policy records cannot be empty. Tokens relying on it then have no remote pool record, so sends revert and receives
    fail.
-4. **`TOKEN_MANAGER_ROLE`:** update each inline remote pool record for X that lists P to remove it. Preserve all other
+4. **`CONFIG_ROLE`:** update each inline remote pool record for X that lists P to remove it. Preserve all other
    pools and flags.
    - Disabling `allowLegacyPoolDataOnReceive` is insufficient. Long-format forged data can include the expected source token.
    - If P is the only listed pool, set an empty pool list. Preserve `useLegacyPoolDataOnSend` and
@@ -2109,7 +2125,7 @@ Every unpause must wait for all checks in step 5.
    Also query X's TAR to list every token whose pool there is P.
 6. **`UNPAUSER_ROLE`:** call `unpauseChains([chainX], Inbound)`. Messages from the remaining trusted legacy and MTTP pools can
    execute again. Keep outbound paused.
-7. **`TOKEN_MANAGER_ROLE`:** for every token whose remote TAR pool is P, set an inline rate limit stop on both outbound
+7. **`CONFIG_ROLE`:** for every token whose remote TAR pool is P, set an inline rate limit stop on both outbound
    finality classes for X. Then **`UNPAUSER_ROLE`** calls `unpauseChains([chainX], Outbound)`.
    These tokens must not send to P, where their destination release would execute.
 
@@ -2141,23 +2157,23 @@ Every unpause must wait for all checks in step 5.
 9. Chain X deploys a new pool with a new owner and moves its tokens there. This chain then configures trust and removes
    the stops from step 7:
 
-   - **`TOKEN_MANAGER_ROLE`:** update the inline records for X changed in step 4. Without policy trust, add the new pool.
+   - **`CONFIG_ROLE`:** update the inline records for X changed in step 4. Without policy trust, add the new pool.
      With `trustPolicyRemotePools`, add a new legacy pool; add a new MTTP only while it sends legacy data. Preserve
      every other flag except for the changes required below.
    - Enable `allowLegacyPoolDataOnReceive` for the new pool if it is legacy. For an MTTP, enable it only while it sends
      legacy data before migration step 10 on X. Disable it after draining those messages, as in migration step 12.
-   - **`REMOTE_POOL_ROLE`:** add a new MTTP to the policy records for X.
+   - **`CONFIG_ROLE`:** add a new MTTP to the policy records for X.
    - **Legacy pool owner:** update every step 2 pool where X is still configured, including rollback pools. On 1.5.1 or
      later, call `addRemotePool(chainX, abi.encode(newPool))`. On 1.5.0, call
      `setRemotePool(chainX, abi.encode(newPool))`.
    - **Legacy pool owner:** for each pool where step 2 or 7 removed X, re-add it with `applyChainUpdates` instead.
      Restore the remote token and limits saved by tooling. Trust the new pool and previously saved pools except P.
      A 1.5.0 pool accepts only one pool, so use the new one.
-   - If the replacement is not an MTTP, **`TOKEN_MANAGER_ROLE`** must set inline remote pool records with
+   - If the replacement is not an MTTP, **`CONFIG_ROLE`** must set inline remote pool records with
      `useLegacyPoolDataOnSend` enabled before lifting stops. List the new pool with `allowLegacyPoolDataOnReceive`
      enabled. Tokens previously using policy records also need these inline records. In the same batch, set inline
      destination overhead to 32 bytes.
-   - **`TOKEN_MANAGER_ROLE`:** restore the outbound limits from before step 7. Remove an inline rate limit record only if
+   - **`CONFIG_ROLE`:** restore the outbound limits from before step 7. Remove an inline rate limit record only if
      step 7 created it. **Legacy pool owner:** also restore the previous outbound limits on legacy pools.
    - Never add P back to any record or legacy pool, including rollback pools.
 

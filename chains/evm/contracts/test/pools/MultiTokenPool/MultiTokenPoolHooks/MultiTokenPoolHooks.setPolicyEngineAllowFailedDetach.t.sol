@@ -4,7 +4,11 @@ pragma solidity ^0.8.24;
 import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngine.sol";
 
 import {MultiTokenPoolHooks} from "../../../../pools/MultiTokenPool/MultiTokenPoolHooks.sol";
-import {MockPolicyEngineNoDetach, MockPolicyEngineRevertingDetach} from "../../../mocks/MockPolicyEngine.sol";
+import {
+  MockPolicyEngineLargeRevertDetach,
+  MockPolicyEngineNoDetach,
+  MockPolicyEngineRevertingDetach
+} from "../../../mocks/MockPolicyEngine.sol";
 import {MultiTokenPoolHooksSetup} from "./MultiTokenPoolHooksSetup.t.sol";
 import {Ownable2Step} from "@chainlink/contracts/src/v0.8/shared/access/Ownable2Step.sol";
 
@@ -14,12 +18,25 @@ contract MultiTokenPoolHooks_setPolicyEngineAllowFailedDetach is MultiTokenPoolH
     s_hooks.setPolicyEngine(revertingPolicyEngine);
 
     vm.expectEmit();
-    emit MultiTokenPoolHooks.PolicyEngineDetachFailed(
-      revertingPolicyEngine, abi.encodeWithSelector(MockPolicyEngineRevertingDetach.DetachNotSupported.selector)
-    );
+    emit MultiTokenPoolHooks.PolicyEngineDetachFailed(revertingPolicyEngine);
     vm.expectEmit();
     emit MultiTokenPoolHooks.PolicyEngineAttached(s_policyEngine);
     s_hooks.setPolicyEngineAllowFailedDetach(s_policyEngine);
+
+    assertEq(address(s_policyEngine), address(s_hooks.getPolicyEngine()));
+    assertTrue(s_policyEngine.isAttached(address(s_hooks)));
+  }
+
+  function test_setPolicyEngineAllowFailedDetach_OldPolicyEngineDetachRevertsWithLargeData() public {
+    IPolicyEngine largeRevertPolicyEngine = IPolicyEngine(address(new MockPolicyEngineLargeRevertDetach()));
+    s_hooks.setPolicyEngine(largeRevertPolicyEngine);
+
+    // The mock reverts with as much data as the forwarded gas allows, so the call needs a gas limit.
+    vm.expectEmit();
+    emit MultiTokenPoolHooks.PolicyEngineDetachFailed(largeRevertPolicyEngine);
+    vm.expectEmit();
+    emit MultiTokenPoolHooks.PolicyEngineAttached(s_policyEngine);
+    s_hooks.setPolicyEngineAllowFailedDetach{gas: 30_000_000}(s_policyEngine);
 
     assertEq(address(s_policyEngine), address(s_hooks.getPolicyEngine()));
     assertTrue(s_policyEngine.isAttached(address(s_hooks)));
@@ -30,7 +47,7 @@ contract MultiTokenPoolHooks_setPolicyEngineAllowFailedDetach is MultiTokenPoolH
     s_hooks.setPolicyEngine(noDetachPolicyEngine);
 
     vm.expectEmit();
-    emit MultiTokenPoolHooks.PolicyEngineDetachFailed(noDetachPolicyEngine, "");
+    emit MultiTokenPoolHooks.PolicyEngineDetachFailed(noDetachPolicyEngine);
     vm.expectEmit();
     emit MultiTokenPoolHooks.PolicyEngineAttached(s_policyEngine);
     s_hooks.setPolicyEngineAllowFailedDetach(s_policyEngine);

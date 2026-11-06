@@ -181,6 +181,30 @@ contract MockPolicyEngineRevertingDetach {
   ) external view {}
 }
 
+/// @notice Reverts detach with as much data as the forwarded gas allows.
+contract MockPolicyEngineLargeRevertDetach {
+  function attach() external {}
+
+  function detach() external view {
+    assembly {
+      let size := 0
+      for {} gt(gas(), 100000) {} {
+        size := add(size, 0x400)
+        mstore(size, 0)
+      }
+      revert(0, size)
+    }
+  }
+
+  function run(
+    IPolicyEngine.Payload calldata
+  ) external {}
+
+  function check(
+    IPolicyEngine.Payload calldata
+  ) external view {}
+}
+
 contract MockPolicyEngineNoDetach {
   function attach() external {}
 
