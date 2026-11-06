@@ -89,16 +89,19 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
     assertEq(abi.encode(_getStoredProfile(profiles[0], true, false, false)), abi.encode(_getTokenProfile(s_newToken)));
   }
 
-  function test_applyTokenProfileUpdates_BurnToAddressAcceptsAnyAddress() public {
+  function test_applyTokenProfileUpdates_BurnToAddressAcceptsAnyNonZeroAddress() public {
     PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_newToken);
     profiles[0].lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.BurnToAddress;
-
-    s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
-    assertEq(address(0), _getTokenProfile(s_newToken).lockOrBurnAddress);
-
     profiles[0].lockOrBurnAddress = s_burnAddress;
+
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
     assertEq(s_burnAddress, _getTokenProfile(s_newToken).lockOrBurnAddress);
+
+    // The target does not need code.
+    address otherBurnAddress = makeAddr("otherBurnAddress");
+    profiles[0].lockOrBurnAddress = otherBurnAddress;
+    s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
+    assertEq(otherBurnAddress, _getTokenProfile(s_newToken).lockOrBurnAddress);
   }
 
   function test_applyTokenProfileUpdates_TokenWithoutDecimals() public {
@@ -188,9 +191,10 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
   }
 
   function test_applyTokenProfileUpdates_RevertWhen_InvalidLockOrBurnAddress() public {
-    // Lock requires a compatible LockBox. Burn, BurnFrom, and BurnWithFrom require a zero target address.
-    IPoolConfigManager.LockOrBurnFlavor[] memory flavors = new IPoolConfigManager.LockOrBurnFlavor[](5);
-    address[] memory lockOrBurnAddresses = new address[](5);
+    // Lock requires a compatible LockBox. BurnToAddress requires a non-zero target. Burn, BurnFrom, and BurnWithFrom
+    // require a zero target address.
+    IPoolConfigManager.LockOrBurnFlavor[] memory flavors = new IPoolConfigManager.LockOrBurnFlavor[](6);
+    address[] memory lockOrBurnAddresses = new address[](6);
     flavors[0] = IPoolConfigManager.LockOrBurnFlavor.Lock;
     flavors[1] = IPoolConfigManager.LockOrBurnFlavor.Lock;
     // A lock box that does not support the token.
@@ -202,6 +206,7 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
     lockOrBurnAddresses[3] = s_burnAddress;
     flavors[4] = IPoolConfigManager.LockOrBurnFlavor.BurnWithFrom;
     lockOrBurnAddresses[4] = s_burnAddress;
+    flavors[5] = IPoolConfigManager.LockOrBurnFlavor.BurnToAddress;
 
     for (uint256 i = 0; i < flavors.length; ++i) {
       PolicyConfig.TokenProfileArgs[] memory profiles = _getTokenProfileArgs(s_newToken);

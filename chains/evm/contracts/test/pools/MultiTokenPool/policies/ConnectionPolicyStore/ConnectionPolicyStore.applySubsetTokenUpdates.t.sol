@@ -95,6 +95,37 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
     assertFalse(s_connectionStore.hasLaneBatch(_getLaneKeys(s_token, SOURCE_CHAIN_SELECTOR))[0]);
   }
 
+  /// @dev The subset can be filled while onlySubsetTokens is false, so switching to subset closes no listed lane.
+  function test_applySubsetTokenUpdates_BeforeOnlySubsetTokensIsSet() public {
+    _setTokenConnectionPolicy(s_otherToken, CONNECTION_POLICY);
+    _setTokenRemotePoolPolicy(s_otherToken, REMOTE_POOL_POLICY);
+    IPoolConfigManager.LaneKey[] memory lanes = new IPoolConfigManager.LaneKey[](2);
+    lanes[0] = _getLaneKeys(s_token, DEST_CHAIN_SELECTOR)[0];
+    lanes[1] = _getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR)[0];
+
+    vm.expectEmit();
+    emit ConnectionPolicyStore.SubsetTokenAdded(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, s_token);
+    s_connectionStore.applySubsetTokenUpdates(
+      new ConnectionPolicyStore.SubsetTokenArgs[](0),
+      _getSubsetTokenArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, s_token)
+    );
+
+    // The subset list has no effect until onlySubsetTokens is set.
+    (bool onlySubsetTokens, address[] memory subsetTokens) =
+      s_connectionStore.getSubsetTokens(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, 0, type(uint64).max);
+    assertFalse(onlySubsetTokens);
+    assertEq(_arrayOf(s_token), subsetTokens);
+    bool[] memory hasLane = s_connectionStore.hasLaneBatch(lanes);
+    assertTrue(hasLane[0]);
+    assertTrue(hasLane[1]);
+
+    // Switching keeps the listed token's lane open and closes the unlisted one.
+    _setConnectionPolicyConfig(_getConnectionPolicyConfigArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, true));
+    hasLane = s_connectionStore.hasLaneBatch(lanes);
+    assertTrue(hasLane[0]);
+    assertFalse(hasLane[1]);
+  }
+
   // Reverts
 
   function test_applySubsetTokenUpdates_RevertWhen_SubsetTokenNotFound() public {
@@ -124,18 +155,6 @@ contract ConnectionPolicyStore_applySubsetTokenUpdates is ConnectionPolicyStoreS
         _getSubsetTokenArgs(CONNECTION_POLICY, remoteChainSelectors[i], s_token)
       );
     }
-  }
-
-  function test_applySubsetTokenUpdates_RevertWhen_OnlySubsetTokensNotSet() public {
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        ConnectionPolicyStore.OnlySubsetTokensNotSet.selector, CONNECTION_POLICY, DEST_CHAIN_SELECTOR
-      )
-    );
-    s_connectionStore.applySubsetTokenUpdates(
-      new ConnectionPolicyStore.SubsetTokenArgs[](0),
-      _getSubsetTokenArgs(CONNECTION_POLICY, DEST_CHAIN_SELECTOR, s_token)
-    );
   }
 
   function test_applySubsetTokenUpdates_RevertWhen_TokenNotInPolicy() public {

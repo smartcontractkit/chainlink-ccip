@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IPoolConfigManager} from "../../../interfaces/IPoolConfigManager.sol";
 
 import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
+import {BurnMintMultiTokenPool} from "../../../pools/MultiTokenPool/BurnMintMultiTokenPool.sol";
 import {MultiTokenPoolSetup} from "../MultiTokenPool/MultiTokenPoolSetup.t.sol";
 
 /// @dev The flavor-specific token movement of BurnMintMultiTokenPool. The generic lockOrBurn checks are covered in
@@ -52,6 +53,26 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     // The tokens are sent to the configured burn address without reducing the total supply.
     assertEq(s_token.balanceOf(burnAddress), amount);
     assertEq(s_token.balanceOf(address(s_pool)), 0);
+  }
+
+  // Reverts
+
+  /// @dev Tokens sent to the pool would stay there and be swept as fees, and the zero address rejects most transfers.
+  function test_lockOrBurn_RevertWhen_InvalidBurnAddress() public {
+    uint256 amount = 20_000e18;
+    deal(address(s_token), address(s_pool), amount);
+    address[] memory burnAddresses = new address[](2);
+    burnAddresses[1] = address(s_pool);
+
+    vm.startPrank(s_allowedOnRamp);
+    for (uint256 i = 0; i < burnAddresses.length; ++i) {
+      _mockFlavor(amount, IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, burnAddresses[i]);
+
+      vm.expectRevert(
+        abi.encodeWithSelector(BurnMintMultiTokenPool.InvalidBurnAddress.selector, address(s_token), burnAddresses[i])
+      );
+      s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
+    }
   }
 
   function _mockFlavor(
