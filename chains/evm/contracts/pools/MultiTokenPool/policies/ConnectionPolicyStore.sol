@@ -1197,8 +1197,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (provider != address(0) && provider.code.length == 0) revert ProviderHasNoCode(provider);
   }
 
-  /// @dev Lock requires a LockBox that supports the token. BurnToAddress requires a non-zero address. All other flavors
-  /// require a zero address.
+  /// @dev Lock requires a LockBox that supports the token. BurnToAddress accepts any address, matching
+  /// BurnToAddressMintTokenPool. All other flavors require a zero address.
   function _validateLockOrBurnAddress(
     address localToken,
     IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor,
@@ -1208,12 +1208,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (lockOrBurnAddress == address(0) || !ILockBox(lockOrBurnAddress).isTokenSupported(localToken)) {
         revert InvalidLockOrBurnAddress(localToken, lockOrBurnFlavor, lockOrBurnAddress);
       }
-    } else if (lockOrBurnFlavor == IPoolConfigManager.LockOrBurnFlavor.BurnToAddress) {
-      // Most tokens revert on a transfer to address(0). The pool checks for its own address at send time.
-      if (lockOrBurnAddress == address(0)) {
-        revert InvalidLockOrBurnAddress(localToken, lockOrBurnFlavor, lockOrBurnAddress);
-      }
-    } else if (lockOrBurnAddress != address(0)) {
+    } else if (lockOrBurnFlavor != IPoolConfigManager.LockOrBurnFlavor.BurnToAddress && lockOrBurnAddress != address(0))
+    {
       revert InvalidLockOrBurnAddress(localToken, lockOrBurnFlavor, lockOrBurnAddress);
     }
   }

@@ -415,8 +415,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev Unlike getFee, this does not revert when the lane or its fee config is missing. It returns a disabled config
-  /// instead.
+  /// @dev Returns the resolved token transfer fee config for the token and destination chain.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,

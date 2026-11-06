@@ -47,7 +47,7 @@ library PolicyConfig {
   struct TokenProfileArgs {
     address localToken; // ──────────────────────────────────╮ The local token.
     uint8 localDecimals; //                                  │ Checked against decimals(). Fixed while registered.
-    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the token out on send.
+    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ Specifies token's burn flavor, or to use lock/release.
     bytes4 allowedFinalityConfig; // ────────────────────────╯ The allowed FTF finality. Zero allows default only.
     address lockOrBurnAddress; // The burn address for BurnToAddress, the lock box for Lock, zero otherwise.
     address additionalPoolDataProvider; // The IAdditionalPoolDataProvider of the token, zero for none.
@@ -96,8 +96,8 @@ library PolicyConfig {
   }
 
   /// @notice Adds a record to a policy, or keeps the record if it exists. Creates the policy if it does not exist.
-  /// @dev The caller is responsible for storing the record values. Policy types without a default record must reject
-  /// chain selector zero before calling this.
+  /// @dev The caller stores the values of the record. Policy types without a default record must reject chain selector
+  /// zero.
   /// @param s_policies The policies of the policy type.
   /// @param policyName The name of the policy.
   /// @param remoteChainSelector The chain of the record. Zero names the default record.
@@ -115,7 +115,7 @@ library PolicyConfig {
   }
 
   /// @notice Removes a record from a policy. The policy stays, even when it has no records left.
-  /// @dev The caller is responsible for deleting the record values.
+  /// @dev The caller deletes the values of the record.
   /// @param s_policies The policies of the policy type.
   /// @param policyName The name of the policy.
   /// @param remoteChainSelector The chain of the record. Zero names the default record.
@@ -152,8 +152,7 @@ library PolicyConfig {
   }
 
   /// @notice Adds an inline record to a token, or keeps the record if it exists.
-  /// @dev Inline records have no default, so chain selector zero is rejected. The caller is responsible for storing the
-  /// record values.
+  /// @dev There are no defaults for inline records, chain selector zero is rejected.
   /// @param s_tokens The registered tokens.
   /// @param s_inlineChainSelectors The chains of the inline records of the token.
   /// @param localToken The token.
@@ -175,7 +174,7 @@ library PolicyConfig {
   }
 
   /// @notice Removes an inline record from a token.
-  /// @dev The caller is responsible for deleting the record values.
+  /// @dev The caller deletes the values of the record.
   /// @param s_inlineChainSelectors The chains of the inline records of the token.
   /// @param localToken The token.
   /// @param remoteChainSelector The chain of the record.
@@ -190,7 +189,7 @@ library PolicyConfig {
   }
 
   /// @notice Updates the token counts when a token changes from its old policy to its new policy.
-  /// A zero policy name means that the token has no policy. Does nothing if both names are equal.
+  /// A zero policy name means that the token has no policy. No-op if both names are equal.
   /// @param s_policies The policies of the policy type.
   /// @param oldPolicyName The current policy of the token, as the caller stores it. If nonzero, it must exist and have
   /// at least one token.

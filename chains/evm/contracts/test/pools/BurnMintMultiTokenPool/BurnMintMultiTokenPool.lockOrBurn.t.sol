@@ -7,6 +7,8 @@ import {FinalityCodec} from "../../../libraries/FinalityCodec.sol";
 import {BurnMintMultiTokenPool} from "../../../pools/MultiTokenPool/BurnMintMultiTokenPool.sol";
 import {MultiTokenPoolSetup} from "../MultiTokenPool/MultiTokenPoolSetup.t.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
 /// @dev The flavor-specific token movement of BurnMintMultiTokenPool. The generic lockOrBurn checks are covered in
 /// MultiTokenPool.lockOrBurn.t.sol.
 contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
@@ -55,24 +57,31 @@ contract BurnMintMultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
     assertEq(s_token.balanceOf(address(s_pool)), 0);
   }
 
+  function test_lockOrBurn_BurnToZeroAddress() public {
+    uint256 amount = 20_000e18;
+    deal(address(s_token), address(s_pool), amount);
+    _mockFlavor(amount, IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, address(0));
+    // Some tokens burn on a transfer to address(0). The test token reverts on it, so mock the transfer.
+    vm.mockCall(address(s_token), abi.encodeCall(IERC20.transfer, (address(0), amount)), abi.encode(true));
+
+    vm.startPrank(s_allowedOnRamp);
+    vm.expectCall(address(s_token), abi.encodeCall(IERC20.transfer, (address(0), amount)));
+    s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
+  }
+
   // Reverts
 
-  /// @dev Tokens sent to the pool would stay there and be swept as fees, and the zero address rejects most transfers.
+  /// @dev Tokens sent to the pool would stay there and be withdrawn as fees.
   function test_lockOrBurn_RevertWhen_InvalidBurnAddress() public {
     uint256 amount = 20_000e18;
     deal(address(s_token), address(s_pool), amount);
-    address[] memory burnAddresses = new address[](2);
-    burnAddresses[1] = address(s_pool);
+    _mockFlavor(amount, IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, address(s_pool));
 
     vm.startPrank(s_allowedOnRamp);
-    for (uint256 i = 0; i < burnAddresses.length; ++i) {
-      _mockFlavor(amount, IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, burnAddresses[i]);
-
-      vm.expectRevert(
-        abi.encodeWithSelector(BurnMintMultiTokenPool.InvalidBurnAddress.selector, address(s_token), burnAddresses[i])
-      );
-      s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
-    }
+    vm.expectRevert(
+      abi.encodeWithSelector(BurnMintMultiTokenPool.InvalidBurnAddress.selector, address(s_token), address(s_pool))
+    );
+    s_pool.lockOrBurn(_lockOrBurnIn(amount), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
   }
 
   function _mockFlavor(

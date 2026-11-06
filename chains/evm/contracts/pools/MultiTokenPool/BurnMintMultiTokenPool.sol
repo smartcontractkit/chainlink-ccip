@@ -39,7 +39,7 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
   /// @inheritdoc MultiTokenPool
   /// @dev Burns tokens held by the pool. The token fee stays in the pool. BurnToAddress sends the tokens to an address
   /// which can never transfer them, making the tokens unrecoverable without reducing the total supply. Reverts with
-  /// InvalidBurnAddress if the BurnToAddress target is zero or this pool.
+  /// InvalidBurnAddress if the BurnToAddress target is this pool.
   function _lockOrBurn(
     address token,
     uint64, // remoteChainSelector
@@ -52,7 +52,7 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
     } else if (flavor == IPoolConfigManager.LockOrBurnFlavor.BurnToAddress) {
       // The connection store can't check for this pool's address, as it doesn't know which pool serves the token.
       // Tokens sent here would be withdrawn as fees while the destination still mints.
-      if (lockOrBurnAddress == address(0) || lockOrBurnAddress == address(this)) {
+      if (lockOrBurnAddress == address(this)) {
         revert InvalidBurnAddress(token, lockOrBurnAddress);
       }
       IERC20(token).safeTransfer(lockOrBurnAddress, amount);
