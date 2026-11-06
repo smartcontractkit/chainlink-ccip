@@ -38,10 +38,8 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
 
   /// @inheritdoc MultiTokenPool
   /// @dev Burns tokens held by the pool. The token fee stays in the pool. BurnToAddress sends the tokens to an address
-  /// which can never transfer them, making the tokens unrecoverable without reducing the total supply.
-  /// Some tokens allow burning from the sender without approval, but not all do. To be safe, BurnFrom and BurnWithFrom
-  /// approve the pool to burn from the pool. The single-token pools approve in the constructor. This pool learns its
-  /// tokens later, so it approves the maximum on a send when the allowance is below the amount.
+  /// which can never transfer them, making the tokens unrecoverable without reducing the total supply. Reverts with
+  /// InvalidBurnAddress if the BurnToAddress target is zero or this pool.
   function _lockOrBurn(
     address token,
     uint64, // remoteChainSelector
@@ -52,8 +50,8 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
     if (flavor == IPoolConfigManager.LockOrBurnFlavor.Burn) {
       IBurnMintERC20(token).burn(amount);
     } else if (flavor == IPoolConfigManager.LockOrBurnFlavor.BurnToAddress) {
-      // The config store cannot reject this pool as a target, as it does not know which pool serves the token.
-      // Tokens sent to this pool would stay here and be swept as fees while the destination mints.
+      // The connection store can't check for this pool's address, as it doesn't know which pool serves the token.
+      // Tokens sent here would be withdrawn as fees while the destination still mints.
       if (lockOrBurnAddress == address(0) || lockOrBurnAddress == address(this)) {
         revert InvalidBurnAddress(token, lockOrBurnAddress);
       }
@@ -62,6 +60,8 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
       flavor == IPoolConfigManager.LockOrBurnFlavor.BurnFrom
         || flavor == IPoolConfigManager.LockOrBurnFlavor.BurnWithFrom
     ) {
+      // Not all tokens allow burnFrom on the caller's own balance without an approval. Single-token pools approve in
+      // the constructor, but this pool doesn't know its tokens up front, so we approve the max when needed.
       if (IERC20(token).allowance(address(this), address(this)) < amount) {
         IERC20(token).forceApprove(address(this), type(uint256).max);
       }

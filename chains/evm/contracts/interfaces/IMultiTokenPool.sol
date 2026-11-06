@@ -22,7 +22,7 @@ interface IMultiTokenPool is IPoolV1V2, IGetPoolConfigManager {
   /// @notice Returns the remote token from the resolved lane.
   /// @param localToken The local token.
   /// @param remoteChainSelector The remote chain.
-  /// @return remoteToken The encoded remote token, or empty bytes if no lane exists.
+  /// @return remoteToken The encoded remote token. Empty if no lane exists or the remote token cannot be resolved.
   function getRemoteToken(
     address localToken,
     uint64 remoteChainSelector
@@ -36,8 +36,8 @@ interface IMultiTokenPool is IPoolV1V2, IGetPoolConfigManager {
   ) external view returns (uint8 decimals);
 
   /// @notice Withdraws accrued fee token balances to the provided `recipient`.
-  /// @dev Only callable by authorized callers. Reverts if the recipient is the zero address.
-  /// @param feeTokens The token addresses to withdraw, including the pool token when applicable.
+  /// @dev Only callable by the pool config manager. Reverts if the recipient is the zero address.
+  /// @param feeTokens The tokens to withdraw.
   /// @param recipient The address to withdraw the fee tokens to.
   function withdrawFeeTokens(
     address[] calldata feeTokens,

@@ -22,7 +22,9 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 /// and lane config lives in the pool config manager, which the pool calls through IPoolConfigManager.
 /// @dev The pool runs the checks that a pool config manager cannot skip: the RMN curse, the ramp caller, and the lock or
 /// burn flavor. The pool config manager resolves the lane. It builds and checks the pool data, which includes the
-/// source token and the additional pool data. It also charges the token fee and consumes the rate limits.
+/// source token and the additional pool data. It also computes the token fee and consumes the rate limits.
+/// The pool config manager only accepts validate calls from the token's pool in the TokenAdminRegistry, so the
+/// registered pool has to make the call itself.
 /// @dev This pool supports different decimals on different chains but using this feature could impact the total number
 /// of tokens in circulation. Since all of the tokens are locked/burned on the source, and a rounded amount is
 /// minted/released on the destination, the number of tokens minted/released could be less than the number of tokens
@@ -156,7 +158,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   /// - preflight checks hook (if configured)
   /// @dev These checks are essential security checks. An override that skips one would allow for various exploits.
   /// @param lockOrBurnIn The original lock or burn request.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @param tokenArgs Additional token arguments, passed to the pool config manager and the hook.
   /// @param chargeTokenFee False for the V1 path, which charges no token fee.
   /// @return lockOrBurnOut The remote token and the pool data.
@@ -207,7 +209,9 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
 
   /// @notice Contains the specific lock or burn token logic for a pool.
   /// @dev Overriding this method allows us to create pools with different lock or burn flavors without duplicating the
-  /// underlying logic.
+  /// underlying logic. Overrides must move the full amount off this contract, since withdrawFeeTokens withdraws the
+  /// entire balance as fees. A BurnToAddress override must reject this pool as the target, as the connection store
+  /// can't check for it.
   /// @param token The local token.
   /// @param remoteChainSelector The selector of the remote chain.
   /// @param amount The amount of tokens to lock or burn, after the token fee.
@@ -325,8 +329,6 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
 
   /// @notice Checks whether the msg.sender is the permissioned onRamp for the given chain on the Router.
   /// @dev The pool does not check the lane. The pool config manager does, so a token without a lane reverts there.
-  /// The pool config manager accepts validate calls only from the token's TokenAdminRegistry pool, so the ramps must
-  /// call this pool directly.
   /// @param remoteChainSelector The remote chain selector.
   function _onlyOnRamp(
     uint64 remoteChainSelector
@@ -397,7 +399,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev The CCV lists do not depend on the amount or the extra data.
+  /// @dev CCVs are configured per lane and direction, so the amount, finality and extra data are ignored. Returns an
+  /// empty list if the lane does not exist.
   function getRequiredCCVs(
     address localToken,
     uint64 remoteChainSelector,
@@ -412,7 +415,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev Returns the resolved token transfer fee config for the token and destination chain.
+  /// @dev Unlike getFee, this does not revert when the lane or its fee config is missing. It returns a disabled config
+  /// instead.
   function getTokenTransferFeeConfig(
     address localToken,
     uint64 destChainSelector,
@@ -423,8 +427,8 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   }
 
   /// @inheritdoc IPoolV2
-  /// @dev Reverts if the requested finality is not allowed or the lane has no fee configuration. This prevents the
-  /// OnRamp from falling back to FeeQuoter's token transfer fees.
+  /// @dev Reverts if the requested finality is not allowed, or if the lane or its fee config is missing. Returning a
+  /// disabled config instead would make the OnRamp fall back to FeeQuoter's token transfer fees.
   function getFee(
     address localToken,
     uint64 destChainSelector,
@@ -476,14 +480,13 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
   // ================================================================
 
   /// @inheritdoc IMultiTokenPool
-  /// @dev Pools accrue fees directly on this contract. Lock/release pools send bridge liquidity to their ERC20 lockbox
-  /// during the lock flow, which means any balance left on this contract represents fees that have accrued to the pool.
-  /// Because user liquidity never resides on `address(this)` for lock/release pools, transferring the full contract
-  /// balance is safe and clears only accrued fees.
+  /// @dev Transfers the full balance of each token. Only fees stay on this contract, as _lockOrBurn moves the rest of
+  /// each transfer out in the same call.
   function withdrawFeeTokens(
     address[] calldata feeTokens,
     address recipient
   ) external virtual {
+    // The pool config manager checks FEE_COLLECTOR_ROLE.
     if (msg.sender != address(s_poolConfigManager)) revert CallerIsNotPoolConfigManager(msg.sender);
     FeeTokenHandler._withdrawFeeTokens(feeTokens, recipient);
   }

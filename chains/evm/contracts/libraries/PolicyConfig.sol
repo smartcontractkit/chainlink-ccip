@@ -47,7 +47,7 @@ library PolicyConfig {
   struct TokenProfileArgs {
     address localToken; // ──────────────────────────────────╮ The local token.
     uint8 localDecimals; //                                  │ Checked against decimals(). Fixed while registered.
-    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ Specifies token's burn flavor, or to use lock/release.
+    IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the token out on send.
     bytes4 allowedFinalityConfig; // ────────────────────────╯ The allowed FTF finality. Zero allows default only.
     address lockOrBurnAddress; // The burn address for BurnToAddress, the lock box for Lock, zero otherwise.
     address additionalPoolDataProvider; // The IAdditionalPoolDataProvider of the token, zero for none.
@@ -60,7 +60,7 @@ library PolicyConfig {
   }
 
   /// @notice The state of one policy instance.
-  /// @dev A policy cannot be removed if there are any tokens using it.
+  /// @dev A policy can be removed only when no token uses it and it has no records.
   struct Policy {
     EnumerableSet.UintSet remoteChainSelectors; // The chains of the policy records. Zero names the default record.
     uint32 tokenCount; // The number of tokens that use the policy.
@@ -72,8 +72,8 @@ library PolicyConfig {
     mapping(bytes32 policyName => Policy policy) policies; // The state of each policy.
   }
 
-  /// @notice Helper function that returns the level of the policy record that serves a chain.
-  /// A chain-specific record takes higher precedence over the default record.
+  /// @notice Returns the level of the policy record that serves a chain. A chain record takes precedence over the
+  /// default record.
   /// @dev The caller checks the inline record of the token first, as an inline record overrides the policy.
   /// @param s_policyChainSelectors The chains of the records of the token's policy.
   /// @param remoteChainSelector The remote chain selector.
@@ -82,6 +82,7 @@ library PolicyConfig {
     EnumerableSet.UintSet storage s_policyChainSelectors,
     uint64 remoteChainSelector
   ) internal view returns (RecordLevel) {
+    // Chain selector zero is the key of the default record, not a real chain.
     if (remoteChainSelector == DEFAULT_CHAIN_SELECTOR) {
       return RecordLevel.None;
     }
@@ -94,7 +95,9 @@ library PolicyConfig {
     return RecordLevel.None;
   }
 
-  /// @notice Adds a record to a policy, or keeps the record if it exists.
+  /// @notice Adds a record to a policy, or keeps the record if it exists. Creates the policy if it does not exist.
+  /// @dev The caller is responsible for storing the record values. Policy types without a default record must reject
+  /// chain selector zero before calling this.
   /// @param s_policies The policies of the policy type.
   /// @param policyName The name of the policy.
   /// @param remoteChainSelector The chain of the record. Zero names the default record.
@@ -112,7 +115,7 @@ library PolicyConfig {
   }
 
   /// @notice Removes a record from a policy. The policy stays, even when it has no records left.
-  /// @dev The caller deletes the values of the record.
+  /// @dev The caller is responsible for deleting the record values.
   /// @param s_policies The policies of the policy type.
   /// @param policyName The name of the policy.
   /// @param remoteChainSelector The chain of the record. Zero names the default record.
@@ -149,7 +152,8 @@ library PolicyConfig {
   }
 
   /// @notice Adds an inline record to a token, or keeps the record if it exists.
-  /// @dev There are no defaults for inline records, chain selector zero is rejected.
+  /// @dev Inline records have no default, so chain selector zero is rejected. The caller is responsible for storing the
+  /// record values.
   /// @param s_tokens The registered tokens.
   /// @param s_inlineChainSelectors The chains of the inline records of the token.
   /// @param localToken The token.
@@ -171,6 +175,7 @@ library PolicyConfig {
   }
 
   /// @notice Removes an inline record from a token.
+  /// @dev The caller is responsible for deleting the record values.
   /// @param s_inlineChainSelectors The chains of the inline records of the token.
   /// @param localToken The token.
   /// @param remoteChainSelector The chain of the record.
@@ -185,11 +190,11 @@ library PolicyConfig {
   }
 
   /// @notice Updates the token counts when a token changes from its old policy to its new policy.
-  /// A zero policy name means that the token has no policy.
+  /// A zero policy name means that the token has no policy. Does nothing if both names are equal.
   /// @param s_policies The policies of the policy type.
-  /// @param oldPolicyName The current policy of the token, as the caller stores it. It must exist and have at least
-  /// one token.
-  /// @param newPolicyName The new policy of the token. It must exist.
+  /// @param oldPolicyName The current policy of the token, as the caller stores it. If nonzero, it must exist and have
+  /// at least one token.
+  /// @param newPolicyName The new policy of the token. If nonzero, it must exist.
   function _moveToken(
     Policies storage s_policies,
     bytes32 oldPolicyName,
@@ -198,6 +203,8 @@ library PolicyConfig {
     if (oldPolicyName == newPolicyName) {
       return;
     }
+    // These should never fail for a correctly stored policy name, but give a clear error instead of an underflow if
+    // they do.
     if (oldPolicyName != bytes32(0)) {
       if (!s_policies.policyNames.contains(oldPolicyName)) {
         revert PolicyNotFound(oldPolicyName);

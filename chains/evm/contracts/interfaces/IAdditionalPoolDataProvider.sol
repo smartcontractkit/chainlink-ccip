@@ -8,7 +8,7 @@ interface IAdditionalPoolDataProvider {
   /// @notice Returns the additional pool data for a lockOrBurn.
   /// @param localToken The local token that is being locked or burned.
   /// @param remoteChainSelector The destination chain.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @param tokenArgs The token arguments of the message. The sender chooses them.
   /// @return additionalPoolData The additional pool data to validate on the destination chain.
   function getAdditionalPoolData(
@@ -21,7 +21,7 @@ interface IAdditionalPoolDataProvider {
   /// @notice Returns if the additional pool data from the source chain is valid for the local token on dest chain.
   /// @param localToken The local token that is being released or minted.
   /// @param remoteChainSelector The source chain.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @param additionalPoolData The additional pool data from the source chain. Empty if none was provided.
   /// @return isValid True if the data is valid for the local token, false otherwise.
   function isAdditionalPoolDataValid(
