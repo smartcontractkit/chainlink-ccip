@@ -668,7 +668,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) {
         InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
         connection.useLegacyPoolDataOnSend = record.useLegacyPoolDataOnSend;
-        connection.remotePools = _getRemotePools(record);
+        connection.remotePools = _getInlineRemotePools(record);
         if (!record.trustPolicyRemotePools) continue;
       }
 
@@ -915,7 +915,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
         remoteChainSelector: remoteChainSelector,
         trustPolicyRemotePools: record.trustPolicyRemotePools,
         remotePoolConfig: RemotePoolConfig({
-          useLegacyPoolDataOnSend: record.useLegacyPoolDataOnSend, remotePools: _getRemotePools(record)
+          useLegacyPoolDataOnSend: record.useLegacyPoolDataOnSend, remotePools: _getInlineRemotePools(record)
         })
       });
     }
@@ -1057,7 +1057,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return remotePools;
   }
 
-  function _getRemotePools(
+  function _getInlineRemotePools(
     InlineRemotePoolRecord storage record
   ) private view returns (IPoolConfigManager.RemotePool[] memory remotePools) {
     bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
@@ -1419,7 +1419,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       // would burn or lock tokens for messages it can't process. Clearing the flag first confirms the remote pool has
       // been upgraded.
       if (record.useLegacyPoolDataOnSend) revert LegacyRemotePoolRecord(localToken, remoteChainSelector);
-      _clearRemotePools(record);
+      _clearInlineRemotePools(record);
       delete s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       emit InlineRemotePoolConfigRemoved(localToken, remoteChainSelector);
     }
@@ -1540,7 +1540,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RemotePoolConfig calldata remotePoolConfig,
     bool trustPolicyRemotePools
   ) private {
-    _clearRemotePools(record);
+    _clearInlineRemotePools(record);
     record.useLegacyPoolDataOnSend = remotePoolConfig.useLegacyPoolDataOnSend;
     record.trustPolicyRemotePools = trustPolicyRemotePools;
 
@@ -1561,7 +1561,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return remotePoolHash;
   }
 
-  /// @dev Deleting the set does not clear its internal mapping, so each entry is removed individually.
+  /// @dev Use remove instead of EnumerableSet.clear to stay within the contract size limit.
   function _clearPolicyRemotePools(
     EnumerableSet.Bytes32Set storage policyRemotePoolHashes
   ) private {
@@ -1571,8 +1571,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev Deleting the struct does not clear the set or the mapping, so each entry is removed individually.
-  function _clearRemotePools(
+  /// @dev Deleting the struct does not clear its mappings. Remove each pool first.
+  function _clearInlineRemotePools(
     InlineRemotePoolRecord storage record
   ) private {
     bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
