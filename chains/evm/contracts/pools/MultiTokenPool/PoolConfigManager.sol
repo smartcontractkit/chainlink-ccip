@@ -125,9 +125,6 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // ================================================================
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store resolves the lane and builds the pool data. The fee store checks the pool data size
-  /// and computes the token fee. The security store consumes outbound rate limit capacity for the amount after
-  /// fees. Only the security store changes state.
   function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
@@ -137,10 +134,13 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     bool chargeTokenFee
   ) external override returns (OutboundLane memory lane) {
     _onlyTokenPool(localToken);
+
     lane = i_connectionStore.resolveOutboundLane(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs);
+    // The fee store checks the pool data length against destBytesOverhead, so it needs the pool data first.
     lane.feeAmount = i_feeStore.validateLockOrBurn(
       localToken, remoteChainSelector, amount, requestedFinalityConfig, chargeTokenFee, lane.destPoolData.length
     );
+    // The rate limit applies to the amount after the token fee.
     lane.hook = i_securityStore.validateLockOrBurn(
       localToken, remoteChainSelector, amount - lane.feeAmount, requestedFinalityConfig
     );
@@ -148,15 +148,13 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev The connection store resolves the lane, checks the pool data, and converts the amount to local decimals.
-  /// The security store consumes inbound rate limit capacity for that amount. Only the security store changes
-  /// state.
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     bytes4 requestedFinalityConfig
   ) external override returns (ResolvedInboundTransfer memory transfer) {
     address localToken = releaseOrMintIn.localToken;
     uint64 remoteChainSelector = releaseOrMintIn.remoteChainSelector;
+
     _onlyTokenPool(localToken);
     transfer = i_connectionStore.resolveInboundLane(
       localToken,
@@ -166,9 +164,11 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
       releaseOrMintIn.sourceDenominatedAmount,
       requestedFinalityConfig
     );
+    // The rate limit applies to the amount in local decimals.
     transfer.hook = i_securityStore.validateReleaseOrMint(
       localToken, remoteChainSelector, transfer.localAmount, requestedFinalityConfig
     );
+
     return transfer;
   }
 
@@ -177,9 +177,10 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // ================================================================
 
   // Batch getters do not need pages. Callers can split token and lane inputs into smaller batches.
+  // Only the connection store knows whether a lane exists. Getters that read the other stores zero out the entries
+  // for lanes that don't exist.
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev Checks the requested finality before reading fees. Returns zero values for lanes that do not exist.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -187,47 +188,49 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     i_connectionStore.checkRequestedFinalityBatch(lanes, requestedFinalityConfig);
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     fees = i_feeStore.getFeeBatch(lanes, requestedFinalityConfig);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
-        delete fees[i]; // Preserves lane indices and sets isEnabled = false to indicate no fee record.
+        delete fees[i]; // Sets isEnabled to false.
       }
     }
+
     return fees;
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev Returns fee configs from the fee store. Returns zero values for lanes that do not exist.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view override returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs) {
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     feeConfigs = i_feeStore.getTokenTransferFeeConfigBatch(lanes);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
         delete feeConfigs[i];
       }
     }
+
     return feeConfigs;
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev Returns bucket state regardless of pauses. Returns zero values for lanes that do not exist.
-  /// See SecurityPolicyStore.getCurrentRateLimiterStateBatch for refill and config change behavior.
   function getCurrentRateLimiterStateBatch(
     LaneKey[] calldata lanes
   ) external view override returns (LaneRateLimiterState[] memory states) {
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     states = i_securityStore.getCurrentRateLimiterStateBatch(lanes);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
         delete states[i];
       }
     }
+
     return states;
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev See ConnectionPolicyStore.getLaneConnectionBatch for resolution rules, including lanes that do not exist.
   function getLaneConnectionBatch(
     LaneKey[] calldata lanes
   ) external view override returns (LaneConnection[] memory connections) {
@@ -235,8 +238,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev Ignores the requested finality. Returns the hook and CCV lists from the security store.
-  /// Returns a zero hook and empty CCV lists for lanes that do not exist.
+  /// @dev The requested finality is ignored, as the hook and CCVs are the same for all finalities.
   function getLaneVerificationBatch(
     LaneKey[] calldata lanes,
     bytes4 // requestedFinalityConfig
@@ -248,6 +250,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   {
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     (hooks, outboundCCVs, inboundCCVs) = i_securityStore.getLaneVerificationBatch(lanes);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
         delete hooks[i];
@@ -255,20 +258,24 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
         delete inboundCCVs[i];
       }
     }
+
     return (hooks, outboundCCVs, inboundCCVs);
   }
 
   /// @inheritdoc IPoolConfigManager
-  /// @dev Combines the token profile and lanes from the connection store with policy names from all three stores.
-  /// Returns zero values for unregistered tokens.
   function getTokenConfigBatch(
     address[] calldata localTokens
   ) external view override returns (TokenConfig[] memory configs) {
+    // The connection store returns the profile, lanes, and connection and remote pool policy names. The policy names
+    // of the other stores are added below.
     configs = i_connectionStore.getTokenConfigBatch(localTokens);
+
     (bytes32[] memory feePolicyNames, bytes32[] memory destOverheadPolicyNames) =
       i_feeStore.getTokenPolicyNamesBatch(localTokens);
+
     (bytes32[] memory rateLimitPolicyNames, bytes32[] memory securityPolicyNames) =
       i_securityStore.getTokenPolicyNamesBatch(localTokens);
+
     for (uint256 i = 0; i < localTokens.length; ++i) {
       configs[i].rateLimitPolicyName = rateLimitPolicyNames[i];
       configs[i].feePolicyName = feePolicyNames[i];
@@ -292,9 +299,11 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @notice Returns the record level that each config type would use to resolve a transfer on each lane.
-  /// @dev The connection level shows whether the lane exists. Connection and remote pool policies have no default
-  /// records, so their levels are never PolicyDefault. An inline remote pool record can also trust policy pools.
-  /// Its level remains Inline. Chain selector zero returns None for every type. Results follow the input lane order.
+  /// @dev Each config type is resolved on its own, including for lanes that do not exist yet, so tooling can check the
+  /// records before opening a lane. The connection level shows whether the lane exists. Connection and remote pool
+  /// policies have no default record, so their level is never PolicyDefault. An inline remote pool record reports
+  /// Inline, even if it also trusts policy pools. Chain selector zero returns None for every type. All returned arrays
+  /// are in the same order as lanes.
   /// @param lanes The token and remote chain lanes to query.
   /// @return connectionLevels The level of the connection record.
   /// @return remotePoolLevels The level of the remote pool record.
@@ -582,6 +591,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   /// @notice Removes and adds subset tokens. See ConnectionPolicyStore.applySubsetTokenUpdates.
   /// Checks that each added token has a record of every other config type for the chain.
   /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or CONNECTION_ROLE. Reverts on the first missing record.
+  /// The check runs even while onlySubsetTokens is false, so the lane is ready when the restriction is enabled.
   /// @param tokensToAdd The subset tokens to add.
   function applySubsetTokenUpdates(
     ConnectionPolicyStore.SubsetTokenArgs[] calldata, // tokensToRemove
@@ -596,8 +606,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @notice Sets the remote token address providers of connection policies. See
   /// ConnectionPolicyStore.applyRemoteTokenAddressProviderUpdates.
-  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or CONNECTION_ROLE.
-  /// Changing a provider does not open a lane, so no lane check is required.
+  /// @dev Only callable by CONFIG_ROLE, POLICY_ROLE, or CONNECTION_ROLE. Changing a provider does not open a lane, so
+  /// there is no lane check.
   function applyRemoteTokenAddressProviderUpdates(
     ConnectionPolicyStore.RemoteTokenAddressProviderArgs[] calldata // providersToSet
   ) external {
@@ -810,8 +820,8 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   // ================================================================
 
   /// @notice Withdraws the pool's full balance of each fee token to the recipient.
-  /// @dev Only callable by FEE_COLLECTOR_ROLE. The pool must use this contract as its pool config manager.
-  /// The pool also checks that only its pool config manager can withdraw fees.
+  /// @dev Only callable by FEE_COLLECTOR_ROLE. Reverts if the pool does not use this contract as its pool config
+  /// manager.
   /// @param pool The pool that holds the fees.
   /// @param feeTokens The tokens to withdraw.
   /// @param recipient The fee recipient. Must not be the zero address.
@@ -820,6 +830,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     address[] calldata feeTokens,
     address recipient
   ) external onlyRole(FEE_COLLECTOR_ROLE) {
+    // The pool would also reject this call, but checking here gives a clearer error.
     address poolConfigManager = pool.getPoolConfigManager();
     if (poolConfigManager != address(this)) revert PoolConfigManagerMismatch(address(pool), poolConfigManager);
     pool.withdrawFeeTokens(feeTokens, recipient);
@@ -838,7 +849,6 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
 
   /// @dev Checks all three stores after setting an inline connection record or adding a subset token.
   /// Other writes, including connection policy changes, require checks in off-chain tooling.
-  /// Records are checked in connection store, fee store, and security store order.
   function _checkLane(
     address localToken,
     uint64 remoteChainSelector
@@ -849,11 +859,12 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   }
 
   /// @dev Ends the external call with the store's raw return data. The manager and store functions must have matching
-  /// signatures and return types. Assembly avoids decoding and encoding the same values again.
+  /// signatures and return types.
   function _forwardView(
     address store
   ) private view {
     bytes memory returnData = Address.functionStaticCall(store, msg.data);
+    // Return the raw data to avoid decoding and encoding the same values again.
     assembly ("memory-safe") {
       return(add(returnData, 32), mload(returnData))
     }

@@ -141,7 +141,7 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     profiles[1].localDecimals = 8;
 
     vm.expectRevert(
-      abi.encodeWithSelector(ConnectionPolicyStore.InvalidDecimalArgs.selector, DEFAULT_TOKEN_DECIMALS, 6)
+      abi.encodeWithSelector(ConnectionPolicyStore.InvalidDecimalArgs.selector, s_tokenC, DEFAULT_TOKEN_DECIMALS, 6)
     );
     s_poolConfigManager.applyTokenProfileUpdates(new address[](0), profiles);
   }

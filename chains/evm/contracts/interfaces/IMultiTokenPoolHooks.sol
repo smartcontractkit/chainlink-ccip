@@ -7,10 +7,9 @@ import {Pool} from "../libraries/Pool.sol";
 interface IMultiTokenPoolHooks {
   /// @notice Preflight check before the lock or burn operation.
   /// @param lockOrBurnIn The lock or burn input parameters.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @param tokenArgs Additional token arguments.
   /// @param amountPostFee The amount after the token fee.
-  /// @dev A revert stops the transfer on the source chain.
   function preflightCheck(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn,
     bytes4 requestedFinalityConfig,
@@ -21,8 +20,7 @@ interface IMultiTokenPoolHooks {
   /// @notice Postflight check before the release or mint operation.
   /// @param releaseOrMintIn The release or mint input parameters.
   /// @param localAmount The amount in local decimals that the pool releases or mints.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @dev A revert makes the message fail. It can be executed again after the cause is fixed.
+  /// @param requestedFinalityConfig The requested finality.
   function postflightCheck(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     uint256 localAmount,

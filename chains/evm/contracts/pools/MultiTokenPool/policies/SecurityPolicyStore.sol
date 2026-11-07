@@ -19,7 +19,7 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// writes to this store.
 ///
 /// Each token has its own buckets for each chain. Tokens of one policy share the config, not the state.
-/// A security record holds the outbound and inbound CCVs and the MultiTokenPoolHook address.
+/// A security record holds the outbound and inbound CCVs and the IMultiTokenPoolHooks address.
 contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -103,8 +103,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes32 securityPolicyName; // Identifier of the security policy attached to the token, or zero.
   }
 
-  /// @dev The values of a rate limit record. Amounts are in local token units. While an FTF config is disabled, an FTF
-  /// transfer in its direction uses the default finality bucket of the same record.
+  /// @notice The values of a rate limit record. Amounts are in local token units.
+  /// @dev While an FTF config is disabled, an FTF transfer in its direction uses the default finality bucket of the
+  /// same record.
   struct RateLimitConfig {
     RateLimiter.Config outbound; // The outbound limit for default finality, meaning the rate limits for all of the onRamps for the given chain.
     RateLimiter.Config inbound; // The inbound limit for default finality, meaning the rate limits for all of the offRamps for the given chain.
@@ -112,7 +113,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimiter.Config fastFinalityInbound; // The inbound limit for FTF.
   }
 
-  /// @dev RateLimitConfig with its policy record key.
+  /// @notice RateLimitConfig with its policy record key.
   struct RateLimitPolicyConfigArgs {
     bytes32 policyName; // The rate limit policy.
     uint64 remoteChainSelector; // ─╮ The remote chain. Zero names the policy default record.
@@ -120,14 +121,14 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimitConfig rateLimitConfig; // The values of the record.
   }
 
-  /// @dev RateLimitConfig with its token and chain.
+  /// @notice RateLimitConfig with its token and chain.
   struct InlineRateLimitConfigArgs {
     address localToken; // ─────────╮ The local token address.
     uint64 remoteChainSelector; // ─╯ The remote chain.
     RateLimitConfig rateLimitConfig; // The values of the record.
   }
 
-  /// @dev One bucket of an inline rate limit record to update.
+  /// @notice One bucket of an inline rate limit record to update.
   // solhint-disable-next-line gas-struct-packing
   struct InlineRateLimitBucketArgs {
     address localToken; // ────────────────╮ The local token address.
@@ -137,7 +138,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RateLimiter.Config config; // The limit of the bucket.
   }
 
-  /// @dev One bucket of a rate limit policy record to update.
+  /// @notice One bucket of a rate limit policy record to update.
   // solhint-disable-next-line gas-struct-packing
   struct RateLimitPolicyBucketArgs {
     bytes32 policyName; // The rate limit policy.
@@ -152,17 +153,17 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   struct SecurityConfig {
     address[] outboundCCVs; // CCVs required for outgoing messages to the remote chain.
     address[] inboundCCVs; // CCVs required for incoming messages from the remote chain.
-    address hook; // The IMultiTokenPoolHooks of the lane.
+    address hook; // The IMultiTokenPoolHooks of the lane. Zero means no hook.
   }
 
-  /// @dev SecurityConfig with its policy record key.
+  /// @notice SecurityConfig with its policy record key.
   struct SecurityPolicyConfigArgs {
     bytes32 policyName; // The security policy.
     uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
     SecurityConfig securityConfig; // The values of the record.
   }
 
-  /// @dev SecurityConfig with its token and chain.
+  /// @notice SecurityConfig with its token and chain.
   struct InlineSecurityConfigArgs {
     address localToken; // ─────────╮ The local token address.
     uint64 remoteChainSelector; // ─╯ The remote chain.
@@ -189,8 +190,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// its config in the policy, and the store copies it into the bucket on use. A bucket is keyed by the remote chain
   /// of the transfer, also while the token uses a policy record.
   /// Separate buckets give fast finality transfers isolated rate limits, as their risk profile differs from default
-  /// transfers. When the FTF buckets are not configured, the default bucket of the same direction is used for all
-  /// transfers regardless of the finality requirements.
+  /// transfers.
   mapping(
     address localToken
       => mapping(
@@ -261,12 +261,13 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // and returns the hook of the security record. A transfer reverts if the token has no record for the chain.
 
   /// @notice Consumes the outbound rate limit of an outbound transfer, and returns the hook of the lane.
-  /// @dev Reverts if the token has no security record or no rate limit record for the chain, in that order.
+  /// @dev Reverts if the token has no security or rate limit record for the chain. Any requested finality other than
+  /// WAIT_FOR_FINALITY_FLAG uses the FTF bucket.
   /// @param localToken The local token.
-  /// @param remoteChainSelector The remote chain selector.
-  /// @param amount The amount after the token fee.
+  /// @param remoteChainSelector The destination chain.
+  /// @param amount The amount after the token fee, in local decimals.
   /// @param requestedFinalityConfig The requested finality.
-  /// @return hook The address of MultiTokenPoolHook.
+  /// @return hook The hook of the security record. Zero means no hook.
   function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
@@ -275,7 +276,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external onlyAuthorizedCallers returns (address hook) {
     (PolicyConfig.RecordLevel level, SecurityConfig storage securityConfig) =
       _resolveSecurityConfig(localToken, remoteChainSelector);
+
     if (level == PolicyConfig.RecordLevel.None) revert SecurityRecordNotFound(localToken, remoteChainSelector);
+
     _consumeRateLimit(
       localToken,
       remoteChainSelector,
@@ -287,11 +290,12 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Consumes the inbound rate limit, and returns the hook of the lane.
-  /// @dev Reverts if the token has no rate limit record or no security record for the chain.
+  /// @dev Reverts if the token has no rate limit or security record for the chain. Any requested finality other than
+  /// WAIT_FOR_FINALITY_FLAG uses the FTF bucket.
   /// @param localToken The local token.
   /// @param remoteChainSelector The source chain.
   /// @param localAmount The amount in local decimals.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @return hook The hook of the security record. Zero means no hook.
   function validateReleaseOrMint(
     address localToken,
@@ -306,13 +310,16 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       requestedFinalityConfig != FinalityCodec.WAIT_FOR_FINALITY_FLAG,
       localAmount
     );
+
     (PolicyConfig.RecordLevel level, SecurityConfig storage securityConfig) =
       _resolveSecurityConfig(localToken, remoteChainSelector);
+
     if (level == PolicyConfig.RecordLevel.None) revert SecurityRecordNotFound(localToken, remoteChainSelector);
+
     return securityConfig.hook;
   }
 
-  /// @dev A transfer never runs without a rate limit record.
+  /// @dev Reverts if the token has no rate limit record for the chain.
   function _consumeRateLimit(
     address localToken,
     uint64 remoteChainSelector,
@@ -322,7 +329,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) private {
     (PolicyConfig.RecordLevel level, bytes32 policyName, uint64 recordChainSelector) =
       _resolveRateLimitRecord(localToken, remoteChainSelector);
+
     if (level == PolicyConfig.RecordLevel.None) revert RateLimitRecordNotFound(localToken, remoteChainSelector);
+
     // If the FTF config of the record is not enabled, an FTF transfer uses the default finality bucket, the same as
     // TokenPool. A bucket gets the config of its policy record only on use, so this check reads the record.
     if (fastFinality && !_isFastFinalityRateLimitEnabled(localToken, policyName, recordChainSelector, direction)) {
@@ -362,7 +371,6 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// - the token moved to a record with a different config.
   /// Otherwise the bucket keeps its current state. Because the sync is lazy, a bucket never holds more tokens than it
   /// would if every config change or record move had refilled it immediately.
-  /// Inline records skip the sync, as their buckets already hold their config.
   function _syncBucket(
     address localToken,
     uint64 remoteChainSelector,
@@ -372,6 +380,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bool fastFinality
   ) private returns (RateLimiter.TokenBucket storage bucket) {
     bucket = s_tokenBuckets[localToken][remoteChainSelector][fastFinality][direction];
+    // An inline record keeps its config in the bucket, so there is nothing to sync.
     if (policyName == bytes32(0)) {
       return bucket;
     }
@@ -392,21 +401,23 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return bucket.isEnabled == config.isEnabled && bucket.capacity == config.capacity && bucket.rate == config.rate;
   }
 
-  /// @dev An inline record overrides the policy, so it is checked before the policy name is read. The policy name is
-  /// zero for an inline record, which keeps its config in the buckets of the token. recordChainSelector is the chain
-  /// key of the record. It is the remote chain for an inline record and for a policy chain record, and zero for a
-  /// policy default record.
+  /// @dev Inline records keep their config in the token's buckets, so they return a zero policy name.
+  /// recordChainSelector is zero for a policy default record and the remote chain otherwise. Returns (None, 0, 0) if
+  /// the token has no record.
   function _resolveRateLimitRecord(
     address localToken,
     uint64 remoteChainSelector
   ) private view returns (PolicyConfig.RecordLevel level, bytes32 policyName, uint64 recordChainSelector) {
+    // Inline records override the policy.
     if (s_inlineRateLimitChains[localToken].contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.Inline, bytes32(0), remoteChainSelector);
     }
+
     policyName = s_tokenStates[localToken].rateLimitPolicyName;
     level = PolicyConfig._resolvePolicyRecordLevel(
       s_rateLimitPolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
     );
+
     if (level == PolicyConfig.RecordLevel.PolicyChain) {
       return (level, policyName, remoteChainSelector);
     }
@@ -416,8 +427,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (level, bytes32(0), 0);
   }
 
-  /// @dev The same order as _resolveRateLimitRecord. A token without a record gets its inline slot for the chain, which
-  /// is empty, because a removal deletes the values of a record.
+  /// @dev Resolves in the same order as _resolveRateLimitRecord. Returns an empty config if the token has no record.
   function _resolveSecurityConfig(
     address localToken,
     uint64 remoteChainSelector
@@ -425,16 +435,19 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (s_inlineSecurityChains[localToken].contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.Inline, s_inlineSecurityConfigs[localToken][remoteChainSelector]);
     }
+
     bytes32 policyName = s_tokenStates[localToken].securityPolicyName;
     level = PolicyConfig._resolvePolicyRecordLevel(
       s_securityPolicies.policies[policyName].remoteChainSelectors, remoteChainSelector
     );
+
     if (level == PolicyConfig.RecordLevel.PolicyChain) {
       return (level, s_policySecurityConfigs[policyName][remoteChainSelector]);
     }
     if (level == PolicyConfig.RecordLevel.PolicyDefault) {
       return (level, s_policySecurityConfigs[policyName][PolicyConfig.DEFAULT_CHAIN_SELECTOR]);
     }
+    // Without any record this slot is empty, as removing an inline record deletes its values.
     return (level, s_inlineSecurityConfigs[localToken][remoteChainSelector]);
   }
 
@@ -447,16 +460,15 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @param lanes The token and remote chain lanes to query.
   /// @return hooks The hook per lane, aligned with lanes by index. Zero if no hook is configured or if the token has no
   /// security record.
-  /// @return outboundCCVs The outbound CCVs per lane, aligned with lanes by index. Empty if the token has no security
-  /// record.
-  /// @return inboundCCVs The inbound CCVs per lane, aligned with lanes by index. Empty if the token has no security
-  /// record.
+  /// @return outboundCCVs The outbound CCVs per lane, aligned by index. Empty if the token has no security record.
+  /// @return inboundCCVs The inbound CCVs per lane, aligned by index. Empty if the token has no security record.
   function getLaneVerificationBatch(
     IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (address[] memory hooks, address[][] memory outboundCCVs, address[][] memory inboundCCVs) {
     hooks = new address[](lanes.length);
     outboundCCVs = new address[][](lanes.length);
     inboundCCVs = new address[][](lanes.length);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       (, SecurityConfig storage securityConfig) =
         _resolveSecurityConfig(lanes[i].localToken, lanes[i].remoteChainSelector);
@@ -477,6 +489,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     IPoolConfigManager.LaneKey[] calldata lanes
   ) external view returns (IPoolConfigManager.LaneRateLimiterState[] memory states) {
     states = new IPoolConfigManager.LaneRateLimiterState[](lanes.length);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       states[i] = _getCurrentRateLimiterState(lanes[i].localToken, lanes[i].remoteChainSelector);
     }
@@ -494,6 +507,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view {
     (PolicyConfig.RecordLevel level,,) = _resolveRateLimitRecord(localToken, remoteChainSelector);
     if (level == PolicyConfig.RecordLevel.None) revert RateLimitRecordNotFound(localToken, remoteChainSelector);
+
     (level,) = _resolveSecurityConfig(localToken, remoteChainSelector);
     if (level == PolicyConfig.RecordLevel.None) revert SecurityRecordNotFound(localToken, remoteChainSelector);
   }
@@ -514,9 +528,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   {
     rateLimitLevels = new PolicyConfig.RecordLevel[](lanes.length);
     securityLevels = new PolicyConfig.RecordLevel[](lanes.length);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       address localToken = lanes[i].localToken;
       uint64 remoteChainSelector = lanes[i].remoteChainSelector;
+
       (rateLimitLevels[i],,) = _resolveRateLimitRecord(localToken, remoteChainSelector);
       (securityLevels[i],) = _resolveSecurityConfig(localToken, remoteChainSelector);
     }
@@ -530,9 +546,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) private view returns (IPoolConfigManager.LaneRateLimiterState memory state) {
     (PolicyConfig.RecordLevel level, bytes32 policyName, uint64 recordChainSelector) =
       _resolveRateLimitRecord(localToken, remoteChainSelector);
+
     if (level == PolicyConfig.RecordLevel.None) {
       return state;
     }
+
     return IPoolConfigManager.LaneRateLimiterState({
       outbound: _getCurrentTokenBucketState(
         localToken, remoteChainSelector, policyName, recordChainSelector, false, IPoolV2.MessageDirection.Outbound
@@ -559,9 +577,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     IPoolV2.MessageDirection direction
   ) private view returns (IPoolConfigManager.TokenBucket memory) {
     RateLimiter.TokenBucket storage bucket = s_tokenBuckets[localToken][remoteChainSelector][fastFinality][direction];
+
     if (policyName != bytes32(0)) {
       RateLimiter.Config storage config =
         s_policyRateLimitConfigs[policyName][recordChainSelector][fastFinality][direction];
+
       if (!_hasConfig(bucket, config)) {
         return IPoolConfigManager.TokenBucket({
           tokens: config.capacity,
@@ -621,6 +641,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view returns (bytes32[] memory rateLimitPolicyNames, bytes32[] memory securityPolicyNames) {
     rateLimitPolicyNames = new bytes32[](localTokens.length);
     securityPolicyNames = new bytes32[](localTokens.length);
+
     for (uint256 i = 0; i < localTokens.length; ++i) {
       TokenState storage tokenState = s_tokenStates[localTokens[i]];
       rateLimitPolicyNames[i] = tokenState.rateLimitPolicyName;
@@ -637,10 +658,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   function getInlineRateLimitConfigs(
     address localToken
   ) external view returns (InlineRateLimitConfigArgs[] memory inlineConfigs) {
-    uint256[] memory chains = s_inlineRateLimitChains[localToken].values();
-    inlineConfigs = new InlineRateLimitConfigArgs[](chains.length);
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    uint256[] memory remoteChainSelectors = s_inlineRateLimitChains[localToken].values();
+    inlineConfigs = new InlineRateLimitConfigArgs[](remoteChainSelectors.length);
+
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       inlineConfigs[i] = InlineRateLimitConfigArgs({
         localToken: localToken,
         remoteChainSelector: remoteChainSelector,
@@ -668,10 +690,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   function getInlineSecurityConfigs(
     address localToken
   ) external view returns (InlineSecurityConfigArgs[] memory inlineConfigs) {
-    uint256[] memory chains = s_inlineSecurityChains[localToken].values();
-    inlineConfigs = new InlineSecurityConfigArgs[](chains.length);
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    uint256[] memory remoteChainSelectors = s_inlineSecurityChains[localToken].values();
+    inlineConfigs = new InlineSecurityConfigArgs[](remoteChainSelectors.length);
+
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       SecurityConfig storage securityConfig = s_inlineSecurityConfigs[localToken][remoteChainSelector];
       inlineConfigs[i] = InlineSecurityConfigArgs({
         localToken: localToken, remoteChainSelector: remoteChainSelector, securityConfig: securityConfig
@@ -691,10 +714,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes32 policyName
   ) external view returns (uint32 tokenCount, uint8 localDecimals, RateLimitPolicyConfigArgs[] memory policyConfigs) {
     PolicyConfig.Policy storage policy = s_rateLimitPolicies.policies[policyName];
-    uint256[] memory chains = policy.remoteChainSelectors.values();
-    policyConfigs = new RateLimitPolicyConfigArgs[](chains.length);
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    uint256[] memory remoteChainSelectors = policy.remoteChainSelectors.values();
+    policyConfigs = new RateLimitPolicyConfigArgs[](remoteChainSelectors.length);
+
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       policyConfigs[i] = RateLimitPolicyConfigArgs({
         policyName: policyName,
         remoteChainSelector: remoteChainSelector,
@@ -724,10 +748,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes32 policyName
   ) external view returns (uint32 tokenCount, SecurityPolicyConfigArgs[] memory policyConfigs) {
     PolicyConfig.Policy storage policy = s_securityPolicies.policies[policyName];
-    uint256[] memory chains = policy.remoteChainSelectors.values();
-    policyConfigs = new SecurityPolicyConfigArgs[](chains.length);
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    uint256[] memory remoteChainSelectors = policy.remoteChainSelectors.values();
+    policyConfigs = new SecurityPolicyConfigArgs[](remoteChainSelectors.length);
+
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       SecurityConfig storage securityConfig = s_policySecurityConfigs[policyName][remoteChainSelector];
       policyConfigs[i] = SecurityPolicyConfigArgs({
         policyName: policyName, remoteChainSelector: remoteChainSelector, securityConfig: securityConfig
@@ -774,12 +799,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Deregisters tokens, then sets the profile of tokens. A set of a new token registers it with no policy.
   /// All three stores apply the same call in one transaction.
-  /// @dev This store keeps only the decimals of the profile. The connection store checks the decimals of a new token
-  /// against the token in the same transaction, so this store copies the decimals of a new token without a check. A set
-  /// of a registered token needs the stored decimals, the same rule as in the connection store. So a caller that writes
-  /// only this store cannot change the decimals of a registered token. A deregistration needs a token without a policy
-  /// and without an inline record of a type of this store. A deregistered token can be registered again, also with other
-  /// decimals.
+  /// @dev This store only keeps the token decimals. Decimals cannot change while a token is registered, same as in the
+  /// connection store. A token can only be deregistered once it has no policy and no inline records in this store. It
+  /// can be registered again later, with different decimals if needed.
   /// @param tokensToRemove The registered tokens to deregister.
   /// @param profilesToSet The tokens to register or to update.
   function applyTokenProfileUpdates(
@@ -788,7 +810,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external onlyAuthorizedCallers {
     for (uint256 i = 0; i < tokensToRemove.length; ++i) {
       address localToken = tokensToRemove[i];
+
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+
       TokenState storage tokenState = s_tokenStates[localToken];
       if (
         tokenState.rateLimitPolicyName != bytes32(0) || tokenState.securityPolicyName != bytes32(0)
@@ -796,6 +820,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       ) {
         revert TokenHasConfig(localToken);
       }
+
       s_tokens.remove(localToken);
       emit TokenRemoved(localToken);
     }
@@ -803,12 +828,16 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < profilesToSet.length; ++i) {
       PolicyConfig.TokenProfileArgs calldata args = profilesToSet[i];
       address localToken = args.localToken;
+
       if (localToken == address(0)) revert ZeroAddressInvalid();
+
       TokenState storage tokenState = s_tokenStates[localToken];
       if (s_tokens.contains(localToken) && tokenState.localDecimals != args.localDecimals) {
         revert InvalidDecimalArgs(localToken, tokenState.localDecimals, args.localDecimals);
       }
 
+      // A PoolConfigManager is the only expected caller of this function.
+      // Here we expect it to have validated the decimals already.
       s_tokens.add(localToken);
       tokenState.localDecimals = args.localDecimals;
       emit TokenProfileSet(localToken, args.localDecimals);
@@ -825,16 +854,20 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
       address localToken = tokenPoliciesToSet[i].localToken;
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
+
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+
       TokenState storage tokenState = s_tokenStates[localToken];
       // The existence check runs first, because a policy that does not exist has zero decimals.
       if (policyName != bytes32(0)) {
         if (!s_rateLimitPolicies.policyNames.contains(policyName)) revert PolicyConfig.PolicyNotFound(policyName);
+
         uint8 policyDecimals = s_rateLimitPolicyDecimals[policyName];
         if (policyDecimals != tokenState.localDecimals) {
           revert InvalidRateLimitPolicyDecimals(policyName, policyDecimals, tokenState.localDecimals);
         }
       }
+
       bytes32 oldPolicyName = tokenState.rateLimitPolicyName;
       PolicyConfig._moveToken(s_rateLimitPolicies, oldPolicyName, policyName);
       tokenState.rateLimitPolicyName = policyName;
@@ -851,9 +884,12 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < tokenPoliciesToSet.length; ++i) {
       address localToken = tokenPoliciesToSet[i].localToken;
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
+
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+
       TokenState storage tokenState = s_tokenStates[localToken];
       bytes32 oldPolicyName = tokenState.securityPolicyName;
+
       PolicyConfig._moveToken(s_securityPolicies, oldPolicyName, policyName);
       tokenState.securityPolicyName = policyName;
       emit TokenSecurityPolicySet(localToken, oldPolicyName, policyName);
@@ -866,11 +902,10 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Removes inline rate limit records, and creates or replaces them. A set writes all four configs of the
   /// record.
-  /// @dev The removals run first, then the sets. A set creates the record of its lane if it does not exist, so a
-  /// removal and a set of the same lane in one call replaces the record. Each config follows the checks of
-  /// RateLimiter. A set writes a bucket only when its config changes, so a set of the same config keeps the state of
-  /// the bucket. A removal deletes the buckets of the record. To refill a bucket without a config change, remove the
-  /// record and set it again in one call, or raise its capacity.
+  /// @dev Removals are applied before sets. A set creates the record if it does not exist. Configs are validated with
+  /// the same checks as RateLimiter. A bucket is only written, and refilled, when its config changes, so setting the
+  /// same config keeps the current bucket state. Removing a record deletes its buckets. To refill a bucket without
+  /// changing its config, remove and set the record in the same call.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineRateLimitConfigUpdates(
@@ -880,7 +915,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < inlineConfigsToRemove.length; ++i) {
       address localToken = inlineConfigsToRemove[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
+
       PolicyConfig._removeInlineRecord(s_inlineRateLimitChains[localToken], localToken, remoteChainSelector);
+
       mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.TokenBucket bucket))
         storage buckets = s_tokenBuckets[localToken][remoteChainSelector];
       delete buckets[false][IPoolV2.MessageDirection.Outbound];
@@ -893,6 +930,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
       InlineRateLimitConfigArgs calldata args = inlineConfigsToSet[i];
       RateLimitConfig calldata rateLimitConfig = args.rateLimitConfig;
+
       if (
         !_isValidRateLimitConfig(rateLimitConfig.outbound) || !_isValidRateLimitConfig(rateLimitConfig.inbound)
           || !_isValidRateLimitConfig(rateLimitConfig.fastFinalityOutbound)
@@ -904,6 +942,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineRateLimitChains[args.localToken], args.localToken, args.remoteChainSelector
       );
+
       mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.TokenBucket bucket))
         storage buckets = s_tokenBuckets[args.localToken][args.remoteChainSelector];
       _setBucketIfChanged(buckets[false][IPoolV2.MessageDirection.Outbound], rateLimitConfig.outbound);
@@ -914,19 +953,20 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets one bucket of inline rate limit records. The caller names one direction and one finality class, so it
-  /// never supplies the config of another bucket, and a set of the same config keeps the state of the bucket.
-  /// @dev The record must exist, so a caller creates it with applyInlineRateLimitConfigUpdates first. Each config
-  /// follows the checks of RateLimiter.
+  /// @notice Updates individual buckets of inline rate limit records, leaving the other buckets unchanged.
+  /// @dev The record must already exist, see applyInlineRateLimitConfigUpdates. Configs are validated with the same
+  /// checks as RateLimiter. A bucket is only written, and refilled, when its config changes.
   /// @param bucketConfigsToSet The bucket records to set.
   function applyInlineRateLimitBucketUpdates(
     InlineRateLimitBucketArgs[] calldata bucketConfigsToSet
   ) external onlyAuthorizedCallers {
     for (uint256 i = 0; i < bucketConfigsToSet.length; ++i) {
       InlineRateLimitBucketArgs calldata args = bucketConfigsToSet[i];
+
       if (!s_inlineRateLimitChains[args.localToken].contains(args.remoteChainSelector)) {
         revert RateLimitRecordNotFound(args.localToken, args.remoteChainSelector);
       }
+
       if (!_isValidRateLimitConfig(args.config)) {
         revert InvalidInlineRateLimitBucketConfig(
           args.localToken, args.remoteChainSelector, args.direction, args.fastFinality, args.config
@@ -944,14 +984,12 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Removes and sets rate limit policy records, and removes rate limit policies. A set writes all four
   /// configs of the record.
-  /// @dev The record removals run first, then the policy removals, then the record sets. The first record set under a
-  /// new name creates the policy and fixes its decimals, which stay fixed until the policy is removed. A record removal
-  /// keeps the policy. A policy removal needs a policy without tokens and without records. Chain selector zero names
-  /// the policy default record. Each config follows the checks of RateLimiter. A set changes no bucket. A bucket of a
-  /// token that uses a policy record copies the config of its record on its next use, when the config of the bucket
-  /// differs, which refills the bucket. So a set of the same config refills no bucket. After a removal of a policy
-  /// record, the buckets of its tokens keep their state. To refill a bucket without a config change, raise its
-  /// capacity.
+  /// @dev Record removals are applied first, then policy removals, then record sets. The first record set under a new
+  /// name creates the policy and fixes its decimals until the policy is removed. Removing a record keeps the policy. A
+  /// policy can only be removed once it has no tokens and no records. Chain selector zero is the policy default record.
+  /// Configs are validated with the same checks as RateLimiter. Sets do not write any buckets: a token's bucket picks
+  /// up the new config on its next use, and is refilled only if the config changed. After a policy record is removed,
+  /// the buckets of its tokens keep their state.
   /// @param policyConfigsToRemove The policy records to remove.
   /// @param policiesToRemove The policies to remove.
   /// @param policyConfigsToSet The policy records to set.
@@ -963,7 +1001,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < policyConfigsToRemove.length; ++i) {
       bytes32 policyName = policyConfigsToRemove[i].policyName;
       uint64 remoteChainSelector = policyConfigsToRemove[i].remoteChainSelector;
+
       PolicyConfig._removePolicyRecord(s_rateLimitPolicies, policyName, remoteChainSelector);
+
       mapping(bool fastFinality => mapping(IPoolV2.MessageDirection direction => RateLimiter.Config config)) storage
         recordConfigs = s_policyRateLimitConfigs[policyName][remoteChainSelector];
       delete recordConfigs[false][IPoolV2.MessageDirection.Outbound];
@@ -975,6 +1015,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < policiesToRemove.length; ++i) {
       bytes32 policyName = policiesToRemove[i];
+
       PolicyConfig._removePolicy(s_rateLimitPolicies, policyName);
       delete s_rateLimitPolicyDecimals[policyName];
       emit RateLimitPolicyRemoved(policyName);
@@ -982,13 +1023,14 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
       RateLimitPolicyConfigArgs calldata args = policyConfigsToSet[i];
-      // isNewPolicy is read before _setPolicyRecord, which adds the name of a new policy.
       bool isNewPolicy = !s_rateLimitPolicies.policyNames.contains(args.policyName);
+
       if (!isNewPolicy && s_rateLimitPolicyDecimals[args.policyName] != args.localDecimals) {
         revert InvalidRateLimitPolicyDecimals(
           args.policyName, s_rateLimitPolicyDecimals[args.policyName], args.localDecimals
         );
       }
+
       RateLimitConfig calldata rateLimitConfig = args.rateLimitConfig;
       if (
         !_isValidRateLimitConfig(rateLimitConfig.outbound) || !_isValidRateLimitConfig(rateLimitConfig.inbound)
@@ -1012,22 +1054,22 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @notice Sets one bucket of rate limit policy records. The caller names one direction and one finality class, so it
-  /// never supplies the config of another bucket.
-  /// @dev The record must exist, so a caller creates it with applyRateLimitPolicyConfigUpdates first. Chain selector
-  /// zero names the policy default record. Each config follows the checks of RateLimiter. A set changes no bucket. A
-  /// bucket of a token that uses a policy record copies the config of its record on its next use, when the config of
-  /// the bucket differs, which refills the bucket. So a set of the same config refills no bucket.
+  /// @notice Updates individual buckets of rate limit policy records, leaving the other buckets unchanged.
+  /// @dev The record must already exist, see applyRateLimitPolicyConfigUpdates. Chain selector zero is the policy
+  /// default record. Configs are validated with the same checks as RateLimiter. Sets do not write any buckets: a
+  /// token's bucket picks up the new config on its next use, and is refilled only if the config changed.
   /// @param bucketConfigsToSet The bucket records to set.
   function applyRateLimitPolicyBucketUpdates(
     RateLimitPolicyBucketArgs[] calldata bucketConfigsToSet
   ) external onlyAuthorizedCallers {
     for (uint256 i = 0; i < bucketConfigsToSet.length; ++i) {
       RateLimitPolicyBucketArgs calldata args = bucketConfigsToSet[i];
+
       // A record exists exactly when its chain is in the record set of its policy. Zero names the default record.
       if (!s_rateLimitPolicies.policies[args.policyName].remoteChainSelectors.contains(args.remoteChainSelector)) {
         revert PolicyConfig.PolicyRecordNotFound(args.policyName, args.remoteChainSelector);
       }
+
       if (!_isValidRateLimitConfig(args.config)) {
         revert InvalidRateLimitPolicyBucketConfig(
           args.policyName, args.remoteChainSelector, args.direction, args.fastFinality, args.config
@@ -1049,7 +1091,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev The checks of RateLimiter._setTokenBucketConfig. A set runs them for every config before it writes. A policy
   /// record stores a config without a bucket, so these are its only checks. The callers revert with the policy or token
-  /// and chain, so a batch op names the record that failed.
+  /// and chain, so the error identifies the failing record in a batch.
   function _isValidRateLimitConfig(
     RateLimiter.Config calldata config
   ) private pure returns (bool) {
@@ -1077,7 +1119,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @notice Removes and sets inline security records. A set writes every value of the record, so it replaces the
   /// record.
-  /// @dev The removals run first, then the sets. Each set runs the checks of CCVConfigValidation on both CCV lists.
+  /// @dev Removals are applied before sets. A set creates the record if it does not exist. CCV lists must not contain
+  /// duplicates.
   /// @param inlineConfigsToRemove The inline records to remove.
   /// @param inlineConfigsToSet The inline records to set.
   function applyInlineSecurityConfigUpdates(
@@ -1087,6 +1130,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < inlineConfigsToRemove.length; ++i) {
       address localToken = inlineConfigsToRemove[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
+
       PolicyConfig._removeInlineRecord(s_inlineSecurityChains[localToken], localToken, remoteChainSelector);
       delete s_inlineSecurityConfigs[localToken][remoteChainSelector];
       emit InlineSecurityConfigRemoved(localToken, remoteChainSelector);
@@ -1095,7 +1139,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < inlineConfigsToSet.length; ++i) {
       InlineSecurityConfigArgs calldata args = inlineConfigsToSet[i];
       SecurityConfig calldata securityConfig = args.securityConfig;
+
       _validateSecurityConfig(securityConfig.outboundCCVs, securityConfig.inboundCCVs);
+
       PolicyConfig._setInlineRecord(
         s_tokens, s_inlineSecurityChains[args.localToken], args.localToken, args.remoteChainSelector
       );
@@ -1108,8 +1154,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// record, so it replaces the record.
   /// @dev The record removals run first, then the policy removals, then the record sets. The first record set under a
   /// new name creates the policy. A record removal keeps the policy. A policy removal needs a policy without tokens
-  /// and without records. Chain selector zero names the policy default record. Each set runs the checks of
-  /// CCVConfigValidation on both CCV lists.
+  /// and without records. Chain selector zero names the policy default record. CCV lists must not contain duplicates.
   /// @param policyConfigsToRemove The policy records to remove.
   /// @param policiesToRemove The policies to remove.
   /// @param policyConfigsToSet The policy records to set.
@@ -1121,6 +1166,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < policyConfigsToRemove.length; ++i) {
       bytes32 policyName = policyConfigsToRemove[i].policyName;
       uint64 remoteChainSelector = policyConfigsToRemove[i].remoteChainSelector;
+
       PolicyConfig._removePolicyRecord(s_securityPolicies, policyName, remoteChainSelector);
       delete s_policySecurityConfigs[policyName][remoteChainSelector];
       emit SecurityPolicyConfigRemoved(policyName, remoteChainSelector);
@@ -1128,6 +1174,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < policiesToRemove.length; ++i) {
       bytes32 policyName = policiesToRemove[i];
+
       PolicyConfig._removePolicy(s_securityPolicies, policyName);
       emit SecurityPolicyRemoved(policyName);
     }
@@ -1135,14 +1182,16 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < policyConfigsToSet.length; ++i) {
       SecurityPolicyConfigArgs calldata args = policyConfigsToSet[i];
       SecurityConfig calldata securityConfig = args.securityConfig;
+
       _validateSecurityConfig(securityConfig.outboundCCVs, securityConfig.inboundCCVs);
+
       PolicyConfig._setPolicyRecord(s_securityPolicies, args.policyName, args.remoteChainSelector);
       _setSecurityConfig(s_policySecurityConfigs[args.policyName][args.remoteChainSelector], securityConfig);
       emit SecurityPolicyConfigSet(args.policyName, args.remoteChainSelector, securityConfig);
     }
   }
 
-  /// @dev A CCV list must not have a duplicate.
+  /// @dev Rejects duplicate CCVs. address(0) is allowed and means the default CCVs.
   function _validateSecurityConfig(
     address[] calldata outboundCCVs,
     address[] calldata inboundCCVs
@@ -1151,8 +1200,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     CCVConfigValidation._assertNoDuplicates(inboundCCVs);
   }
 
-  /// @dev Any address is accepted for the hook. A MultiTokenPoolHooks must list every pool
-  /// that serves a token of its lanes as an authorized caller.
+  /// @dev Any address is accepted for the hook. A MultiTokenPoolHooks must list every pool that serves a token of its
+  /// lanes as an authorized caller.
   function _setSecurityConfig(
     SecurityConfig storage storedConfig,
     SecurityConfig calldata config

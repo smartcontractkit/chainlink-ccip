@@ -59,7 +59,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   event DestOverheadPolicyConfigRemoved(bytes32 indexed policyName, uint64 indexed remoteChainSelector);
   event DestOverheadPolicyRemoved(bytes32 indexed policyName);
 
-  /// @dev The values of a fee record.
+  /// @notice The values of a fee record.
   struct FeeConfig {
     uint32 finalityFeeUSDCents; // ───────╮ Fee for a transfer with default finality, in multiples of 0.01 USD.
     uint32 fastFinalityFeeUSDCents; //    │ Fee for an FTF transfer, in multiples of 0.01 USD.
@@ -67,41 +67,41 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint16 fastFinalityTransferFeeBps; // ╯ Token fee for an FTF transfer, in basis points.
   }
 
-  /// @dev The values of a dest overhead record.
+  /// @notice The values of a dest overhead record.
   struct DestOverheadConfig {
     uint32 destGasOverhead; // ──╮ Gas for releaseOrMint on the destination chain. Not zero.
     uint32 destBytesOverhead; // ╯ Bytes charged for data availability and maximum pool data length. At least 32.
   }
 
-  /// @dev FeeConfig with its policy record key.
+  /// @notice FeeConfig with its policy record key.
   struct FeePolicyConfigArgs {
     bytes32 policyName; // The fee policy. Not zero.
     uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
     FeeConfig feeConfig; // The values of the record.
   }
 
-  /// @dev FeeConfig with its token and chain.
+  /// @notice FeeConfig with its token and chain.
   struct InlineFeeConfigArgs {
     address localToken; // ─────────╮ A registered token.
     uint64 remoteChainSelector; // ─╯ The remote chain. Not zero.
     FeeConfig feeConfig; //           The values of the record.
   }
 
-  /// @dev DestOverheadConfig with its policy record key.
+  /// @notice DestOverheadConfig with its policy record key.
   struct DestOverheadPolicyConfigArgs {
     bytes32 policyName; // The dest overhead policy. Not zero.
     uint64 remoteChainSelector; // The remote chain. Zero names the policy default record.
     DestOverheadConfig destOverheadConfig; // The values of the record.
   }
 
-  /// @dev DestOverheadConfig with its token and chain.
+  /// @notice DestOverheadConfig with its token and chain.
   struct InlineDestOverheadConfigArgs {
     address localToken; // ─────────╮ A registered token.
     uint64 remoteChainSelector; // ─╯ The remote chain. Not zero.
     DestOverheadConfig destOverheadConfig; // The values of the record.
   }
 
-  /// @dev The policies of a token. Zero means no policy.
+  /// @notice The policies of a token. Zero means no policy.
   struct TokenState {
     bytes32 feePolicyName; // The fee policy of the token.
     bytes32 destOverheadPolicyName; // The dest overhead policy of the token.
@@ -119,11 +119,11 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // │                       Inline storage                         │
   // ================================================================
 
-  /// @dev An inline fee record exists when a token x chain is in the set.
+  /// @dev A token has an inline fee record for a chain if the chain is in its set.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineFeeChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_inlineFeeConfigs;
 
-  /// @dev An inline overhead record exists when a token x chain is in the set.
+  /// @dev A token has an inline dest overhead record for a chain if the chain is in its set.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineDestOverheadChains;
   mapping(address localToken => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
     s_inlineDestOverheadConfigs;
@@ -137,7 +137,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => FeeConfig feeConfig)) private s_policyFeeConfigs;
 
   PolicyConfig.Policies private s_destOverheadPolicies;
-  /// @dev Overheads policy record details. Chain selector zero holds the policy default.
+  /// @dev Dest overhead policy record details. Chain selector zero holds the policy default.
   mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => DestOverheadConfig destOverheadConfig)) private
     s_policyDestOverheadConfigs;
 
@@ -155,15 +155,16 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   // ================================================================
 
   /// @notice Validates the outbound fee configuration and pool data length. Returns the token fee.
-  /// @dev Requires both fee and destination overhead records. Pool data must fit within destBytesOverhead, including
-  /// on the V1 path where no token fee is charged.
+  /// @dev Reverts if the token has no fee or dest overhead record for the chain. The pool data must fit within
+  /// destBytesOverhead, including on the V1 path where no token fee is charged. Any requested finality other than
+  /// WAIT_FOR_FINALITY_FLAG is charged the FTF token fee.
   /// @param localToken The local token.
   /// @param remoteChainSelector The destination chain.
   /// @param amount The transfer amount before deducting the token fee.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @param chargeTokenFee False for the V1 path, which charges no token fee.
   /// @param destPoolDataLength The length in bytes of the pool data returned by lockOrBurn.
-  /// @return feeAmount The token fee in local token units. Zero if chargeTokenFee is false.
+  /// @return feeAmount The token fee in local token units, rounded down. Zero if chargeTokenFee is false.
   function validateLockOrBurn(
     address localToken,
     uint64 remoteChainSelector,
@@ -174,6 +175,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view returns (uint256 feeAmount) {
     (FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
       _getLaneRecords(localToken, remoteChainSelector);
+
     if (destPoolDataLength > destOverheadConfig.destBytesOverhead) {
       revert PoolDataTooLarge(localToken, remoteChainSelector, destPoolDataLength, destOverheadConfig.destBytesOverhead);
     }
@@ -203,12 +205,13 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return (feeConfig, destOverheadConfig);
   }
 
-  /// @dev Returns the fee record of the token for the chain, and its level. An inline record overrides the policy. For
-  /// level None, the record is the empty inline slot, so callers must check the level first.
+  /// @dev Returns the fee record of the token for the chain, and its level. For level None, the record is the empty
+  /// inline slot, so callers must check the level first.
   function _resolveFeeConfig(
     address localToken,
     uint64 remoteChainSelector
   ) private view returns (PolicyConfig.RecordLevel level, FeeConfig storage feeConfig) {
+    // Inline records override the policy.
     if (s_inlineFeeChains[localToken].contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.Inline, s_inlineFeeConfigs[localToken][remoteChainSelector]);
     }
@@ -257,7 +260,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   /// @notice Returns the fee of each lane for the requested finality.
   /// @dev Does not check whether a connection exists. The PoolConfigManager clears results for missing lanes.
   /// @param lanes The lanes to query.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @return fees Fee parameters in the same order as lanes. Returns zero values with isEnabled false if either the
   /// fee or destination overhead record is missing.
   function getFeeBatch(
@@ -311,8 +314,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     return feeConfigs;
   }
 
-  /// @notice Reverts if the token has no fee record or no dest overhead record for the chain.
-  /// @dev The PoolConfigManager calls it after a write that opens a lane.
+  /// @notice Reverts if the token has no fee or dest overhead record for the chain.
+  /// @dev The PoolConfigManager calls it after it sets an inline connection record or adds a subset token.
   /// @param localToken The local token.
   /// @param remoteChainSelector The remote chain.
   function checkLaneRecords(
@@ -529,6 +532,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Sets the fee policy of tokens. Inline records are kept.
+  /// @dev The token must be registered and the policy must exist.
   /// @param tokenPoliciesToSet The fee policy of each token, applied in order. Zero removes the token from its policy.
   function applyTokenFeePolicyUpdates(
     PolicyConfig.TokenPolicyArgs[] calldata tokenPoliciesToSet
@@ -548,6 +552,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Sets the dest overhead policy of tokens. Inline records are kept.
+  /// @dev The token must be registered and the policy must exist.
   /// @param tokenPoliciesToSet The dest overhead policy of each token, applied in order. Zero removes the token from
   /// its policy.
   function applyTokenDestOverheadPolicyUpdates(
@@ -558,6 +563,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+
       TokenState storage tokenState = s_tokenStates[localToken];
       bytes32 oldPolicyName = tokenState.destOverheadPolicyName;
 
@@ -723,8 +729,8 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  /// @dev Requires nonzero gas overhead and enough bytes for legacy pool data, matching TokenPool and FeeQuoter.
-  /// Larger payloads require a higher destBytesOverhead; validateLockOrBurn checks the actual length.
+  /// @dev Matches TokenPool and FeeQuoter: the gas overhead must be nonzero and the bytes overhead must fit legacy pool
+  /// data. Larger pool data needs a higher destBytesOverhead, validateLockOrBurn checks the actual length.
   function _isValidDestOverheadConfig(
     DestOverheadConfig calldata destOverheadConfig
   ) private pure returns (bool) {

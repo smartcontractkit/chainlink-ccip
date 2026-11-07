@@ -6,7 +6,7 @@ import {IPoolV2} from "./IPoolV2.sol";
 import {Pool} from "../libraries/Pool.sol";
 
 /// @notice Transfer validation and resolved configuration views for multi-token pools.
-/// @dev Rate-limit consumption is restricted to the token's registered pool.
+/// @dev Only the token's pool in the TokenAdminRegistry can call the validate functions.
 interface IPoolConfigManager {
   /// @notice The token operation used on send. Burn flavors mint on receive; Lock releases tokens on receive.
   enum LockOrBurnFlavor {
@@ -20,20 +20,20 @@ interface IPoolConfigManager {
   /// @notice Resolved outbound configuration, pool data, and token fee for a transfer.
   // solhint-disable-next-line gas-struct-packing
   struct OutboundLane {
-    bytes remoteToken; //                   The token on the remote chain, abi encoded for EVM chains.
+    bytes remoteToken; //                   The token on the remote chain, ABI encoded for EVM chains.
     bytes destPoolData; //                  The pool data for the destination pool.
     uint8 localDecimals; // ──────────────╮ The decimals of the local token.
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out.
-    address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
+    address lockOrBurnAddress; // ────────╯ The lock box for Lock, the burn address for BurnToAddress, zero otherwise.
     uint256 feeAmount; //                   The token fee, in local token units.
     address hook; //                        The lane's IMultiTokenPoolHooks, called preflight. Zero means no hook.
   }
 
   /// @notice Resolved inbound transfer configuration.
   struct ResolvedInboundTransfer {
-    uint256 localAmount; //                 The local token amount to be used for the inbound transfer.
-    LockOrBurnFlavor lockOrBurnFlavor; // ╮ The token's type, used to decide if release or mint during inbound.
-    address lockOrBurnAddress; // ────────╯ Used for lockbox address during inbound.
+    uint256 localAmount; //                 The amount to release or mint, in local token units.
+    LockOrBurnFlavor lockOrBurnFlavor; // ╮ Lock releases on receive, all other flavors mint.
+    address lockOrBurnAddress; // ────────╯ The lock box for Lock, the burn address for BurnToAddress, zero otherwise.
     address hook; //                        The postflight hook to call. Zero means no hook.
   }
 
@@ -70,9 +70,7 @@ interface IPoolConfigManager {
   }
 
   /// @notice A trusted remote pool and its legacy pool data setting.
-  /// @dev Legacy pool data is empty or contains only token decimals. Allow legacy mode when receiving from
-  /// a legacy source pool, or a multi-token pool that sent legacy data before the destination migrated.
-  /// Keep the permission until all inflight messages with legacy pool data have executed.
+  /// @dev Legacy pool data is empty or contains only token decimals.
   struct RemotePool {
     bytes remotePoolAddress; //           The remote pool address, ABI encoded for EVM chains.
     bool allowLegacyPoolDataOnReceive; // Whether to accept legacy pool data from this pool.
@@ -99,8 +97,8 @@ interface IPoolConfigManager {
     bool isRegistered; // ────────────────╮ True if the token is registered.
     uint8 localDecimals; //               │ The decimals of the local token. Zero if the token is not registered.
     LockOrBurnFlavor lockOrBurnFlavor; // │ How the pool moves the local token out. Burn if not registered.
-    bytes4 allowedFinalityConfig; //      │ The allowed finality config. Decode with FinalityCodec.
-    address lockOrBurnAddress; // ────────╯ BurnToAddress target, Lock box, zero otherwise.
+    bytes4 allowedFinalityConfig; //      │ The allowed finality config.
+    address lockOrBurnAddress; // ────────╯ The lock box for Lock, the burn address for BurnToAddress, zero otherwise.
     address additionalPoolDataProvider; //  The token's IAdditionalPoolDataProvider. Zero means none.
     uint64[] supportedChains; //            The remote chains covered by the token's resolved lanes.
     bytes32 connectionPolicyName; //        The connection policy of the token. Zero if it has none.
@@ -112,11 +110,12 @@ interface IPoolConfigManager {
   }
 
   /// @notice Validates an outbound transfer, consumes its rate limit after the token fee, and builds the pool data.
+  /// @dev Reverts if the transfer is paused, the finality is not allowed, or the lane is not fully configured.
   /// @param localToken The local token that is being locked or burned.
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount before the token fee.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @param tokenArgs The token arguments of the message. The sender chooses them.
+  /// @param requestedFinalityConfig The requested finality.
+  /// @param tokenArgs Additional token arguments passed in by the sender of the message.
   /// @param chargeTokenFee Whether to deduct a token fee from the transfer amount.
   /// @return lane The resolved outbound configuration, pool data, token fee, and hook to call before moving tokens.
   function validateLockOrBurn(
@@ -128,11 +127,12 @@ interface IPoolConfigManager {
     bool chargeTokenFee
   ) external returns (OutboundLane memory lane);
 
-  /// @notice Checks the inbound lane, the source token, and the additional pool data. Converts the amount to local
-  /// decimals and consumes the inbound rate limit.
+  /// @notice Checks the inbound lane, the source pool, and the pool data. Converts the amount to local decimals and
+  /// consumes the inbound rate limit.
+  /// @dev Reverts if the transfer is paused or the lane is not fully configured.
   /// @param input The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
-  /// @return transfer The converted amount, token profile, and postflight hook.
+  /// @return transfer The converted amount, the token's lock or burn config, and the postflight hook.
   function validateReleaseOrMint(
     Pool.ReleaseOrMintInV1 calldata input,
     bytes4 requestedFinalityConfig
@@ -141,9 +141,9 @@ interface IPoolConfigManager {
   /// @notice Returns the resolved fee parameters for the requested finality.
   /// @dev Reverts if a token does not allow the requested finality, even when it has no lane.
   /// @param lanes The token and remote chain lanes to query.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
-  /// @return fees Fee parameters in the same order as lanes. Returns zero values with isEnabled false if the lane,
-  /// fee record, or destination overhead record is missing.
+  /// @param requestedFinalityConfig The requested finality.
+  /// @return fees Fee parameters in the same order as lanes. Zero values with isEnabled false if the lane does not
+  /// exist or has no fee configuration.
   function getFeeBatch(
     LaneKey[] calldata lanes,
     bytes4 requestedFinalityConfig
@@ -151,13 +151,14 @@ interface IPoolConfigManager {
 
   /// @notice Returns the resolved lane fee configurations.
   /// @param lanes The token and remote chain lanes to query.
-  /// @return feeConfigs Fee configurations in the same order as lanes. Returns zero values with isEnabled false if
-  /// the lane, fee record, or destination overhead record is missing.
+  /// @return feeConfigs Fee configurations in the same order as lanes. Zero values with isEnabled false if the lane
+  /// does not exist or has no fee configuration.
   function getTokenTransferFeeConfigBatch(
     LaneKey[] calldata lanes
   ) external view returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs);
 
   /// @notice Returns the current buckets for both finality classes under each resolved lane.
+  /// @dev Returns the bucket state even when the lane is paused.
   /// @param lanes The token and remote chain lanes to query.
   /// @return states The rate limiter state per lane, aligned with lanes by index. Lanes that do not exist return
   /// zero values.
@@ -166,6 +167,7 @@ interface IPoolConfigManager {
   ) external view returns (LaneRateLimiterState[] memory states);
 
   /// @notice Returns the resolved connections and effective pause state.
+  /// @dev For a lane without a connection, only the pause state is set.
   /// @param lanes The token and remote chain lanes to query.
   /// @return connections The connection state per lane, aligned with lanes by index.
   function getLaneConnectionBatch(
@@ -174,7 +176,7 @@ interface IPoolConfigManager {
 
   /// @notice Returns the resolved hook and outbound and inbound CCV lists.
   /// @param lanes The token and remote chain lanes to query.
-  /// @param requestedFinalityConfig The requested finality, encoded with FinalityCodec.
+  /// @param requestedFinalityConfig The requested finality.
   /// @return hooks The lane's IMultiTokenPoolHooks per lane, aligned with lanes by index. Zero if no hook is configured
   /// or no lane exists.
   /// @return outboundCCVs The configured outbound CCVs per lane, aligned with lanes by index. Empty if no lane exists.
@@ -186,12 +188,14 @@ interface IPoolConfigManager {
 
   /// @notice Returns the token's resolved configuration.
   /// @param localTokens The local tokens.
-  /// @return configs The resolved token configurations, aligned with localTokens by index.
+  /// @return configs The resolved token configurations, aligned with localTokens by index. Zero values for
+  /// unregistered tokens.
   function getTokenConfigBatch(
     address[] calldata localTokens
   ) external view returns (TokenConfig[] memory configs);
 
   /// @notice Returns one page of tokens registered with this pool config manager.
+  /// @dev Removing a token can change the order of the list. Query all pages at the same block for a consistent result.
   /// @param startIndex The position of the first token to return.
   /// @param maxCount The maximum number of tokens to return.
   /// @return tokens The tokens. Fewer than maxCount only at the end of the list.
