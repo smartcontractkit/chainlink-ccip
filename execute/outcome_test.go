@@ -12,6 +12,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 )
 
 func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
@@ -96,7 +97,7 @@ func TestOutcome_PseudoDeletedConsensusConflict(t *testing.T) {
 		})
 	}
 
-	consensusObs, err := computeConsensusObservation(lggr, aos, 999, 1)
+	consensusObs, err := computeConsensusObservation(lggr, aos, 999, 1, metrics.Noop{})
 	require.NoError(t, err)
 	require.Len(t, consensusObs.Messages, 2)
 	require.Equal(t, msg1, consensusObs.Messages[srcChain1][srcChain1SeqNr])
