@@ -177,7 +177,9 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
     profiles[0].localDecimals = USDC_TOKEN_DECIMALS;
 
     vm.expectRevert(
-      abi.encodeWithSelector(ConnectionPolicyStore.InvalidDecimalArgs.selector, NEW_TOKEN_DECIMALS, USDC_TOKEN_DECIMALS)
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.InvalidDecimalArgs.selector, s_newToken, NEW_TOKEN_DECIMALS, USDC_TOKEN_DECIMALS
+      )
     );
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);
   }
@@ -189,7 +191,7 @@ contract ConnectionPolicyStore_applyTokenProfileUpdates is ConnectionPolicyStore
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        ConnectionPolicyStore.InvalidDecimalArgs.selector, DEFAULT_TOKEN_DECIMALS, USDC_TOKEN_DECIMALS
+        ConnectionPolicyStore.InvalidDecimalArgs.selector, s_token, DEFAULT_TOKEN_DECIMALS, USDC_TOKEN_DECIMALS
       )
     );
     s_connectionStore.applyTokenProfileUpdates(new address[](0), profiles);

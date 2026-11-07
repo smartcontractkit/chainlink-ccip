@@ -27,7 +27,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.UintSet;
 
   error ZeroAddressInvalid();
-  error InvalidDecimalArgs(uint8 expected, uint8 actual);
+  error InvalidDecimalArgs(address localToken, uint8 expected, uint8 actual);
   error InvalidLockOrBurnAddress(
     address localToken, IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor, address lockOrBurnAddress
   );
@@ -1114,7 +1114,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (!s_tokens.contains(localToken)) {
         _validateDecimals(localToken, profile.localDecimals);
       } else if (tokenState.localDecimals != profile.localDecimals) {
-        revert InvalidDecimalArgs(tokenState.localDecimals, profile.localDecimals);
+        revert InvalidDecimalArgs(localToken, tokenState.localDecimals, profile.localDecimals);
       }
       _validateLockOrBurnAddress(localToken, profile.lockOrBurnFlavor, profile.lockOrBurnAddress);
       _validateProvider(profile.additionalPoolDataProvider);
@@ -1202,7 +1202,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint8 localDecimals
   ) private view {
     try IERC20Metadata(localToken).decimals() returns (uint8 tokenDecimals) {
-      if (tokenDecimals != localDecimals) revert InvalidDecimalArgs(tokenDecimals, localDecimals);
+      if (tokenDecimals != localDecimals) revert InvalidDecimalArgs(localToken, tokenDecimals, localDecimals);
     } catch {}
   }
 

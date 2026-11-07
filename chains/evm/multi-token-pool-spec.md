@@ -152,6 +152,7 @@ A transfer reverts if any required record is missing.
   response, trusted pool list, or additional pool data provider can cause these messages to fail.
 - Removing a record immediately selects the next record in the resolution order. If none exists, the token has no
   record of that type. [Inline connection removal](#removing-an-inline-connection) also checks the remote token.
+  [Inline remote pool removal](#removing-an-inline-remote-pool-record) requires legacy send to be disabled first.
 - Changing a token's policy immediately selects the new policy's records. Its inline records remain in place.
 - Records have no flag to disable the whole record. Pauses and rate limit stops prevent transfers without removing
   records.
@@ -223,8 +224,10 @@ stops sends and waits for those messages before removing connections.
 
 ### Subset tokens
 
-- Adding a subset token requires an existing connection policy record with `onlySubsetTokens` enabled. The token must
-  be assigned to that policy. Adding an existing subset member reverts.
+- Adding a subset token requires an existing connection policy record and a token assigned to that policy. Adding an
+  existing subset member reverts.
+- Subset entries can be added or removed while `onlySubsetTokens` is disabled. The list remains stored, but restricts
+  policy lanes only while the flag is enabled.
 - A token cannot leave or change its connection policy while it belongs to any of that policy's subsets. The call
   reverts with `TokenHasConfig`.
 - The [roles table](#roles) lists who can remove subset entries or change policy assignments.
@@ -285,17 +288,20 @@ The [remote token checks](#checking-remote-tokens) list the affected writes and 
 
 ## Lane checks
 
-The PCM checks for every other record type after either of these writes opens a lane for one token:
+The PCM checks for every other record type after each of these writes:
 
 - Setting an inline connection.
 - Adding a subset token.
+
+The check also runs when replacing an existing inline connection or adding a subset token while `onlySubsetTokens`
+is disabled.
 
 The first missing record causes the write to revert. This is the only configuration write check that reads all three
 stores.
 
 The PCM does not run this check for:
 
-- Connection policy records that apply to all policy tokens. No store lists those tokens.
+- Connection policy record writes, including changes to `onlySubsetTokens`. No store lists all assigned tokens.
 - Token policy assignments, including connection policies.
 - Changes or removals of other policy assignments.
 - Any removal.
@@ -583,7 +589,8 @@ Provider calls are views and cannot change state. A revert, missing code, or res
 send or fails the received message.
 
 The sender chooses the token args and requested finality. The connection store checks finality against the token
-profile before calling the provider on send. On receive, finality has been checked only on the source chain.
+profile before calling the provider on send. On receive, it passes the requested finality to the provider without
+checking it against the local token's allowed finality.
 
 Token args reach only the hook and additional pool data provider. They do not reach the remote token address provider,
 fee store, or security store. A provider can use token args to build data, but excessive size or receive cost can only
@@ -656,8 +663,8 @@ The store hashes remote pool addresses exactly as supplied, as in `TokenPool`. E
 | Inline | Its own pool list, `allowLegacyPoolDataOnReceive` per pool, and `useLegacyPoolDataOnSend` and `trustPolicyRemotePools` for the record |
 | Policy chain | Pool addresses only; no `useLegacyPoolDataOnSend` or `allowLegacyPoolDataOnReceive` |
 
-Setting an inline record replaces all flags. Removing it deletes all flags. A record trusts its listed pools, plus
-policy pools only when the inline record explicitly enables `trustPolicyRemotePools`.
+Setting an inline record replaces all flags. A record trusts its listed pools, plus policy pools only when the inline
+record explicitly enables `trustPolicyRemotePools`.
 
 - A legacy source pool needs `allowLegacyPoolDataOnReceive` enabled permanently, because its messages never expire.
 - An MTTP needs `allowLegacyPoolDataOnReceive` enabled while it sends legacy data and until all such messages have executed.
@@ -665,6 +672,22 @@ policy pools only when the inline record explicitly enables `trustPolicyRemotePo
 - A token sending to a legacy pool, or receiving legacy data, needs an inline record for that chain.
 - A legacy pool belongs only on its token's inline record, never on a policy record. Policy pools are trusted for
   every assigned token.
+
+### Removing an inline remote pool record
+
+Removing an inline remote pool record reverts with `LegacyRemotePoolRecord` while `useLegacyPoolDataOnSend` is enabled.
+This prevents removal from selecting a policy that sends long data to a destination that still requires legacy data.
+The check also applies when there is no policy record to select.
+
+Disable the flag with a record set before removing the record. These must be separate calls because removals run
+before sets within a call. Both calls can be in the same batch. To replace an existing record, set it without removing
+it first.
+
+Before disabling the flag on a live lane, tooling must check [remote pool compatibility](#checking-remote-pool-compatibility)
+and [transfer budgets](#setting-transfer-budgets).
+
+Removal deletes the inline pool list and all its flags. `allowLegacyPoolDataOnReceive` does not block removal, and the
+contract does not check for pending messages. Tooling must follow the retention rules above.
 
 ### No default remote pool record
 
@@ -1102,7 +1125,11 @@ The four burn flavors match the corresponding single-token burn and mint pools.
 | Flavor | Burn address |
 | --- | --- |
 | `Burn`, `BurnFrom`, or `BurnWithFrom` | Zero |
-| `BurnToAddress` | Use an address from which the tokens cannot be transferred. The contract accepts any address, as in `BurnToAddressMintTokenPool`. |
+| `BurnToAddress` | Use an address from which the tokens cannot be transferred. The connection store accepts any address, including zero. |
+
+On send, `BurnMintMultiTokenPool` rejects its own address as a `BurnToAddress` target with `InvalidBurnAddress`. Tokens
+left in the pool could otherwise be withdrawn as fees while the destination mints. Other targets, including zero,
+are passed to the token's `transfer`; the token must accept that transfer.
 
 `BurnMintMultiTokenPool` supports all four burn flavors. `BurnFrom` and `BurnWithFrom` use the pool's allowance to
 itself. Before burning, the pool grants itself the maximum allowance if the current allowance is insufficient.
@@ -1604,7 +1631,9 @@ which starts full.
 1. Keep T paused and call `TAR.setPool(T, address(0))`.
 2. **`CONFIG_ROLE`:** remove T from each subset added in step 5 through `applySubsetTokenUpdates`.
 3. Clear T's connection policy.
-4. Remove its inline records and clear its other policies.
+4. Remove its inline connections first. Before removing an inline remote pool record, disable `useLegacyPoolDataOnSend`
+   as described under [inline remote pool removal](#removing-an-inline-remote-pool-record). Then remove its remaining
+   inline records and clear its other policies.
 5. Deregister T.
 
 Clear the connection policy before removing inline connections, because their removal checks the selected policy.
@@ -2018,7 +2047,7 @@ For one chain, follow this order. Each step can be a separate call.
 
    | Remote chain | Action |
    | --- | --- |
-   | The token never used a legacy pool, and now uses a policy pool. | Remove the inline remote pool record. |
+   | The token never used a legacy pool, and now uses a policy pool. | Remove the inline remote pool record with `useLegacyPoolDataOnSend` disabled. |
    | The token has legacy pool history. | Keep an inline record listing its legacy pools with `allowLegacyPoolDataOnReceive` enabled. Include the remote MTTP with `allowLegacyPoolDataOnReceive` enabled only while its legacy-format messages are pending. |
 
    For an inline record retained in this step, preserve the token's `useLegacyPoolDataOnSend` value. If the remote token

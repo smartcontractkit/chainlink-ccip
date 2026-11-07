@@ -55,6 +55,7 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
       if (lockOrBurnAddress == address(this)) {
         revert InvalidBurnAddress(token, lockOrBurnAddress);
       }
+
       IERC20(token).safeTransfer(lockOrBurnAddress, amount);
     } else if (
       flavor == IPoolConfigManager.LockOrBurnFlavor.BurnFrom
@@ -65,6 +66,7 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
       if (IERC20(token).allowance(address(this), address(this)) < amount) {
         IERC20(token).forceApprove(address(this), type(uint256).max);
       }
+
       if (flavor == IPoolConfigManager.LockOrBurnFlavor.BurnFrom) {
         IBurnMintERC20(token).burnFrom(address(this), amount);
       } else {

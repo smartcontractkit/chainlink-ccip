@@ -134,6 +134,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     bool chargeTokenFee
   ) external override returns (OutboundLane memory lane) {
     _onlyTokenPool(localToken);
+
     lane = i_connectionStore.resolveOutboundLane(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs);
     // The fee store checks the pool data length against destBytesOverhead, so it needs the pool data first.
     lane.feeAmount = i_feeStore.validateLockOrBurn(
@@ -153,6 +154,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   ) external override returns (ResolvedInboundTransfer memory transfer) {
     address localToken = releaseOrMintIn.localToken;
     uint64 remoteChainSelector = releaseOrMintIn.remoteChainSelector;
+
     _onlyTokenPool(localToken);
     transfer = i_connectionStore.resolveInboundLane(
       localToken,
@@ -166,6 +168,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     transfer.hook = i_securityStore.validateReleaseOrMint(
       localToken, remoteChainSelector, transfer.localAmount, requestedFinalityConfig
     );
+
     return transfer;
   }
 
@@ -185,11 +188,13 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     i_connectionStore.checkRequestedFinalityBatch(lanes, requestedFinalityConfig);
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     fees = i_feeStore.getFeeBatch(lanes, requestedFinalityConfig);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
         delete fees[i]; // Sets isEnabled to false.
       }
     }
+
     return fees;
   }
 
@@ -199,11 +204,13 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   ) external view override returns (IPoolV2.TokenTransferFeeConfig[] memory feeConfigs) {
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     feeConfigs = i_feeStore.getTokenTransferFeeConfigBatch(lanes);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
         delete feeConfigs[i];
       }
     }
+
     return feeConfigs;
   }
 
@@ -213,11 +220,13 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   ) external view override returns (LaneRateLimiterState[] memory states) {
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     states = i_securityStore.getCurrentRateLimiterStateBatch(lanes);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
         delete states[i];
       }
     }
+
     return states;
   }
 
@@ -241,6 +250,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   {
     bool[] memory hasLanes = i_connectionStore.hasLaneBatch(lanes);
     (hooks, outboundCCVs, inboundCCVs) = i_securityStore.getLaneVerificationBatch(lanes);
+
     for (uint256 i = 0; i < lanes.length; ++i) {
       if (!hasLanes[i]) {
         delete hooks[i];
@@ -248,6 +258,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
         delete inboundCCVs[i];
       }
     }
+
     return (hooks, outboundCCVs, inboundCCVs);
   }
 
@@ -258,10 +269,13 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
     // The connection store returns the profile, lanes, and connection and remote pool policy names. The policy names
     // of the other stores are added below.
     configs = i_connectionStore.getTokenConfigBatch(localTokens);
+
     (bytes32[] memory feePolicyNames, bytes32[] memory destOverheadPolicyNames) =
       i_feeStore.getTokenPolicyNamesBatch(localTokens);
+
     (bytes32[] memory rateLimitPolicyNames, bytes32[] memory securityPolicyNames) =
       i_securityStore.getTokenPolicyNamesBatch(localTokens);
+
     for (uint256 i = 0; i < localTokens.length; ++i) {
       configs[i].rateLimitPolicyName = rateLimitPolicyNames[i];
       configs[i].feePolicyName = feePolicyNames[i];

@@ -658,11 +658,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   function getInlineRateLimitConfigs(
     address localToken
   ) external view returns (InlineRateLimitConfigArgs[] memory inlineConfigs) {
-    uint256[] memory chains = s_inlineRateLimitChains[localToken].values();
-    inlineConfigs = new InlineRateLimitConfigArgs[](chains.length);
+    uint256[] memory remoteChainSelectors = s_inlineRateLimitChains[localToken].values();
+    inlineConfigs = new InlineRateLimitConfigArgs[](remoteChainSelectors.length);
 
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       inlineConfigs[i] = InlineRateLimitConfigArgs({
         localToken: localToken,
         remoteChainSelector: remoteChainSelector,
@@ -690,11 +690,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   function getInlineSecurityConfigs(
     address localToken
   ) external view returns (InlineSecurityConfigArgs[] memory inlineConfigs) {
-    uint256[] memory chains = s_inlineSecurityChains[localToken].values();
-    inlineConfigs = new InlineSecurityConfigArgs[](chains.length);
+    uint256[] memory remoteChainSelectors = s_inlineSecurityChains[localToken].values();
+    inlineConfigs = new InlineSecurityConfigArgs[](remoteChainSelectors.length);
 
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       SecurityConfig storage securityConfig = s_inlineSecurityConfigs[localToken][remoteChainSelector];
       inlineConfigs[i] = InlineSecurityConfigArgs({
         localToken: localToken, remoteChainSelector: remoteChainSelector, securityConfig: securityConfig
@@ -714,11 +714,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes32 policyName
   ) external view returns (uint32 tokenCount, uint8 localDecimals, RateLimitPolicyConfigArgs[] memory policyConfigs) {
     PolicyConfig.Policy storage policy = s_rateLimitPolicies.policies[policyName];
-    uint256[] memory chains = policy.remoteChainSelectors.values();
-    policyConfigs = new RateLimitPolicyConfigArgs[](chains.length);
+    uint256[] memory remoteChainSelectors = policy.remoteChainSelectors.values();
+    policyConfigs = new RateLimitPolicyConfigArgs[](remoteChainSelectors.length);
 
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       policyConfigs[i] = RateLimitPolicyConfigArgs({
         policyName: policyName,
         remoteChainSelector: remoteChainSelector,
@@ -748,11 +748,11 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes32 policyName
   ) external view returns (uint32 tokenCount, SecurityPolicyConfigArgs[] memory policyConfigs) {
     PolicyConfig.Policy storage policy = s_securityPolicies.policies[policyName];
-    uint256[] memory chains = policy.remoteChainSelectors.values();
-    policyConfigs = new SecurityPolicyConfigArgs[](chains.length);
+    uint256[] memory remoteChainSelectors = policy.remoteChainSelectors.values();
+    policyConfigs = new SecurityPolicyConfigArgs[](remoteChainSelectors.length);
 
-    for (uint256 i = 0; i < chains.length; ++i) {
-      uint64 remoteChainSelector = uint64(chains[i]);
+    for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
+      uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
       SecurityConfig storage securityConfig = s_policySecurityConfigs[policyName][remoteChainSelector];
       policyConfigs[i] = SecurityPolicyConfigArgs({
         policyName: policyName, remoteChainSelector: remoteChainSelector, securityConfig: securityConfig
