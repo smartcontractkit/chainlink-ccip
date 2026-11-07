@@ -20,6 +20,8 @@ import (
 	fq16ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/fee_quoter"
 	orops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	usdcpoolops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/burn_mint_with_lock_release_flag_token_pool"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/adapters"
+	v1_6_1_adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/changesets"
 	ccipdeploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cs_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -230,7 +232,7 @@ func TestUpdateGasConfigForGlamsterdamV16(t *testing.T) {
 	e.DataStore = ds.Seal()
 
 	mcmsRegistry := cs_core.GetRegistry()
-	out, err := changesets.UpdateGasConfigForGlamsterdamV16(mcmsRegistry).Apply(*e, cs_core.WithMCMS[changesets.GlamsterdamGasUpdateV16Cfg]{
+	out, err := changesets.UpdateGasConfigForGlamsterdamV16(mcmsRegistry, v1_6_1_adapters.GetGasUpdateAdapterRegistry()).Apply(*e, cs_core.WithMCMS[changesets.GlamsterdamGasUpdateV16Cfg]{
 		MCMS: mcms.Input{},
 		Cfg: changesets.GlamsterdamGasUpdateV16Cfg{
 			TargetChainSelector: gg16TargetChainSel,
