@@ -196,8 +196,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Trusted remote pools and compatibility settings.
-  /// @dev All flags are false for policy records.
-  struct RemotePoolRecord {
+  struct InlineRemotePoolRecord {
     bool useLegacyPoolDataOnSend; // ─╮ Whether to send only the token decimals in the pool data.
     bool trustPolicyRemotePools; // ──╯ Whether to also trust pools from the token's policy for this chain.
     EnumerableSet.Bytes32Set remotePoolHashes; // The hashes of the trusted remote pools.
@@ -232,7 +231,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev Remote chains with an inline remote pool record, indexed by local token.
   mapping(address localToken => EnumerableSet.UintSet remoteChainSelectors) private s_inlineRemotePoolChains;
-  mapping(address localToken => mapping(uint64 remoteChainSelector => RemotePoolRecord record)) private
+  mapping(address localToken => mapping(uint64 remoteChainSelector => InlineRemotePoolRecord record)) private
     s_inlineRemotePoolRecords;
 
   // ================================================================
@@ -246,8 +245,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   mapping(bytes32 policyName => address remoteTokenAddressProvider) private s_remoteTokenAddressProviders;
 
   PolicyConfig.Policies private s_remotePoolPolicies;
-  mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => RemotePoolRecord record)) private
-    s_policyRemotePoolRecords;
+  mapping(bytes32 policyName => mapping(uint64 remoteChainSelector => EnumerableSet.Bytes32Set remotePoolHashes))
+    private s_policyRemotePoolHashes;
 
   // ================================================================
   // │                        Pause storage                         │
@@ -291,18 +290,14 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       revert ChainIsPaused(remoteChainSelector, PauseDirection.Outbound);
     }
 
-    (PolicyConfig.RecordLevel connectionLevel, bool isInline, RemotePoolRecord storage record) =
-      _resolveLane(localToken, remoteChainSelector);
+    (PolicyConfig.RecordLevel connectionLevel, bool isInline) = _resolveLane(localToken, remoteChainSelector);
     FinalityCodec._ensureRequestedFinalityAllowed(requestedFinalityConfig, tokenState.allowedFinalityConfig);
 
     lane.remoteToken = _resolveRemoteToken(localToken, remoteChainSelector, connectionLevel);
+    bool useLegacyPoolDataOnSend =
+      isInline && s_inlineRemotePoolRecords[localToken][remoteChainSelector].useLegacyPoolDataOnSend;
     lane.destPoolData = _encodePoolData(
-      localToken,
-      remoteChainSelector,
-      requestedFinalityConfig,
-      tokenArgs,
-      tokenState,
-      isInline && record.useLegacyPoolDataOnSend
+      localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs, tokenState, useLegacyPoolDataOnSend
     );
     lane.localDecimals = tokenState.localDecimals;
     lane.lockOrBurnFlavor = tokenState.lockOrBurnFlavor;
@@ -335,12 +330,16 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       revert ChainIsPaused(remoteChainSelector, PauseDirection.Inbound);
     }
 
-    // Resolve the connection level inside _checkPoolData to avoid a stack-too-deep error here.
-    (, bool isInline, RemotePoolRecord storage record) = _resolveLane(localToken, remoteChainSelector);
-    bool allowLegacyPoolDataOnReceive =
-      _checkSourcePool(localToken, remoteChainSelector, isInline, record, sourcePoolAddress);
+    (PolicyConfig.RecordLevel connectionLevel, bool isInline) = _resolveLane(localToken, remoteChainSelector);
+    bool allowLegacyPoolDataOnReceive = _checkSourcePool(localToken, remoteChainSelector, isInline, sourcePoolAddress);
     uint8 remoteDecimals = _checkPoolData(
-      localToken, remoteChainSelector, requestedFinalityConfig, sourcePoolData, tokenState, allowLegacyPoolDataOnReceive
+      localToken,
+      remoteChainSelector,
+      connectionLevel,
+      requestedFinalityConfig,
+      sourcePoolData,
+      tokenState,
+      allowLegacyPoolDataOnReceive
     );
 
     transfer.localAmount = _calculateLocalAmount(sourceDenominatedAmount, remoteDecimals, tokenState.localDecimals);
@@ -349,12 +348,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return transfer;
   }
 
-  /// @dev Resolves the connection level and remote pool record. Reverts if either is missing.
+  /// @dev Resolves the connection level and remote pool record level. Reverts if either record is missing.
   /// isInline identifies whether the remote pool record is inline and can allow legacy pool data.
   function _resolveLane(
     address localToken,
     uint64 remoteChainSelector
-  ) private view returns (PolicyConfig.RecordLevel connectionLevel, bool isInline, RemotePoolRecord storage record) {
+  ) private view returns (PolicyConfig.RecordLevel connectionLevel, bool isInline) {
     connectionLevel = _resolveConnectionLevel(localToken, remoteChainSelector);
     if (connectionLevel == PolicyConfig.RecordLevel.None) {
       // If the chain is configured, the token must have been excluded by the policy's subset restriction.
@@ -365,12 +364,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       revert ConnectionRecordNotFound(localToken, remoteChainSelector);
     }
 
-    PolicyConfig.RecordLevel remotePoolLevel;
-    (remotePoolLevel, record) = _resolveRemotePoolRecord(localToken, remoteChainSelector);
+    PolicyConfig.RecordLevel remotePoolLevel = _resolveRemotePoolLevel(localToken, remoteChainSelector);
     if (remotePoolLevel == PolicyConfig.RecordLevel.None) {
       revert RemotePoolRecordNotFound(localToken, remoteChainSelector);
     }
-    return (connectionLevel, remotePoolLevel == PolicyConfig.RecordLevel.Inline, record);
+    return (connectionLevel, remotePoolLevel == PolicyConfig.RecordLevel.Inline);
   }
 
   /// @dev Checks that the source pool is trusted and returns whether it may send legacy pool data.
@@ -378,24 +376,22 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     address localToken,
     uint64 remoteChainSelector,
     bool isInline,
-    RemotePoolRecord storage record,
     bytes calldata sourcePoolAddress
   ) private view returns (bool) {
     bytes32 sourcePoolHash = keccak256(sourcePoolAddress);
-    // Check the resolved record first, so inline settings take precedence for pools listed in both records.
-    if (record.remotePoolHashes.contains(sourcePoolHash)) {
-      return isInline && record.allowLegacyPoolDataOnReceive[sourcePoolHash];
-    }
-
-    if (isInline && record.trustPolicyRemotePools) {
-      (PolicyConfig.RecordLevel policyLevel, RemotePoolRecord storage policyRecord) =
-        _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
-
-      if (policyLevel != PolicyConfig.RecordLevel.None && policyRecord.remotePoolHashes.contains(sourcePoolHash)) {
-        // Pools trusted only through the policy cannot send legacy pool data.
-        return false;
+    if (isInline) {
+      InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
+      // Check the inline record first, so inline settings take precedence for pools listed in both records.
+      if (record.remotePoolHashes.contains(sourcePoolHash)) return record.allowLegacyPoolDataOnReceive[sourcePoolHash];
+      if (!record.trustPolicyRemotePools) {
+        revert InvalidSourcePoolAddress(localToken, remoteChainSelector, sourcePoolAddress);
       }
     }
+
+    (PolicyConfig.RecordLevel policyLevel, EnumerableSet.Bytes32Set storage policyRemotePoolHashes) =
+      _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
+    // Pools trusted only through the policy cannot send legacy pool data.
+    if (policyLevel != PolicyConfig.RecordLevel.None && policyRemotePoolHashes.contains(sourcePoolHash)) return false;
     revert InvalidSourcePoolAddress(localToken, remoteChainSelector, sourcePoolAddress);
   }
 
@@ -477,16 +473,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     return !policyRecord.onlySubsetTokens || policyRecord.subsetTokens.contains(localToken);
   }
 
-  /// @dev Returns the inline remote pool record if present, otherwise the token's policy record for this chain.
-  function _resolveRemotePoolRecord(
+  /// @dev Inline remote pool records take precedence over the token's remote pool policy.
+  function _resolveRemotePoolLevel(
     address localToken,
     uint64 remoteChainSelector
-  ) private view returns (PolicyConfig.RecordLevel level, RemotePoolRecord storage record) {
-    if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) {
-      return (PolicyConfig.RecordLevel.Inline, s_inlineRemotePoolRecords[localToken][remoteChainSelector]);
-    }
+  ) private view returns (PolicyConfig.RecordLevel) {
+    if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) return PolicyConfig.RecordLevel.Inline;
 
-    return _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
+    (PolicyConfig.RecordLevel policyLevel,) = _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
+    return policyLevel;
   }
 
   /// @dev Returns the token's remote pool policy record for this chain, or an empty record with level None if there is
@@ -494,15 +489,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   function _resolvePolicyRemotePoolRecord(
     address localToken,
     uint64 remoteChainSelector
-  ) private view returns (PolicyConfig.RecordLevel level, RemotePoolRecord storage record) {
+  ) private view returns (PolicyConfig.RecordLevel level, EnumerableSet.Bytes32Set storage remotePoolHashes) {
     bytes32 policyName = s_tokenStates[localToken].remotePoolPolicyName;
 
     if (s_remotePoolPolicies.policies[policyName].remoteChainSelectors.contains(remoteChainSelector)) {
-      return (PolicyConfig.RecordLevel.PolicyChain, s_policyRemotePoolRecords[policyName][remoteChainSelector]);
+      return (PolicyConfig.RecordLevel.PolicyChain, s_policyRemotePoolHashes[policyName][remoteChainSelector]);
     }
 
     // The zero policy name cannot be configured, so its records are always empty.
-    return (PolicyConfig.RecordLevel.None, s_policyRemotePoolRecords[bytes32(0)][remoteChainSelector]);
+    return (PolicyConfig.RecordLevel.None, s_policyRemotePoolHashes[bytes32(0)][remoteChainSelector]);
   }
 
   // ================================================================
@@ -537,6 +532,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   function _checkPoolData(
     address localToken,
     uint64 remoteChainSelector,
+    PolicyConfig.RecordLevel connectionLevel,
     bytes4 requestedFinalityConfig,
     bytes calldata sourcePoolData,
     TokenState storage tokenState,
@@ -552,7 +548,6 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     } else {
       // Legacy messages have no source token, so only this branch resolves the remote token. This keeps legacy
       // messages working without the remote token address provider.
-      PolicyConfig.RecordLevel connectionLevel = _resolveConnectionLevel(localToken, remoteChainSelector);
       bytes memory remoteToken = _resolveRemoteToken(localToken, remoteChainSelector, connectionLevel);
       if (keccak256(sourceToken) != keccak256(remoteToken)) {
         revert SourceTokenMismatch(localToken, remoteChainSelector, remoteToken, sourceToken);
@@ -670,15 +665,21 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       connection.remoteToken = level == PolicyConfig.RecordLevel.Inline
         ? s_inlineRemoteTokens[localToken][remoteChainSelector]
         : _tryGetPolicyRemoteToken(localToken, remoteChainSelector);
-      (, RemotePoolRecord storage record) = _resolveRemotePoolRecord(localToken, remoteChainSelector);
-      connection.useLegacyPoolDataOnSend = record.useLegacyPoolDataOnSend;
-      connection.remotePools = _getRemotePools(record);
-      if (record.trustPolicyRemotePools) {
-        (PolicyConfig.RecordLevel policyLevel, RemotePoolRecord storage policyRecord) =
-          _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
-        if (policyLevel != PolicyConfig.RecordLevel.None) {
-          connection.remotePools = _addPolicyRemotePools(connection.remotePools, record, policyRecord);
-        }
+      if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) {
+        InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
+        connection.useLegacyPoolDataOnSend = record.useLegacyPoolDataOnSend;
+        connection.remotePools = _getRemotePools(record);
+        if (!record.trustPolicyRemotePools) continue;
+      }
+
+      (PolicyConfig.RecordLevel policyLevel, EnumerableSet.Bytes32Set storage policyRemotePoolHashes) =
+        _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
+      if (policyLevel != PolicyConfig.RecordLevel.None) {
+        connection.remotePools = _addPolicyRemotePools(
+          connection.remotePools,
+          s_inlineRemotePoolRecords[localToken][remoteChainSelector].remotePoolHashes,
+          policyRemotePoolHashes
+        );
       }
     }
     return connections;
@@ -754,7 +755,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     address localToken,
     uint64 remoteChainSelector
   ) external view {
-    (PolicyConfig.RecordLevel level,) = _resolveRemotePoolRecord(localToken, remoteChainSelector);
+    PolicyConfig.RecordLevel level = _resolveRemotePoolLevel(localToken, remoteChainSelector);
 
     if (level == PolicyConfig.RecordLevel.None) {
       revert RemotePoolRecordNotFound(localToken, remoteChainSelector);
@@ -779,7 +780,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < lanes.length; ++i) {
       connectionLevels[i] = _resolveConnectionLevel(lanes[i].localToken, lanes[i].remoteChainSelector);
-      (remotePoolLevels[i],) = _resolveRemotePoolRecord(lanes[i].localToken, lanes[i].remoteChainSelector);
+      remotePoolLevels[i] = _resolveRemotePoolLevel(lanes[i].localToken, lanes[i].remoteChainSelector);
     }
     return (connectionLevels, remotePoolLevels);
   }
@@ -908,7 +909,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChainSelectors[i]);
-      RemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
+      InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       inlineConfigs[i] = InlineRemotePoolConfigArgs({
         localToken: localToken,
         remoteChainSelector: remoteChainSelector,
@@ -999,7 +1000,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       policyConfigs[i] = RemotePoolPolicyConfigArgs({
         policyName: policyName,
         remoteChainSelector: remoteChainSelector,
-        remotePoolAddresses: _getRemotePoolAddresses(s_policyRemotePoolRecords[policyName][remoteChainSelector])
+        remotePoolAddresses: _getRemotePoolAddresses(s_policyRemotePoolHashes[policyName][remoteChainSelector])
       });
     }
     return (policy.tokenCount, policyConfigs);
@@ -1017,9 +1018,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   function _getRemotePoolAddresses(
-    RemotePoolRecord storage record
+    EnumerableSet.Bytes32Set storage policyRemotePoolHashes
   ) private view returns (bytes[] memory remotePoolAddresses) {
-    bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
+    bytes32[] memory remotePoolHashes = policyRemotePoolHashes.values();
     remotePoolAddresses = new bytes[](remotePoolHashes.length);
 
     for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
@@ -1030,16 +1031,16 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   function _addPolicyRemotePools(
     IPoolConfigManager.RemotePool[] memory inlineRemotePools,
-    RemotePoolRecord storage inlineRecord,
-    RemotePoolRecord storage policyRecord
+    EnumerableSet.Bytes32Set storage inlineRemotePoolHashes,
+    EnumerableSet.Bytes32Set storage policyRemotePoolHashes
   ) private view returns (IPoolConfigManager.RemotePool[] memory remotePools) {
-    bytes32[] memory policyRemotePoolHashes = policyRecord.remotePoolHashes.values();
+    bytes32[] memory remotePoolHashes = policyRemotePoolHashes.values();
 
     // Move the policy-only pools to the front. This array is a memory copy, so storage does not change.
     uint256 policyOnlyPoolCount = 0;
-    for (uint256 i = 0; i < policyRemotePoolHashes.length; ++i) {
-      if (!inlineRecord.remotePoolHashes.contains(policyRemotePoolHashes[i])) {
-        policyRemotePoolHashes[policyOnlyPoolCount++] = policyRemotePoolHashes[i];
+    for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
+      if (inlineRemotePools.length == 0 || !inlineRemotePoolHashes.contains(remotePoolHashes[i])) {
+        remotePoolHashes[policyOnlyPoolCount++] = remotePoolHashes[i];
       }
     }
 
@@ -1049,18 +1050,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
 
     for (uint256 i = 0; i < policyOnlyPoolCount; ++i) {
-      bytes32 remotePoolHash = policyRemotePoolHashes[i];
-
       remotePools[inlineRemotePools.length + i] = IPoolConfigManager.RemotePool({
-        remotePoolAddress: s_remotePoolAddresses[remotePoolHash],
-        allowLegacyPoolDataOnReceive: policyRecord.allowLegacyPoolDataOnReceive[remotePoolHash]
+        remotePoolAddress: s_remotePoolAddresses[remotePoolHashes[i]], allowLegacyPoolDataOnReceive: false
       });
     }
     return remotePools;
   }
 
   function _getRemotePools(
-    RemotePoolRecord storage record
+    InlineRemotePoolRecord storage record
   ) private view returns (IPoolConfigManager.RemotePool[] memory remotePools) {
     bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
     remotePools = new IPoolConfigManager.RemotePool[](remotePoolHashes.length);
@@ -1415,7 +1413,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = inlineConfigsToRemove[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
 
-      RemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
+      InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       PolicyConfig._removeInlineRecord(s_inlineRemotePoolChains[localToken], localToken, remoteChainSelector);
       // Policy records don't support legacy pool data. Falling back to the policy while the remote pool is still legacy
       // would burn or lock tokens for messages it can't process. Clearing the flag first confirms the remote pool has
@@ -1458,8 +1456,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       uint64 remoteChainSelector = policyConfigsToRemove[i].remoteChainSelector;
 
       PolicyConfig._removePolicyRecord(s_remotePoolPolicies, policyName, remoteChainSelector);
-      _clearRemotePools(s_policyRemotePoolRecords[policyName][remoteChainSelector]);
-      delete s_policyRemotePoolRecords[policyName][remoteChainSelector];
+      _clearPolicyRemotePools(s_policyRemotePoolHashes[policyName][remoteChainSelector]);
       emit RemotePoolPolicyConfigRemoved(policyName, remoteChainSelector);
     }
 
@@ -1485,7 +1482,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       _validateRemotePoolAddresses(remoteChainSelector, remotePoolAddresses);
 
       PolicyConfig._setPolicyRecord(s_remotePoolPolicies, policyName, remoteChainSelector);
-      _setPolicyRemotePools(s_policyRemotePoolRecords[policyName][remoteChainSelector], remotePoolAddresses);
+      _setPolicyRemotePools(s_policyRemotePoolHashes[policyName][remoteChainSelector], remotePoolAddresses);
       emit RemotePoolPolicyConfigSet(policyName, remoteChainSelector, remotePoolAddresses);
     }
   }
@@ -1527,19 +1524,19 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
   /// @dev The caller must validate the addresses first.
   function _setPolicyRemotePools(
-    RemotePoolRecord storage record,
+    EnumerableSet.Bytes32Set storage policyRemotePoolHashes,
     bytes[] calldata remotePoolAddresses
   ) private {
-    _clearRemotePools(record);
+    _clearPolicyRemotePools(policyRemotePoolHashes);
 
     for (uint256 i = 0; i < remotePoolAddresses.length; ++i) {
-      _addRemotePool(record, remotePoolAddresses[i]);
+      _addRemotePool(policyRemotePoolHashes, remotePoolAddresses[i]);
     }
   }
 
   /// @dev The caller must validate the addresses first.
   function _setInlineRemotePoolRecord(
-    RemotePoolRecord storage record,
+    InlineRemotePoolRecord storage record,
     RemotePoolConfig calldata remotePoolConfig,
     bool trustPolicyRemotePools
   ) private {
@@ -1549,24 +1546,34 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < remotePoolConfig.remotePools.length; ++i) {
       IPoolConfigManager.RemotePool calldata pool = remotePoolConfig.remotePools[i];
-      bytes32 remotePoolHash = _addRemotePool(record, pool.remotePoolAddress);
+      bytes32 remotePoolHash = _addRemotePool(record.remotePoolHashes, pool.remotePoolAddress);
       record.allowLegacyPoolDataOnReceive[remotePoolHash] = pool.allowLegacyPoolDataOnReceive;
     }
   }
 
   function _addRemotePool(
-    RemotePoolRecord storage record,
+    EnumerableSet.Bytes32Set storage remotePoolHashes,
     bytes calldata remotePoolAddress
   ) private returns (bytes32 remotePoolHash) {
     remotePoolHash = keccak256(remotePoolAddress);
-    record.remotePoolHashes.add(remotePoolHash);
+    remotePoolHashes.add(remotePoolHash);
     s_remotePoolAddresses[remotePoolHash] = remotePoolAddress;
     return remotePoolHash;
   }
 
+  /// @dev Deleting the set does not clear its internal mapping, so each entry is removed individually.
+  function _clearPolicyRemotePools(
+    EnumerableSet.Bytes32Set storage policyRemotePoolHashes
+  ) private {
+    bytes32[] memory remotePoolHashes = policyRemotePoolHashes.values();
+    for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
+      policyRemotePoolHashes.remove(remotePoolHashes[i]);
+    }
+  }
+
   /// @dev Deleting the struct does not clear the set or the mapping, so each entry is removed individually.
   function _clearRemotePools(
-    RemotePoolRecord storage record
+    InlineRemotePoolRecord storage record
   ) private {
     bytes32[] memory remotePoolHashes = record.remotePoolHashes.values();
     for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
