@@ -94,7 +94,7 @@ func DeployContractsForSelector(ctx context.Context, env *deployment.Environment
 	// admin and fails without it, and the UltraFastCurse instance in turn needs the CLLCCIP
 	// timelock as its admin, so the two must be deployed in that order before any contracts.
 	for _, qualifier := range []string{cciputils.CLLQualifier, cciputils.UltraFastCurseMCMSQualifier} {
-		if err := deployMCMSInstance(env, runningDS, dReg, version, selector, qualifier); err != nil {
+		if err := deployMCMSInstance(env, runningDS, dReg, version, contractVersion, selector, qualifier); err != nil {
 			return nil, err
 		}
 	}
@@ -199,6 +199,7 @@ func deployMCMSInstance(
 	runningDS *datastore.MemoryDataStore,
 	dReg *deployops.DeployerRegistry,
 	version *semver.Version,
+	contractVersion string,
 	selector uint64,
 	qualifier string,
 ) error {
@@ -209,6 +210,7 @@ func deployMCMSInstance(
 			Proposer:         SingleGroupMCMS(),
 			TimelockMinDelay: big.NewInt(1),
 			Qualifier:        ptr.String(qualifier),
+			ContractVersion:  contractVersion,
 		},
 	}
 
