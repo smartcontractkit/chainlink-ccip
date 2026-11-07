@@ -552,8 +552,8 @@ the pool. The MTTP can therefore check source identity only through long pool da
 Legacy data from a remote MTTP provides no token identity. An incorrect remote-token mapping on the source can then
 mint the wrong destination token. A legacy pool that trusts a remote MTTP has the same exposure.
 
-Legacy receive permission for an MTTP is restricted to migration or rollback: while it sends legacy data and
-until all such messages have executed. A legacy pool may trust an MTTP only when its own token migrates to that MTTP.
+Legacy receive permission for an MTTP is restricted to migration: while it sends legacy data and until all such
+messages have executed. A legacy pool may trust an MTTP only when its own token migrates to that MTTP.
 The [compatibility checks](#checking-remote-pool-compatibility) also require reciprocal token mappings before legacy
 send is enabled.
 
@@ -1199,7 +1199,7 @@ can mint the token. This trust is valid only if the remote token uses a policy p
 ### Compromised pools and owners
 
 A compromised pool address must remain untrusted permanently. Messages do not expire, so forged messages can execute
-as soon as a record or legacy pool restores that trust. This includes legacy pools retained for rollback.
+as soon as a record or legacy pool restores that trust.
 
 The destination cannot distinguish honest pending messages from forged ones. Recovery requires a new pool address.
 Honest unexecuted messages need resolution outside the contracts, such as a refund. The
@@ -1266,8 +1266,8 @@ before the first send, and prepare destinations before sources where practical. 
 an unannounced lane.
 
 A token or chain pause stops sends before the burn. A token can be paused before registration. Legacy pool data from
-a remote MTTP is permitted only during migration or rollback. These messages provide no source token identity, so
-keep that period as short as the procedure permits.
+a remote MTTP is permitted only during migration. These messages provide no source token identity, so keep that
+period as short as the procedure permits.
 
 Connection policy assignments and record writes do not run the lane check. Before a lane goes live, tooling must read:
 
@@ -1449,9 +1449,12 @@ contract does not check that those messages have completed.
 
 To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
 
-1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist.
+1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist, and with the old
+   hook's `getAllowList()` and `getPolicyEngine()`.
 2. **Hook owner:** authorize every pool that serves a token using the new hook.
-3. **`CONFIG_ROLE`:** point the affected security records to the new hook.
+3. **Policy engine admin:** give the new hook the old hook's policies with `addPolicy`, and the same target default
+   with `setTargetDefaultPolicyAllow`. The engine keys policies by hook address.
+4. **`CONFIG_ROLE`:** point the affected security records to the new hook.
 
 Authorization is also required when reusing `AdvancedPoolHooks` or `MultiTokenPoolHooks` with a new pool. Authorize the
 new pool before it handles transfers.
@@ -1712,8 +1715,8 @@ issuer's first MTTP deployment, apply these rules:
   second.
 - At its switch, the spoke disables `useLegacyPoolDataOnSend` toward the hub. Its inline record must list the hub MTTP
   with `allowLegacyPoolDataOnReceive` enabled until migration step 12.
-- The hub keeps `useLegacyPoolDataOnSend` enabled until the issuer rules out rollback on both chains. Migration step 10
-  disables it and raises `destBytesOverhead` for long data.
+- The hub keeps `useLegacyPoolDataOnSend` enabled until the spoke switches. Migration step 10 then disables it and
+  raises `destBytesOverhead` for long data.
 - Keep the legacy pool on the token's inline record permanently. See
   [policy adoption](#move-a-migrated-token-to-policies).
 
@@ -1739,8 +1742,8 @@ Without that pause, early messages fail on the hub and need retries after step 1
 | Where and when | Check |
 | --- | --- |
 | New chain, after step 7 | PCM `getTokenAdminRegistry` matches the ramps' TAR, which maps each token to the MTTP. |
-| New chain, after step 7 | `getLaneRecordLevelBatch` shows every type for each token. `getLaneConnectionBatch` shows the hub token and MTTP. |
-| Hub, before step 13 | For each token in the batch on the new chain, `getLaneRecordLevelBatch` shows the five other types. Its CCVs support the new chain. Each inbound limit covers the other side's outbound limit. |
+| New chain, after step 7 | `getLaneRecordLevelBatch` shows every type for each token. `getLaneConnectionBatch` shows the hub token and MTTP. `getLaneVerificationBatch` shows the correct CCVs and hook. |
+| Hub, before step 13 | For each token in the batch on the new chain, `getLaneRecordLevelBatch` shows the five other types. `getLaneVerificationBatch` shows the correct CCVs and hook. Each inbound limit covers the other side's outbound limit. |
 | Hub, before step 14 | For all tokens from `getAllConfiguredTokens`, only the selected tokens have `hasConnection` to the new chain. Their remote tokens and MTTP are correct. The complete `getSubsetTokens` scan lists the selected tokens. |
 | Both chains, before step 14 | `getLaneConnectionBatch` reports matching `hasConnection` for each token. |
 
@@ -1778,7 +1781,7 @@ on both chains and wait for all in-flight messages before removing any connectio
 | Legacy pool owner | Upgrade every 1.5.0 pool to 1.5.1 or later before phase 2, including chains that will remain legacy. See [the upgrade procedure](#upgrade-pools-older-than-151). |
 | `CONFIG_ROLE` | Use no additional pool data provider, or one that accepts empty data. This remains a permanent requirement. |
 | Issuer | Before phase 1, choose fees for each token on every lane, including lanes to legacy pools. Fees can be zero. |
-| Hook owner | Ensure each legacy hook's `getThresholdAmount` returns 0. MTTP has no threshold amount and cannot copy threshold CCV lists. |
+| Hook owner | For each legacy hook with a non-zero `getThresholdAmount`, move `thresholdOutboundCCVs` and `thresholdInboundCCVs` into `outboundCCVs` and `inboundCCVs` with `applyCCVConfigUpdates`. Then call `setThresholdAmount(0)`. MTTP has no threshold amount, so these CCVs then apply to every amount. |
 
 See [destination gas budgets](#destination-gas-budget), [source byte allowances](#source-byte-allowance), and
 [empty data compatibility](#empty-data-and-migration).
@@ -1788,15 +1791,27 @@ See [destination gas budgets](#destination-gas-budget), [source byte allowances]
 The TAR still points to the legacy pools, so this phase does not change traffic.
 
 1. **Deployer and `DEFAULT_ADMIN_ROLE`:** deploy the five contracts, authorize the PCM, transfer ownership, and grant roles
-   as in [chain expansion](#chain-expansion).
+   as in [chain expansion](#chain-expansion). For each legacy pool older than 2.0 with `getAllowListEnabled()` true,
+   also deploy a `MultiTokenPoolHooks` with the pool's `getAllowList()`. Pools with the same allowlist can share one
+   hook.
 2. **`CONFIG_ROLE`:** create policy defaults:
    - Fee: the issuer's chosen fees.
    - Destination overhead: the measured MTTP receive gas and 32 bytes. The byte limit prevents long-format sends
      while the destination is still legacy.
-   - Security: empty CCV lists and no hook.
+   - Security: a policy whose default record has empty CCV lists and no hook. Also create one policy for each hook
+     below. Its default record has the hook and empty CCV lists. For an `AdvancedPoolHooks`, add a chain record with
+     the same hook and its `outboundCCVs` and `inboundCCVs` for each chain that sets them. A new chain then gets the
+     hook from the default record.
+
+     | Legacy pool | Hook |
+     | --- | --- |
+     | 2.0 with an `AdvancedPoolHooks` | Its `getAdvancedPoolHooks()` |
+     | Older than 2.0, with `getAllowListEnabled()` true | The `MultiTokenPoolHooks` from step 1 |
+
 3. **`CONFIG_ROLE`:** register the tokens with `applyTokenProfileUpdates`. Copy each legacy pool's decimals, pool
    flavor, burn address, and allowed finality. Assign the three policies with `applyTokenFeePolicyUpdates`,
-   `applyTokenDestOverheadPolicyUpdates`, and `applyTokenSecurityPolicyUpdates`.
+   `applyTokenDestOverheadPolicyUpdates`, and `applyTokenSecurityPolicyUpdates`. Each token gets the security policy
+   for its hook from step 2, or the policy without a hook.
    Keep the additional pool data provider unset or compatible with empty data permanently.
 4. **`CONFIG_ROLE`:** copy each token's legacy configuration into inline records for every remote chain, in this
    order:
@@ -1806,7 +1821,6 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
    | Remote pool | Copy `getRemotePools`, with `allowLegacyPoolDataOnReceive` enabled for each legacy pool. For 1.5.0, read `getRemotePool` or wait for its upgrade. Enable `useLegacyPoolDataOnSend`. Add the future remote MTTP where the token will migrate. |
    | Rate limit | Copy the legacy limits. Pools older than 1.6.1 measure inbound amounts in source units; convert to local units if decimals differ. |
    | Fee | Add an inline record only where the token needs different fees from the default. Use fees from an enabled fee configuration of the legacy 2.0 pool, or fees chosen by the issuer. |
-   | Security | For a legacy 2.0 pool with a hook, copy the hook and its `outboundCCVs` and `inboundCCVs`. |
    | Connection, last | Copy the remote token in the remote MTTP's source-token encoding. Use `abi.encode(address)` for EVM, converting any legacy 20-byte value. For non-EVM chains, preserve the exact bytes from `getRemoteToken`. This write runs the lane check. |
 
    Configure `allowLegacyPoolDataOnReceive` for the future remote MTTP according to the planned switch order:
@@ -1818,7 +1832,7 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
 
 5. **Role admin of each token:** grant the MTTP mint and burn roles. Before the switch, the PCM prevents their use
    through transfers because it accepts validation calls only from the token's TAR pool.
-6. **Hook owner:** authorize the MTTP on any reused legacy hook.
+6. **Hook owner:** authorize the MTTP on each hook from step 2.
 7. **Legacy pool owner:** before each remote switch, call
    `addRemotePool(remoteChainSelector, abi.encode(remoteMttp))` on every legacy pool whose token will use that MTTP.
    Keep the old remote pools.
@@ -1856,9 +1870,9 @@ Start only after phase 1 is complete on every chain.
    - If both keep `useLegacyPoolDataOnSend` enabled, both accept a period of legacy-format MTTP traffic.
    - If both disable it, a message arriving before the other switch fails until that switch and needs a retry.
 
-9. Keep the legacy pools for rollback. They must accept messages from each remote token's current pool. Whenever a
-   remote chain selects a new pool, the **owner of each retained legacy pool** calls
-   `addRemotePool(remoteChainSelector, abi.encode(newPool))`.
+9. **Role admin of each token:** after the switch, revoke the legacy pool's mint and burn roles. The owner of a legacy
+   2.0 pool also withdraws its fees. The OffRamp uses the TAR pool at execution time, so the legacy pool no longer
+   executes messages.
 
 #### Upgrade pools older than 1.5.1
 
@@ -1870,8 +1884,8 @@ ends of these lanes must continue to use the same decimals.
 
 For a 1.5.0 pool on chain C:
 
-1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later. For each remote chain, trust the pools listed by
-   the old pool. Also trust that chain's replacement pool if it is upgrading.
+1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's `getAllowList()`. For each
+   remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
 2. **Legacy pool owner on each remote chain already using 1.5.1 or later:** call
    `addRemotePool(chainC, abi.encode(newPool))` before C's TAR switch.
 3. Upgrade any remote 1.5.0 pool too. Its replacement must trust both C's old and new pools.
@@ -1879,16 +1893,15 @@ For a 1.5.0 pool on chain C:
 5. **Token admin on C:** call `TAR.setPool(token, newPool)`.
    A new-pool message can arrive before the remote upgrade switches and fail on that chain's 1.5.0 pool. Tooling
    must list these messages and retry them through `OffRamp.execute` after the remote switch.
-6. **Role admin of the token on C:** revoke the 1.5.0 pool's mint and burn roles after the switch. Do not keep it for
-   rollback.
+6. **Role admin of the token on C:** revoke the 1.5.0 pool's mint and burn roles after the switch.
    The OffRamp uses the TAR pool at execution time, so it no longer executes on that old pool.
 7. **`CONFIG_ROLE` on remote chains with phase 1 records already configured:** add C's new pool to the token's inline
    remote pool record with `allowLegacyPoolDataOnReceive` enabled. Keep the old pool permanently; its messages never expire.
 
 #### Migration phase 3: Finish each lane
 
-Complete this phase separately for each token and lane. Start only when both TARs select the token's MTTP and the
-issuer has ruled out rollback on both chains. Every step below applies to that token and lane.
+Complete this phase separately for each token and lane. Start only when both TARs select the token's MTTP. Every step
+below applies to that token and lane.
 
 - **F** is the chain that switched first on this lane.
 - **S** is the chain that switched second and disabled `useLegacyPoolDataOnSend` for this lane during the switch.
@@ -1903,8 +1916,6 @@ issuer has ruled out rollback on both chains. Every step below applies to that t
 12. **`CONFIG_ROLE` on S:** disable `allowLegacyPoolDataOnReceive` for F's MTTP. Keep every legacy pool with
     `allowLegacyPoolDataOnReceive` enabled permanently. F needs no equivalent change because S's MTTP never had that
     permission on F.
-13. **Role admin of each token:** once rollback is ruled out, revoke the legacy pool's mint and burn roles. The owner
-    of a legacy 2.0 pool also withdraws its fees.
 
 After step 12, retain inline remote pool records for chains with legacy pool history. See
 [moving a migrated token to policies](#move-a-migrated-token-to-policies).
@@ -1919,9 +1930,9 @@ After step 12, retain inline remote pool records for chains with legacy pool his
 | MTTP source with long data | The destination checks source identity. If configured, its additional pool data provider also checks the additional data, including empty data. |
 | Failed message awaiting retry | The TAR pool at retry time executes it under the configuration then in effect. |
 
-S disables `useLegacyPoolDataOnSend` at its switch. F keeps it enabled until step 10, after rollback is ruled out. If a
-legacy-format MTTP message unexpectedly fails after step 12, **`CONFIG_ROLE`** re-enables
-`allowLegacyPoolDataOnReceive` for that MTTP. Any party retries the message. **`CONFIG_ROLE`** then disables it again.
+S disables `useLegacyPoolDataOnSend` at its switch. F keeps it enabled until step 10. If a legacy-format MTTP message
+unexpectedly fails after step 12, **`CONFIG_ROLE`** re-enables `allowLegacyPoolDataOnReceive` for that MTTP. Any party
+retries the message. **`CONFIG_ROLE`** then disables it again.
 
 Other requirements for pending messages:
 
@@ -1962,6 +1973,7 @@ Then verify the following:
 | Source fee configurations | Gas estimates cover measured receive cost with a margin, including legacy sources priced through the pool or FeeQuoter. |
 | MTTP Router | Includes every OffRamp with pending messages for the token's remote chains. |
 | `getLaneVerificationBatch` | Matches the legacy pool's `getRequiredCCVs`. For a pool without `IPoolV2` support, empty lists select default CCVs. |
+| Hook from `getLaneVerificationBatch` | The legacy 2.0 pool's `getAdvancedPoolHooks()`, or the step 1 hook with the legacy pool's `getAllowList()`. Zero if the legacy pool has neither. |
 | Additional pool data provider | Not configured, or accepts empty data from every relevant remote chain |
 | Second chain's switch batch | Sets inline overhead toward the first chain to 192 bytes plus padded provider data. |
 | TARs and old 1.5.0 pools | No TAR selects a 1.5.0 pool for the token; replaced 1.5.0 pools have no mint or burn role. |
@@ -1974,44 +1986,6 @@ Then verify the following:
 | Before step 10 | The remote TAR selects the MTTP for this token. |
 | Before step 12 | Every legacy-format message from the remote MTTP has executed locally. |
 | After step 12 | `getLaneConnectionBatch` shows `allowLegacyPoolDataOnReceive` disabled for the remote MTTP and enabled for every remote legacy pool. |
-
-#### Migration rollback
-
-Before rolling back, tooling must read each legacy pool's `getRemotePools` for every remote chain. Reject the rollback
-if any of the following holds:
-
-- The legacy pool lists a pool named in an incident.
-- The legacy pool does not trust the token's current remote TAR pool. See migration step 9.
-- A remote TAR still selects a pool named in an incident. Wait for that chain's recovery.
-- The legacy pool's inbound CCVs differ from MTTP `getLaneVerificationBatch`. A legacy pool without `IPoolV2` support
-  requires the default CCVs.
-
-Choose the rollback procedure separately for each remote chain. A TAR switch alone is sufficient only if every remote
-chain still sends legacy data to this chain. For a lane between F and S, this holds for S before step 10 on F, or for
-F before S switches. The **token admin** can then call `TAR.setPool(token, legacyPool)`.
-
-Otherwise, use this order:
-
-1. **`CONFIG_ROLE` locally:** enable `allowLegacyPoolDataOnReceive` for the remote MTTP. The local MTTP must accept
-   the legacy data introduced in rollback step 2 until the TAR switches.
-2. **`CONFIG_ROLE` remotely:** enable `useLegacyPoolDataOnSend` toward this chain for the token. In the same batch, set
-   an inline destination overhead record with `destBytesOverhead` equal to 32. The eventual legacy destination needs
-   this format and byte limit.
-3. Wait for all long-format messages from that remote MTTP to execute locally. Check execution state as in migration
-   step 11.
-4. **Role admin of the token:** if migration step 13 revoked the legacy pool's roles, restore its mint and burn roles.
-   Otherwise, its mint calls will fail.
-5. **Token admin:** call `TAR.setPool(token, legacyPool)`. Pending messages now execute on the legacy pool, which trusts
-   the remote MTTPs.
-6. After returning to the MTTP, **`CONFIG_ROLE` remotely:** first raise the byte allowance, then disable
-   `useLegacyPoolDataOnSend`, as in migration step 10. Locally, drain legacy-format MTTP messages and disable
-   `allowLegacyPoolDataOnReceive` from rollback step 1, as in migration steps 11 and 12.
-
-If the rollback cannot wait for step 3, the token admin can switch earlier. Pending long-format messages then wait on
-the legacy pool until the token returns to an MTTP. If it never returns, those messages remain stranded.
-
-During rollback, the legacy pool again trusts the remote MTTP through migration step 7. This again permits legacy pool
-data from a remote MTTP until rollback step 6 completes.
 
 ### Move a migrated token to policies
 
@@ -2032,8 +2006,8 @@ For one chain, follow this order. Each step can be a separate call.
    - Tooling must reject removal if `getLaneConnectionBatch` would report `hasConnection` false afterward. Keep the
      lane open.
 3. **`CONFIG_ROLE`:** assign the rate limit, fee, destination overhead, and security policies. Then remove those
-   inline records. Before each removal, **tooling** checks that the selected policy record has the required values
-   for that token and chain.
+   inline records. Before each assignment and removal, **tooling** checks that the selected policy record has the
+   required values for that token and chain, including the hook.
    - Removing an inline rate limit record deletes its buckets. The policy buckets start full, so the move can allow
      an additional amount equal to each bucket's capacity.
    - For a remote chain still using a non-MTTP pool, retain an inline destination overhead record with 32 bytes. If
@@ -2065,8 +2039,7 @@ For a remote chain with legacy pool history:
 
 - Keep the token's inline remote pool record permanently. It lists only that token's pools. Add new remote MTTPs to
   the policy record only, where they take effect immediately through policy trust.
-- Keep the per-token `useLegacyPoolDataOnSend` value. If the remote token rolls back to a legacy pool, enable it for this
-  token only.
+- Keep the per-token `useLegacyPoolDataOnSend` value.
 - If a late legacy-format MTTP message fails after step 6, add that MTTP back to the inline list with
   `allowLegacyPoolDataOnReceive` enabled. Any party can retry the message. Then remove the MTTP from the inline list again.
 - Never put a legacy pool in a policy record.
@@ -2092,8 +2065,7 @@ Every unpause must wait for all checks in step 5.
 
 1. **`PAUSER_ROLE`:** call `pauseChains([chainX], Both)`. This stops MTTP transfers with X immediately. It does not stop tokens
    whose TAR pool is legacy.
-2. **Legacy pool owner:** remove P from every local legacy pool that trusts it, including pools retained for rollback
-   under migration step 9. Do this even if migration step 13 revoked their roles; rollback can restore those roles.
+2. **Legacy pool owner:** remove P from every local legacy pool that trusts it.
 
    | Legacy pool | Action |
    | --- | --- |
@@ -2112,14 +2084,13 @@ Every unpause must wait for all checks in step 5.
    - If P is the only listed pool, set an empty pool list. Preserve `useLegacyPoolDataOnSend` and
      `trustPolicyRemotePools`.
    - Empty inline records are valid and trust no pools of their own. Do not remove these records.
-5. **Tooling:** complete all five scans below. P must appear nowhere:
+5. **Tooling:** complete all four scans below. P must appear nowhere:
 
    | Scan | Reads |
    | --- | --- |
    | Policy records | `getPolicyNames`, then `getRemotePoolPolicy` for every remote pool policy |
    | Inline records | `getAllConfiguredTokens`, then `getInlineRemotePoolConfigs` for every token |
    | Active legacy pools | TAR `getAllConfiguredTokens`, then `getPool` for each token administered by the issuer. Skip tokens without pools. For non-MTTP pools, read `getRemotePools(chainX)`, or `getRemotePool(chainX)` on 1.5.0. A reverted read fails the scan. |
-   | Retained legacy pools | `getRemotePools(chainX)` on every pool retained under migration step 9. Tooling must keep this inventory from the migration. |
    | Resolved lanes | `getLaneConnectionBatch` for every token and X, including policy pools added through `trustPolicyRemotePools` |
 
    Also query X's TAR to list every token whose pool there is P.
@@ -2163,9 +2134,8 @@ Every unpause must wait for all checks in step 5.
    - Enable `allowLegacyPoolDataOnReceive` for the new pool if it is legacy. For an MTTP, enable it only while it sends
      legacy data before migration step 10 on X. Disable it after draining those messages, as in migration step 12.
    - **`CONFIG_ROLE`:** add a new MTTP to the policy records for X.
-   - **Legacy pool owner:** update every step 2 pool where X is still configured, including rollback pools. On 1.5.1 or
-     later, call `addRemotePool(chainX, abi.encode(newPool))`. On 1.5.0, call
-     `setRemotePool(chainX, abi.encode(newPool))`.
+   - **Legacy pool owner:** update every step 2 pool where X is still configured. On 1.5.1 or later, call
+     `addRemotePool(chainX, abi.encode(newPool))`. On 1.5.0, call `setRemotePool(chainX, abi.encode(newPool))`.
    - **Legacy pool owner:** for each pool where step 2 or 7 removed X, re-add it with `applyChainUpdates` instead.
      Restore the remote token and limits saved by tooling. Trust the new pool and previously saved pools except P.
      A 1.5.0 pool accepts only one pool, so use the new one.
@@ -2175,7 +2145,7 @@ Every unpause must wait for all checks in step 5.
      destination overhead to 32 bytes.
    - **`CONFIG_ROLE`:** restore the outbound limits from before step 7. Remove an inline rate limit record only if
      step 7 created it. **Legacy pool owner:** also restore the previous outbound limits on legacy pools.
-   - Never add P back to any record or legacy pool, including rollback pools.
+   - Never add P back to any record or legacy pool.
 
 #### Incident limits and pending messages
 

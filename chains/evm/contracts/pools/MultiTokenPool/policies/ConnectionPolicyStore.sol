@@ -390,6 +390,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (isInline && record.trustPolicyRemotePools) {
       (PolicyConfig.RecordLevel policyLevel, RemotePoolRecord storage policyRecord) =
         _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
+
       if (policyLevel != PolicyConfig.RecordLevel.None && policyRecord.remotePoolHashes.contains(sourcePoolHash)) {
         // Pools trusted only through the policy cannot send legacy pool data.
         return false;
@@ -410,6 +411,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     } else if (connectionLevel == PolicyConfig.RecordLevel.PolicyChain) {
       bytes32 policyName = s_tokenStates[localToken].connectionPolicyName;
       address remoteTokenAddressProvider = s_remoteTokenAddressProviders[policyName];
+
       if (remoteTokenAddressProvider != address(0)) {
         remoteToken = IRemoteTokenAddressProvider(remoteTokenAddressProvider)
           .getRemoteTokenAddress(localToken, remoteChainSelector);
@@ -454,7 +456,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) private view returns (PolicyConfig.RecordLevel) {
     if (s_inlineConnectionChains[localToken].contains(remoteChainSelector)) return PolicyConfig.RecordLevel.Inline;
+
     if (_hasPolicyLane(localToken, remoteChainSelector)) return PolicyConfig.RecordLevel.PolicyChain;
+
     return PolicyConfig.RecordLevel.None;
   }
 
@@ -464,6 +468,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) private view returns (bool) {
     bytes32 policyName = s_tokenStates[localToken].connectionPolicyName;
+
     if (!s_connectionPolicies.policies[policyName].remoteChainSelectors.contains(remoteChainSelector)) {
       return false;
     }
@@ -480,6 +485,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.Inline, s_inlineRemotePoolRecords[localToken][remoteChainSelector]);
     }
+
     return _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
   }
 
@@ -490,9 +496,11 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) private view returns (PolicyConfig.RecordLevel level, RemotePoolRecord storage record) {
     bytes32 policyName = s_tokenStates[localToken].remotePoolPolicyName;
+
     if (s_remotePoolPolicies.policies[policyName].remoteChainSelectors.contains(remoteChainSelector)) {
       return (PolicyConfig.RecordLevel.PolicyChain, s_policyRemotePoolRecords[policyName][remoteChainSelector]);
     }
+
     // The zero policy name cannot be configured, so its records are always empty.
     return (PolicyConfig.RecordLevel.None, s_policyRemotePoolRecords[bytes32(0)][remoteChainSelector]);
   }
@@ -560,6 +568,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     ) {
       revert InvalidAdditionalPoolData(localToken, remoteChainSelector, additionalPoolData);
     }
+
     return remoteDecimals;
   }
 
@@ -714,8 +723,9 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view {
     for (uint256 i = 0; i < lanes.length; ++i) {
       address localToken = lanes[i].localToken;
-      bytes4 allowedFinalityConfig =
-        s_tokens.contains(localToken) ? s_tokenStates[localToken].allowedFinalityConfig : bytes4(0);
+      bytes4 allowedFinalityConfig = bytes4(0);
+      if (s_tokens.contains(localToken)) allowedFinalityConfig = s_tokenStates[localToken].allowedFinalityConfig;
+
       FinalityCodec._ensureRequestedFinalityAllowed(requestedFinalityConfig, allowedFinalityConfig);
     }
   }
@@ -745,7 +755,10 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint64 remoteChainSelector
   ) external view {
     (PolicyConfig.RecordLevel level,) = _resolveRemotePoolRecord(localToken, remoteChainSelector);
-    if (level == PolicyConfig.RecordLevel.None) revert RemotePoolRecordNotFound(localToken, remoteChainSelector);
+
+    if (level == PolicyConfig.RecordLevel.None) {
+      revert RemotePoolRecordNotFound(localToken, remoteChainSelector);
+    }
   }
 
   /// @notice Returns the connection and remote pool record levels for each token and chain.
@@ -779,22 +792,21 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     uint256[] memory policyChains =
       s_connectionPolicies.policies[s_tokenStates[localToken].connectionPolicyName].remoteChainSelectors.values();
 
-    uint256 count = inlineChains.length;
+    // Move the policy-only chains to the front. This array is a memory copy, so storage does not change.
+    uint256 policyOnlyChainCount = 0;
     for (uint256 i = 0; i < policyChains.length; ++i) {
       if (_resolveConnectionLevel(localToken, uint64(policyChains[i])) == PolicyConfig.RecordLevel.PolicyChain) {
-        ++count;
+        policyChains[policyOnlyChainCount++] = policyChains[i];
       }
     }
 
-    remoteChainSelectors = new uint64[](count);
+    remoteChainSelectors = new uint64[](inlineChains.length + policyOnlyChainCount);
     for (uint256 i = 0; i < inlineChains.length; ++i) {
       remoteChainSelectors[i] = uint64(inlineChains[i]);
     }
-    count = inlineChains.length;
-    for (uint256 i = 0; i < policyChains.length; ++i) {
-      if (_resolveConnectionLevel(localToken, uint64(policyChains[i])) == PolicyConfig.RecordLevel.PolicyChain) {
-        remoteChainSelectors[count++] = uint64(policyChains[i]);
-      }
+
+    for (uint256 i = 0; i < policyOnlyChainCount; ++i) {
+      remoteChainSelectors[inlineChains.length + i] = uint64(policyChains[i]);
     }
     return remoteChainSelectors;
   }
@@ -1022,20 +1034,24 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     RemotePoolRecord storage policyRecord
   ) private view returns (IPoolConfigManager.RemotePool[] memory remotePools) {
     bytes32[] memory policyRemotePoolHashes = policyRecord.remotePoolHashes.values();
-    uint256 count = inlineRemotePools.length;
+
+    // Move the policy-only pools to the front. This array is a memory copy, so storage does not change.
+    uint256 policyOnlyPoolCount = 0;
     for (uint256 i = 0; i < policyRemotePoolHashes.length; ++i) {
-      if (!inlineRecord.remotePoolHashes.contains(policyRemotePoolHashes[i])) ++count;
+      if (!inlineRecord.remotePoolHashes.contains(policyRemotePoolHashes[i])) {
+        policyRemotePoolHashes[policyOnlyPoolCount++] = policyRemotePoolHashes[i];
+      }
     }
 
-    remotePools = new IPoolConfigManager.RemotePool[](count);
+    remotePools = new IPoolConfigManager.RemotePool[](inlineRemotePools.length + policyOnlyPoolCount);
     for (uint256 i = 0; i < inlineRemotePools.length; ++i) {
       remotePools[i] = inlineRemotePools[i];
     }
-    count = inlineRemotePools.length;
-    for (uint256 i = 0; i < policyRemotePoolHashes.length; ++i) {
+
+    for (uint256 i = 0; i < policyOnlyPoolCount; ++i) {
       bytes32 remotePoolHash = policyRemotePoolHashes[i];
-      if (inlineRecord.remotePoolHashes.contains(remotePoolHash)) continue;
-      remotePools[count++] = IPoolConfigManager.RemotePool({
+
+      remotePools[inlineRemotePools.length + i] = IPoolConfigManager.RemotePool({
         remotePoolAddress: s_remotePoolAddresses[remotePoolHash],
         allowLegacyPoolDataOnReceive: policyRecord.allowLegacyPoolDataOnReceive[remotePoolHash]
       });
@@ -1198,7 +1214,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @dev Lock requires a LockBox that supports the token. BurnToAddress accepts any address, matching
-  /// BurnToAddressMintTokenPool. All other flavors require a zero address.
+  /// BurnToAddressMintTokenPool. All other flavors require a zero lockOrBurnAddress address.
   function _validateLockOrBurnAddress(
     address localToken,
     IPoolConfigManager.LockOrBurnFlavor lockOrBurnFlavor,
@@ -1588,7 +1604,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < localTokens.length; ++i) {
       TokenState storage tokenState = s_tokenStates[localTokens[i]];
       (bool isOutboundPaused, bool isInboundPaused) =
-        _getPauseFlags(tokenState.isOutboundPaused, tokenState.isInboundPaused, direction, isPaused);
+        _resolvePauseFlags(tokenState.isOutboundPaused, tokenState.isInboundPaused, direction, isPaused);
       if (isOutboundPaused == tokenState.isOutboundPaused && isInboundPaused == tokenState.isInboundPaused) continue;
 
       tokenState.isOutboundPaused = isOutboundPaused;
@@ -1611,7 +1627,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < remoteChainSelectors.length; ++i) {
       ChainPause storage chainPause = s_chainPauses[remoteChainSelectors[i]];
       (bool isOutboundPaused, bool isInboundPaused) =
-        _getPauseFlags(chainPause.isOutboundPaused, chainPause.isInboundPaused, direction, isPaused);
+        _resolvePauseFlags(chainPause.isOutboundPaused, chainPause.isInboundPaused, direction, isPaused);
       if (isOutboundPaused == chainPause.isOutboundPaused && isInboundPaused == chainPause.isInboundPaused) continue;
 
       chainPause.isOutboundPaused = isOutboundPaused;
@@ -1620,7 +1636,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     }
   }
 
-  function _getPauseFlags(
+  function _resolvePauseFlags(
     bool isOutboundPaused,
     bool isInboundPaused,
     PauseDirection direction,

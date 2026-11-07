@@ -175,6 +175,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) external view returns (uint256 feeAmount) {
     (FeeConfig storage feeConfig, DestOverheadConfig storage destOverheadConfig) =
       _getLaneRecords(localToken, remoteChainSelector);
+
     if (destPoolDataLength > destOverheadConfig.destBytesOverhead) {
       revert PoolDataTooLarge(localToken, remoteChainSelector, destPoolDataLength, destOverheadConfig.destBytesOverhead);
     }
@@ -562,6 +563,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+
       TokenState storage tokenState = s_tokenStates[localToken];
       bytes32 oldPolicyName = tokenState.destOverheadPolicyName;
 
