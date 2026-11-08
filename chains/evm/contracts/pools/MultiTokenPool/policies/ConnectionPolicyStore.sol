@@ -672,6 +672,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) {
         connection.useLegacyPoolDataOnSend = record.useLegacyPoolDataOnSend;
         connection.remotePools = _getInlineRemotePools(record);
+
+        // Inline records override policy records by default. With trustPolicyRemotePools, a union is used.
         if (!record.trustPolicyRemotePools) continue;
       }
 
