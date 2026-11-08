@@ -661,13 +661,15 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       if (level == PolicyConfig.RecordLevel.None) continue;
 
       connection.hasConnection = true;
-      // Keep the rest of the lane visible if the provider reverts or returns an invalid address.
-      connection.remoteToken = level == PolicyConfig.RecordLevel.Inline
-        ? s_inlineRemoteTokens[localToken][remoteChainSelector]
-        : _tryGetPolicyRemoteToken(localToken, remoteChainSelector);
+      if (level == PolicyConfig.RecordLevel.Inline) {
+        connection.remoteToken = s_inlineRemoteTokens[localToken][remoteChainSelector];
+      } else {
+        // Keep the rest of the lane visible if the provider reverts or returns an invalid address.
+        connection.remoteToken = _tryGetPolicyRemoteToken(localToken, remoteChainSelector);
+      }
 
+      InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) {
-        InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
         connection.useLegacyPoolDataOnSend = record.useLegacyPoolDataOnSend;
         connection.remotePools = _getInlineRemotePools(record);
         if (!record.trustPolicyRemotePools) continue;
@@ -676,11 +678,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       (PolicyConfig.RecordLevel policyLevel, EnumerableSet.Bytes32Set storage policyRemotePoolHashes) =
         _resolvePolicyRemotePoolRecord(localToken, remoteChainSelector);
       if (policyLevel != PolicyConfig.RecordLevel.None) {
-        connection.remotePools = _addPolicyRemotePools(
-          connection.remotePools,
-          s_inlineRemotePoolRecords[localToken][remoteChainSelector].remotePoolHashes,
-          policyRemotePoolHashes
-        );
+        connection.remotePools =
+          _addPolicyRemotePools(connection.remotePools, record.remotePoolHashes, policyRemotePoolHashes);
       }
     }
     return connections;

@@ -104,8 +104,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice The values of a rate limit record. Amounts are in local token units.
-  /// @dev While an FTF config is disabled, an FTF transfer in its direction uses the default finality bucket of the
-  /// same record.
+  /// @dev If an FTF rate limit is disabled, fast transfers use the default finality bucket of the same record and
+  /// direction. Transfers keep their requested finality.
+  /// ConnectionPolicyStore checks the token's allowedFinalityConfig on send.
   struct RateLimitConfig {
     RateLimiter.Config outbound; // The outbound limit for default finality, meaning the rate limits for all of the onRamps for the given chain.
     RateLimiter.Config inbound; // The inbound limit for default finality, meaning the rate limits for all of the offRamps for the given chain.
@@ -261,8 +262,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   // and returns the hook of the security record. A transfer reverts if the token has no record for the chain.
 
   /// @notice Consumes the outbound rate limit of an outbound transfer, and returns the hook of the lane.
-  /// @dev Reverts if the token has no security or rate limit record for the chain. Any requested finality other than
-  /// WAIT_FOR_FINALITY_FLAG uses the FTF bucket.
+  /// @dev Reverts if the token has no security or rate limit record for the chain.
+  /// WAIT_FOR_FINALITY_FLAG uses the default outbound bucket. Other finalities use the FTF outbound bucket if the
+  /// record's FTF outbound rate limit is enabled. Otherwise, they use the default outbound bucket of the same record.
   /// @param localToken The local token.
   /// @param remoteChainSelector The destination chain.
   /// @param amount The amount after the token fee, in local decimals.
@@ -290,8 +292,9 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   }
 
   /// @notice Consumes the inbound rate limit, and returns the hook of the lane.
-  /// @dev Reverts if the token has no rate limit or security record for the chain. Any requested finality other than
-  /// WAIT_FOR_FINALITY_FLAG uses the FTF bucket.
+  /// @dev Reverts if the token has no rate limit or security record for the chain.
+  /// WAIT_FOR_FINALITY_FLAG uses the default inbound bucket. Other finalities use the FTF inbound bucket if the
+  /// record's FTF inbound rate limit is enabled. Otherwise, they use the default inbound bucket of the same record.
   /// @param localToken The local token.
   /// @param remoteChainSelector The source chain.
   /// @param localAmount The amount in local decimals.
@@ -332,8 +335,8 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     if (level == PolicyConfig.RecordLevel.None) revert RateLimitRecordNotFound(localToken, remoteChainSelector);
 
-    // If the FTF config of the record is not enabled, an FTF transfer uses the default finality bucket, the same as
-    // TokenPool. A bucket gets the config of its policy record only on use, so this check reads the record.
+    // If the record's FTF rate limit is disabled for this direction, use its default bucket, as in TokenPool.
+    // A bucket gets the config of its policy record only on use, so this check reads the record.
     if (fastFinality && !_isFastFinalityRateLimitEnabled(localToken, policyName, recordChainSelector, direction)) {
       fastFinality = false;
     }
@@ -714,6 +717,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
     bytes32 policyName
   ) external view returns (uint32 tokenCount, uint8 localDecimals, RateLimitPolicyConfigArgs[] memory policyConfigs) {
     PolicyConfig.Policy storage policy = s_rateLimitPolicies.policies[policyName];
+    localDecimals = s_rateLimitPolicyDecimals[policyName];
     uint256[] memory remoteChainSelectors = policy.remoteChainSelectors.values();
     policyConfigs = new RateLimitPolicyConfigArgs[](remoteChainSelectors.length);
 
@@ -722,7 +726,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       policyConfigs[i] = RateLimitPolicyConfigArgs({
         policyName: policyName,
         remoteChainSelector: remoteChainSelector,
-        localDecimals: s_rateLimitPolicyDecimals[policyName],
+        localDecimals: localDecimals,
         rateLimitConfig: RateLimitConfig({
           outbound: _getRateLimitPolicyConfig(
             policyName, remoteChainSelector, false, IPoolV2.MessageDirection.Outbound
@@ -737,7 +741,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
         })
       });
     }
-    return (policy.tokenCount, s_rateLimitPolicyDecimals[policyName], policyConfigs);
+    return (policy.tokenCount, localDecimals, policyConfigs);
   }
 
   /// @notice Returns the records of a security policy, in the shape of applySecurityPolicyConfigUpdates. Never reverts.
