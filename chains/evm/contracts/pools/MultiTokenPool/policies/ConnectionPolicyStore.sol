@@ -665,6 +665,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       connection.remoteToken = level == PolicyConfig.RecordLevel.Inline
         ? s_inlineRemoteTokens[localToken][remoteChainSelector]
         : _tryGetPolicyRemoteToken(localToken, remoteChainSelector);
+
       if (s_inlineRemotePoolChains[localToken].contains(remoteChainSelector)) {
         InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
         connection.useLegacyPoolDataOnSend = record.useLegacyPoolDataOnSend;
@@ -1039,7 +1040,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     // Move the policy-only pools to the front. This array is a memory copy, so storage does not change.
     uint256 policyOnlyPoolCount = 0;
     for (uint256 i = 0; i < remotePoolHashes.length; ++i) {
-      if (inlineRemotePools.length == 0 || !inlineRemotePoolHashes.contains(remotePoolHashes[i])) {
+      if (!inlineRemotePoolHashes.contains(remotePoolHashes[i])) {
         remotePoolHashes[policyOnlyPoolCount++] = remotePoolHashes[i];
       }
     }
@@ -1090,8 +1091,8 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = tokensToRemove[i];
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
-      TokenState storage tokenState = s_tokenStates[localToken];
 
+      TokenState storage tokenState = s_tokenStates[localToken];
       if (
         tokenState.connectionPolicyName != bytes32(0) || tokenState.remotePoolPolicyName != bytes32(0)
           || s_inlineConnectionChains[localToken].length() != 0 || s_inlineRemotePoolChains[localToken].length() != 0
@@ -1106,14 +1107,16 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
     for (uint256 i = 0; i < profilesToSet.length; ++i) {
       PolicyConfig.TokenProfileArgs calldata profile = profilesToSet[i];
       address localToken = profile.localToken;
-      if (localToken == address(0)) revert ZeroAddressInvalid();
-      TokenState storage tokenState = s_tokenStates[localToken];
 
+      if (localToken == address(0)) revert ZeroAddressInvalid();
+
+      TokenState storage tokenState = s_tokenStates[localToken];
       if (!s_tokens.contains(localToken)) {
         _validateDecimals(localToken, profile.localDecimals);
       } else if (tokenState.localDecimals != profile.localDecimals) {
         revert InvalidDecimalArgs(localToken, tokenState.localDecimals, profile.localDecimals);
       }
+
       _validateLockOrBurnAddress(localToken, profile.lockOrBurnFlavor, profile.lockOrBurnAddress);
       _validateProvider(profile.additionalPoolDataProvider);
 
@@ -1148,6 +1151,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+
       TokenState storage tokenState = s_tokenStates[localToken];
       bytes32 oldPolicyName = tokenState.connectionPolicyName;
       // Otherwise the old subset entries would come back if the token rejoins the old policy.
@@ -1170,6 +1174,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       bytes32 policyName = tokenPoliciesToSet[i].policyName;
 
       if (!s_tokens.contains(localToken)) revert PolicyConfig.LocalTokenNotRegistered(localToken);
+
       TokenState storage tokenState = s_tokenStates[localToken];
       bytes32 oldPolicyName = tokenState.remotePoolPolicyName;
 
@@ -1270,6 +1275,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       address localToken = inlineConfigsToSet[i].localToken;
       uint64 remoteChainSelector = inlineConfigsToSet[i].remoteChainSelector;
       bytes calldata remoteToken = inlineConfigsToSet[i].remoteToken;
+
       if (!_isValidRemoteToken(remoteToken)) revert InvalidRemoteToken(localToken, remoteChainSelector);
 
       PolicyConfig._setInlineRecord(s_tokens, s_inlineConnectionChains[localToken], localToken, remoteChainSelector);
@@ -1299,6 +1305,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       ConnectionPolicyRecord storage policyRecord = s_policyConnectionRecords[policyName][remoteChainSelector];
       // Remove each set entry before deleting the struct, since delete does not clear the set's internal mapping.
       address[] memory subsetTokens = policyRecord.subsetTokens.values();
+
       for (uint256 j = 0; j < subsetTokens.length; ++j) {
         policyRecord.subsetTokens.remove(subsetTokens[j]);
       }
@@ -1308,6 +1315,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
 
     for (uint256 i = 0; i < policiesToRemove.length; ++i) {
       bytes32 policyName = policiesToRemove[i];
+
       PolicyConfig._removePolicy(s_connectionPolicies, policyName);
       delete s_remoteTokenAddressProviders[policyName];
       emit ConnectionPolicyRemoved(policyName);
