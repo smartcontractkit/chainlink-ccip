@@ -20,7 +20,8 @@ import {EnumerableSet} from "@openzeppelin/contracts@5.3.0/utils/structs/Enumera
 /// Connection records determine which remote chains a token can use. Transfers also require a remote pool record.
 /// Inline connections specify the remote token directly; policy connections use an IRemoteTokenAddressProvider.
 /// A connection policy can enable a chain for all assigned tokens or restrict it to a subset.
-/// Inline records override the corresponding policy records. Connection and remote pool policies have no defaults.
+/// Inline records override the corresponding policy records. With trustPolicyRemotePools, an inline remote pool
+/// record also trusts the policy pools. Connection and remote pool policies have no defaults.
 contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -1423,11 +1424,12 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
       uint64 remoteChainSelector = inlineConfigsToRemove[i].remoteChainSelector;
 
       InlineRemotePoolRecord storage record = s_inlineRemotePoolRecords[localToken][remoteChainSelector];
-      PolicyConfig._removeInlineRecord(s_inlineRemotePoolChains[localToken], localToken, remoteChainSelector);
       // Policy records don't support legacy pool data. Falling back to the policy while the remote pool is still legacy
       // would burn or lock tokens for messages it can't process. Clearing the flag first confirms the remote pool has
       // been upgraded.
       if (record.useLegacyPoolDataOnSend) revert LegacyRemotePoolRecord(localToken, remoteChainSelector);
+
+      PolicyConfig._removeInlineRecord(s_inlineRemotePoolChains[localToken], localToken, remoteChainSelector);
       _clearInlineRemotePools(record);
       delete s_inlineRemotePoolRecords[localToken][remoteChainSelector];
       emit InlineRemotePoolConfigRemoved(localToken, remoteChainSelector);

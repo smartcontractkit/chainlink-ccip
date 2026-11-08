@@ -968,7 +968,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
       InlineRateLimitBucketArgs calldata args = bucketConfigsToSet[i];
 
       if (!s_inlineRateLimitChains[args.localToken].contains(args.remoteChainSelector)) {
-        revert RateLimitRecordNotFound(args.localToken, args.remoteChainSelector);
+        revert PolicyConfig.InlineRecordNotFound(args.localToken, args.remoteChainSelector);
       }
 
       if (!_isValidRateLimitConfig(args.config)) {
