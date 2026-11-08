@@ -130,11 +130,11 @@ interface IPoolConfigManager {
   /// @notice Checks the inbound lane, the source pool, and the pool data. Converts the amount to local decimals and
   /// consumes the inbound rate limit.
   /// @dev Reverts if the transfer is paused or the lane is not fully configured.
-  /// @param input The original inbound transfer.
+  /// @param releaseOrMintIn The original inbound transfer.
   /// @param requestedFinalityConfig The requested finality.
   /// @return transfer The converted amount, the token's lock or burn config, and the postflight hook.
   function validateReleaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata input,
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn,
     bytes4 requestedFinalityConfig
   ) external returns (ResolvedInboundTransfer memory transfer);
 

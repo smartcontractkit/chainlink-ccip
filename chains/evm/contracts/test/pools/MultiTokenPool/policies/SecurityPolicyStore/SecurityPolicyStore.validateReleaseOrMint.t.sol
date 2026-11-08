@@ -64,7 +64,7 @@ contract SecurityPolicyStore_validateReleaseOrMint is SecurityPolicyStoreSetup {
     assertEq(CAPACITY + 3 - 100e18, state.fastFinalityInbound.tokens);
   }
 
-  /// @notice A record with no FTF config makes an FTF transfer use the default finality bucket, the same as TokenPool.
+  /// @notice An FTF transfer uses the default inbound bucket when the FTF inbound rate limit is disabled.
   function test_validateReleaseOrMint_FastFinalityFallsBackToDefaultBucket() public {
     RateLimiter.Config memory disabled;
     _setInlineRateLimitConfigPerSlot(
@@ -151,7 +151,7 @@ contract SecurityPolicyStore_validateReleaseOrMint is SecurityPolicyStoreSetup {
     assertEq(CAPACITY + 3 - 100e18, state.fastFinalityInbound.tokens);
   }
 
-  /// @notice An FTF inbound transfer that uses a policy falls back to the default bucket when the policy disables FTF.
+  /// @notice An FTF transfer uses the default inbound bucket when the policy's FTF inbound rate limit is disabled.
   function test_validateReleaseOrMint_FastFinalityPolicyDisabled() public {
     RateLimiter.Config memory disabled;
     _setRateLimitPolicyConfigPerSlot(

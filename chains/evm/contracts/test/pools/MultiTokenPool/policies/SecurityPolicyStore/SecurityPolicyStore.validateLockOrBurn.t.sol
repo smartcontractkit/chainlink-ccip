@@ -64,7 +64,7 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     assertEq(CAPACITY + 3, state.fastFinalityInbound.tokens);
   }
 
-  /// @notice A record with no FTF config makes an FTF transfer use the default finality bucket, the same as TokenPool.
+  /// @notice An FTF transfer uses the default outbound bucket when the FTF outbound rate limit is disabled.
   function test_validateLockOrBurn_FastFinalityFallsBackToDefaultBucket() public {
     RateLimiter.Config memory disabled;
     _setInlineRateLimitConfigPerSlot(
@@ -151,7 +151,7 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     assertEq(CAPACITY + 2 - 100e18, state.fastFinalityOutbound.tokens);
   }
 
-  /// @notice An FTF transfer that uses a policy falls back to the default bucket when the policy record disables FTF.
+  /// @notice An FTF transfer uses the default outbound bucket when the policy's FTF outbound rate limit is disabled.
   function test_validateLockOrBurn_FastFinalityPolicyDisabled() public {
     RateLimiter.Config memory disabled;
     _setRateLimitPolicyConfigPerSlot(
