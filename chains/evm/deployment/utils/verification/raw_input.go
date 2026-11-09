@@ -46,6 +46,7 @@ import (
 	v1_6_5_Usdc_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool"
 	v2_0_0_Cctp_message_transmitter_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/registry_module_external_access_control"
 	rmn_2_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
@@ -136,6 +137,13 @@ var (
 				solidityStandardJSONInput: registry_module_owner_custom.SolidityStandardInput,
 				bytecode:                  registry_module_owner_custom.RegistryModuleOwnerCustomBin,
 				name:                      "contracts/tokenAdminRegistry/RegistryModuleOwnerCustom.sol:RegistryModuleOwnerCustom",
+			},
+		},
+		utils.RegistryModuleExternalAccessControl: {
+			Version2_1_0: rawContractInfo{
+				solidityStandardJSONInput: registry_module_external_access_control.SolidityStandardInput,
+				bytecode:                  registry_module_external_access_control.RegistryModuleExternalAccessControlBin,
+				name:                      "contracts/tokenAdminRegistry/RegistryModuleExternalAccessControl.sol:RegistryModuleExternalAccessControl",
 			},
 		},
 		nonce_managerops.ContractType: {
