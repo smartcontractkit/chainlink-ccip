@@ -241,7 +241,14 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
-	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
+	// When a finalized commitment is requested, waiting for "confirmed" is not enough: reading
+	// the transaction back at the finalized commitment before it is finalized returns an empty
+	// result, so wait until the transaction reaches the requested commitment level.
+	targetStatus := rpc.ConfirmationStatusConfirmed
+	if commitment == rpc.CommitmentFinalized {
+		targetStatus = rpc.ConfirmationStatusFinalized
+	}
+	for txStatus != targetStatus {
 		if count > 500 {
 			return nil, fmt.Errorf("unable to find transaction within timeout (sig: %v)", txsig)
 		}
@@ -266,6 +273,10 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 			Commitment:                     commitment,
 			MaxSupportedTransactionVersion: &v,
 		})
+		if errGetTx == nil && transactionRes == nil {
+			// The transaction is not yet visible at the requested commitment level; retry.
+			errGetTx = fmt.Errorf("transaction %s not yet available at commitment %s", txsig, commitment)
+		}
 		if errGetTx != nil {
 			fmt.Println("Error getting transaction:", errGetTx)
 			time.Sleep(transactionConfigs.RetryDelay)
@@ -432,6 +443,28 @@ func GetAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, ac
 		return err
 	}
 	return bin.NewBorshDecoder(resp.Value.Data.GetBinary()).Decode(data)
+}
+
+// GetFinalizedAccountDataBorshInto reads the account at the finalized commitment, retrying while
+// the account is not yet visible. Accounts created by a transaction confirmed at a lower
+// commitment level (e.g. via Chain.Confirm) may not be finalized yet, in which case a plain read
+// at the finalized commitment reports the account as not found.
+func GetFinalizedAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, account solana.PublicKey, data any) error {
+	const attempts = 120 // ~30s at 250ms per attempt
+	const retryDelay = 250 * time.Millisecond
+	var err error
+	for i := 0; i < attempts; i++ {
+		err = GetAccountDataBorshInto(ctx, solanaGoClient, account, rpc.CommitmentFinalized, data)
+		if err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryDelay):
+		}
+	}
+	return err
 }
 
 func IsClosedAccount(ctx context.Context, solanaGoClient *rpc.Client, accountKey solana.PublicKey, commitment rpc.CommitmentType) bool {
