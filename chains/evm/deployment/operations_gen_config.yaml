@@ -910,3 +910,12 @@ contracts:
         access: public
       - name: getCursedSubjects
         access: public
+
+  # 2.1.0
+  #
+  # Deploy only. The registry module is registered on the TokenAdminRegistry by the
+  # DeployRegistryModuleExternalAccessControl changeset; the registerAdminVia* / register*AccessControl*
+  # functions are called by token owners/admins, not by the deployment, so they are not generated here.
+  - contract_name: RegistryModuleExternalAccessControl
+    version: "2.1.0"
+    functions: []
