@@ -19,6 +19,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/registry_module_external_access_control"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -46,7 +47,6 @@ import (
 	v1_6_5_Usdc_token_pool "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_5/usdc_token_pool"
 	v2_0_0_Cctp_message_transmitter_proxy "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/cctp_message_transmitter_proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/erc20_lock_box"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/registry_module_external_access_control"
 	rmn_2_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_1_0/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 )
