@@ -36,7 +36,10 @@ const (
 	CCTPTokenPool              cldf.ContractType = "CCTPTokenPool"
 	FeeQuoter                  cldf.ContractType = "FeeQuoter"
 	RegistryModule             cldf.ContractType = "RegistryModuleOwnerCustom"
-	EVMSignerRegistry          cldf.ContractType = "SignerRegistry"
+	// RegistryModuleExternalAccessControl is the TAR registry module that registers admins via
+	// getCCIPAdmin, owner, DEFAULT_ADMIN_ROLE, or CCIP_TOKEN_REGISTRY_ADMIN_ROLE.
+	RegistryModuleExternalAccessControl cldf.ContractType = "RegistryModuleExternalAccessControl"
+	EVMSignerRegistry                   cldf.ContractType = "SignerRegistry"
 
 	// Pools
 	TokenPoolFactory                    cldf.ContractType = "TokenPoolFactory"

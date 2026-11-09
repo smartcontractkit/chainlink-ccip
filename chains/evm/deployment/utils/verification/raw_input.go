@@ -19,6 +19,7 @@ import (
 	offrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/offramp"
 	onrampops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	fee_quoter_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_3/operations/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/registry_module_external_access_control"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
@@ -136,6 +137,13 @@ var (
 				solidityStandardJSONInput: registry_module_owner_custom.SolidityStandardInput,
 				bytecode:                  registry_module_owner_custom.RegistryModuleOwnerCustomBin,
 				name:                      "contracts/tokenAdminRegistry/RegistryModuleOwnerCustom.sol:RegistryModuleOwnerCustom",
+			},
+		},
+		utils.RegistryModuleExternalAccessControl: {
+			Version2_1_0: rawContractInfo{
+				solidityStandardJSONInput: registry_module_external_access_control.SolidityStandardInput,
+				bytecode:                  registry_module_external_access_control.RegistryModuleExternalAccessControlBin,
+				name:                      "contracts/tokenAdminRegistry/RegistryModuleExternalAccessControl.sol:RegistryModuleExternalAccessControl",
 			},
 		},
 		nonce_managerops.ContractType: {
