@@ -223,6 +223,20 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
     _resolveInboundLane(chainRemotePool);
   }
 
+  function test_getLaneConnectionBatch_PolicyPoolAfterInlineRemoval() public {
+    _setInlineRemotePoolConfigTrustingPolicy(s_token, s_remotePool, true);
+
+    s_connectionStore.applyInlineRemotePoolConfigUpdates(
+      _getLaneKeys(s_token, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0)
+    );
+
+    IPoolConfigManager.LaneConnection memory connection = _getLaneConnection(s_token, DEST_CHAIN_SELECTOR);
+
+    assertEq(1, connection.remotePools.length);
+    assertEq(s_remotePool, connection.remotePools[0].remotePoolAddress);
+    assertFalse(connection.remotePools[0].allowLegacyPoolDataOnReceive);
+  }
+
   function test_getLaneConnectionBatch_NoRemotePoolRecord() public {
     _setTokenRemotePoolPolicy(s_token, bytes32(0));
 

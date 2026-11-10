@@ -19,7 +19,7 @@ import {IERC165} from "@openzeppelin/contracts@5.3.0/utils/introspection/IERC165
 
 /// @notice Base abstract class with common functions for all multi-token pools. A multi-token pool serves as isolated
 /// place for holding many tokens and token specific logic that may execute as tokens move across the bridge. All token
-/// and lane config lives in the pool config manager, which the pool calls through IPoolConfigManager.
+/// and lane config comes from the pool config manager, which the pool calls through IPoolConfigManager.
 /// @dev The pool runs the checks that a pool config manager cannot skip: the RMN curse, the ramp caller, and the lock or
 /// burn flavor. The pool config manager resolves the lane. It builds and checks the pool data, which includes the
 /// source token and the additional pool data. It also computes the token fee and consumes the rate limits.
@@ -57,7 +57,7 @@ abstract contract MultiTokenPool is IMultiTokenPool, Ownable2StepMsgSender {
 
   /// @dev The address of the router.
   IRouter private s_router;
-  /// @dev The pool config manager that holds the config of every token of this pool.
+  /// @dev The pool config manager that resolves the config of every token of this pool.
   IPoolConfigManager private s_poolConfigManager;
 
   constructor(

@@ -195,6 +195,18 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
     s_connectionStore.applyInlineRemotePoolConfigUpdates(_getLaneKeys(s_token, DEST_CHAIN_SELECTOR), inlineConfigs);
 
     assertEq(abi.encode(inlineConfigs), abi.encode(s_connectionStore.getInlineRemotePoolConfigs(s_token)));
+    bytes memory sourcePoolData = _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, "");
+    s_connectionStore.resolveInboundLane(
+      s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.InvalidSourcePoolAddress.selector, s_token, DEST_CHAIN_SELECTOR, s_remotePool
+      )
+    );
+    s_connectionStore.resolveInboundLane(
+      s_token, DEST_CHAIN_SELECTOR, s_remotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function test_applyInlineRemotePoolConfigUpdates_TrustPolicyRemotePools() public {
