@@ -49,6 +49,7 @@ import (
 	lock_release_token_pool_v140 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_4_0/lock_release_token_pool"
 	lock_release_token_pool_v150 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/lock_release_token_pool"
 	lock_release_token_pool_v151 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
+	siloed_lock_release_token_pool_v160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/siloed_lock_release_token_pool"
 	siloed_lock_release_token_pool_v161 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/siloed_lock_release_token_pool"
 	latest_siloed "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/siloed_lock_release_token_pool"
 	tokens_core "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -1389,7 +1390,7 @@ func TestMigrateLockReleasePoolLiquidity_SourceRejectsOtherOnChainVersion(t *tes
 			name:          "v1.6.1 source, v1.5.1 pool",
 			sourceVersion: cciputils.Version_1_6_1,
 			oldPool:       oldPoolV1_5_1,
-			expectedErr:   "the v1.6.1 liquidity migration source only supports v1.6.1 and v1.6.2 pools",
+			expectedErr:   "the v1.6.1 liquidity migration source only supports v1.6.0, v1.6.1, and v1.6.2 pools",
 		},
 		{
 			name:          "v1.5.0 source, v1.5.1 pool",
@@ -1656,6 +1657,18 @@ func (s siloedMigrationSetup) balanceOf(t *testing.T, holder common.Address) *bi
 // chains, one further lockbox mapped to all of them.
 func setupSiloedMigrationTest(t *testing.T, chainSel uint64, topology siloedTopology) siloedMigrationSetup {
 	t.Helper()
+	return setupSiloedMigrationTestWithOldVersion(t, chainSel, topology, cciputils.Version_1_6_1)
+}
+
+// setupSiloedMigrationTestWithOldVersion is setupSiloedMigrationTest with an explicit legacy pool
+// version. It deploys real v1.6.0 bytecode when asked for v1.6.0, so the on-chain typeAndVersion is
+// "SiloedLockReleaseTokenPool 1.6.0"; the v1.6.0 and v1.6.1 ABIs are identical, so the v1.6.1
+// operations drive either pool unchanged.
+func setupSiloedMigrationTestWithOldVersion(t *testing.T, chainSel uint64, topology siloedTopology, oldPoolVersion *semver.Version) siloedMigrationSetup {
+	t.Helper()
+	require.True(t,
+		oldPoolVersion != nil && (oldPoolVersion.Equal(cciputils.Version_1_6_0) || oldPoolVersion.Equal(cciputils.Version_1_6_1)),
+		"setupSiloedMigrationTestWithOldVersion supports v1.6.0 and v1.6.1, got %v", oldPoolVersion)
 
 	totalMint := new(big.Int).Set(topology.unsiloedAmount)
 	for _, silo := range topology.siloedChains {
@@ -1710,19 +1723,35 @@ func setupSiloedMigrationTest(t *testing.T, chainSel uint64, topology siloedTopo
 	require.NoError(t, err)
 	tokenAddr := common.HexToAddress(tokenReport.Output.Address)
 
-	oldPoolReport, err := operations.ExecuteOperation(
-		e.OperationsBundle, old_siloed.Deploy, chain,
-		evm_contract.DeployInput[old_siloed.ConstructorArgs]{
-			ChainSelector:  chainSel,
-			TypeAndVersion: deployment.NewTypeAndVersion(old_siloed.ContractType, *old_siloed.Version),
-			Args: old_siloed.ConstructorArgs{
-				Token: tokenAddr, LocalTokenDecimals: 18,
-				Allowlist: []common.Address{}, RmnProxy: rmnProxyAddr, Router: routerAddr,
+	// Deploy the legacy pool at the requested version. v1.6.0 must be real v1.6.0 bytecode: the
+	// migration source reads typeAndVersion() on-chain, so deploying v1.6.1 bytecode and only
+	// relabelling the datastore ref would not exercise the v1.6.0 path.
+	var oldPoolAddr common.Address
+	if oldPoolVersion.Equal(cciputils.Version_1_6_0) {
+		auth := *chain.DeployerKey
+		auth.Nonce = nil
+		addr, tx, _, deployErr := siloed_lock_release_token_pool_v160.DeploySiloedLockReleaseTokenPool(
+			&auth, chain.Client, tokenAddr, 18, []common.Address{}, rmnProxyAddr, routerAddr,
+		)
+		require.NoError(t, deployErr)
+		_, err = chain.Confirm(tx)
+		require.NoError(t, err)
+		oldPoolAddr = addr
+	} else {
+		oldPoolReport, deployErr := operations.ExecuteOperation(
+			e.OperationsBundle, old_siloed.Deploy, chain,
+			evm_contract.DeployInput[old_siloed.ConstructorArgs]{
+				ChainSelector:  chainSel,
+				TypeAndVersion: deployment.NewTypeAndVersion(old_siloed.ContractType, *old_siloed.Version),
+				Args: old_siloed.ConstructorArgs{
+					Token: tokenAddr, LocalTokenDecimals: 18,
+					Allowlist: []common.Address{}, RmnProxy: rmnProxyAddr, Router: routerAddr,
+				},
 			},
-		},
-	)
-	require.NoError(t, err)
-	oldPoolAddr := common.HexToAddress(oldPoolReport.Output.Address)
+		)
+		require.NoError(t, deployErr)
+		oldPoolAddr = common.HexToAddress(oldPoolReport.Output.Address)
+	}
 
 	allChains := make([]uint64, 0, len(topology.siloedChains)+len(topology.sharedChains))
 	for _, silo := range topology.siloedChains {
@@ -1928,6 +1957,62 @@ func TestMigrateLockReleasePoolLiquidity_SiloedSharedLockBoxIsDistinct(t *testin
 	require.Equal(t, 0, silo2Amount.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed2])),
 		"siloed chain 2 lockbox should hold only its own reserved balance")
 
+	require.Equal(t, 0, unsiloedAmount.Cmp(s.balanceOf(t, s.sharedLockBox)),
+		"shared lockbox should hold the whole unsiloed balance")
+}
+
+// TestMigrateLockReleasePoolLiquidity_SiloedPoolV160Source migrates a real on-chain v1.6.0 siloed
+// pool end-to-end through the v1.6.1 source and the v2.0.0 sink. The old pool is deployed from
+// v1.6.0 bytecode, so typeAndVersion() reports 1.6.0 and the source version guard is actually
+// exercised; relabelling v1.6.1 bytecode would not prove the fix.
+func TestMigrateLockReleasePoolLiquidity_SiloedPoolV160Source(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	siloed2 := uint64(4949039107694359620)
+	shared1 := uint64(15971525489660198786)
+
+	silo1Amount := big.NewInt(3000)
+	silo2Amount := big.NewInt(2000)
+	unsiloedAmount := big.NewInt(1000)
+
+	s := setupSiloedMigrationTestWithOldVersion(t, chainSel, siloedTopology{
+		siloedChains: []siloedChainSpec{
+			{selector: siloed1, amount: silo1Amount},
+			{selector: siloed2, amount: silo2Amount},
+		},
+		sharedChains:   []uint64{shared1},
+		unsiloedAmount: unsiloedAmount,
+	}, cciputils.Version_1_6_0)
+
+	// Guard the premise: the source must see a genuine v1.6.0 pool on-chain.
+	tvReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle), type_and_version.GetTypeAndVersion,
+		s.env.BlockChains.EVMChains()[chainSel],
+		evm_contract.FunctionInput[struct{}]{ChainSelector: chainSel, Address: s.oldPoolAddr})
+	require.NoError(t, err)
+	require.Equal(t, "SiloedLockReleaseTokenPool", string(tvReport.Output.Type))
+	require.Equal(t, "1.6.0", tvReport.Output.Version.String(),
+		"old pool must be real v1.6.0 bytecode for this test to exercise the version guard")
+
+	basisPoints := uint16(10000)
+	executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:          chainSel,
+			OldPoolAddress:         s.oldPoolAddr.Hex(),
+			NewPoolAddress:         s.newPoolAddr.Hex(),
+			TimelockAddress:        s.deployer.Hex(),
+			BasisPoints:            &basisPoints,
+			UnsiloedLockBoxAddress: s.sharedLockBox.Hex(),
+		},
+	)
+
+	require.Equal(t, 0, big.NewInt(0).Cmp(s.balanceOf(t, s.oldPoolAddr)), "old pool should be fully drained")
+	require.Equal(t, 0, silo1Amount.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed1])),
+		"siloed chain 1 lockbox should hold its reserved balance")
+	require.Equal(t, 0, silo2Amount.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed2])),
+		"siloed chain 2 lockbox should hold its reserved balance")
 	require.Equal(t, 0, unsiloedAmount.Cmp(s.balanceOf(t, s.sharedLockBox)),
 		"shared lockbox should hold the whole unsiloed balance")
 }
