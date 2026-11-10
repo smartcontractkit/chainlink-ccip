@@ -45,10 +45,13 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 				return sequences.OnChainOutput{}, err
 			}
 			// The adapter may have been resolved from a datastore version; only drive pools whose
-			// on-chain version actually shares the v1.6.1 bindings.
-			if !oldTV.Version.Equal(cciputils.Version_1_6_1) && !oldTV.Version.Equal(cciputils.Version_1_6_2) {
+			// on-chain version actually shares the v1.6.1 bindings. v1.6.0 is byte-for-byte
+			// ABI-compatible with v1.6.1 for every operation this source uses.
+			if !oldTV.Version.Equal(cciputils.Version_1_6_0) &&
+				!oldTV.Version.Equal(cciputils.Version_1_6_1) &&
+				!oldTV.Version.Equal(cciputils.Version_1_6_2) {
 				return sequences.OnChainOutput{}, fmt.Errorf(
-					"old pool %s is %s %s on-chain; the v1.6.1 liquidity migration source only supports v1.6.1 and v1.6.2 pools",
+					"old pool %s is %s %s on-chain; the v1.6.1 liquidity migration source only supports v1.6.0, v1.6.1, and v1.6.2 pools",
 					oldPool, oldTV.Type, oldTV.Version)
 			}
 			if string(oldTV.Type) == cciputils.SiloedLockReleaseTokenPool.String() {
