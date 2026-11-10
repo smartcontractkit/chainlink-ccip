@@ -71,13 +71,16 @@ type laneAdapterID string
 type LaneAdapterRegistry struct {
 	mu sync.Mutex
 	m  map[laneAdapterID]LaneAdapter
+	// versions are the registered versions per chain family.
+	versions map[string][]*semver.Version
 }
 
 // NewLaneAdapterRegistry creates a fresh registry.  It is kept unexported
 // because callers should obtain the singleton via GetLaneAdapterRegistry().
 func newLaneAdapterRegistry() *LaneAdapterRegistry {
 	return &LaneAdapterRegistry{
-		m: make(map[laneAdapterID]LaneAdapter),
+		m:        make(map[laneAdapterID]LaneAdapter),
+		versions: make(map[string][]*semver.Version),
 	}
 }
 
@@ -92,6 +95,7 @@ func (r *LaneAdapterRegistry) RegisterLaneAdapter(chainFamily string, version *s
 
 	if _, exists := r.m[id]; !exists {
 		r.m[id] = adapter
+		r.versions[chainFamily] = append(r.versions[chainFamily], version)
 	}
 
 	if mp, ok := adapter.(ChainMetadataProvider); ok {
@@ -101,12 +105,15 @@ func (r *LaneAdapterRegistry) RegisterLaneAdapter(chainFamily string, version *s
 
 // GetLaneAdapter looks up an adapter; the second return value tells you if it was found.
 func (r *LaneAdapterRegistry) GetLaneAdapter(chainFamily string, version *semver.Version) (LaneAdapter, bool) {
-	id := newLaneAdapterID(chainFamily, version)
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	adapter, ok := r.m[id]
+	// Exact registration first, then the same major from 2.0.0 up (a 2.0.1 ref uses the 2.0.0 adapter).
+	registered, ok := utils.ResolveRegisteredVersion(r.versions[chainFamily], version)
+	if !ok {
+		return nil, false
+	}
+	adapter, ok := r.m[newLaneAdapterID(chainFamily, registered)]
 	return adapter, ok
 }
 

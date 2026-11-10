@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -252,18 +253,17 @@ func updateFeeQuoterApply() func(cldf.Environment, UpdateFeeQuoterInput) (cldf.C
 		transferOwnershipReg := GetTransferOwnershipRegistry()
 		mcmsRegistry := changesets.GetRegistry()
 		for chainSel, perChainInput := range input.Chains {
-			var feeQuoterAddrRef datastore.AddressRef
-			feeQuoterAddrRefs := e.DataStore.Addresses().Filter(
-				datastore.AddressRefByChainSelector(chainSel),
-				datastore.AddressRefByType(datastore.ContractType(utils.FeeQuoter)),
-				datastore.AddressRefByVersion(perChainInput.FeeQuoterVersion),
-			)
-			if len(feeQuoterAddrRefs) > 0 {
-				feeQuoterAddrRef = feeQuoterAddrRefs[0]
-				e.Logger.Infof("Found existing FeeQuoter address %s for chain selector %d and version %s",
-					feeQuoterAddrRef.Address, chainSel, perChainInput.FeeQuoterVersion.String())
+			existingFeeQuoter, err := findFeeQuoterRef(e.DataStore, chainSel, perChainInput.FeeQuoterVersion)
+			if err != nil {
+				return cldf.ChangesetOutput{}, err
 			}
-			isNewFeeQuoterDeployment := len(feeQuoterAddrRefs) == 0
+			var feeQuoterAddrRef datastore.AddressRef
+			if existingFeeQuoter != nil {
+				feeQuoterAddrRef = *existingFeeQuoter
+				e.Logger.Infof("Found existing FeeQuoter address %s for chain selector %d and version %s",
+					feeQuoterAddrRef.Address, chainSel, feeQuoterAddrRef.Version.String())
+			}
+			isNewFeeQuoterDeployment := existingFeeQuoter == nil
 			if perChainInput.FeeQuoterVersion.GreaterThanEqual(semver.MustParse("2.0.0")) && !perChainInput.DoNotDeployFQOrUpdateFQConfig {
 				fquUpdater, ok := fquRegistry.GetFeeQuoterUpdater(chainSel, perChainInput.FeeQuoterVersion)
 				if !ok {
@@ -450,4 +450,25 @@ func PopulateMetaDataFromConfigImporter(e cldf.Environment, configImporter Confi
 	}
 
 	return populateConfigReport.Output, nil
+}
+
+// findFeeQuoterRef returns the FeeQuoter ref of the requested version, or nil when there is none.
+// From 2.0.0 up it returns the greatest ref on the requested major line.
+func findFeeQuoterRef(ds datastore.DataStore, chainSel uint64, version *semver.Version) (*datastore.AddressRef, error) {
+	query := datastore.AddressRef{ChainSelector: chainSel, Type: datastore.ContractType(utils.FeeQuoter), Version: version}
+	if version.Major() >= utils.Version_2_0_0.Major() {
+		ref, err := datastore_utils.FindRefByMajor(ds, query)
+		if errors.Is(err, datastore_utils.ErrNoRefOnMajor) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &ref, nil
+	}
+	refs := ds.Addresses().Filter(datastore_utils.AddressRefToFilters(query)...)
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	return &refs[0], nil
 }

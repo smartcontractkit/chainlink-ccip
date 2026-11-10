@@ -84,7 +84,7 @@ func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
 	if !exists {
 		return fmt.Errorf("solana chain with selector %d not found in environment", selector)
 	}
-	rmnRemoteRef, err := datastore_utils.FindAndFormatRef(
+	rmnRemoteRef, err := datastore_utils.FindAndFormatRefByMajor(
 		e.DataStore,
 		datastore.AddressRef{
 			ChainSelector: selector,
@@ -106,7 +106,7 @@ func (ca *CurseAdapter) Initialize(e cldf.Environment, selector uint64) error {
 	if err != nil {
 		return fmt.Errorf("failed to find RMNRemoteCurses PDA: %w", err)
 	}
-	routerRef, err := datastore_utils.FindAndFormatRef(
+	routerRef, err := datastore_utils.FindAndFormatRefByMajor(
 		e.DataStore,
 		datastore.AddressRef{
 			ChainSelector: selector,
@@ -133,7 +133,7 @@ func (ca *CurseAdapter) IsSubjectCursedOnChain(e cldf.Environment, selector uint
 
 func (ca *CurseAdapter) IsChainConnectedToTargetChain(e cldf.Environment, selector uint64, targetSel uint64) (bool, error) {
 	// get offRamp address
-	offRampAddr, err := datastore_utils.FindAndFormatRef(e.DataStore, datastore.AddressRef{
+	offRampAddr, err := datastore_utils.FindAndFormatRefByMajor(e.DataStore, datastore.AddressRef{
 		ChainSelector: selector,
 		Type:          datastore.ContractType(offramp.ContractType),
 		Version:       offramp.Version,
