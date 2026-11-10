@@ -46,7 +46,9 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 			}
 			// The adapter may have been resolved from a datastore version; only drive pools whose
 			// on-chain version actually shares the v1.6.1 bindings. v1.6.0 is byte-for-byte
-			// ABI-compatible with v1.6.1 for every operation this source uses.
+			// ABI-compatible with v1.6.1 for every operation this source uses. v1.6.0 was only
+			// released for SiloedLockReleaseTokenPool: the plain LockReleaseTokenPool line goes
+			// v1.5.1 -> v1.6.1, so accepting v1.6.0 here is siloed-only in practice.
 			if !oldTV.Version.Equal(cciputils.Version_1_6_0) &&
 				!oldTV.Version.Equal(cciputils.Version_1_6_1) &&
 				!oldTV.Version.Equal(cciputils.Version_1_6_2) {
