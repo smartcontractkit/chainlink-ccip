@@ -37,7 +37,6 @@ contract PoolConfigManager_applyDestOverheadPolicyConfigUpdates is PoolConfigMan
     assertEq(_policyNamesOf(DEFAULT_POLICY), destOverheadPolicyNames);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyDestOverheadPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -50,7 +49,6 @@ contract PoolConfigManager_applyDestOverheadPolicyConfigUpdates is PoolConfigMan
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyDestOverheadPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

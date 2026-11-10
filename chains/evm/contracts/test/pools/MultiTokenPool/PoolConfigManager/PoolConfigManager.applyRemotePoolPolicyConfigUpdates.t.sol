@@ -32,7 +32,6 @@ contract PoolConfigManager_applyRemotePoolPolicyConfigUpdates is PoolConfigManag
     assertEq(_policyNamesOf(DEFAULT_POLICY), remotePoolPolicyNames);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyRemotePoolPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -49,7 +48,6 @@ contract PoolConfigManager_applyRemotePoolPolicyConfigUpdates is PoolConfigManag
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyRemotePoolPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

@@ -30,7 +30,6 @@ contract PoolConfigManager_pauseTokens is PoolConfigManagerRolesSetup {
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_pauseTokens_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

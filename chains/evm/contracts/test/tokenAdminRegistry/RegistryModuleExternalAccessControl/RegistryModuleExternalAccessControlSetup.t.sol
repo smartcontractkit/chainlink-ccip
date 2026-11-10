@@ -10,8 +10,6 @@ import {MockExternalAccessControlRegistry} from "../../mocks/MockExternalAccessC
 import {MockExternalAccessControlledToken} from "../../mocks/MockExternalAccessControlledToken.sol";
 
 contract RegistryModuleExternalAccessControlSetup is BaseTest {
-  error AuthorityUnavailable();
-
   RegistryModuleExternalAccessControl internal s_registryModuleExternalAccessControl;
   TokenAdminRegistry internal s_tokenAdminRegistry;
   MockExternalAccessControlRegistry internal s_accessControlRegistry;

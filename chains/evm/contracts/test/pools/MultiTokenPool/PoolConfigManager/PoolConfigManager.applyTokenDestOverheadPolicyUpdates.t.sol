@@ -25,7 +25,6 @@ contract PoolConfigManager_applyTokenDestOverheadPolicyUpdates is PoolConfigMana
     assertEq(bytes32(0), _getTokenConfig(s_tokenB).destOverheadPolicyName);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyTokenDestOverheadPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenDestOverheadPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
@@ -35,7 +34,6 @@ contract PoolConfigManager_applyTokenDestOverheadPolicyUpdates is PoolConfigMana
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyTokenDestOverheadPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenDestOverheadPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),

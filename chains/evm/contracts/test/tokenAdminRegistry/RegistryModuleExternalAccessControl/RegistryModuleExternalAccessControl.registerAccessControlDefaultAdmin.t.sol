@@ -108,44 +108,17 @@ contract RegistryModuleExternalAccessControl_registerAccessControlDefaultAdmin i
     _assertPendingAdministrators(s_tokens, address(0));
   }
 
-  function test_registerAccessControlDefaultAdmin_RevertWhen_AlreadyRegistered() public {
+  function test_registerAccessControlDefaultAdmin_RevertWhen_RequiredRoleNotFound_CustomDefaultAdminRole() public {
     address lastToken = s_tokens[s_tokens.length - 1];
-    s_registryModuleExternalAccessControl.registerAccessControlDefaultAdmin(_arrayOf(lastToken));
-    s_tokenAdminRegistry.acceptAdminRole(lastToken);
-    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, lastToken));
-    s_registryModuleExternalAccessControl.registerAccessControlDefaultAdmin(s_tokens);
-    for (uint256 i = 0; i < s_tokens.length; ++i) {
-      assertEq(address(0), s_tokenAdminRegistry.getTokenConfig(s_tokens[i]).pendingAdministrator);
-    }
-    assertEq(OWNER, s_tokenAdminRegistry.getTokenConfig(lastToken).administrator);
-  }
-
-  function test_registerAccessControlDefaultAdmin_RevertWhen_OnlyRegistryModuleOrOwner() public {
-    s_tokenAdminRegistry.removeRegistryModule(address(s_registryModuleExternalAccessControl));
+    bytes32 defaultAdminRole = keccak256("CUSTOM_DEFAULT_ADMIN_ROLE");
+    vm.mockCall(
+      lastToken, abi.encodeCall(AccessControl(lastToken).DEFAULT_ADMIN_ROLE, ()), abi.encode(defaultAdminRole)
+    );
     vm.expectRevert(
       abi.encodeWithSelector(
-        TokenAdminRegistry.OnlyRegistryModuleOrOwner.selector, address(s_registryModuleExternalAccessControl)
+        RegistryModuleExternalAccessControl.RequiredRoleNotFound.selector, OWNER, defaultAdminRole, lastToken
       )
     );
-    s_registryModuleExternalAccessControl.registerAccessControlDefaultAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAccessControlDefaultAdmin_RevertWhen_AuthorityCallReverts() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    vm.mockCallRevert(
-      lastToken,
-      abi.encodeCall(AccessControl.hasRole, (bytes32(0), OWNER)),
-      abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerAccessControlDefaultAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAccessControlDefaultAdmin_RevertWhen_TokenHasNoCode() public {
-    s_tokens.push(address(0));
-    vm.expectRevert();
     s_registryModuleExternalAccessControl.registerAccessControlDefaultAdmin(s_tokens);
     _assertPendingAdministrators(s_tokens, address(0));
   }

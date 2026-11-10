@@ -59,10 +59,13 @@ contract SecurityPolicyStore_applyInlineSecurityConfigUpdates is SecurityPolicyS
 
   // Reverts
 
-  /// @notice A CCV list has no duplicate.
+  /// @notice Neither CCV list has a duplicate.
   function test_applyInlineSecurityConfigUpdates_RevertWhen_DuplicateCCVNotAllowed() public {
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv1));
     _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv1), _arrayOf(s_ccv2), s_hook);
+
+    vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv2));
+    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _arrayOf(s_ccv1), _ccvsOf(s_ccv2, s_ccv2), s_hook);
   }
 
   /// @notice A token has no default record, so an inline record needs a chain.

@@ -37,7 +37,6 @@ contract PoolConfigManager_applyRateLimitPolicyConfigUpdates is PoolConfigManage
     assertEq(_policyNamesOf(DEFAULT_POLICY), rateLimitPolicyNames);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyRateLimitPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -54,7 +53,6 @@ contract PoolConfigManager_applyRateLimitPolicyConfigUpdates is PoolConfigManage
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyRateLimitPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

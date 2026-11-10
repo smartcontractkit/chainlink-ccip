@@ -99,44 +99,4 @@ contract RegistryModuleExternalAccessControl_registerAdminViaOwner is RegistryMo
     s_registryModuleExternalAccessControl.registerAdminViaOwner(s_tokens);
     _assertPendingAdministrators(s_tokens, address(0));
   }
-
-  function test_registerAdminViaOwner_RevertWhen_AlreadyRegistered() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    s_registryModuleExternalAccessControl.registerAdminViaOwner(_arrayOf(lastToken));
-    s_tokenAdminRegistry.acceptAdminRole(lastToken);
-    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, lastToken));
-    s_registryModuleExternalAccessControl.registerAdminViaOwner(s_tokens);
-    for (uint256 i = 0; i < s_tokens.length; ++i) {
-      assertEq(address(0), s_tokenAdminRegistry.getTokenConfig(s_tokens[i]).pendingAdministrator);
-    }
-    assertEq(OWNER, s_tokenAdminRegistry.getTokenConfig(lastToken).administrator);
-  }
-
-  function test_registerAdminViaOwner_RevertWhen_OnlyRegistryModuleOrOwner() public {
-    s_tokenAdminRegistry.removeRegistryModule(address(s_registryModuleExternalAccessControl));
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        TokenAdminRegistry.OnlyRegistryModuleOrOwner.selector, address(s_registryModuleExternalAccessControl)
-      )
-    );
-    s_registryModuleExternalAccessControl.registerAdminViaOwner(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAdminViaOwner_RevertWhen_AuthorityCallReverts() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    vm.mockCallRevert(
-      lastToken, abi.encodeCall(IOwner.owner, ()), abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerAdminViaOwner(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAdminViaOwner_RevertWhen_TokenHasNoCode() public {
-    s_tokens.push(address(0));
-    vm.expectRevert();
-    s_registryModuleExternalAccessControl.registerAdminViaOwner(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
 }

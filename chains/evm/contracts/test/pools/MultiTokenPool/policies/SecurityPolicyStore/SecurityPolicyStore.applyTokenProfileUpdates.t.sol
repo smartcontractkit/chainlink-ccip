@@ -74,10 +74,25 @@ contract SecurityPolicyStore_applyTokenProfileUpdates is SecurityPolicyStoreSetu
 
   /// @notice A deregistration needs a token without a policy and without an inline record.
   function test_applyTokenProfileUpdates_RevertWhen_TokenHasConfig() public {
-    _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
+    // Each of the four kinds of config blocks the deregistration on its own.
+    _setRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
+    _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
+    _expectTokenHasConfigRevert();
+    _setTokenRateLimitPolicy(s_tokenA, bytes32(0));
 
-    vm.expectRevert(abi.encodeWithSelector(SecurityPolicyStore.TokenHasConfig.selector, s_tokenA));
-    _applyTokenProfileUpdates(_arrayOf(s_tokenA), new PolicyConfig.TokenProfileArgs[](0));
+    _setSecurityPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _arrayOf(s_ccv1), _arrayOf(s_ccv2), s_hook);
+    _setTokenSecurityPolicy(s_tokenA, DEFAULT_POLICY);
+    _expectTokenHasConfigRevert();
+    _setTokenSecurityPolicy(s_tokenA, bytes32(0));
+
+    _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
+    _expectTokenHasConfigRevert();
+    _setInlineRateLimitRecords(
+      _lanesOf(s_tokenA, DEST_CHAIN_SELECTOR), new SecurityPolicyStore.InlineRateLimitConfigArgs[](0)
+    );
+
+    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _arrayOf(s_ccv1), _arrayOf(s_ccv2), s_hook);
+    _expectTokenHasConfigRevert();
   }
 
   function test_applyTokenProfileUpdates_RevertWhen_ZeroAddressInvalid() public {
@@ -98,5 +113,12 @@ contract SecurityPolicyStore_applyTokenProfileUpdates is SecurityPolicyStoreSetu
   function test_applyTokenProfileUpdates_RevertWhen_UnauthorizedCaller() public {
     vm.expectRevert(abi.encodeWithSelector(AuthorizedCallers.UnauthorizedCaller.selector, address(this)));
     s_store.applyTokenProfileUpdates(new address[](0), new PolicyConfig.TokenProfileArgs[](0));
+  }
+
+  // Helpers
+
+  function _expectTokenHasConfigRevert() internal {
+    vm.expectRevert(abi.encodeWithSelector(SecurityPolicyStore.TokenHasConfig.selector, s_tokenA));
+    _applyTokenProfileUpdates(_arrayOf(s_tokenA), new PolicyConfig.TokenProfileArgs[](0));
   }
 }

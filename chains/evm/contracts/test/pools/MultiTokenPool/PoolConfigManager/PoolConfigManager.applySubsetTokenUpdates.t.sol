@@ -53,7 +53,6 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     assertFalse(_getLaneConnection(s_tokenB, OTHER_CHAIN_SELECTOR).hasConnection);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applySubsetTokenUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -117,7 +116,6 @@ contract PoolConfigManager_applySubsetTokenUpdates is PoolConfigManagerRolesSetu
     s_poolConfigManager.applySubsetTokenUpdates(new ConnectionPolicyStore.SubsetTokenArgs[](0), tokensToAdd);
   }
 
-  /// @notice Calls without an allowed role revert.
   function test_applySubsetTokenUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

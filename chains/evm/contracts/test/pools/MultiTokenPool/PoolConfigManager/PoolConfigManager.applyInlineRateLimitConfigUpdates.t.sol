@@ -32,7 +32,6 @@ contract PoolConfigManager_applyInlineRateLimitConfigUpdates is PoolConfigManage
     assertEq(1, s_poolConfigManager.getInlineRateLimitConfigs(s_tokenA).length);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineRateLimitConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -45,7 +44,6 @@ contract PoolConfigManager_applyInlineRateLimitConfigUpdates is PoolConfigManage
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyInlineRateLimitConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

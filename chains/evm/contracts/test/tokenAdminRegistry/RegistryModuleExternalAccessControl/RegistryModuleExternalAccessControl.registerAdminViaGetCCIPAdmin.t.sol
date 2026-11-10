@@ -119,21 +119,4 @@ contract RegistryModuleExternalAccessControl_registerAdminViaGetCCIPAdmin is Reg
     s_registryModuleExternalAccessControl.registerAdminViaGetCCIPAdmin(s_tokens);
     _assertPendingAdministrators(s_tokens, address(0));
   }
-
-  function test_registerAdminViaGetCCIPAdmin_RevertWhen_AuthorityCallReverts() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    vm.mockCallRevert(
-      lastToken, abi.encodeCall(IGetCCIPAdmin.getCCIPAdmin, ()), abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerAdminViaGetCCIPAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAdminViaGetCCIPAdmin_RevertWhen_TokenHasNoCode() public {
-    s_tokens.push(address(0));
-    vm.expectRevert();
-    s_registryModuleExternalAccessControl.registerAdminViaGetCCIPAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
 }

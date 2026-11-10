@@ -57,10 +57,13 @@ contract SecurityPolicyStore_applySecurityPolicyConfigUpdates is SecurityPolicyS
 
   // Reverts
 
-  /// @notice A CCV list has no duplicate.
+  /// @notice Neither CCV list has a duplicate.
   function test_applySecurityPolicyConfigUpdates_RevertWhen_DuplicateCCVNotAllowed() public {
     vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv1));
     _setSecurityPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv1), _arrayOf(s_ccv2), s_hook);
+
+    vm.expectRevert(abi.encodeWithSelector(CCVConfigValidation.DuplicateCCVNotAllowed.selector, s_ccv2));
+    _setSecurityPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _arrayOf(s_ccv1), _ccvsOf(s_ccv2, s_ccv2), s_hook);
   }
 
   /// @notice A record removal names a record that exists.

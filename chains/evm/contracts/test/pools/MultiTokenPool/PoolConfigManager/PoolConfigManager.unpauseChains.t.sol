@@ -36,7 +36,6 @@ contract PoolConfigManager_unpauseChains is PoolConfigManagerRolesSetup {
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_unpauseChains_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(
