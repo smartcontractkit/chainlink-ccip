@@ -23,14 +23,15 @@ import (
 )
 
 // MigrateLockReleasePoolLiquiditySequence returns the SOURCE half of a lock-release liquidity
-// migration for v1.6.1 pools (plain and siloed), also serving v1.6.2 which registers this adapter. It
-// extracts liquidity from the old pool to the timelock with the v1.6.1 bindings and records the moved
-// amounts in input.Resolved for the v2.0.0 sink.
+// migration for v1.6.0-v1.6.2 pools, also serving v1.6.2 which registers this adapter. v1.6.0 was
+// only released for SiloedLockReleaseTokenPool, so v1.6.0 here is siloed in practice; plain pools
+// start at v1.6.1. It extracts liquidity from the old pool to the timelock with the v1.6.1 bindings
+// and records the moved amounts in input.Resolved for the v2.0.0 sink.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-v1.6.1-adapter:migrate-lock-release-pool-liquidity-source",
 		semver.MustParse("1.6.1"),
-		"Extract lock-release liquidity from a v1.6.1 pool (plain or siloed) to the timelock",
+		"Extract lock-release liquidity from a v1.6.0-v1.6.2 pool (plain or siloed) to the timelock",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
 			evmChain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
