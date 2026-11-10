@@ -49,8 +49,9 @@ func (c *SolanaCCTPChainAdapter) DeployCCTPChain() *operations.Sequence[adapters
 		common_utils.Version_1_6_0,
 		"Skips Solana CCTP deployment and only supports lane configuration",
 		func(b operations.Bundle, deps adapters.DeployCCTPChainDeps, input adapters.DeployCCTPInput) (seq_core.OnChainOutput, error) {
-			poolRef, err := datastore_utils.FindAndFormatRef(deps.DataStore, datastore.AddressRef{
-				Type: datastore.ContractType(common_utils.CCTPTokenPool),
+			poolRef, err := datastore_utils.FindAndFormatRefByMajor(deps.DataStore, datastore.AddressRef{
+				Type:    datastore.ContractType(common_utils.CCTPTokenPool),
+				Version: common_utils.Version_1_6_0,
 			}, input.ChainSelector, datastore_utils.FullRef)
 			if err != nil {
 				return seq_core.OnChainOutput{}, fmt.Errorf("failed to resolve Solana CCTP token pool for chain %d: %w", input.ChainSelector, err)

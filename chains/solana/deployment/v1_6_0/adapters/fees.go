@@ -42,7 +42,7 @@ func (a *FeesAdapter) validateFeeRef(feeRef datastore.AddressRef) error {
 	if feeRef.Type.String() != fqops.ContractType.String() {
 		return fmt.Errorf("unexpected contract type for FeeQuoter address ref: got %s, want %s", feeRef.Type.String(), fqops.ContractType)
 	}
-	if !feeRef.Version.Equal(utils.Version_1_6_0) {
+	if !utils.SameMajor(feeRef.Version, utils.Version_1_6_0) {
 		return fmt.Errorf("unexpected FeeQuoter contract version: got %s, want %s", feeRef.Version, utils.Version_1_6_0)
 	}
 
@@ -53,7 +53,7 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 	if onRampRef.Type.String() != routerops.ContractType.String() {
 		return datastore.AddressRef{}, fmt.Errorf("unexpected contract type for Router address ref for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Type.String(), routerops.ContractType)
 	}
-	if !onRampRef.Version.Equal(utils.Version_1_6_0) {
+	if !utils.SameMajor(onRampRef.Version, utils.Version_1_6_0) {
 		return datastore.AddressRef{}, fmt.Errorf("unexpected Router contract version for src %d and dst %d: got %s, want %s", src, dst, onRampRef.Version, utils.Version_1_6_0)
 	}
 
@@ -79,10 +79,11 @@ func (a *FeesAdapter) GetFeeContractRef(b operations.Bundle, chains cldf_chain.B
 		return datastore.AddressRef{}, fmt.Errorf("failed to read Router config for router %s on chain selector %d: %w", routerPubkey, src, err)
 	}
 
-	fqRef, err := datastore_utils.FindAndFormatRef(
+	fqRef, err := datastore_utils.FindAndFormatRefByMajor(
 		ds,
 		datastore.AddressRef{
 			Type:          datastore.ContractType(fqops.ContractType),
+			Version:       utils.Version_1_6_0,
 			Address:       routerConfig.FeeQuoter.String(),
 			ChainSelector: src,
 		},
