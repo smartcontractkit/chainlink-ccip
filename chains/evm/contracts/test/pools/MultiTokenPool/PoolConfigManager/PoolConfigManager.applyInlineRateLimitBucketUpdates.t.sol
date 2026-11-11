@@ -29,7 +29,6 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
     );
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineRateLimitBucketUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -41,7 +40,6 @@ contract PoolConfigManager_applyInlineRateLimitBucketUpdates is PoolConfigManage
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyInlineRateLimitBucketUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

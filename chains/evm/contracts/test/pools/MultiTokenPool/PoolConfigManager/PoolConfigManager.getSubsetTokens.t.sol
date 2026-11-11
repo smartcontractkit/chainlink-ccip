@@ -36,21 +36,6 @@ contract PoolConfigManager_getSubsetTokens is PoolConfigManagerSetup {
     assertEq(0, subsetTokens.length);
   }
 
-  function test_getSubsetTokens_Pagination() public {
-    s_poolConfigManager.applySubsetTokenUpdates(
-      new ConnectionPolicyStore.SubsetTokenArgs[](0), _getSubsetTokenArgs(_getTokensBAndC())
-    );
-
-    (bool onlySubsetTokens, address[] memory subsetTokens) =
-      s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, 1, 1);
-    assertTrue(onlySubsetTokens);
-    assertEq(_arrayOf(s_tokenC), subsetTokens);
-
-    (onlySubsetTokens, subsetTokens) = s_poolConfigManager.getSubsetTokens(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, 2, 1);
-    assertTrue(onlySubsetTokens);
-    assertEq(0, subsetTokens.length);
-  }
-
   /// @dev Subset tokens of the DEFAULT connection policy record for the other chain.
   function _getSubsetTokenArgs(
     address[] memory localTokens

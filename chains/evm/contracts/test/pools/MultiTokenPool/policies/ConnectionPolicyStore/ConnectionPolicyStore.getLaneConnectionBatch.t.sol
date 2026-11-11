@@ -48,23 +48,23 @@ contract ConnectionPolicyStore_getLaneConnectionBatch is ConnectionPolicyStoreSe
 
   function test_getLaneConnectionBatch_PauseState() public {
     s_connectionStore.setGlobalPause(true);
-    s_connectionStore.setTokenPause(_arrayOf(s_otherToken), ConnectionPolicyStore.PauseDirection.Outbound, true);
+    s_connectionStore.setTokenPause(_arrayOf(s_otherToken), ConnectionPolicyStore.PauseDirection.Inbound, true);
     uint64[] memory remoteChainSelectors = _getRemoteChainSelectors(DEST_CHAIN_SELECTOR);
-    s_connectionStore.setChainPause(remoteChainSelectors, ConnectionPolicyStore.PauseDirection.Inbound, true);
+    s_connectionStore.setChainPause(remoteChainSelectors, ConnectionPolicyStore.PauseDirection.Outbound, true);
 
     // Pause state is returned even when no connection exists.
     IPoolConfigManager.LaneConnection memory connection = _getLaneConnection(s_otherToken, DEST_CHAIN_SELECTOR);
 
     assertFalse(connection.hasConnection);
     assertTrue(connection.isGloballyPaused);
-    assertTrue(connection.isTokenOutboundPaused);
-    assertFalse(connection.isTokenInboundPaused);
-    assertFalse(connection.isChainOutboundPaused);
-    assertTrue(connection.isChainInboundPaused);
+    assertFalse(connection.isTokenOutboundPaused);
+    assertTrue(connection.isTokenInboundPaused);
+    assertTrue(connection.isChainOutboundPaused);
+    assertFalse(connection.isChainInboundPaused);
     assertTrue(connection.isOutboundPaused);
     assertTrue(connection.isInboundPaused);
 
-    // Clearing the global pause leaves the token's outbound pause and the chain's inbound pause active.
+    // Clearing the global pause leaves the token's inbound pause and the chain's outbound pause active.
     s_connectionStore.setGlobalPause(false);
     connection = _getLaneConnection(s_otherToken, DEST_CHAIN_SELECTOR);
 

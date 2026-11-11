@@ -30,7 +30,6 @@ contract PoolConfigManager_unpauseGlobally is PoolConfigManagerRolesSetup {
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_unpauseGlobally_RevertWhen_MissingRole() public {
     _assertRolesRevert(abi.encodeCall(PoolConfigManager.unpauseGlobally, ()), _getUnpauseRoles());
   }

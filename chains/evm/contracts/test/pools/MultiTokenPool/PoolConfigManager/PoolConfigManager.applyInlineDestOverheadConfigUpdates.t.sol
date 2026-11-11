@@ -33,7 +33,6 @@ contract PoolConfigManager_applyInlineDestOverheadConfigUpdates is PoolConfigMan
     assertEq(1, s_poolConfigManager.getInlineDestOverheadConfigs(s_tokenA).length);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineDestOverheadConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -46,7 +45,6 @@ contract PoolConfigManager_applyInlineDestOverheadConfigUpdates is PoolConfigMan
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyInlineDestOverheadConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

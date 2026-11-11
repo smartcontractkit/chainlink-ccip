@@ -45,7 +45,6 @@ contract PoolConfigManager_applyTokenConnectionPolicyUpdates is PoolConfigManage
     assertEq(uint8(PolicyConfig.RecordLevel.None), uint8(remotePoolLevels[0]));
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyTokenConnectionPolicyUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(PoolConfigManager.applyTokenConnectionPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),
@@ -55,7 +54,6 @@ contract PoolConfigManager_applyTokenConnectionPolicyUpdates is PoolConfigManage
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyTokenConnectionPolicyUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(PoolConfigManager.applyTokenConnectionPolicyUpdates, (new PolicyConfig.TokenPolicyArgs[](0))),

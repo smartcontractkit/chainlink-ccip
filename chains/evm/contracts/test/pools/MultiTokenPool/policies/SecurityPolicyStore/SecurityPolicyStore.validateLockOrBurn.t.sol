@@ -99,7 +99,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
       _getRateLimitConfig(CAPACITY + 3)
     );
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
 
     _consume(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
 
@@ -121,7 +120,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
       _getRateLimitConfig(CAPACITY + 3)
     );
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
 
     _consume(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
 
@@ -130,11 +128,12 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     assertEq(CAPACITY + 1, state.inbound.tokens);
   }
 
-  /// @notice An FTF transfer that uses a policy consumes the FTF bucket when the policy record enables it.
+  /// @notice An FTF transfer that uses a policy consumes the FTF bucket when the policy record enables it. The
+  /// policy default record serves the transfer, so the check must read the record and not the transfer chain.
   function test_validateLockOrBurn_FastFinalityPolicyEnabled() public {
     _setRateLimitPolicyConfigPerSlot(
       DEFAULT_POLICY,
-      DEST_CHAIN_SELECTOR,
+      PolicyConfig.DEFAULT_CHAIN_SELECTOR,
       _getRateLimitConfig(CAPACITY),
       _getRateLimitConfig(CAPACITY + 1),
       _getRateLimitConfig(CAPACITY + 2),
@@ -180,7 +179,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     _setRateLimitPolicyConfig(DEFAULT_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _getRateLimitConfig(3 * CAPACITY));
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
     _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
 
     // The inline record serves the transfer.
     _consume(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
@@ -192,7 +190,7 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     assertEq(2 * CAPACITY - 100e18, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).outbound.tokens);
 
     // After the chain record removal, the default record of the policy serves the transfer.
-    _removeRateLimitPolicyRecord(DEFAULT_POLICY, DEST_CHAIN_SELECTOR);
+    _removeRateLimitPolicyRecords(DEFAULT_POLICY, DEST_CHAIN_SELECTOR);
     _consume(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
     assertEq(3 * CAPACITY - 100e18, _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR).outbound.tokens);
   }
@@ -204,9 +202,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     _setRateLimitPolicyConfig(DEFAULT_POLICY, OTHER_CHAIN_SELECTOR, _getRateLimitConfig(2 * CAPACITY));
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
     _setTokenRateLimitPolicy(s_tokenB, DEFAULT_POLICY);
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
-    _setInlineSecurityConfig(s_tokenA, OTHER_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
-    _setInlineSecurityConfig(s_tokenB, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
 
     _consume(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
 
@@ -220,7 +215,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
   function test_validateLockOrBurn_PolicyChangeAndTimeRefill() public {
     _setRateLimitPolicyConfig(DEFAULT_POLICY, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
 
     _consume(s_tokenA, DEST_CHAIN_SELECTOR, 400e18);
 
@@ -244,8 +238,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
   /// @notice validateLockOrBurn reads the security record first, so a missing security record reverts before the rate
   /// limit is touched.
   function test_validateLockOrBurn_RevertWhen_SecurityRecordNotFound() public {
-    _setInlineRateLimitConfig(s_tokenA, DEST_CHAIN_SELECTOR, _getRateLimitConfig(CAPACITY));
-
     vm.expectRevert(
       abi.encodeWithSelector(SecurityPolicyStore.SecurityRecordNotFound.selector, s_tokenA, DEST_CHAIN_SELECTOR)
     );
@@ -282,15 +274,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
 
   // Helpers
 
-  function _consume(
-    address localToken,
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal {
-    vm.prank(s_poolConfigManager);
-    s_store.validateLockOrBurn(localToken, remoteChainSelector, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
-  }
-
   function _removeInlineRateLimitRecord(
     address localToken,
     uint64 remoteChainSelector
@@ -298,19 +281,6 @@ contract SecurityPolicyStore_validateLockOrBurn is SecurityPolicyStoreSetup {
     vm.prank(s_poolConfigManager);
     s_store.applyInlineRateLimitConfigUpdates(
       _lanesOf(localToken, remoteChainSelector), new SecurityPolicyStore.InlineRateLimitConfigArgs[](0)
-    );
-  }
-
-  function _removeRateLimitPolicyRecord(
-    bytes32 policyName,
-    uint64 remoteChainSelector
-  ) internal {
-    PolicyConfig.PolicyRecordKey[] memory recordsToRemove = new PolicyConfig.PolicyRecordKey[](1);
-    recordsToRemove[0] =
-      PolicyConfig.PolicyRecordKey({policyName: policyName, remoteChainSelector: remoteChainSelector});
-    vm.prank(s_poolConfigManager);
-    s_store.applyRateLimitPolicyConfigUpdates(
-      recordsToRemove, new bytes32[](0), new SecurityPolicyStore.RateLimitPolicyConfigArgs[](0)
     );
   }
 }

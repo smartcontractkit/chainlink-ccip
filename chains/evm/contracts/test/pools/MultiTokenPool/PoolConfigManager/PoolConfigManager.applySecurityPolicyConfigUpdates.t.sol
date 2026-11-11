@@ -40,7 +40,6 @@ contract PoolConfigManager_applySecurityPolicyConfigUpdates is PoolConfigManager
     assertEq(_policyNamesOf(DEFAULT_POLICY), securityPolicyNames);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applySecurityPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -53,7 +52,6 @@ contract PoolConfigManager_applySecurityPolicyConfigUpdates is PoolConfigManager
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applySecurityPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

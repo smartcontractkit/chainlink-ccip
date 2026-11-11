@@ -168,7 +168,6 @@ contract PoolConfigManager_applyTokenProfileUpdates is PoolConfigManagerRolesSet
     assertTrue(isRegistered);
   }
 
-  /// @notice Calls without an allowed role revert.
   function test_applyTokenProfileUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

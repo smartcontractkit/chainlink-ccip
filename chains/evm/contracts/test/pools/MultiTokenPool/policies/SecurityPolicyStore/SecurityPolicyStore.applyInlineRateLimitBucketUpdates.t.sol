@@ -156,14 +156,4 @@ contract SecurityPolicyStore_applyInlineRateLimitBucketUpdates is SecurityPolicy
     vm.prank(s_poolConfigManager);
     s_store.applyInlineRateLimitBucketUpdates(bucketConfigs);
   }
-
-  function _consume(
-    address localToken,
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal {
-    _setInlineSecurityConfig(localToken, remoteChainSelector, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
-    vm.prank(s_poolConfigManager);
-    s_store.validateLockOrBurn(localToken, remoteChainSelector, amount, bytes4(0));
-  }
 }

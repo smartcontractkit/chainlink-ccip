@@ -50,7 +50,7 @@ contract ConnectionPolicyStore_applyRemotePoolPolicyConfigUpdates is ConnectionP
     );
 
     _assertRemotePoolPolicy(REMOTE_POOL_POLICY, 1, policyConfigs);
-    // Both tokens use the updated policy pools without changing their assignments.
+    // The token uses the updated policy pools without a new assignment.
     s_connectionStore.resolveInboundLane(
       s_token, DEST_CHAIN_SELECTOR, s_otherRemotePool, sourcePoolData, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );

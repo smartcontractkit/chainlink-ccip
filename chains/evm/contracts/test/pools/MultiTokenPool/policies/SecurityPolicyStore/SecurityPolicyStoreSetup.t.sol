@@ -237,6 +237,30 @@ contract SecurityPolicyStoreSetup is BaseTest {
     s_store.applySecurityPolicyConfigUpdates(new PolicyConfig.PolicyRecordKey[](0), new bytes32[](0), configs);
   }
 
+  function _removeRateLimitPolicyRecords(
+    bytes32 policyName,
+    uint64 remoteChainSelector
+  ) internal {
+    PolicyConfig.PolicyRecordKey[] memory recordsToRemove = new PolicyConfig.PolicyRecordKey[](1);
+    recordsToRemove[0] =
+      PolicyConfig.PolicyRecordKey({policyName: policyName, remoteChainSelector: remoteChainSelector});
+    vm.prank(s_poolConfigManager);
+    s_store.applyRateLimitPolicyConfigUpdates(
+      recordsToRemove, new bytes32[](0), new SecurityPolicyStore.RateLimitPolicyConfigArgs[](0)
+    );
+  }
+
+  /// @dev Consumes the outbound default finality bucket. A transfer needs a security record, so this sets one first.
+  function _consume(
+    address localToken,
+    uint64 remoteChainSelector,
+    uint256 amount
+  ) internal {
+    _setInlineSecurityConfig(localToken, remoteChainSelector, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
+    vm.prank(s_poolConfigManager);
+    s_store.validateLockOrBurn(localToken, remoteChainSelector, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+  }
+
   // ================================================================
   // │                          Read back                           │
   // ================================================================

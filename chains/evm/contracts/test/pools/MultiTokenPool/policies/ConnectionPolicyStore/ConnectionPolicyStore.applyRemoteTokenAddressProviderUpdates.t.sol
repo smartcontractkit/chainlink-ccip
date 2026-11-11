@@ -34,7 +34,7 @@ contract ConnectionPolicyStore_applyRemoteTokenAddressProviderUpdates is Connect
 
     (, address remoteTokenAddressProvider,) = s_connectionStore.getConnectionPolicy(CONNECTION_POLICY);
     assertEq(s_newProvider, remoteTokenAddressProvider);
-    // Both tokens resolve their remote address through the new provider.
+    // The token resolves its remote address through the new provider.
     assertEq(s_newRemoteToken, _getLaneConnection(s_token, DEST_CHAIN_SELECTOR).remoteToken);
     IPoolConfigManager.OutboundLane memory lane =
       s_connectionStore.resolveOutboundLane(s_token, DEST_CHAIN_SELECTOR, FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");

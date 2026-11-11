@@ -31,7 +31,6 @@ contract PoolConfigManager_applyFeePolicyConfigUpdates is PoolConfigManagerRoles
     assertEq(_policyNamesOf(DEFAULT_POLICY), feePolicyNames);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyFeePolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -44,7 +43,6 @@ contract PoolConfigManager_applyFeePolicyConfigUpdates is PoolConfigManagerRoles
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyFeePolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

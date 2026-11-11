@@ -128,27 +128,34 @@ contract ConnectionPolicyStore_applyInlineRemotePoolConfigUpdates is ConnectionP
   }
 
   function test_applyInlineRemotePoolConfigUpdates_RemoveDeletesValues() public {
-    // With no policy to fall back to, removal leaves no remote pool configuration.
     _setInlineConnectionConfig(
       _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
     );
-    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
-    remotePoolConfig.useLegacyPoolDataOnSend = true;
-    remotePoolConfig.remotePools[0].allowLegacyPoolDataOnReceive = true;
-    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, remotePoolConfig));
-    // Removal requires the legacy flags to be cleared first.
-    remotePoolConfig.useLegacyPoolDataOnSend = false;
-    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, remotePoolConfig));
-
+    _setInlineRemotePoolConfig(
+      _getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, _getRemotePoolConfig())
+    );
     s_connectionStore.applyInlineRemotePoolConfigUpdates(
       _getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR), new ConnectionPolicyStore.InlineRemotePoolConfigArgs[](0)
     );
 
-    IPoolConfigManager.LaneConnection[] memory connections =
-      s_connectionStore.getLaneConnectionBatch(_getLaneKeys(s_otherToken, DEST_CHAIN_SELECTOR));
-    assertTrue(connections[0].hasConnection);
-    assertFalse(connections[0].useLegacyPoolDataOnSend);
-    assertEq(0, connections[0].remotePools.length);
+    // A new record must not trust the pool of the removed record. Deleting a record does not clear its pool set.
+    ConnectionPolicyStore.RemotePoolConfig memory remotePoolConfig = _getRemotePoolConfig();
+    remotePoolConfig.remotePools[0].remotePoolAddress = s_otherRemotePool;
+    _setInlineRemotePoolConfig(_getInlineRemotePoolConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, remotePoolConfig));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.InvalidSourcePoolAddress.selector, s_otherToken, DEST_CHAIN_SELECTOR, s_remotePool
+      )
+    );
+    s_connectionStore.resolveInboundLane(
+      s_otherToken,
+      DEST_CHAIN_SELECTOR,
+      s_remotePool,
+      _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_otherToken, ""),
+      1e18,
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
   function test_applyInlineRemotePoolConfigUpdates_RemoveRecordTrustingPolicy() public {

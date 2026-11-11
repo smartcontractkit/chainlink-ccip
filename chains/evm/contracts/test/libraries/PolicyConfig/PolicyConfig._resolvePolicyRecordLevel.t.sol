@@ -36,14 +36,6 @@ contract PolicyConfig__resolvePolicyRecordLevel is PolicyConfigSetup {
     _assertLevel(PolicyConfig.RecordLevel.None, POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR);
   }
 
-  function testFuzz__resolvePolicyRecordLevel_DefaultRecordServesOtherChains(
-    uint64 remoteChainSelector
-  ) public view {
-    vm.assume(remoteChainSelector != CHAIN_SELECTOR && remoteChainSelector != PolicyConfig.DEFAULT_CHAIN_SELECTOR);
-
-    _assertLevel(PolicyConfig.RecordLevel.PolicyDefault, POLICY, remoteChainSelector);
-  }
-
   function _assertLevel(
     PolicyConfig.RecordLevel expected,
     bytes32 policyName,

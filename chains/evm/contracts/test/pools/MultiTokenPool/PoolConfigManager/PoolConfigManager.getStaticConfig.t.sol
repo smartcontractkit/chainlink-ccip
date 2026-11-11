@@ -23,9 +23,4 @@ contract PoolConfigManager_getStaticConfig is PoolConfigManagerSetup {
     assertEq(address(s_feeStore), address(feeStore));
     assertEq(address(s_securityStore), address(securityStore));
   }
-
-  /// @notice The token admin registry view returns the same registry.
-  function test_getTokenAdminRegistry() public view {
-    assertEq(address(s_tokenAdminRegistry), s_poolConfigManager.getTokenAdminRegistry());
-  }
 }

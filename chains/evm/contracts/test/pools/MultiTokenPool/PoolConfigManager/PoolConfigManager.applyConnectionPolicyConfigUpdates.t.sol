@@ -52,7 +52,6 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
     assertFalse(_getLaneConnection(s_tokenB, DEST_CHAIN_SELECTOR).hasConnection);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyConnectionPolicyConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -101,7 +100,6 @@ contract PoolConfigManager_applyConnectionPolicyConfigUpdates is PoolConfigManag
     );
   }
 
-  /// @notice Calls without an allowed role revert.
   function test_applyConnectionPolicyConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

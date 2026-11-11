@@ -20,6 +20,14 @@ contract MultiTokenPool_isSupportedChain is MultiTokenPoolSetup {
     assertFalse(s_pool.isSupportedChain(address(s_token), DEST_CHAIN_SELECTOR));
   }
 
+  function test_isSupportedChain_FalseWhenTokenNotSupported() public {
+    IPoolConfigManager.TokenConfig memory config = _defaultTokenConfig();
+    config.lockOrBurnFlavor = IPoolConfigManager.LockOrBurnFlavor.Lock;
+    _mockTokenConfig(config);
+
+    assertFalse(s_pool.isSupportedChain(address(s_token), DEST_CHAIN_SELECTOR));
+  }
+
   function test_isSupportedChain_RevertWhen_LocalTokenRequired() public {
     vm.expectRevert(IMultiTokenPool.LocalTokenRequired.selector);
     s_pool.isSupportedChain(DEST_CHAIN_SELECTOR);

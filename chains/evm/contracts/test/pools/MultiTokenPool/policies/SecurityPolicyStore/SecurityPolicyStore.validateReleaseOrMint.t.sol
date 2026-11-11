@@ -101,7 +101,7 @@ contract SecurityPolicyStore_validateReleaseOrMint is SecurityPolicyStoreSetup {
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
     _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, new address[](0), _ccvsOf(s_ccv1, s_ccv2), s_hook);
 
-    _consume(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
+    _consumeInbound(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
 
     IPoolConfigManager.LaneRateLimiterState memory state = _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR);
     assertEq(CAPACITY, state.outbound.tokens);
@@ -123,7 +123,7 @@ contract SecurityPolicyStore_validateReleaseOrMint is SecurityPolicyStoreSetup {
     _setTokenRateLimitPolicy(s_tokenA, DEFAULT_POLICY);
     _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, new address[](0), _ccvsOf(s_ccv1, s_ccv2), s_hook);
 
-    _consume(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
+    _consumeInbound(s_tokenA, DEST_CHAIN_SELECTOR, 100e18);
 
     IPoolConfigManager.LaneRateLimiterState memory state = _getRateLimiterState(s_tokenA, DEST_CHAIN_SELECTOR);
     assertEq(CAPACITY, state.outbound.tokens);
@@ -178,8 +178,6 @@ contract SecurityPolicyStore_validateReleaseOrMint is SecurityPolicyStoreSetup {
   /// @notice validateReleaseOrMint reads the rate limit record first, so a missing rate limit record reverts before the
   /// security record is read.
   function test_validateReleaseOrMint_RevertWhen_RateLimitRecordNotFound() public {
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, new address[](0), _ccvsOf(s_ccv1, s_ccv2), s_hook);
-
     vm.expectRevert(
       abi.encodeWithSelector(SecurityPolicyStore.RateLimitRecordNotFound.selector, s_tokenA, DEST_CHAIN_SELECTOR)
     );
@@ -216,7 +214,7 @@ contract SecurityPolicyStore_validateReleaseOrMint is SecurityPolicyStoreSetup {
 
   // Helpers
 
-  function _consume(
+  function _consumeInbound(
     address localToken,
     uint64 remoteChainSelector,
     uint256 amount

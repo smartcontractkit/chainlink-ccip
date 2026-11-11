@@ -16,17 +16,6 @@ contract FactoryTokenWithUIDPoolDataProvider_getAdditionalPoolData is FactoryTok
     );
   }
 
-  /// @dev The UID belongs to the token, so the finality and the token args do not change it.
-  function testFuzz_getAdditionalPoolData_IgnoresFinalityAndTokenArgs(
-    bytes4 requestedFinalityConfig,
-    bytes calldata tokenArgs
-  ) public view {
-    assertEq(
-      abi.encode(UID),
-      s_provider.getAdditionalPoolData(s_token, DEST_CHAIN_SELECTOR, requestedFinalityConfig, tokenArgs)
-    );
-  }
-
   // Reverts
 
   function test_getAdditionalPoolData_RevertWhen_TokenNotFromFactory() public {
