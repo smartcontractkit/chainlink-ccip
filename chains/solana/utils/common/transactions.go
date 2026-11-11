@@ -155,6 +155,16 @@ func AddComputeUnitPrice(v fees.ComputeUnitPrice) TxModifier {
 	}
 }
 
+// commitmentReached reports whether a transaction at the given status has reached the wanted status. A
+// finalized transaction has reached every lower level, which matters for RPCs and clusters that report a
+// transaction as finalized without ever reporting it as confirmed.
+func commitmentReached(status, wanted rpc.ConfirmationStatusType) bool {
+	if status == rpc.ConfirmationStatusFinalized {
+		return true
+	}
+	return status == wanted
+}
+
 type TransactionConfigs struct {
 	SkipPreflight bool
 	Retries       int
@@ -248,7 +258,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	if commitment == rpc.CommitmentFinalized {
 		targetStatus = rpc.ConfirmationStatusFinalized
 	}
-	for txStatus != targetStatus {
+	for !commitmentReached(txStatus, targetStatus) {
 		if count > 500 {
 			return nil, fmt.Errorf("unable to find transaction within timeout (sig: %v)", txsig)
 		}
