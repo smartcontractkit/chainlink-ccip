@@ -14,10 +14,9 @@ contract SecurityPolicyStore_checkLaneRecords is SecurityPolicyStoreSetup {
 
   // Reverts
 
-  /// @notice checkLaneRecords reverts when the token has no rate limit record for the chain.
+  /// @notice checkLaneRecords checks the rate limit record first, so a token with neither record reverts for the rate
+  /// limit record.
   function test_checkLaneRecords_RevertWhen_RateLimitRecordNotFound() public {
-    _setInlineSecurityConfig(s_tokenA, DEST_CHAIN_SELECTOR, _arrayOf(s_ccv1), _arrayOf(s_ccv2), s_hook);
-
     vm.expectRevert(
       abi.encodeWithSelector(SecurityPolicyStore.RateLimitRecordNotFound.selector, s_tokenA, DEST_CHAIN_SELECTOR)
     );

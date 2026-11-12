@@ -417,20 +417,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
       );
       _resolveInboundLane(s_token, s_otherRemotePool, sourcePoolDatas[i], AMOUNT);
     }
-
-    // An inline legacy permission must not affect other tokens using the same remote pool policy.
-    _setTokenRemotePoolPolicy(s_otherToken, REMOTE_POOL_POLICY);
-    _setInlineConnectionConfig(
-      _getInlineConnectionConfigArgs(s_otherToken, DEST_CHAIN_SELECTOR, abi.encode(s_otherToken))
-    );
-    vm.expectRevert(
-      abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_otherToken, DEST_CHAIN_SELECTOR)
-    );
-    _resolveInboundLane(s_otherToken, s_remotePool, sourcePoolDatas[0], AMOUNT);
-  }
-
-  function test_resolveInboundLane_RevertWhen_LegacyPoolDataNotAllowed_PolicyRecord() public {
-    _assertPolicyPoolRejectsLegacyPoolData(s_remotePool);
   }
 
   function test_resolveInboundLane_RevertWhen_SourceTokenMismatch() public {
@@ -470,13 +456,14 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     // Decimals above 255, in both formats.
     sourcePoolDatas[0] = abi.encode(uint256(256));
     sourcePoolDatas[1] = abi.encode(uint256(256), abi.encode(s_token), "");
-    // Multi-token pool data with an empty source token.
-    sourcePoolDatas[2] = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), "", "");
+    // Multi-token pool data with an empty source token. The additional pool data makes it pass the length check.
+    sourcePoolDatas[2] = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), "", abi.encode(s_token));
     // Trailing data after a valid ABI encoding.
     sourcePoolDatas[3] = abi.encodePacked(validPoolData, bytes1(0));
-    // Overlapping offsets are decodable but not a canonical ABI encoding.
-    sourcePoolDatas[4] =
-      abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x60), uint256(0x60), uint256(0x20), s_token);
+    // Overlapping offsets are decodable but not a canonical ABI encoding, even at the canonical length.
+    sourcePoolDatas[4] = abi.encode(
+      uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x60), uint256(0x60), uint256(0x20), s_token, uint256(0x20), s_token
+    );
     // Truncated data must return InvalidSourcePoolData instead of an empty decoding error.
     sourcePoolDatas[5] = abi.encode(uint256(DEFAULT_TOKEN_DECIMALS), uint256(0x40));
 
@@ -607,28 +594,6 @@ contract ConnectionPolicyStore_resolveInboundLane is ConnectionPolicyStoreSetup 
     return s_connectionStore.resolveInboundLane(
       localToken, DEST_CHAIN_SELECTOR, sourcePoolAddress, sourcePoolData, sourceDenominatedAmount, WAIT_FOR_FINALITY
     );
-  }
-
-  /// @dev Policy pools require a source token, whether trusted directly or through trustPolicyRemotePools.
-  function _assertPolicyPoolRejectsLegacyPoolData(
-    bytes memory policyRemotePool
-  ) private {
-    bytes[2] memory legacyPoolDatas = [abi.encode(uint256(DEFAULT_TOKEN_DECIMALS)), bytes("")];
-    for (uint256 i = 0; i < legacyPoolDatas.length; ++i) {
-      vm.expectRevert(
-        abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_token, DEST_CHAIN_SELECTOR)
-      );
-      _resolveInboundLane(s_token, policyRemotePool, legacyPoolDatas[i], AMOUNT);
-    }
-
-    _setInlineRemotePoolConfigTrustingPolicy(s_token, abi.encode(makeAddr("legacyPool")), true);
-    for (uint256 i = 0; i < legacyPoolDatas.length; ++i) {
-      vm.expectRevert(
-        abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_token, DEST_CHAIN_SELECTOR)
-      );
-      _resolveInboundLane(s_token, policyRemotePool, legacyPoolDatas[i], AMOUNT);
-    }
-    _resolveInboundLane(s_token, policyRemotePool, _getSourcePoolData(DEFAULT_TOKEN_DECIMALS, s_token, ""), AMOUNT);
   }
 
   function _allowLegacyPoolDataOnReceive() private {

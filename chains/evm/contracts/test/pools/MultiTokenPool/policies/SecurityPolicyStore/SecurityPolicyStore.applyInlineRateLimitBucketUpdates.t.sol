@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPoolV2} from "../../../../../interfaces/IPoolV2.sol";
 
+import {PolicyConfig} from "../../../../../libraries/PolicyConfig.sol";
 import {RateLimiter} from "../../../../../libraries/RateLimiter.sol";
 import {SecurityPolicyStore} from "../../../../../pools/MultiTokenPool/policies/SecurityPolicyStore.sol";
 import {SecurityPolicyStoreSetup} from "./SecurityPolicyStoreSetup.t.sol";
@@ -39,8 +40,8 @@ contract SecurityPolicyStore_applyInlineRateLimitBucketUpdates is SecurityPolicy
 
   // Reverts
 
-  /// @notice The bucket update needs the record to exist.
-  function test_applyInlineRateLimitBucketUpdates_RevertWhen_RateLimitRecordNotFound() public {
+  /// @notice The bucket update needs the inline record to exist.
+  function test_applyInlineRateLimitBucketUpdates_RevertWhen_InlineRecordNotFound() public {
     SecurityPolicyStore.InlineRateLimitBucketArgs[] memory bucketConfigs =
       new SecurityPolicyStore.InlineRateLimitBucketArgs[](1);
     bucketConfigs[0] = SecurityPolicyStore.InlineRateLimitBucketArgs({
@@ -51,9 +52,7 @@ contract SecurityPolicyStore_applyInlineRateLimitBucketUpdates is SecurityPolicy
       config: _getRateLimitConfig(CAPACITY)
     });
 
-    vm.expectRevert(
-      abi.encodeWithSelector(SecurityPolicyStore.RateLimitRecordNotFound.selector, s_tokenA, DEST_CHAIN_SELECTOR)
-    );
+    vm.expectRevert(abi.encodeWithSelector(PolicyConfig.InlineRecordNotFound.selector, s_tokenA, DEST_CHAIN_SELECTOR));
     vm.prank(s_poolConfigManager);
     s_store.applyInlineRateLimitBucketUpdates(bucketConfigs);
   }
@@ -156,15 +155,5 @@ contract SecurityPolicyStore_applyInlineRateLimitBucketUpdates is SecurityPolicy
     emit SecurityPolicyStore.InlineRateLimitBucketSet(s_tokenA, DEST_CHAIN_SELECTOR, direction, fastFinality, config);
     vm.prank(s_poolConfigManager);
     s_store.applyInlineRateLimitBucketUpdates(bucketConfigs);
-  }
-
-  function _consume(
-    address localToken,
-    uint64 remoteChainSelector,
-    uint256 amount
-  ) internal {
-    _setInlineSecurityConfig(localToken, remoteChainSelector, _ccvsOf(s_ccv1, s_ccv2), new address[](0), s_hook);
-    vm.prank(s_poolConfigManager);
-    s_store.validateLockOrBurn(localToken, remoteChainSelector, amount, bytes4(0));
   }
 }

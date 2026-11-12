@@ -27,7 +27,6 @@ contract PoolConfigManager_applyInlineFeeConfigUpdates is PoolConfigManagerRoles
     assertEq(1, s_poolConfigManager.getInlineFeeConfigs(s_tokenA).length);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyInlineFeeConfigUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -40,7 +39,6 @@ contract PoolConfigManager_applyInlineFeeConfigUpdates is PoolConfigManagerRoles
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyInlineFeeConfigUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

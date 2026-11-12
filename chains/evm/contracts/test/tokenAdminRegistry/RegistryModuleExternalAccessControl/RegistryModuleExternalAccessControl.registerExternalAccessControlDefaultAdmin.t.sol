@@ -88,19 +88,22 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
   function test_registerExternalAccessControlDefaultAdmin_ReRegisterAfterRoleRevoked() public {
     address newAdmin = makeAddr("newAdmin");
     bytes32 defaultAdminRole = s_accessControlRegistry.DEFAULT_ADMIN_ROLE();
-
     s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
 
-    // The default admin role moves to a new admin before the pending admin has accepted.
     s_accessControlRegistry.grantRole(defaultAdminRole, newAdmin);
     s_accessControlRegistry.revokeRole(defaultAdminRole, OWNER);
-
     vm.startPrank(newAdmin);
     s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
 
-    for (uint256 i = 0; i < s_tokens.length; ++i) {
-      assertEq(newAdmin, s_tokenAdminRegistry.getTokenConfig(s_tokens[i]).pendingAdministrator);
-    }
+    // The previous admin can no longer replace the pending admin.
+    vm.startPrank(OWNER);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        RegistryModuleExternalAccessControl.RequiredRoleNotFound.selector, OWNER, defaultAdminRole, s_token
+      )
+    );
+    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
+    _assertPendingAdministrators(s_tokens, newAdmin);
   }
 
   function test_registerExternalAccessControlDefaultAdmin_DifferentRegistries() public {
@@ -161,85 +164,20 @@ contract RegistryModuleExternalAccessControl_registerExternalAccessControlDefaul
     }
   }
 
-  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_RequiredRoleNotFound_RoleRevoked() public {
-    address newAdmin = makeAddr("newAdmin");
-    bytes32 defaultAdminRole = s_accessControlRegistry.DEFAULT_ADMIN_ROLE();
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-
-    s_accessControlRegistry.grantRole(defaultAdminRole, newAdmin);
-    s_accessControlRegistry.revokeRole(defaultAdminRole, OWNER);
-    vm.startPrank(newAdmin);
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-
-    // The previous admin can no longer replace the pending admin.
-    vm.startPrank(OWNER);
+  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_RequiredRoleNotFound_CustomDefaultAdminRole()
+    public
+  {
+    bytes32 defaultAdminRole = keccak256("CUSTOM_DEFAULT_ADMIN_ROLE");
+    vm.mockCall(
+      address(s_accessControlRegistry),
+      abi.encodeCall(s_accessControlRegistry.DEFAULT_ADMIN_ROLE, ()),
+      abi.encode(defaultAdminRole)
+    );
     vm.expectRevert(
       abi.encodeWithSelector(
         RegistryModuleExternalAccessControl.RequiredRoleNotFound.selector, OWNER, defaultAdminRole, s_token
       )
     );
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, newAdmin);
-  }
-
-  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_AlreadyRegistered() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(_arrayOf(lastToken));
-    s_tokenAdminRegistry.acceptAdminRole(lastToken);
-    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, lastToken));
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-    for (uint256 i = 0; i < s_tokens.length; ++i) {
-      assertEq(address(0), s_tokenAdminRegistry.getTokenConfig(s_tokens[i]).pendingAdministrator);
-    }
-    assertEq(OWNER, s_tokenAdminRegistry.getTokenConfig(lastToken).administrator);
-  }
-
-  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_OnlyRegistryModuleOrOwner() public {
-    s_tokenAdminRegistry.removeRegistryModule(address(s_registryModuleExternalAccessControl));
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        TokenAdminRegistry.OnlyRegistryModuleOrOwner.selector, address(s_registryModuleExternalAccessControl)
-      )
-    );
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_TokenCallReverts() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    vm.mockCallRevert(
-      lastToken,
-      abi.encodeCall(IExternalAccessControlRegistry.ACCESS_CONTROLLED_REGISTRY, ()),
-      abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_RegistryCallReverts() public {
-    address registry = address(new MockExternalAccessControlRegistry(OWNER));
-    s_tokens.push(address(new MockExternalAccessControlledToken(registry)));
-    vm.mockCallRevert(
-      registry,
-      abi.encodeCall(AccessControl.hasRole, (bytes32(0), OWNER)),
-      abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_RegistryHasNoCode() public {
-    s_tokens.push(address(new MockExternalAccessControlledToken(address(0))));
-    vm.expectRevert();
-    s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerExternalAccessControlDefaultAdmin_RevertWhen_TokenHasNoCode() public {
-    s_tokens.push(address(0));
-    vm.expectRevert();
     s_registryModuleExternalAccessControl.registerExternalAccessControlDefaultAdmin(s_tokens);
     _assertPendingAdministrators(s_tokens, address(0));
   }

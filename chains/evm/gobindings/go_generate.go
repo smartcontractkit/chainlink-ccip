@@ -13,6 +13,7 @@ package ccip
 //go:generate go run ./wrap ccip FeeQuoter fee_quoter
 //go:generate go run ./wrap ccip TokenAdminRegistry token_admin_registry
 //go:generate go run ./wrap ccip RegistryModuleOwnerCustom registry_module_owner_custom
+//go:generate go run ./wrap ccip RegistryModuleExternalAccessControl registry_module_external_access_control
 //go:generate go run ./wrap ccip RMNProxy rmn_proxy_contract
 //go:generate go run ./wrap ccip RMN rmn
 //go:generate go run ./wrap ccip EtherSenderReceiver ether_sender_receiver
@@ -41,6 +42,18 @@ package ccip
 //go:generate go run ./wrap ccip LombardTokenPool lombard_token_pool
 
 //go:generate go run ./wrap ccip CrossChainToken cross_chain_token
+
+// Multi-token pools
+//go:generate go run ./wrap ccip MultiTokenPool multi_token_pool
+//go:generate go run ./wrap ccip BurnMintMultiTokenPool burn_mint_multi_token_pool
+//go:generate go run ./wrap ccip PoolConfigManager pool_config_manager
+//go:generate go run ./wrap ccip ConnectionPolicyStore connection_policy_store
+//go:generate go run ./wrap ccip FeePolicyStore fee_policy_store
+//go:generate go run ./wrap ccip SecurityPolicyStore security_policy_store
+//go:generate go run ./wrap ccip MultiTokenPoolHooks multi_token_pool_hooks
+//go:generate go run ./wrap ccip MultiTokenPoolHooksExternalBlocklist multi_token_pool_hooks_external_blocklist
+//go:generate go run ./wrap ccip SameAddressRemoteTokenAddressProvider same_address_remote_token_address_provider
+//go:generate go run ./wrap ccip FactoryTokenWithUIDPoolDataProvider factory_token_with_uid_pool_data_provider
 
 // Helpers
 //go:generate go run ./wrap ccip MaybeRevertMessageReceiver maybe_revert_message_receiver

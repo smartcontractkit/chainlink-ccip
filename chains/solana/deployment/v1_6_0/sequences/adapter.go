@@ -46,7 +46,7 @@ func (a *SolanaAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector u
 }
 
 func (a *SolanaAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatRefByMajor(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(offramp.ContractType),
 		Version:       offramp.Version,
@@ -58,7 +58,7 @@ func (a *SolanaAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector 
 }
 
 func (a *SolanaAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatRefByMajor(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(fee_quoter.ContractType),
 		Version:       fee_quoter.Version,
@@ -70,7 +70,7 @@ func (a *SolanaAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint6
 }
 
 func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatRefByMajor(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(router.ContractType),
 		Version:       router.Version,
@@ -82,7 +82,7 @@ func (a *SolanaAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector u
 }
 
 func (a *SolanaAdapter) GetRMNRemoteAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
-	addr, err := datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
+	addr, err := datastore_utils.FindAndFormatRefByMajor(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(rmnremoteops.ContractType),
 		Version:       rmnremoteops.Version,

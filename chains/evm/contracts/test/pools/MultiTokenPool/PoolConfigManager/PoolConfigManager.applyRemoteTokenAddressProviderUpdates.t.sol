@@ -34,7 +34,6 @@ contract PoolConfigManager_applyRemoteTokenAddressProviderUpdates is PoolConfigM
     assertEq(s_provider, storedProvider);
   }
 
-  /// @notice Each allowed role authorizes the call on its own.
   function test_applyRemoteTokenAddressProviderUpdates_AllowedRoles() public {
     _assertRolesPass(
       abi.encodeCall(
@@ -47,7 +46,6 @@ contract PoolConfigManager_applyRemoteTokenAddressProviderUpdates is PoolConfigM
 
   // Reverts
 
-  /// @notice Calls without an allowed role revert.
   function test_applyRemoteTokenAddressProviderUpdates_RevertWhen_MissingRole() public {
     _assertRolesRevert(
       abi.encodeCall(

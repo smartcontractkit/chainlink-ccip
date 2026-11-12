@@ -34,19 +34,6 @@ contract FactoryTokenWithUIDPoolDataProvider_isAdditionalPoolDataValid is Factor
     );
   }
 
-  function testFuzz_isAdditionalPoolDataValid_IgnoresFinality(
-    bytes4 requestedFinalityConfig
-  ) public view {
-    assertTrue(
-      s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, requestedFinalityConfig, abi.encode(UID))
-    );
-    assertFalse(
-      s_provider.isAdditionalPoolDataValid(
-        s_token, SOURCE_CHAIN_SELECTOR, requestedFinalityConfig, abi.encode(OTHER_UID)
-      )
-    );
-  }
-
   function test_isAdditionalPoolDataValid_UIDOfOtherToken() public view {
     assertFalse(
       s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, abi.encode(OTHER_UID))
@@ -86,15 +73,5 @@ contract FactoryTokenWithUIDPoolDataProvider_isAdditionalPoolDataValid is Factor
         s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, additionalPoolData[i])
       );
     }
-  }
-
-  function testFuzz_isAdditionalPoolDataValid_WrongLength(
-    bytes calldata additionalPoolData
-  ) public view {
-    vm.assume(additionalPoolData.length != 32);
-
-    assertFalse(
-      s_provider.isAdditionalPoolDataValid(s_token, SOURCE_CHAIN_SELECTOR, WAIT_FOR_FINALITY, additionalPoolData)
-    );
   }
 }

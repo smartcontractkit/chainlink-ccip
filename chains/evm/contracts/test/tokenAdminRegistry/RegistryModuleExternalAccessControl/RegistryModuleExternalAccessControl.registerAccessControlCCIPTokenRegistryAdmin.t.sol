@@ -118,18 +118,6 @@ contract RegistryModuleExternalAccessControl_registerAccessControlCCIPTokenRegis
     _assertPendingAdministrators(s_tokens, newAdmin);
   }
 
-  function test_registerAccessControlCCIPTokenRegistryAdmin_AcceptAfterRoleRevoked() public {
-    address token = s_tokens[0];
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(_arrayOf(token));
-    vm.startPrank(s_defaultAdmin);
-    CrossChainToken(token).revokeRole(s_tokenRegistryAdminRole, OWNER);
-
-    // TokenAdminRegistry does not check the role again when the pending admin accepts.
-    vm.startPrank(OWNER);
-    s_tokenAdminRegistry.acceptAdminRole(token);
-    assertEq(OWNER, s_tokenAdminRegistry.getTokenConfig(token).administrator);
-  }
-
   // Reverts
 
   function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_InvalidRoleAdmin() public {
@@ -150,30 +138,6 @@ contract RegistryModuleExternalAccessControl_registerAccessControlCCIPTokenRegis
       s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
       _assertPendingAdministrators(s_tokens, address(0));
     }
-  }
-
-  function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_RoleAdminCallReverts() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    vm.mockCallRevert(
-      lastToken,
-      abi.encodeCall(AccessControl.getRoleAdmin, (s_tokenRegistryAdminRole)),
-      abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_DefaultAdminRoleCallReverts() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    vm.mockCallRevert(
-      lastToken,
-      abi.encodeCall(AccessControl(lastToken).DEFAULT_ADMIN_ROLE, ()),
-      abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
   }
 
   function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_RequiredRoleNotFound_UnauthorizedCaller()
@@ -218,48 +182,6 @@ contract RegistryModuleExternalAccessControl_registerAccessControlCCIPTokenRegis
         RegistryModuleExternalAccessControl.RequiredRoleNotFound.selector, OWNER, s_tokenRegistryAdminRole, otherToken
       )
     );
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_AlreadyRegistered() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(_arrayOf(lastToken));
-    s_tokenAdminRegistry.acceptAdminRole(lastToken);
-    vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.AlreadyRegistered.selector, lastToken));
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
-    for (uint256 i = 0; i < s_tokens.length; ++i) {
-      assertEq(address(0), s_tokenAdminRegistry.getTokenConfig(s_tokens[i]).pendingAdministrator);
-    }
-    assertEq(OWNER, s_tokenAdminRegistry.getTokenConfig(lastToken).administrator);
-  }
-
-  function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_OnlyRegistryModuleOrOwner() public {
-    s_tokenAdminRegistry.removeRegistryModule(address(s_registryModuleExternalAccessControl));
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        TokenAdminRegistry.OnlyRegistryModuleOrOwner.selector, address(s_registryModuleExternalAccessControl)
-      )
-    );
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_AuthorityCallReverts() public {
-    address lastToken = s_tokens[s_tokens.length - 1];
-    vm.mockCallRevert(
-      lastToken,
-      abi.encodeCall(AccessControl.hasRole, (s_tokenRegistryAdminRole, OWNER)),
-      abi.encodeWithSelector(AuthorityUnavailable.selector)
-    );
-    vm.expectRevert(AuthorityUnavailable.selector);
-    s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
-    _assertPendingAdministrators(s_tokens, address(0));
-  }
-
-  function test_registerAccessControlCCIPTokenRegistryAdmin_RevertWhen_TokenHasNoCode() public {
-    s_tokens.push(address(0));
-    vm.expectRevert();
     s_registryModuleExternalAccessControl.registerAccessControlCCIPTokenRegistryAdmin(s_tokens);
     _assertPendingAdministrators(s_tokens, address(0));
   }

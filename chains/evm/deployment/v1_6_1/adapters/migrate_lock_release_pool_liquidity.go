@@ -23,14 +23,15 @@ import (
 )
 
 // MigrateLockReleasePoolLiquiditySequence returns the SOURCE half of a lock-release liquidity
-// migration for v1.6.1 pools (plain and siloed), also serving v1.6.2 which registers this adapter. It
-// extracts liquidity from the old pool to the timelock with the v1.6.1 bindings and records the moved
-// amounts in input.Resolved for the v2.0.0 sink.
+// migration for v1.6.0-v1.6.2 pools, also serving v1.6.2 which registers this adapter. v1.6.0 was
+// only released for SiloedLockReleaseTokenPool, so v1.6.0 here is siloed in practice; plain pools
+// start at v1.6.1. It extracts liquidity from the old pool to the timelock with the v1.6.1 bindings
+// and records the moved amounts in input.Resolved for the v2.0.0 sink.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-v1.6.1-adapter:migrate-lock-release-pool-liquidity-source",
 		semver.MustParse("1.6.1"),
-		"Extract lock-release liquidity from a v1.6.1 pool (plain or siloed) to the timelock",
+		"Extract lock-release liquidity from a v1.6.0-v1.6.2 pool (plain or siloed) to the timelock",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
 			evmChain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
@@ -45,10 +46,15 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 				return sequences.OnChainOutput{}, err
 			}
 			// The adapter may have been resolved from a datastore version; only drive pools whose
-			// on-chain version actually shares the v1.6.1 bindings.
-			if !oldTV.Version.Equal(cciputils.Version_1_6_1) && !oldTV.Version.Equal(cciputils.Version_1_6_2) {
+			// on-chain version actually shares the v1.6.1 bindings. v1.6.0 is byte-for-byte
+			// ABI-compatible with v1.6.1 for every operation this source uses. v1.6.0 was only
+			// released for SiloedLockReleaseTokenPool: the plain LockReleaseTokenPool line goes
+			// v1.5.1 -> v1.6.1, so accepting v1.6.0 here is siloed-only in practice.
+			if !oldTV.Version.Equal(cciputils.Version_1_6_0) &&
+				!oldTV.Version.Equal(cciputils.Version_1_6_1) &&
+				!oldTV.Version.Equal(cciputils.Version_1_6_2) {
 				return sequences.OnChainOutput{}, fmt.Errorf(
-					"old pool %s is %s %s on-chain; the v1.6.1 liquidity migration source only supports v1.6.1 and v1.6.2 pools",
+					"old pool %s is %s %s on-chain; the v1.6.1 liquidity migration source only supports v1.6.0, v1.6.1, and v1.6.2 pools",
 					oldPool, oldTV.Type, oldTV.Version)
 			}
 			if string(oldTV.Type) == cciputils.SiloedLockReleaseTokenPool.String() {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -72,6 +73,8 @@ type FeeAdapterRegistry struct {
 	muAdapters  sync.Mutex
 	resolvers   map[feeResolverID]FeeResolver
 	adapters    map[feeAdapterID]FeeAdapter
+	// versions are the registered adapter versions per chain family.
+	versions map[string][]*semver.Version
 }
 
 // newFeeResolverID constructs a unique identifier for a fee resolver based on chain family.
@@ -89,6 +92,7 @@ func newFeeAdapterRegistry() *FeeAdapterRegistry {
 	return &FeeAdapterRegistry{
 		resolvers: make(map[feeResolverID]FeeResolver),
 		adapters:  make(map[feeAdapterID]FeeAdapter),
+		versions:  make(map[string][]*semver.Version),
 	}
 }
 
@@ -113,6 +117,7 @@ func (r *FeeAdapterRegistry) RegisterFeeAdapter(chainFamily string, version *sem
 
 	if _, exists := r.adapters[id]; !exists {
 		r.adapters[id] = adapter
+		r.versions[chainFamily] = append(r.versions[chainFamily], version)
 	}
 }
 
@@ -129,12 +134,15 @@ func (r *FeeAdapterRegistry) GetFeeResolver(chainFamily string) (FeeResolver, bo
 
 // GetFeeAdapter looks up an adapter; the second return value tells you if it was found.
 func (r *FeeAdapterRegistry) GetFeeAdapter(chainFamily string, version *semver.Version) (FeeAdapter, bool) {
-	id := newFeeAdapterID(chainFamily, version)
-
 	r.muAdapters.Lock()
 	defer r.muAdapters.Unlock()
 
-	adapter, ok := r.adapters[id]
+	// Exact registration first, then the same major from 2.0.0 up (a 2.0.1 ref uses the 2.0.0 adapter).
+	registered, ok := utils.ResolveRegisteredVersion(r.versions[chainFamily], version)
+	if !ok {
+		return nil, false
+	}
+	adapter, ok := r.adapters[newFeeAdapterID(chainFamily, registered)]
 	return adapter, ok
 }
 

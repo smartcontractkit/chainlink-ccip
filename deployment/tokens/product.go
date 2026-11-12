@@ -723,6 +723,7 @@ type TokenAdapterRegistry struct {
 	tokenAdminRegistryReaderReg  map[string]TokenAdminRegistryReader
 	tokenAdminRegistryManagerReg map[string]TokenAdminRegistryManager
 	tokenAdapterReg              map[tokenAdapterID]TokenAdapter
+	tokenAdapterVersions         map[string][]*semver.Version // registered versions per chain family
 	tokenRefResolverMu           sync.Mutex
 	tokenAdminRegistryMu         sync.Mutex // guards both TAR maps, so a manager registration updates them together
 	tokenAdapterMu               sync.Mutex
@@ -734,6 +735,7 @@ func newTokenAdapterRegistry() *TokenAdapterRegistry {
 		tokenAdminRegistryReaderReg:  make(map[string]TokenAdminRegistryReader),
 		tokenAdminRegistryManagerReg: make(map[string]TokenAdminRegistryManager),
 		tokenAdapterReg:              make(map[tokenAdapterID]TokenAdapter),
+		tokenAdapterVersions:         make(map[string][]*semver.Version),
 	}
 }
 
@@ -805,6 +807,7 @@ func (r *TokenAdapterRegistry) RegisterTokenAdapter(chainFamily string, version 
 	defer r.tokenAdapterMu.Unlock()
 	if _, exists := r.tokenAdapterReg[id]; !exists {
 		r.tokenAdapterReg[id] = adapter
+		r.tokenAdapterVersions[chainFamily] = append(r.tokenAdapterVersions[chainFamily], version)
 	}
 }
 
@@ -815,10 +818,14 @@ func (r *TokenAdapterRegistry) GetTokenAdapter(chainFamily string, version *semv
 	if version == nil {
 		return nil, false
 	}
-	id := newTokenAdapterID(chainFamily, version)
 	r.tokenAdapterMu.Lock()
 	defer r.tokenAdapterMu.Unlock()
-	adapter, ok := r.tokenAdapterReg[id]
+	// Exact registration first, then the same major from 2.0.0 up (a 2.0.1 ref uses the 2.0.0 adapter).
+	registered, ok := utils.ResolveRegisteredVersion(r.tokenAdapterVersions[chainFamily], version)
+	if !ok {
+		return nil, false
+	}
+	adapter, ok := r.tokenAdapterReg[newTokenAdapterID(chainFamily, registered)]
 	return adapter, ok
 }
 

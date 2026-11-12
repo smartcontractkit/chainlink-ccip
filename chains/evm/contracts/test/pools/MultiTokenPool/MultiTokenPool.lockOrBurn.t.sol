@@ -91,7 +91,7 @@ contract MultiTokenPool_lockOrBurn is MultiTokenPoolSetup {
   // Reverts
 
   function test_lockOrBurn_RevertWhen_CursedByRMN() public {
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
+    _setMockRMNChainCurse(DEST_CHAIN_SELECTOR, true);
 
     vm.startPrank(s_allowedOnRamp);
     vm.expectRevert(MultiTokenPool.CursedByRMN.selector);

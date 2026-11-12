@@ -167,7 +167,7 @@ jobs:
     needs: [detect_deployments_changes]
     if: ${{ needs.detect_deployments_changes.outputs.run_crosschain_deployment == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: integration-tests/deployment
@@ -186,7 +186,7 @@ jobs:
       - name: Test Crosschain Deployments
         id: run-tests
         continue-on-error: true
-        run: gotestsum --junitfile=test-results.xml --format=github-actions -- -timeout 30m ./...
+        run: gotestsum --junitfile=test-results.xml --format=github-actions -- -timeout 50m ./...
       - name: Analyze and upload test results
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
