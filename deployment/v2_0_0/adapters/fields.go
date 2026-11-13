@@ -1,0 +1,163 @@
+package adapters
+
+import (
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
+)
+
+// Field specs for the v2.0 Glamsterdam gas-config mapping table. Values sourced from
+// "Glamsterdam Gas Configuration.md" (embedded in GLAMSTERDAM_GAS_UPDATE_PLAN.md §6, V2.0 table).
+var (
+	// OnRampBaseExecutionGasCost is table row 1.
+	OnRampBaseExecutionGasCost = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "OnRamp.DestChainConfig.BaseExecutionGasCost",
+		ExpectedPrague:   200_000,
+		GlamsterdamValue: 400_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](200_000, 400_000),
+	}
+
+	// FeeQuoterDestGasOverhead is the LEGACY FeeQuoter.DestChainConfig.DestGasOverhead ("gas
+	// charged on top of the gasLimit"). FeeQuoter 2.0.0 only reads it in getValidatedFee, the
+	// pricing path used by v1.6 OnRamps that are wired to a 2.0.0 FeeQuoter, so it has no effect on
+	// pure-v2.0 lanes. It mirrors the v1.6 table (row 1: 300,000 -> 500,000) and lives here, in the
+	// single FeeQuoter write the v2.0 adapter already makes, so that the 2.0.0 FeeQuoter has
+	// exactly one writer (two proposals each writing the whole DestChainConfig struct would
+	// overwrite each other's fields).
+	FeeQuoterDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.DestChainConfig.DestGasOverhead",
+		ExpectedPrague:   300_000,
+		GlamsterdamValue: 500_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](300_000, 500_000),
+	}
+
+	// FeeQuoterDefaultTokenDestGasOverhead is table row 2.
+	FeeQuoterDefaultTokenDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.DestChainConfig.DefaultTokenDestGasOverhead",
+		ExpectedPrague:   90_000,
+		GlamsterdamValue: 270_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](90_000, 270_000),
+	}
+
+	// FeeQuoterMaxPerMsgGasLimit is table row 3. Prague and Glamsterdam values are identical per
+	// the doc ("needs to be re-tested once testnet is live"), so this is a no-op for now: on a
+	// mismatch, the current value is left unchanged rather than scaled.
+	FeeQuoterMaxPerMsgGasLimit = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.DestChainConfig.MaxPerMsgGasLimit",
+		ExpectedPrague:   15_000_000,
+		GlamsterdamValue: 15_000_000,
+		Fallback:         func(current uint32) uint32 { return current },
+	}
+
+	// FeeQuoterDestGasPerPayloadByteBase is table row 4. The "+DA" components
+	// (DestGasPerDataAvailabilityByte et al.) are confirmed unchanged by the doc and are not
+	// part of this field spec.
+	FeeQuoterDestGasPerPayloadByteBase = glamsterdamutils.FieldSpec[uint8]{
+		Name:             "FeeQuoter.DestChainConfig.DestGasPerPayloadByteBase",
+		ExpectedPrague:   20,
+		GlamsterdamValue: 64,
+		Fallback:         glamsterdamutils.ApplyRatio[uint8](20, 64),
+	}
+
+	// FeeQuoterDefaultTxGasLimit is table row 5.
+	FeeQuoterDefaultTxGasLimit = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.DestChainConfig.DefaultTxGasLimit",
+		ExpectedPrague:   200_000,
+		GlamsterdamValue: 400_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](200_000, 400_000),
+	}
+
+	// CommitteeVerifierGasForVerification is table row 8.
+	CommitteeVerifierGasForVerification = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "CommitteeVerifier.RemoteChainConfigArgs.GasForVerification",
+		ExpectedPrague:   75_000,
+		GlamsterdamValue: 85_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](75_000, 85_000),
+	}
+
+	// LombardTokenPoolDestGasOverhead is table row 9. Guesstimate value (real value needs
+	// testnet measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	LombardTokenPoolDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "TokenPool.TokenTransferFeeConfig.DestGasOverhead (Lombard)",
+		ExpectedPrague:   lombardDestGasOverheadPrague,
+		GlamsterdamValue: lombardDestGasOverheadGlamsterdam,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](lombardDestGasOverheadPrague, lombardDestGasOverheadGlamsterdam),
+	}
+
+	// USDCTokenPoolDestGasOverhead is table row 10. Guesstimate value (real value needs testnet
+	// measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	USDCTokenPoolDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "TokenPool.TokenTransferFeeConfig.DestGasOverhead (USDC)",
+		ExpectedPrague:   usdcDestGasOverheadPrague,
+		GlamsterdamValue: usdcDestGasOverheadGlamsterdam,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](usdcDestGasOverheadPrague, usdcDestGasOverheadGlamsterdam),
+	}
+
+	// FeeQuoterUSDCTokenDestGasOverhead is the FeeQuoter per-token override
+	// (TokenTransferFeeConfig.DestGasOverhead) for the USDC token. It is the value the OnRamp
+	// charges whenever the USDC pool is not IPoolV2 (e.g. legacy USDCTokenPool 1.5.x/1.6.x) or its
+	// own pool fee config is disabled, so it must move together with USDCTokenPoolDestGasOverhead.
+	// It shares that spec's constants on purpose: updating the USDC target in one place updates
+	// both.
+	FeeQuoterUSDCTokenDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (USDC)",
+		ExpectedPrague:   usdcDestGasOverheadPrague,
+		GlamsterdamValue: usdcDestGasOverheadGlamsterdam,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](usdcDestGasOverheadPrague, usdcDestGasOverheadGlamsterdam),
+	}
+
+	// FeeQuoterLombardTokenDestGasOverhead is the FeeQuoter per-token override for the Lombard
+	// token; see FeeQuoterUSDCTokenDestGasOverhead. Shares LombardTokenPoolDestGasOverhead's
+	// constants.
+	FeeQuoterLombardTokenDestGasOverhead = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "FeeQuoter.TokenTransferFeeConfig.DestGasOverhead (Lombard)",
+		ExpectedPrague:   lombardDestGasOverheadPrague,
+		GlamsterdamValue: lombardDestGasOverheadGlamsterdam,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](lombardDestGasOverheadPrague, lombardDestGasOverheadGlamsterdam),
+	}
+
+	// FeeQuoterGenericTokenDestGasOverheadScale is applied to the FeeQuoter per-token override of
+	// every token that is neither USDC nor Lombard. There is no per-token Prague baseline or
+	// literal Glamsterdam target for these, so it is purely the fallback ratio (x3, the same ratio
+	// as FeeQuoterDefaultTokenDestGasOverhead and USDC). NOT idempotent: unlike the specs above it
+	// has no "already applied" marker, so re-running the changeset after its proposal executed
+	// would scale the overrides again.
+	FeeQuoterGenericTokenDestGasOverheadScale = glamsterdamutils.ApplyRatio[uint32](1, 3)
+
+	// LombardVerifierGasForVerification is table row 11. Guesstimate value (real value needs
+	// testnet measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	LombardVerifierGasForVerification = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "LombardVerifier.RemoteChainConfigArgs.GasForVerification",
+		ExpectedPrague:   275_000,
+		GlamsterdamValue: 825_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](275_000, 825_000),
+	}
+
+	// USDCVerifierGasForVerification is table row 12. The doc calls this contract "USDCVerifier";
+	// the Solidity/Go type is CCTPVerifier. Guesstimate value (real value needs testnet
+	// measurement per §0/§2.4), applied as-is for the first (testnet) run.
+	USDCVerifierGasForVerification = glamsterdamutils.FieldSpec[uint32]{
+		Name:             "CCTPVerifier.RemoteChainConfigArgs.GasForVerification",
+		ExpectedPrague:   200_000,
+		GlamsterdamValue: 600_000,
+		Fallback:         glamsterdamutils.ApplyRatio[uint32](200_000, 600_000),
+	}
+)
+
+// OffRamp fields (table rows 6-7) are immutable, set only in the constructor, with no setter —
+// StaticConfigCannotBeChanged reverts any attempt to change them. They are read-only sanity
+// checked (never written) against their expected Prague baseline, which should equal their
+// Glamsterdam value.
+const (
+	OffRampExpectedGasForCallExactCheck      = uint16(5_000)
+	OffRampExpectedMaxGasBufferToUpdateState = uint32(12_000)
+)
+
+// Shared USDC / Lombard DestGasOverhead constants. Both the token-pool-level fee config (table
+// rows 9, 10) and the FeeQuoter per-token override are derived from these, so the Glamsterdam
+// values (currently 3x guesstimates) only have to be updated here once a real measurement is
+// available.
+const (
+	lombardDestGasOverheadPrague      = uint32(410_000)
+	lombardDestGasOverheadGlamsterdam = uint32(1_200_000)
+	usdcDestGasOverheadPrague         = uint32(250_000)
+	usdcDestGasOverheadGlamsterdam    = uint32(750_000)
+)

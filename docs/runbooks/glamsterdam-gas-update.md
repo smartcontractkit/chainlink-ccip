@@ -4,6 +4,16 @@ Audience: an engineer (or AI agent) who needs to run the Glamsterdam gas-config 
 generate an MCMS proposal, with no prior context on this feature. Companion doc:
 `GLAMSTERDAM_GAS_UPDATE_PLAN.md` (design spec, field-by-field mapping table, code appendix).
 
+**This feature is implemented via a chain-family adapter, not EVM-only code.** The orchestration
+logic (field resolution, reporting, the `GasUpdateAdapter` interface) lives in the chain-agnostic
+`deployment/v1_6_1` / `deployment/v2_0_0` packages; `chains/evm/deployment/v1_6_1` /
+`chains/evm/deployment/v2_0_0` is just the EVM implementation of that interface, registered into a
+family-keyed registry at init time. Everything below this point still describes the **EVM** run —
+chain selectors, contract names, ABIs, the verification scripts — none of that changed. If you're
+bringing a non-EVM chain family onto this changeset, see
+[`../guides/glamsterdam-adapter-integration.md`](../guides/glamsterdam-adapter-integration.md)
+instead; this doc only covers running it for a family that already has an adapter (currently EVM).
+
 If you just want to generate both proposals with minimal reading, skip to **§3 (Quick path)**.
 Everything else is context/troubleshooting for when something doesn't work on the first try.
 
@@ -63,12 +73,23 @@ these; look them up (§13).
 
 ## 0. What this is
 
-Two `ChangeSetV2` implementations in `chainlink-ccip` (now on `main`; the pool-skip fix described
-in §10 is on branch `fix/glamsterdam-skip-unsupported-token-pools` until it is merged) automate updating source-side gas config on every lane pointed at a chain that's moving
-to the Glamsterdam hard fork:
+Two `ChangeSetV2` implementations automate updating source-side gas config on every lane pointed
+at a chain that's moving to the Glamsterdam hard fork, split into a chain-agnostic layer and a
+per-chain-family adapter layer:
 
-- `UpdateGasConfigForGlamsterdamV2` — `chains/evm/deployment/v2_0_0/changesets/glamsterdam_gas_update.go`
-- `UpdateGasConfigForGlamsterdamV16` — `chains/evm/deployment/v1_6_1/changesets/glamsterdam_gas_update.go`
+- Generic (chain-agnostic) changeset, orchestration sequence, and `GasUpdateAdapter` interface:
+  - `UpdateGasConfigForGlamsterdamV200` — `deployment/v2_0_0/changesets/glamsterdam_gas_update.go`
+  - `UpdateGasConfigForGlamsterdamV16` — `deployment/v1_6_1/changesets/glamsterdam_gas_update.go`
+  - These discover candidate chains across **every** registered chain family (via
+    `chain_selectors.GetSelectorFamily`), group them by family, and dispatch each group to that
+    family's adapter from an injected `GasUpdateAdapterRegistry`. A family with candidate chains
+    but no registered adapter fails the changeset explicitly rather than silently skipping it.
+- EVM adapter (the only chain family implemented as of writing) plus a thin EVM-named wrapper
+  changeset that just forwards to the generic one:
+  - `UpdateGasConfigForGlamsterdamV2` — `chains/evm/deployment/v2_0_0/changesets/glamsterdam_gas_update.go`
+  - `UpdateGasConfigForGlamsterdamV16` — `chains/evm/deployment/v1_6_1/changesets/glamsterdam_gas_update.go`
+  - `GlamsterdamGasAdapter` (the actual EVM read/write logic, implementing `GasUpdateAdapter`) —
+    `chains/evm/deployment/v2_0_0/adapters/glamsterdam_gas_adapter.go` and the `v1_6_1` equivalent.
 
 Both changesets never execute directly — they always produce an MCMS timelock proposal, even if
 the deployer key happens to own the contract.
@@ -236,10 +257,16 @@ In `domains/ccip/testnet/durable_pipelines.go`, near the other `v1_6_1` changese
 (e.g. next to `DurablePipeline_migrate_hybrid_lock_release_liquidity`):
 ```go
 ccip161evmchangesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/changesets"
+ccip161adapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_6_1/adapters"
 ...
 registry.Add("update_gas_config_glamsterdam_v16",
-    cldf_changeset.Configure(ccip161evmchangesets.UpdateGasConfigForGlamsterdamV16(cciputilschangeset.GetRegistry())).WithEnvInput())
+    cldf_changeset.Configure(ccip161evmchangesets.UpdateGasConfigForGlamsterdamV16(
+        cciputilschangeset.GetRegistry(), ccip161adapters.GetGasUpdateAdapterRegistry())).WithEnvInput())
 ```
+The second argument is the chain-family `GasUpdateAdapterRegistry` (adapter-interface layer, not
+the MCMS reader registry) — pass the global singleton accessor here, not a fresh instance; a fresh
+instance has no adapters registered in it and the changeset will fail with "no gas update adapter
+registered for chain family \"evm\"".
 Confirm it builds: `go build ./testnet/...` from `domains/ccip`.
 
 ### 5c. Write the input YAML
@@ -373,8 +400,12 @@ imports `evm_changesets "github.com/smartcontractkit/chainlink-ccip/chains/evm/d
 for `ActivateRMN` etc., so no new import needed):
 ```go
 registry.Add("update_gas_config_glamsterdam_v2",
-    changeset.Configure(evm_changesets.UpdateGasConfigForGlamsterdamV2(mcmsRegistry)).WithEnvInput())
+    changeset.Configure(evm_changesets.UpdateGasConfigForGlamsterdamV2(
+        mcmsRegistry, ccip200adapters.GetGasUpdateAdapterRegistry())).WithEnvInput())
 ```
+(`ccip200adapters` is `"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"` —
+add the import if `evm_pipelines.go` doesn't already have it under some other alias.) Same note as
+the v1.6 snippet above: pass the singleton, not a fresh registry.
 Confirm it builds: `go build ./pkg/... ./prod_testnet/...` from `domains/ccv`.
 
 ### 6e. Write the input YAML
