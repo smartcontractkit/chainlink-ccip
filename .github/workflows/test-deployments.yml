@@ -66,6 +66,7 @@ jobs:
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
           trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+          trunk-test-collection-id: mafaUu1u # chainlink-ccip-unit
 
   test-evm-deployments-race:
       needs: [detect_deployments_changes]
@@ -106,6 +107,7 @@ jobs:
             trunk-variant: race
             artifact-name: evm_deployment_race_test_logs
             trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+            trunk-test-collection-id: mafaUu1u # chainlink-ccip-unit
 
   test-solana-deployments:
     needs: [detect_deployments_changes]
@@ -134,6 +136,7 @@ jobs:
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
           trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+          trunk-test-collection-id: mafaUu1u # chainlink-ccip-unit
 
   test-deployments:
     needs: [detect_deployments_changes]
@@ -162,6 +165,7 @@ jobs:
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
           trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+          trunk-test-collection-id: mafaUu1u # chainlink-ccip-unit
 
   test-deployments-crosschain:
     needs: [detect_deployments_changes]
@@ -195,3 +199,4 @@ jobs:
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
           trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+          trunk-test-collection-id: mafaUu1u # chainlink-ccip-unit
