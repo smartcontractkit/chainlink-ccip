@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -12,8 +13,10 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms/sdk"
+	"github.com/smartcontractkit/mcms/sdk/evm"
 	"github.com/smartcontractkit/mcms/types"
 
+	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 
@@ -36,9 +39,10 @@ type SeqGrantAdminRoleOfTimelockToTimelockInput struct {
 }
 
 type SeqSetMCMSConfigInput struct {
-	ChainSelector uint64
-	MCMConfig     *types.Config
-	MCMContracts  []datastore.AddressRef
+	ChainSelector  uint64
+	MCMConfig      *types.Config
+	MCMContracts   []datastore.AddressRef
+	PartialRollout bool
 }
 
 var SeqDeployMCMWithConfig = cldf_ops.NewSequence(
@@ -114,8 +118,18 @@ var SeqSetMCMSConfigs = cldf_ops.NewSequence(
 	"Sets config on previously deployed MCM contract",
 	func(b cldf_ops.Bundle, chain cldf_evm.Chain, in SeqSetMCMSConfigInput) (output sequences.OnChainOutput, err error) {
 		for _, mcmContract := range in.MCMContracts {
+			mcmConfig := in.MCMConfig
+			if in.PartialRollout {
+				mergedConfig, err := partialRolloutConfig(b.GetContext(), chain, mcmContract.Address, *in.MCMConfig)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build partial MCMS config for contract with address %s: %w", mcmContract.Address, err)
+				}
+
+				mcmConfig = &mergedConfig
+			}
+
 			// Set config on contract
-			groupQuorums, groupParents, signerAddresses, signerGroups, err := sdk.ExtractSetConfigInputs(in.MCMConfig)
+			groupQuorums, groupParents, signerAddresses, signerGroups, err := sdk.ExtractSetConfigInputs(mcmConfig)
 			if err != nil {
 				return sequences.OnChainOutput{}, err
 			}
@@ -144,6 +158,72 @@ var SeqSetMCMSConfigs = cldf_ops.NewSequence(
 		return output, nil
 	},
 )
+
+func partialRolloutConfig(ctx context.Context, chain cldf_evm.Chain, address string, desired types.Config) (types.Config, error) {
+	current, err := evm.NewInspector(chain.Client).GetConfig(ctx, address)
+	if err != nil {
+		return types.Config{}, fmt.Errorf("failed to read current MCMS config: %w", err)
+	}
+
+	remaining := ccipdeploy.PartialRolloutSignerBatchSize
+	merged, err := mergePartialRolloutConfig(*current, desired, &remaining)
+	if err != nil {
+		return types.Config{}, err
+	}
+
+	return merged, nil
+}
+
+func mergePartialRolloutConfig(current, desired types.Config, remaining *int) (types.Config, error) {
+	if current.Quorum != desired.Quorum {
+		return types.Config{}, fmt.Errorf("on-chain quorum %d does not match desired quorum %d", current.Quorum, desired.Quorum)
+	}
+
+	if len(current.GroupSigners) != len(desired.GroupSigners) {
+		return types.Config{}, fmt.Errorf("on-chain group count %d does not match desired group count %d", len(current.GroupSigners), len(desired.GroupSigners))
+	}
+
+	desiredSigners := make(map[common.Address]struct{}, len(desired.Signers))
+	for _, signer := range desired.Signers {
+		desiredSigners[signer] = struct{}{}
+	}
+
+	currentSigners := make(map[common.Address]struct{}, len(current.Signers))
+	merged := desired
+	merged.Signers = append([]common.Address(nil), current.Signers...)
+	for _, signer := range current.Signers {
+		if _, ok := desiredSigners[signer]; !ok {
+			return types.Config{}, fmt.Errorf("on-chain signer %s is not present in desired config", signer.Hex())
+		}
+		currentSigners[signer] = struct{}{}
+	}
+
+	for _, signer := range desired.Signers {
+		if _, ok := currentSigners[signer]; ok {
+			continue
+		}
+
+		if *remaining == 0 {
+			break
+		}
+
+		merged.Signers = append(merged.Signers, signer)
+		currentSigners[signer] = struct{}{}
+		*remaining--
+	}
+
+	merged.GroupSigners = make([]types.Config, len(desired.GroupSigners))
+	for i := range desired.GroupSigners {
+		group, err := mergePartialRolloutConfig(current.GroupSigners[i], desired.GroupSigners[i], remaining)
+		if err != nil {
+			return types.Config{}, err
+		}
+
+		merged.GroupSigners[i] = group
+	}
+
+	return merged, nil
+}
 
 var SeqGrantAdminRoleOfTimelockToTimelock = cldf_ops.NewSequence(
 	"seq-grant-admin-role-of-timelock-to-timelock",
