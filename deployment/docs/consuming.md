@@ -209,7 +209,7 @@ Constructors and inputs. Follow the source link for the config type. Each config
 | Configure token pool | `tokens.ConfigureTokenPool()` | Pool-level settings: fees, finality, router/admins ([configure_token_pool.go](../tokens/configure_token_pool.go)) |
 | Manual registration | `tokens.ManualRegistration()` | Register a customer-deployed token ([manual_registration.go](../tokens/manual_registration.go)) |
 | Rate limits | `tokens.SetTokenPoolRateLimits()` | Set rate limits. Inbound is derived from the counterpart's outbound ([rate_limits.go](../tokens/rate_limits.go)) |
-| Remove remote pools | `tokens.RemoveRemotePools()` | Remove remote pool entries, optionally unregistering ([remove_remote_pools.go](../tokens/remove_remote_pools.go)) |
+| Remove remote pools | `tokens.RemoveRemotePools()` | Remove remote pool entries, optionally wiping a lane's whole chain config and/or unregistering ([remove_remote_pools.go](../tokens/remove_remote_pools.go)) |
 | Token admin roles | `tokens.GrantTokenAdminRole()` / `RevokeTokenAdminRole()` | ([grant_admin_role.go](../tokens/grant_admin_role.go), [revoke_admin_role.go](../tokens/revoke_admin_role.go)) |
 | Migrate lock-release liquidity | `tokens.MigrateLockReleasePoolLiquidity(tokReg, mcmsReg)` | Legacy lock-release pool → 2.0 lockbox ([migrate_lock_release_pool_liquidity.go](../tokens/migrate_lock_release_pool_liquidity.go)) |
 | Token transfer fee | `fees.SetTokenTransferFee()` | FeeQuoter per-token fees: user value → on-chain value → adapter default ([set_token_transfer_fee.go](../fees/set_token_transfer_fee.go)) |

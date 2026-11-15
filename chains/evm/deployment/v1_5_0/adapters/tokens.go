@@ -432,6 +432,38 @@ func (p *poolOpsV150) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, pool
 	return writes, nil
 }
 
+// RemoveRemoteChainConfigs removes the whole remote chain config for each selector. v1.5.0's
+// applyChainUpdates takes a single ChainUpdate array and removes a chain with Allowed=false; the
+// removal entry must carry a zeroed, disabled rate limiter or the contract reverts
+// RateLimitMustBeDisabled (see the v1.5.0 configure sequence's disabledRateLimit helper).
+func (p *poolOpsV150) RemoveRemoteChainConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelectors []uint64) ([]evm_contract.WriteOutput, error) {
+	if len(remoteChainSelectors) == 0 {
+		return nil, nil
+	}
+	updates := make([]tpap.ChainUpdate, 0, len(remoteChainSelectors))
+	for _, remoteChainSelector := range remoteChainSelectors {
+		updates = append(updates, tpap.ChainUpdate{
+			RemoteChainSelector:       remoteChainSelector,
+			Allowed:                   false,
+			RemotePoolAddress:         []byte{},
+			RemoteTokenAddress:        []byte{},
+			OutboundRateLimiterConfig: tpap.Config{Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+			InboundRateLimiterConfig:  tpap.Config{Capacity: big.NewInt(0), Rate: big.NewInt(0)},
+		})
+	}
+	report, err := cldf_ops.ExecuteOperation(b, tpap.ApplyChainUpdates, chain, evm_contract.FunctionInput[[]tpap.ChainUpdate]{
+		ChainSelector: chain.Selector,
+		Address:       poolAddr,
+		Args:          updates,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ApplyChainUpdates v1.5.0: %w", err)
+	}
+	return []evm_contract.WriteOutput{report.Output}, nil
+}
+
+func (p *poolOpsV150) SupportsRemoteChainConfigRemoval() bool { return true }
+
 func (p *poolOpsV150) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.OnchainRateLimits, error) {
 	if ff {
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("fast finality buckets are not supported on v1.5.x token pools")

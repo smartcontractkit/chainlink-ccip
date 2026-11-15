@@ -513,6 +513,23 @@ func (p *poolOpsV200) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, pool
 	return writes, nil
 }
 
+func (p *poolOpsV200) RemoveRemoteChainConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelectors []uint64) ([]contract.WriteOutput, error) {
+	if len(remoteChainSelectors) == 0 {
+		return nil, nil
+	}
+	report, err := cldf_ops.ExecuteOperation(b, token_pool.ApplyChainUpdates, chain, contract.FunctionInput[token_pool.ApplyChainUpdatesArgs]{
+		ChainSelector: chain.Selector,
+		Address:       poolAddr,
+		Args:          token_pool.ApplyChainUpdatesArgs{RemoteChainSelectorsToRemove: remoteChainSelectors},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ApplyChainUpdates v2.0.0: %w", err)
+	}
+	return []contract.WriteOutput{report.Output}, nil
+}
+
+func (p *poolOpsV200) SupportsRemoteChainConfigRemoval() bool { return true }
+
 func (p *poolOpsV200) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokens.OnchainRateLimits, error) {
 	report, err := cldf_ops.ExecuteOperation(
 		b,

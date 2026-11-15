@@ -35,6 +35,21 @@ type RemoveRemotePoolsInput struct {
 //     completing the full teardown. The remotes are always discovered automatically. Unregistering
 //     requires the chain family to register a TokenAdminRegistryManager; a family registered only
 //     as a reader fails at planning when an unregister is needed.
+//   - wipeChainConfigs: opt-in, combinable with any mode (including deactivate) or usable on its
+//     own. When set, after this run's removals every remote chain the pool still supports whose
+//     remote-pool list is empty has its whole chain configuration removed (remote pools, remote
+//     token and rate limits) via the pool's applyChainUpdates. On its own (no allRemotes and no
+//     remotePoolsToRemove) it removes nothing and just sweeps every supported lane that is already
+//     empty, which is the way to retire a lane whose remote pool was removed by an earlier run.
+//     Without it, chain support is never removed. To clean a peer that still lists a lane this pool
+//     wiped one-sided, run a second entry against the peer pool (remotePoolsToRemove naming this
+//     pool, plus wipeChainConfigs): the peer's forward pass reads only its own config, so it never
+//     needs this pool's remote token. The chain family must implement RemoteChainConfigRemover (a
+//     family that does not fails at planning); a pool version whose implementation cannot remove
+//     chain configs is rejected at planning. Discovery is only as good as the family's
+//     getSupportedChains: on Solana that list is derived from chains loaded in the environment and
+//     datastore refs, so a lane to any other chain is not swept. A remote selector that is not
+//     reported as supported is warned about and skipped.
 //
 // The reverse pass removes this pool from up to two pools per peer chain: the peer's TAR-active
 // pool and the peer pool this pool is paired with (they differ once the peer has been upgraded,
@@ -79,6 +94,7 @@ type RemoveRemotePoolsPerPool struct {
 	ChainSelector        uint64               `yaml:"selector" json:"selector"`
 	Pool                 datastore.AddressRef `yaml:"pool" json:"pool"`
 	RemotePoolsToRemove  []RemotePoolToRemove `yaml:"remotePoolsToRemove" json:"remotePoolsToRemove"`
+	WipeChainConfigs     bool                 `yaml:"wipeChainConfigs" json:"wipeChainConfigs"`
 	Bidirectional        bool                 `yaml:"bidirectional" json:"bidirectional"`
 	AllRemotes           bool                 `yaml:"allRemotes" json:"allRemotes"`
 	Deactivate           bool                 `yaml:"deactivate" json:"deactivate"`
@@ -94,7 +110,8 @@ type RemoveRemotePoolsPerPool struct {
 // newer pool), once in-flight messages have settled on the new pools: removing a remote pool
 // makes the peer reject messages still in flight from it. Deactivating a pool that is still the
 // active pool also leaves peers able to send to this chain (removing remote pools does not remove
-// chain support), and those transfers fail on arrival.
+// chain support), and those transfers fail on arrival. With wipeChainConfigs the chain support is
+// removed too, so a send on a wiped lane reverts at the source instead of failing on arrival.
 func RemoveRemotePools() cldf.ChangeSetV2[RemoveRemotePoolsInput] {
 	return cldf.CreateChangeSet(removeRemotePoolsApply(), removeRemotePoolsVerify())
 }
@@ -128,7 +145,7 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 			// Mode rules (see RemoveRemotePoolsPerPool).
 			if pool.Deactivate {
 				if pool.AllRemotes || pool.Bidirectional || len(pool.RemotePoolsToRemove) > 0 {
-					return fmt.Errorf("pool entry %s on chain selector %d: deactivate must be specified alone", datastore_utils.SprintRef(pool.Pool), pool.ChainSelector)
+					return fmt.Errorf("pool entry %s on chain selector %d: deactivate must not be combined with allRemotes, bidirectional or remotePoolsToRemove", datastore_utils.SprintRef(pool.Pool), pool.ChainSelector)
 				}
 			} else {
 				if pool.AllRemotes && len(pool.RemotePoolsToRemove) > 0 {
@@ -140,7 +157,7 @@ func removeRemotePoolsVerify() func(cldf.Environment, RemoveRemotePoolsInput) er
 				if pool.SkipUnsupportedPeers && !pool.Bidirectional {
 					return fmt.Errorf("pool entry %s on chain selector %d: skipUnsupportedPeers requires bidirectional or deactivate", datastore_utils.SprintRef(pool.Pool), pool.ChainSelector)
 				}
-				if !pool.AllRemotes && len(pool.RemotePoolsToRemove) == 0 {
+				if !pool.AllRemotes && len(pool.RemotePoolsToRemove) == 0 && !pool.WipeChainConfigs {
 					return fmt.Errorf("pool entry %s on chain selector %d has no remote pools to remove", datastore_utils.SprintRef(pool.Pool), pool.ChainSelector)
 				}
 			}

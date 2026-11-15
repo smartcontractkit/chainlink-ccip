@@ -191,7 +191,7 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 					AllRemotes:    true,
 				}},
 			},
-			errors: []string{"deactivate must be specified alone"},
+			errors: []string{"deactivate must not be combined with allRemotes, bidirectional or remotePoolsToRemove"},
 		},
 		{
 			name: "rejects_deactivate_with_bidirectional",
@@ -204,7 +204,7 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 					Bidirectional: true,
 				}},
 			},
-			errors: []string{"deactivate must be specified alone"},
+			errors: []string{"deactivate must not be combined with allRemotes, bidirectional or remotePoolsToRemove"},
 		},
 		{
 			name: "rejects_deactivate_with_remote_pools",
@@ -217,7 +217,7 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 					RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: dst, Remote: remoteRef}},
 				}},
 			},
-			errors: []string{"deactivate must be specified alone"},
+			errors: []string{"deactivate must not be combined with allRemotes, bidirectional or remotePoolsToRemove"},
 		},
 		{
 			name: "rejects_deprecated_local_chain",
@@ -263,6 +263,40 @@ func TestRemoveRemotePools_VerifyPreconditions(t *testing.T) {
 			for _, substr := range tt.errors {
 				require.Contains(t, err.Error(), substr)
 			}
+		})
+	}
+}
+
+// TestRemoveRemotePools_VerifyAcceptsWipeChainConfigs checks that wipeChainConfigs is accepted on
+// its own and alongside deactivate; those combinations fail only when the adapter cannot wipe, which
+// is a planning-time concern, not a verify one.
+func TestRemoveRemotePools_VerifyAcceptsWipeChainConfigs(t *testing.T) {
+	sel := chainsel.TEST_90000001.Selector
+	env, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{sel}))
+	require.NoError(t, err)
+
+	cs := tokensapi.RemoveRemotePools()
+	poolRef := datastore.AddressRef{Address: "0x1111111111111111111111111111111111111111"}
+
+	cases := []struct {
+		name  string
+		entry tokensapi.RemoveRemotePoolsPerPool
+	}{
+		{
+			name:  "wipe_chain_configs_alone",
+			entry: tokensapi.RemoveRemotePoolsPerPool{ChainSelector: sel, Pool: poolRef, WipeChainConfigs: true},
+		},
+		{
+			name:  "deactivate_with_wipe_chain_configs",
+			entry: tokensapi.RemoveRemotePoolsPerPool{ChainSelector: sel, Pool: poolRef, Deactivate: true, WipeChainConfigs: true},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, cs.VerifyPreconditions(*env, tokensapi.RemoveRemotePoolsInput{
+				MCMS:  mcms.Input{},
+				Pools: []tokensapi.RemoveRemotePoolsPerPool{tc.entry},
+			}))
 		})
 	}
 }
@@ -1069,4 +1103,152 @@ func applyRemoveRemotePools(t *testing.T, e *cldf_deployment.Environment, input 
 	}
 	testhelpers.ProcessTimelockProposals(t, *e, out.MCMSTimelockProposals, false)
 	return nil
+}
+
+// requirePoolSupports asserts the pool's on-chain isSupportedChain(remote) result.
+func requirePoolSupports(t *testing.T, pool *tokenpoolV2_0_0.TokenPool, remote uint64, want bool, msg string) {
+	t.Helper()
+	got, err := pool.IsSupportedChain(&bind.CallOpts{Context: t.Context()}, remote)
+	require.NoError(t, err)
+	require.Equal(t, want, got, msg)
+}
+
+// TestRemoveRemotePools_WipeChainConfigs_V2 removes a lane's remote pool and its whole chain config
+// in one run (allRemotes + wipeChainConfigs), then verifies the selector is gone from
+// getSupportedChains() and that a re-run is idempotent.
+func TestRemoveRemotePools_WipeChainConfigs_V2(t *testing.T) {
+	tc := setupV2PoolsForConfigureImpl(t, "RRP_WIPE_V2", false)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	requirePoolSupports(t, poolA, tc.selB, true, "pool A should support chain B before the wipe")
+
+	input := tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:    tc.selA,
+			Pool:             datastore.AddressRef{Address: tc.poolA.Hex()},
+			AllRemotes:       true,
+			WipeChainConfigs: true,
+		}},
+	}
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, input))
+	requirePoolSupports(t, poolA, tc.selB, false, "pool A should no longer support chain B after the wipe")
+
+	// Re-running is idempotent: the selector is no longer supported, so no wipe is emitted.
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, input))
+	requirePoolSupports(t, poolA, tc.selB, false, "re-running must not re-add the chain or revert")
+}
+
+// TestRemoveRemotePools_WipeChainConfigs_StandaloneSweepsEmptyLanes covers the CCIP-14649 shape: a
+// lane that already has no remote pool. A pool-only removal leaves the chain supported; a standalone
+// wipeChainConfigs then sweeps the empty lane.
+func TestRemoveRemotePools_WipeChainConfigs_StandaloneSweepsEmptyLanes(t *testing.T) {
+	tc := setupV2PoolsForConfigureImpl(t, "RRP_WIPE_EMPTY", false)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector: tc.selA,
+			Pool:          datastore.AddressRef{Address: tc.poolA.Hex()},
+			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{
+				Selector: tc.selB,
+				Remote:   datastore.AddressRef{Address: tc.poolB.Hex()},
+			}},
+		}},
+	}))
+	requirePoolSupports(t, poolA, tc.selB, true, "a pool-only removal leaves the chain supported")
+
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:    tc.selA,
+			Pool:             datastore.AddressRef{Address: tc.poolA.Hex()},
+			WipeChainConfigs: true,
+		}},
+	}))
+	requirePoolSupports(t, poolA, tc.selB, false, "the empty lane's chain config is wiped")
+}
+
+// TestRemoveRemotePools_WipeChainConfigs_Bidirectional tears the lane down on both ends: the forward
+// pass wipes A's config for B, and the reverse pass wipes B's config for A.
+func TestRemoveRemotePools_WipeChainConfigs_Bidirectional(t *testing.T) {
+	tc := setupV2PoolsForConfigureImpl(t, "RRP_WIPE_BI", false)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	poolB, err := tokenpoolV2_0_0.NewTokenPool(tc.poolB, tc.clientB)
+	require.NoError(t, err)
+
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:    tc.selA,
+			Pool:             datastore.AddressRef{Address: tc.poolA.Hex()},
+			AllRemotes:       true,
+			Bidirectional:    true,
+			WipeChainConfigs: true,
+		}},
+	}))
+	requirePoolSupports(t, poolA, tc.selB, false, "pool A no longer supports B")
+	requirePoolSupports(t, poolB, tc.selA, false, "pool B no longer supports A")
+}
+
+// TestRemoveRemotePools_WipeChainConfigs_V1_5_0 covers the different v1.5.0 applyChainUpdates shape
+// (single ChainUpdate array with allowed=false and zeroed rate limits).
+func TestRemoveRemotePools_WipeChainConfigs_V1_5_0(t *testing.T) {
+	pair := setupLegacyConnectedBnMPair(t, cciputils.Version_1_5_0)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(pair.oldPoolAddrA, pair.env.BlockChains.EVMChains()[pair.selA].Client)
+	require.NoError(t, err)
+	requirePoolSupports(t, poolA, pair.selB, true, "v1.5.0 pool A should support B before the wipe")
+
+	require.NoError(t, applyRemoveRemotePools(t, pair.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:    pair.selA,
+			Pool:             datastore.AddressRef{Address: pair.oldPoolAddrA.Hex()},
+			AllRemotes:       true,
+			WipeChainConfigs: true,
+		}},
+	}))
+	requirePoolSupports(t, poolA, pair.selB, false, "v1.5.0 pool A no longer supports B after the wipe")
+}
+
+// TestRemoveRemotePools_WipeChainConfigs_PeerEntryRecovery covers recovery after a one-sided wipe:
+// A's lane to B is wiped but B still lists A. Running B as its own entry removes B's lane to A
+// without needing A's remote token.
+func TestRemoveRemotePools_WipeChainConfigs_PeerEntryRecovery(t *testing.T) {
+	tc := setupV2PoolsForConfigureImpl(t, "RRP_WIPE_REC", false)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	poolB, err := tokenpoolV2_0_0.NewTokenPool(tc.poolB, tc.clientB)
+	require.NoError(t, err)
+
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:       tc.selA,
+			Pool:                datastore.AddressRef{Address: tc.poolA.Hex()},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selB, Remote: datastore.AddressRef{Address: tc.poolB.Hex()}}},
+		}},
+	}))
+	requirePoolSupports(t, poolA, tc.selB, false, "A no longer supports B after the one-sided wipe")
+	requirePoolSupports(t, poolB, tc.selA, true, "B still lists A")
+
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+			ChainSelector:       tc.selB,
+			Pool:                datastore.AddressRef{Address: tc.poolB.Hex()},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selA, Remote: datastore.AddressRef{Address: tc.poolA.Hex()}}},
+		}},
+	}))
+	requirePoolSupports(t, poolB, tc.selA, false, "B no longer supports A after the peer entry")
 }

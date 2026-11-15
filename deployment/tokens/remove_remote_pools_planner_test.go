@@ -27,6 +27,9 @@ var (
 	reverseTestLocalSel  = chainsel.APTOS_LOCALNET.Selector
 	reverseTestRemoteSel = chainsel.APTOS_TESTNET.Selector
 	reverseTestV2_0_0    = semver.MustParse("2.0.0")
+	// reverseTestRemoteVersion is registered only for the peer adapter, so the local and remote
+	// adapters do not collide in the first-write-wins (family, version) registry.
+	reverseTestRemoteVersion = semver.MustParse("1.6.1")
 )
 
 type reverseTestIdentityNormalizer struct{}
@@ -43,8 +46,12 @@ func (reverseTestIdentityNormalizer) StringToBytes(a string) ([]byte, error) { r
 type reverseTestAdapter struct {
 	supportedChains []uint64
 	remoteToken     string
+	localToken      string
 	remotePools     map[string][]string // pool address -> remote pools it lists for the other chain
-	removed         *[]RemoveRemotePoolsSequenceInput
+	// remotePoolsBySelector, when set, takes precedence and keys the remote pools by the remote
+	// selector as well, so one pool can list different pools per remote chain.
+	remotePoolsBySelector map[uint64]map[string][]string
+	removed               *[]RemoveRemotePoolsSequenceInput
 }
 
 var (
@@ -69,7 +76,14 @@ func (a *reverseTestAdapter) GetRemoteToken(_ cldf.Environment, _ uint64, _, _ [
 	return []byte(a.remoteToken), nil
 }
 
-func (a *reverseTestAdapter) GetRemotePools(_ cldf.Environment, _ uint64, poolAddr, _ []byte, _ uint64) ([][]byte, error) {
+func (a *reverseTestAdapter) GetRemotePools(_ cldf.Environment, _ uint64, poolAddr, _ []byte, remoteSelector uint64) ([][]byte, error) {
+	if a.remotePoolsBySelector != nil {
+		out := [][]byte{}
+		for _, p := range a.remotePoolsBySelector[remoteSelector][string(poolAddr)] {
+			out = append(out, []byte(p))
+		}
+		return out, nil
+	}
 	out := [][]byte{}
 	for _, p := range a.remotePools[string(poolAddr)] {
 		out = append(out, []byte(p))
@@ -89,13 +103,40 @@ func (a *reverseTestAdapter) RemoveRemotePools() *cldf_ops.Sequence[RemoveRemote
 	)
 }
 
+// reverseTestWipeAdapter embeds reverseTestAdapter and additionally implements
+// RemoteChainConfigRemover, recording the chain-config removals it is asked to perform.
+type reverseTestWipeAdapter struct {
+	*reverseTestAdapter
+	wiped       *[]RemoveRemoteChainConfigsSequenceInput
+	unsupported bool
+}
+
+var _ RemoteChainConfigRemover = (*reverseTestWipeAdapter)(nil)
+
+func (a *reverseTestWipeAdapter) SupportsRemoteChainConfigRemoval() bool { return !a.unsupported }
+
+func (a *reverseTestWipeAdapter) RemoveRemoteChainConfigs() *cldf_ops.Sequence[RemoveRemoteChainConfigsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"reverse-test:remove-remote-chain-configs",
+		semver.MustParse("1.0.0"),
+		"Records remote chain config removals for the wipe unit tests",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, in RemoveRemoteChainConfigsSequenceInput) (sequences.OnChainOutput, error) {
+			*a.wiped = append(*a.wiped, in)
+			return sequences.OnChainOutput{}, nil
+		},
+	)
+}
+
 // Unused TokenAdapter methods.
 func (a *reverseTestAdapter) ConfigureTokenForTransfersSequence() *cldf_ops.Sequence[ConfigureTokenForTransfersInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return nil
 }
 
 func (a *reverseTestAdapter) DeriveTokenAddress(cldf.Environment, uint64, datastore.AddressRef) (string, error) {
-	return "", errors.New("not implemented")
+	if a.localToken == "" {
+		return "", errors.New("not implemented")
+	}
+	return a.localToken, nil
 }
 
 func (a *reverseTestAdapter) DeriveTokenDecimals(cldf.Environment, uint64, datastore.AddressRef, []byte) (uint8, error) {
@@ -467,4 +508,315 @@ func TestRemoveRemotePoolsPlanner_GroupsRemovalsPerPool(t *testing.T) {
 	require.Equal(t, "P", removed[2].TokenPoolRef.Address)
 	require.Equal(t, "TOKEN", removed[2].TokenRef.Address)
 	require.Equal(t, []string{"X", "Z"}, remotesOf(removed[2]), "both removals on P run as one call, after the peers")
+}
+
+// reverseTestOtherSel is a third Aptos selector, used to give the local pool a second supported
+// remote chain whose remote-pool list is independent of reverseTestRemoteSel's.
+var reverseTestOtherSel = chainsel.APTOS_MAINNET.Selector
+
+// planPoolTestConfig configures runPlanPoolTest. The local pool is always A_OLD with token
+// TOKEN_LOCAL; peers are on reverseTestRemoteSel with token TOKEN_REMOTE.
+type planPoolTestConfig struct {
+	entry                RemoveRemotePoolsPerPool
+	localSupported       []uint64
+	localRemotePools     map[uint64]map[string][]string // remote selector -> local pool -> remote pools it lists
+	peerPools            []reverseTestPool
+	localWithWipe        bool
+	localWipeUnsupported bool
+	remoteWithWipe       bool
+	activePool           string
+}
+
+// runPlanPoolTest plans and executes a single pool entry against a memory datastore and identity
+// normalizers, returning the recorded per-pool removals and chain-config wipes.
+func runPlanPoolTest(t *testing.T, cfg planPoolTestConfig) ([]RemoveRemotePoolsSequenceInput, []RemoveRemoteChainConfigsSequenceInput, error) {
+	t.Helper()
+
+	localFamily, err := chainsel.GetSelectorFamily(reverseTestLocalSel)
+	require.NoError(t, err)
+	remoteFamily, err := chainsel.GetSelectorFamily(reverseTestRemoteSel)
+	require.NoError(t, err)
+	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(localFamily, reverseTestIdentityNormalizer{})
+	deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer(remoteFamily, reverseTestIdentityNormalizer{})
+
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: reverseTestLocalSel,
+		Address:       "A_OLD",
+		Type:          datastore.ContractType("TestTokenPool"),
+		Version:       reverseTestV2_0_0,
+	}))
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: reverseTestLocalSel,
+		Address:       "TOKEN_LOCAL",
+		Type:          datastore.ContractType("TestToken"),
+		Version:       semver.MustParse("1.0.0"),
+	}))
+	for _, p := range cfg.peerPools {
+		require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+			ChainSelector: reverseTestRemoteSel,
+			Address:       p.address,
+			Type:          datastore.ContractType("TestTokenPool"),
+			Version:       p.version,
+			Qualifier:     p.address,
+		}))
+	}
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: reverseTestRemoteSel,
+		Address:       "TOKEN_REMOTE",
+		Type:          datastore.ContractType("TestToken"),
+		Version:       semver.MustParse("1.0.0"),
+	}))
+
+	loadedChains := map[uint64]cldf_chain.BlockChain{
+		reverseTestLocalSel:  cldf_aptos.Chain{Selector: reverseTestLocalSel},
+		reverseTestRemoteSel: cldf_aptos.Chain{Selector: reverseTestRemoteSel},
+	}
+	lggr := logger.Test(t)
+	e := cldf.Environment{
+		Logger:           lggr,
+		OperationsBundle: cldf_ops.NewBundle(func() context.Context { return t.Context() }, lggr, cldf_ops.NewMemoryReporter()),
+		DataStore:        ds.Seal(),
+		BlockChains:      cldf_chain.NewBlockChains(loadedChains),
+	}
+
+	removed := []RemoveRemotePoolsSequenceInput{}
+	wiped := []RemoveRemoteChainConfigsSequenceInput{}
+	remotePools := map[string][]string{}
+	for _, p := range cfg.peerPools {
+		remotePools[p.address] = p.lists
+	}
+	local := &reverseTestAdapter{
+		supportedChains:       cfg.localSupported,
+		remoteToken:           "TOKEN_REMOTE",
+		localToken:            "TOKEN_LOCAL",
+		remotePoolsBySelector: cfg.localRemotePools,
+		removed:               &removed,
+	}
+	var localAdapter TokenAdapter = local
+	if cfg.localWithWipe {
+		localAdapter = &reverseTestWipeAdapter{reverseTestAdapter: local, wiped: &wiped, unsupported: cfg.localWipeUnsupported}
+	}
+	remoteBase := &reverseTestAdapter{remotePools: remotePools, removed: &removed}
+	var remoteAdapter TokenAdapter = remoteBase
+	if cfg.remoteWithWipe {
+		remoteAdapter = &reverseTestWipeAdapter{reverseTestAdapter: remoteBase, wiped: &wiped}
+	}
+
+	reg := newTokenAdapterRegistry()
+	reg.RegisterTokenAdapter(localFamily, reverseTestV2_0_0, localAdapter)
+	reg.RegisterTokenAdapter(remoteFamily, reverseTestRemoteVersion, remoteAdapter)
+	// The local and remote selectors share one family, and TAR registrations are first-write-wins per
+	// family, so a single manager serves both. It returns the peer's active pool.
+	reg.RegisterTokenAdminRegistryManager(remoteFamily, &reverseTestTAR{activePool: cfg.activePool})
+
+	planner := newRemoveRemotePoolsPlanner(e, reg)
+	if err := planner.planPool(cfg.entry); err != nil {
+		return nil, nil, err
+	}
+	_, _, err = planner.execute()
+	return removed, wiped, err
+}
+
+// Test that wipeChainConfigs on its own removes every supported selector whose remote-pool list is
+// empty and keeps the ones that still have a remote pool.
+func TestRemoveRemotePoolsWipe_StandaloneSweepsEmptyLanes(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:    reverseTestLocalSel,
+			Pool:             datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs: true,
+		},
+		localSupported: []uint64{reverseTestRemoteSel, reverseTestOtherSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {}},
+			reverseTestOtherSel:  {"A_OLD": {"KEEP"}},
+		},
+		localWithWipe: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, removed, "a standalone wipe removes no pools directly")
+	require.Len(t, wiped, 1)
+	require.Equal(t, reverseTestLocalSel, wiped[0].Selector)
+	require.Equal(t, []uint64{reverseTestRemoteSel}, wiped[0].RemoteChainSelectors)
+}
+
+// Test that an explicit removal which empties a selector also wipes its chain config, and that the
+// selector's pools are not also queued for per-pool removal.
+func TestRemoveRemotePoolsWipe_ExplicitRemovalEmptiesSelector(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_OLD"}}},
+		},
+		localSupported: []uint64{reverseTestRemoteSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {"B_OLD"}},
+		},
+		localWithWipe: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, removed, "the wiped selector's pools are not queued for per-pool removal")
+	require.Len(t, wiped, 1)
+	require.Equal(t, []uint64{reverseTestRemoteSel}, wiped[0].RemoteChainSelectors)
+}
+
+// Test that removing one of several remote pools on a selector keeps its chain config and still
+// queues the per-pool removal.
+func TestRemoveRemotePoolsWipe_PartialRemovalKeepsChain(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_OLD"}}},
+		},
+		localSupported: []uint64{reverseTestRemoteSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {"B_OLD", "B_NEW"}},
+		},
+		localWithWipe: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, wiped, "a selector that still has a remote pool keeps its chain config")
+	require.Len(t, removed, 1)
+	require.Equal(t, []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_OLD"}}}, removed[0].RemotePoolsToRemove)
+}
+
+// Test that a selector no longer supported is never wiped (idempotency): the wipe is gated on the
+// plan-time supported-chain list, so a re-run after a wipe does not revert with NonExistentChain.
+func TestRemoveRemotePoolsWipe_AlreadyGoneIsNotRewiped(t *testing.T) {
+	_, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_OLD"}}},
+		},
+		localSupported: []uint64{},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {}},
+		},
+		localWithWipe: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, wiped)
+}
+
+// Test that wipeChainConfigs fails at planning when the adapter cannot remove chain configs.
+func TestRemoveRemotePoolsWipe_UnsupportedAdapterFailsPlanning(t *testing.T) {
+	_, _, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:    reverseTestLocalSel,
+			Pool:             datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs: true,
+		},
+		localSupported: []uint64{reverseTestRemoteSel},
+		localWithWipe:  false,
+	})
+	require.ErrorContains(t, err, "does not support removing remote chain configs")
+}
+
+// Test that an explicitly-listed remote on a lane the local pool does not support is skipped with a
+// warning rather than failing: the local-supported gate is not bypassed, and recovery after a
+// one-sided wipe is done by adding the peer pool as its own entry (see remove_remote_pools.go).
+func TestRemoveRemotePoolsWipe_ExplicitRemoteOnUnsupportedLaneIsSkipped(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			Bidirectional:       true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_NEW"}}},
+		},
+		localSupported: []uint64{}, // already wiped
+		peerPools:      []reverseTestPool{{address: "B_NEW", version: reverseTestRemoteVersion, lists: []string{"A_OLD"}}},
+		localWithWipe:  true,
+		remoteWithWipe: true,
+		activePool:     "B_NEW",
+	})
+	require.NoError(t, err)
+	require.Empty(t, wiped, "the unsupported lane is not wiped again")
+	for _, r := range removed {
+		require.Equal(t, "A_OLD", r.TokenPoolRef.Address, "the peer is not touched when the local lane is unsupported")
+	}
+}
+
+// Test that a peer which still lists another pool for the local chain keeps its chain config and
+// gets a per-pool removal instead of a wipe.
+func TestRemoveRemotePoolsWipe_PeerPartialKeepsChain(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			Bidirectional:       true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_NEW"}}},
+		},
+		localSupported: []uint64{reverseTestRemoteSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {"B_NEW"}},
+		},
+		peerPools:      []reverseTestPool{{address: "B_NEW", version: reverseTestRemoteVersion, lists: []string{"A_OLD", "A_NEW"}}},
+		localWithWipe:  true,
+		remoteWithWipe: true,
+		activePool:     "B_NEW",
+	})
+	require.NoError(t, err)
+	require.Len(t, wiped, 1, "the local pool's own list emptied, so its chain config is wiped")
+	require.Equal(t, "A_OLD", wiped[0].TokenPoolRef.Address)
+	require.Equal(t, []uint64{reverseTestRemoteSel}, wiped[0].RemoteChainSelectors)
+	require.Len(t, removed, 1)
+	require.Equal(t, "B_NEW", removed[0].TokenPoolRef.Address)
+}
+
+// Test that a peer whose adapter cannot wipe is an unsupported peer: fail by default, and with
+// skipUnsupportedPeers remove its pool entry while leaving its chain config.
+func TestRemoveRemotePoolsWipe_UnsupportedPeer(t *testing.T) {
+	cfg := planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			Bidirectional:       true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_NEW"}}},
+		},
+		localSupported: []uint64{reverseTestRemoteSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {"B_NEW"}},
+		},
+		peerPools:      []reverseTestPool{{address: "B_NEW", version: reverseTestRemoteVersion, lists: []string{"A_OLD"}}},
+		localWithWipe:  true,
+		remoteWithWipe: false,
+		activePool:     "B_NEW",
+	}
+
+	_, _, err := runPlanPoolTest(t, cfg)
+	require.ErrorContains(t, err, "does not support removing remote chain configs")
+
+	cfg.entry.SkipUnsupportedPeers = true
+	removed, wiped, err := runPlanPoolTest(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, wiped, 1, "the local pool's chain config is still wiped")
+	require.Equal(t, "A_OLD", wiped[0].TokenPoolRef.Address)
+	require.Len(t, removed, 1)
+	require.Equal(t, "B_NEW", removed[0].TokenPoolRef.Address)
+}
+
+// TestRemoveRemotePoolsWipe_UnsupportedVersionFailsPlanning covers an adapter that implements the
+// interface but reports the resolved version cannot wipe: the planner must fail before any write.
+func TestRemoveRemotePoolsWipe_UnsupportedVersionFailsPlanning(t *testing.T) {
+	_, _, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:    reverseTestLocalSel,
+			Pool:             datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs: true,
+		},
+		localSupported:       []uint64{reverseTestRemoteSel},
+		localWithWipe:        true,
+		localWipeUnsupported: true,
+	})
+	require.ErrorContains(t, err, "does not support removing remote chain configs")
 }

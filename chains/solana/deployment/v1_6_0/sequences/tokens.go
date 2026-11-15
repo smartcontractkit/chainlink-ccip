@@ -658,6 +658,7 @@ func (a *SolanaAdapter) SetTokenPoolRateLimits() *cldf_ops.Sequence[tokenapi.TPR
 var (
 	_ tokenapi.TokenPoolDynamicConfigAdapter = (*SolanaAdapter)(nil)
 	_ tokenapi.RemotePoolRemover             = (*SolanaAdapter)(nil)
+	_ tokenapi.RemoteChainConfigRemover      = (*SolanaAdapter)(nil)
 	_ tokenapi.TokenPoolMigrator             = (*SolanaAdapter)(nil)
 	_ tokenapi.TokenPoolOwnershipChecker     = (*SolanaAdapter)(nil)
 )
@@ -777,6 +778,64 @@ func (a *SolanaAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokenapi.RemoveRe
 		},
 	)
 }
+
+// RemoveRemoteChainConfigs deletes the whole remote chain config for each selector, the Solana
+// equivalent of EVM's applyChainUpdates([selector], []). The pool address is a program ID shared
+// across mints, so the token mint comes from input.TokenRef and the pool type from
+// input.TokenPoolRef. One operation runs per selector; each skips (with a warning) a config that is
+// already absent, so re-runs are idempotent, and emits an MCMS batch operation when the pool
+// authority is not the deployer key.
+func (a *SolanaAdapter) RemoveRemoteChainConfigs() *cldf_ops.Sequence[tokenapi.RemoveRemoteChainConfigsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return operations.NewSequence(
+		"RemoveRemoteChainConfigs",
+		common_utils.Version_1_6_0,
+		"Removes remote chain configs from a Solana 1.6 token pool",
+		func(b operations.Bundle, chains cldf_chain.BlockChains, input tokenapi.RemoveRemoteChainConfigsSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.SolanaChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("solana chain with selector %d not defined", input.Selector)
+			}
+
+			op := tokenpoolops.DeleteChainConfigBurnMint
+			switch input.TokenPoolRef.Type.String() {
+			case common_utils.BurnMintTokenPool.String():
+				op = tokenpoolops.DeleteChainConfigBurnMint
+			case common_utils.LockReleaseTokenPool.String():
+				op = tokenpoolops.DeleteChainConfigLockRelease
+			default:
+				return sequences.OnChainOutput{}, fmt.Errorf("unsupported token pool type '%s' for Solana", input.TokenPoolRef.Type.String())
+			}
+
+			tokenPool, err := solana.PublicKeyFromBase58(input.TokenPoolRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token pool address for chain %d: %s: %w", input.Selector, input.TokenPoolRef.Address, err)
+			}
+
+			tokenMint, err := solana.PublicKeyFromBase58(input.TokenRef.Address)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid token mint address for chain %d: %s: %w", input.Selector, input.TokenRef.Address, err)
+			}
+
+			var result sequences.OnChainOutput
+			for _, remoteSelector := range slices.Sorted(slices.Values(input.RemoteChainSelectors)) {
+				out, err := operations.ExecuteOperation(b, op, chain, tokenpoolops.DeleteChainConfigInput{
+					TokenPool:      tokenPool,
+					TokenMint:      tokenMint,
+					RemoteSelector: remoteSelector,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to delete remote chain config for remote chain %d from pool %s on chain %d: %w", remoteSelector, input.TokenPoolRef.Address, input.Selector, err)
+				}
+				result.BatchOps = append(result.BatchOps, out.Output.BatchOps...)
+			}
+
+			return result, nil
+		},
+	)
+}
+
+// SupportsRemoteChainConfigRemoval reports that Solana pools can delete remote chain configs.
+func (a *SolanaAdapter) SupportsRemoteChainConfigRemoval() bool { return true }
 
 // GetSupportedChains returns the remote chain selectors the pool at poolAddr is configured for.
 //

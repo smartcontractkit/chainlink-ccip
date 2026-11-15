@@ -319,6 +319,23 @@ func (p *poolOpsV161) RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, pool
 	return writes, nil
 }
 
+func (p *poolOpsV161) RemoveRemoteChainConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelectors []uint64) ([]evm_contract.WriteOutput, error) {
+	if len(remoteChainSelectors) == 0 {
+		return nil, nil
+	}
+	report, err := cldf_ops.ExecuteOperation(b, tpOps.ApplyChainUpdates, chain, evm_contract.FunctionInput[tpOps.ApplyChainUpdatesArgs]{
+		ChainSelector: chain.Selector,
+		Address:       poolAddr,
+		Args:          tpOps.ApplyChainUpdatesArgs{RemoteChainSelectorsToRemove: remoteChainSelectors},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ApplyChainUpdates v1.6.1: %w", err)
+	}
+	return []evm_contract.WriteOutput{report.Output}, nil
+}
+
+func (p *poolOpsV161) SupportsRemoteChainConfigRemoval() bool { return true }
+
 func (p *poolOpsV161) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.OnchainRateLimits, error) {
 	if ff {
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("fast finality buckets are not supported on v1.6.x token pools")
