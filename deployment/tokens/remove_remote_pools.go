@@ -38,18 +38,23 @@ type RemoveRemotePoolsInput struct {
 //   - wipeChainConfigs: opt-in, combinable with any mode (including deactivate) or usable on its
 //     own. When set, after this run's removals every remote chain the pool still supports whose
 //     remote-pool list is empty has its whole chain configuration removed (remote pools, remote
-//     token and rate limits) via the pool's applyChainUpdates. On its own (no allRemotes and no
+//     token and rate limits) via the pool's family-specific chain-config removal operation (EVM:
+//     applyChainUpdates; Solana: delete_chain_config). On its own (no allRemotes and no
 //     remotePoolsToRemove) it removes nothing and just sweeps every supported lane that is already
 //     empty, which is the way to retire a lane whose remote pool was removed by an earlier run.
 //     Without it, chain support is never removed. To clean a peer that still lists a lane this pool
 //     wiped one-sided, run a second entry against the peer pool (remotePoolsToRemove naming this
 //     pool, plus wipeChainConfigs): the peer's forward pass reads only its own config, so it never
 //     needs this pool's remote token. The chain family must implement RemoteChainConfigRemover (a
-//     family that does not fails at planning); a pool version whose implementation cannot remove
-//     chain configs is rejected at planning. Discovery is only as good as the family's
+//     family that does not implement it fails at planning); a pool version whose implementation
+//     cannot remove chain configs is rejected at planning. Discovery is only as good as the family's
 //     getSupportedChains: on Solana that list is derived from chains loaded in the environment and
 //     datastore refs, so a lane to any other chain is not swept. A remote selector that is not
-//     reported as supported is warned about and skipped.
+//     reported as supported is warned about and skipped. Which lanes are empty is decided once every
+//     entry is planned, against the removals merged across entries for each pool. A peer whose
+//     adapter cannot wipe is only reported (error, or warning with skipUnsupportedPeers) when one
+//     entry's removal alone empties its lane; a lane emptied only by several entries' removals keeps
+//     its chain config silently (no current adapter: EVM 1.2.0/1.4.0 also cannot remove remote pools).
 //
 // The reverse pass removes this pool from up to two pools per peer chain: the peer's TAR-active
 // pool and the peer pool this pool is paired with (they differ once the peer has been upgraded,

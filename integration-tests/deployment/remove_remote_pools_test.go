@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -1251,4 +1252,74 @@ func TestRemoveRemotePools_WipeChainConfigs_PeerEntryRecovery(t *testing.T) {
 		}},
 	}))
 	requirePoolSupports(t, poolB, tc.selA, false, "B no longer supports A after the peer entry")
+}
+
+// setupWipeSplitLane returns a v2 pair whose pool A lists two remote pools for chain B: pool B and
+// an extra pool. A run that removes both, split across two entries, empties A's lane to B.
+func setupWipeSplitLane(t *testing.T, tokenSymbol string) (configureTestEnv, *tokenpoolV2_0_0.TokenPool, common.Address) {
+	t.Helper()
+	tc := setupV2PoolsForConfigureImpl(t, tokenSymbol, false)
+	extraPool := common.HexToAddress("0x00000000000000000000000000000000000000AA")
+	addRawRemotePool(t, tc.env, tc.selA, tc.poolA, tc.selB, common.LeftPadBytes(extraPool.Bytes(), 32))
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+	remotes, err := poolA.GetRemotePools(&bind.CallOpts{Context: t.Context()}, tc.selB)
+	require.NoError(t, err)
+	require.Len(t, remotes, 2, "pool A should list pool B and the extra pool for chain B")
+	return tc, poolA, extraPool
+}
+
+// TestRemoveRemotePools_WipeChainConfigs_SamePoolSplitAcrossEntries covers two entries that resolve
+// to the same pool (here the checksummed and lowercase address, which the verify duplicate check does
+// not treat as equal) and each remove half of a lane. Neither entry empties the lane on its own, but
+// their merged removals do, so the lane is wiped.
+func TestRemoveRemotePools_WipeChainConfigs_SamePoolSplitAcrossEntries(t *testing.T) {
+	tc, poolA, extraPool := setupWipeSplitLane(t, "RRP_WIPE_SPLIT")
+
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{
+			{
+				ChainSelector:       tc.selA,
+				Pool:                datastore.AddressRef{Address: tc.poolA.Hex()},
+				WipeChainConfigs:    true,
+				RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selB, Remote: datastore.AddressRef{Address: tc.poolB.Hex()}}},
+			},
+			{
+				ChainSelector:       tc.selA,
+				Pool:                datastore.AddressRef{Address: strings.ToLower(tc.poolA.Hex())},
+				WipeChainConfigs:    true,
+				RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selB, Remote: datastore.AddressRef{Address: extraPool.Hex()}}},
+			},
+		},
+	}))
+	requirePoolSupports(t, poolA, tc.selB, false, "the lane emptied by the merged removals should be wiped")
+}
+
+// TestRemoveRemotePools_WipeChainConfigs_LaneEmptiedByAnotherEntrysReversePass covers a lane emptied
+// by one entry's forward removal plus another entry's reverse pass: A removes the extra pool (with
+// wipe), and B's bidirectional entry removes B from A. The merged removals empty A's lane to B, so
+// it is wiped.
+func TestRemoveRemotePools_WipeChainConfigs_LaneEmptiedByAnotherEntrysReversePass(t *testing.T) {
+	tc, poolA, extraPool := setupWipeSplitLane(t, "RRP_WIPE_REVSPLIT")
+
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{
+		MCMS: mcms.Input{},
+		Pools: []tokensapi.RemoveRemotePoolsPerPool{
+			{
+				ChainSelector:       tc.selA,
+				Pool:                datastore.AddressRef{Address: tc.poolA.Hex()},
+				WipeChainConfigs:    true,
+				RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selB, Remote: datastore.AddressRef{Address: extraPool.Hex()}}},
+			},
+			{
+				ChainSelector:       tc.selB,
+				Pool:                datastore.AddressRef{Address: tc.poolB.Hex()},
+				Bidirectional:       true,
+				RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selA, Remote: datastore.AddressRef{Address: tc.poolA.Hex()}}},
+			},
+		},
+	}))
+	requirePoolSupports(t, poolA, tc.selB, false, "the lane emptied by the merged removals should be wiped")
 }

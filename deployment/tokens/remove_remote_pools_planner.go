@@ -40,8 +40,9 @@ type removeRemotePoolsPlanner struct {
 	removalsByPool  map[removeRemotePoolsRemovalKey]*removeRemotePoolsRemoval
 	wipesByPool     map[removeRemotePoolsRemovalKey]*removeRemotePoolsWipe
 	unregisters     []func() (sequences.OnChainOutput, []cldf_ops.Report[any, any], error)
-	removals        []*removeRemotePoolsRemoval // in first-queued order
-	wipes           []*removeRemotePoolsWipe    // in first-queued order
+	removals        []*removeRemotePoolsRemoval       // in first-queued order
+	wipes           []*removeRemotePoolsWipe          // in first-queued order
+	wipeCandidates  []*removeRemotePoolsWipeCandidate // in registration order; resolved by resolveWipes
 }
 
 // removeRemotePoolsRemovalKey identifies a target pool. The token is part of the key because a
@@ -58,6 +59,7 @@ type removeRemotePoolsRemoval struct {
 	remover RemotePoolRemover
 	input   RemoveRemotePoolsSequenceInput
 	ownPool bool // the target is an entry's own pool (a forward removal was queued for it)
+	wiped   bool // every queued removal falls on a wiped lane, so the call is dropped
 }
 
 // removeRemotePoolsWipe is the single chain-config removal call for one target pool, combining
@@ -65,6 +67,29 @@ type removeRemotePoolsRemoval struct {
 type removeRemotePoolsWipe struct {
 	remover RemoteChainConfigRemover
 	input   RemoveRemoteChainConfigsSequenceInput
+}
+
+// removeRemotePoolsWipeCandidate is a pool whose lanes may be wiped. Planning only records the lanes
+// and the remote pools each lists (read at plan time, normalized); resolveWipes decides which lanes
+// to wipe once every entry is planned, against the merged removals queued for the pool. Deciding per
+// entry would miss a lane emptied by removals from several entries (two entries resolving to the
+// same pool, or another entry's reverse pass).
+type removeRemotePoolsWipeCandidate struct {
+	key     removeRemotePoolsRemovalKey
+	remover RemoteChainConfigRemover
+	input   RemoveRemoteChainConfigsSequenceInput // RemoteChainSelectors is filled by resolveWipes
+	lanes   []removeRemotePoolsLane
+	// ownPool marks an entry's own pool, whose lanes are every supported chain. A peer candidate only
+	// records the one lane it was created for, so only an own-pool candidate can tell that a removal
+	// targets an unsupported selector.
+	ownPool bool
+}
+
+// removeRemotePoolsLane is one supported remote chain of a wipe candidate and the normalized remote
+// pools the candidate lists for it.
+type removeRemotePoolsLane struct {
+	selector uint64
+	listed   []string
 }
 
 // removeRemotePoolsPairingKey identifies a pairing by the pool that lists the remote
@@ -103,6 +128,19 @@ func newRemoveRemotePoolsPlanner(e cldf.Environment, registry *TokenAdapterRegis
 	}
 }
 
+// newRemovalKey builds the normalized key identifying a target pool (see removeRemotePoolsRemovalKey).
+func newRemovalKey(selector uint64, poolRef, tokenRef datastore.AddressRef) (removeRemotePoolsRemovalKey, error) {
+	pool, err := deploy.RoundTripAddress(selector, poolRef.Address)
+	if err != nil {
+		return removeRemotePoolsRemovalKey{}, fmt.Errorf("failed to normalize pool address %s on chain selector %d: %w", poolRef.Address, selector, err)
+	}
+	token, err := deploy.RoundTripAddress(selector, tokenRef.Address)
+	if err != nil {
+		return removeRemotePoolsRemovalKey{}, fmt.Errorf("failed to normalize token address %s on chain selector %d: %w", tokenRef.Address, selector, err)
+	}
+	return removeRemotePoolsRemovalKey{selector: selector, pool: pool, token: token}, nil
+}
+
 // planPool queues every write for one input entry.
 func (p *removeRemotePoolsPlanner) planPool(pool RemoveRemotePoolsPerPool) error {
 	entry, err := p.createRemoveRemotePoolsEntry(pool)
@@ -114,25 +152,8 @@ func (p *removeRemotePoolsPlanner) planPool(pool RemoveRemotePoolsPerPool) error
 		return fmt.Errorf("failed to resolve remotes to remove for pool %s on chain selector %d: %w", entry.label, entry.selector, err)
 	}
 
-	// A wipe removes a selector's whole chain config, so its remote pools must not also be queued
-	// for per-pool removal. The reverse pass still runs against the original remotes so peers are
-	// cleaned for wiped lanes too.
-	forwardRemotes := remotes
-	var wipes []uint64
-	if pool.WipeChainConfigs {
-		if entry.chainRemover == nil || !entry.chainRemover.SupportsRemoteChainConfigRemoval() {
-			return fmt.Errorf("adapter for chain selector %d (family %s, version %s) does not support removing remote chain configs", entry.selector, entry.family, entry.poolRef.Version)
-		}
-		wipes, err = p.remoteChainsToWipe(entry, remotes)
-		if err != nil {
-			return fmt.Errorf("failed to resolve remote chains to wipe for pool %s on chain selector %d: %w", entry.label, entry.selector, err)
-		}
-		forwardRemotes = make([]RemotePoolToRemove, 0, len(remotes))
-		for _, remote := range remotes {
-			if !slices.Contains(wipes, remote.Selector) {
-				forwardRemotes = append(forwardRemotes, remote)
-			}
-		}
+	if pool.WipeChainConfigs && (entry.chainRemover == nil || !entry.chainRemover.SupportsRemoteChainConfigRemoval()) {
+		return fmt.Errorf("adapter for chain selector %d (family %s, version %s) does not support removing remote chain configs", entry.selector, entry.family, entry.poolRef.Version)
 	}
 
 	if pool.Bidirectional || pool.Deactivate {
@@ -143,19 +164,16 @@ func (p *removeRemotePoolsPlanner) planPool(pool RemoveRemotePoolsPerPool) error
 			return fmt.Errorf("failed to plan reverse removal of pool %s on chain selector %d: %w", entry.label, entry.selector, err)
 		}
 	}
-	if len(forwardRemotes) > 0 {
-		if err := p.planForward(entry, forwardRemotes); err != nil {
+	// Forward removals are queued even for lanes that end up wiped: resolveWipes decides the wipes
+	// against the merged removals, then drops the removals the wipes make redundant.
+	if len(remotes) > 0 {
+		if err := p.planForward(entry, remotes); err != nil {
 			return err
 		}
 	}
-	if len(wipes) > 0 {
-		if err := p.queueWipe(entry.chainRemover, RemoveRemoteChainConfigsSequenceInput{
-			Selector:             entry.selector,
-			TokenPoolRef:         entry.poolRef,
-			TokenRef:             entry.tokenRef,
-			RemoteChainSelectors: wipes,
-		}); err != nil {
-			return err
+	if pool.WipeChainConfigs {
+		if err := p.addOwnWipeCandidate(entry); err != nil {
+			return fmt.Errorf("failed to resolve remote chains to wipe for pool %s on chain selector %d: %w", entry.label, entry.selector, err)
 		}
 	}
 	if pool.Deactivate {
@@ -170,6 +188,10 @@ func (p *removeRemotePoolsPlanner) planPool(pool RemoveRemotePoolsPerPool) error
 // execute runs the queued writes in phases (see removeRemotePoolsPlanner) and collects their batch
 // operations and reports.
 func (p *removeRemotePoolsPlanner) execute() ([]mcms_types.BatchOperation, []cldf_ops.Report[any, any], error) {
+	if err := p.resolveWipes(); err != nil {
+		return nil, nil, err
+	}
+
 	// Drop queued per-pool removals for any selector whose chain config is being wiped on the same
 	// pool: the wipe deletes the whole config, so the removal would be redundant.
 	for key, wipe := range p.wipesByPool {
@@ -183,17 +205,18 @@ func (p *removeRemotePoolsPlanner) execute() ([]mcms_types.BatchOperation, []cld
 				kept = append(kept, remote)
 			}
 		}
+		removal.wiped = len(kept) == 0 && len(removal.input.RemotePoolsToRemove) > 0
 		removal.input.RemotePoolsToRemove = kept
 	}
 
 	executors := make([]func() (sequences.OnChainOutput, []cldf_ops.Report[any, any], error), 0, len(p.removals)+len(p.wipes)+len(p.unregisters))
 	for _, removal := range p.removals {
-		if !removal.ownPool {
+		if !removal.ownPool && !removal.wiped {
 			executors = append(executors, p.getRemoveRemotePoolExecutor(removal))
 		}
 	}
 	for _, removal := range p.removals {
-		if removal.ownPool {
+		if removal.ownPool && !removal.wiped {
 			executors = append(executors, p.getRemoveRemotePoolExecutor(removal))
 		}
 	}
@@ -306,19 +329,9 @@ func (p *removeRemotePoolsPlanner) remoteTokenRef(entry *removeRemotePoolsEntry,
 // queueRemoval adds input's removals to the single removal call for its target pool. ownPool marks
 // a forward removal, i.e. the target is the queuing entry's own pool.
 func (p *removeRemotePoolsPlanner) queueRemoval(remover RemotePoolRemover, input RemoveRemotePoolsSequenceInput, ownPool bool) error {
-	pool, err := deploy.RoundTripAddress(input.Selector, input.TokenPoolRef.Address)
+	key, err := newRemovalKey(input.Selector, input.TokenPoolRef, input.TokenRef)
 	if err != nil {
-		return fmt.Errorf("failed to normalize pool address %s on chain selector %d: %w", input.TokenPoolRef.Address, input.Selector, err)
-	}
-	token, err := deploy.RoundTripAddress(input.Selector, input.TokenRef.Address)
-	if err != nil {
-		return fmt.Errorf("failed to normalize token address %s on chain selector %d: %w", input.TokenRef.Address, input.Selector, err)
-	}
-
-	key := removeRemotePoolsRemovalKey{
-		selector: input.Selector,
-		token:    token,
-		pool:     pool,
+		return err
 	}
 
 	removal, exists := p.removalsByPool[key]
@@ -339,19 +352,9 @@ func (p *removeRemotePoolsPlanner) queueRemoval(remover RemotePoolRemover, input
 // Duplicate selectors are collapsed so two entries naming the same pool never queue a selector
 // twice (applyChainUpdates reverts on an already-removed chain).
 func (p *removeRemotePoolsPlanner) queueWipe(remover RemoteChainConfigRemover, input RemoveRemoteChainConfigsSequenceInput) error {
-	pool, err := deploy.RoundTripAddress(input.Selector, input.TokenPoolRef.Address)
+	key, err := newRemovalKey(input.Selector, input.TokenPoolRef, input.TokenRef)
 	if err != nil {
-		return fmt.Errorf("failed to normalize pool address %s on chain selector %d: %w", input.TokenPoolRef.Address, input.Selector, err)
-	}
-	token, err := deploy.RoundTripAddress(input.Selector, input.TokenRef.Address)
-	if err != nil {
-		return fmt.Errorf("failed to normalize token address %s on chain selector %d: %w", input.TokenRef.Address, input.Selector, err)
-	}
-
-	key := removeRemotePoolsRemovalKey{
-		selector: input.Selector,
-		token:    token,
-		pool:     pool,
+		return err
 	}
 
 	wipe, exists := p.wipesByPool[key]
@@ -412,71 +415,108 @@ func (p *removeRemotePoolsPlanner) resolveRemotesToRemove(entry *removeRemotePoo
 	return remotes, nil
 }
 
-// remoteChainsToWipe returns the supported remote selectors whose remote-pool list is empty after
-// this run's removals, i.e. the selectors whose whole chain config should be removed. Only
-// currently-supported selectors are considered, so a re-run never re-emits a wipe for a chain that
-// is already gone (applyChainUpdates reverts NonExistentChain). Addresses are compared in the
-// family's normalized string form, which collapses the multiple on-chain encodings of one address.
-func (p *removeRemotePoolsPlanner) remoteChainsToWipe(entry *removeRemotePoolsEntry, remotes []RemotePoolToRemove) ([]uint64, error) {
+// addOwnWipeCandidate records the entry's own pool as a wipe candidate: every lane the pool
+// currently supports, with the remote pools it lists. Only currently-supported selectors are
+// recorded, so a re-run never re-emits a wipe for a chain that is already gone (applyChainUpdates
+// reverts NonExistentChain); resolveWipes warns about removals that target any other selector.
+func (p *removeRemotePoolsPlanner) addOwnWipeCandidate(entry *removeRemotePoolsEntry) error {
 	migrator, err := entry.requireMigrator()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	supportedChains, err := migrator.GetSupportedChains(p.env, entry.selector, entry.poolBytes, entry.tokenBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover supported chains: %w", err)
+		return fmt.Errorf("failed to discover supported chains: %w", err)
 	}
 
-	supported := make(map[uint64]struct{}, len(supportedChains))
-	for _, s := range supportedChains {
-		supported[s] = struct{}{}
-	}
-	warned := make(map[uint64]struct{})
-	for _, remote := range remotes {
-		if _, ok := supported[remote.Selector]; ok {
-			continue
-		}
-		if _, done := warned[remote.Selector]; done {
-			continue
-		}
-		warned[remote.Selector] = struct{}{}
-		p.env.Logger.Warnf("not wiping the chain config for remote chain %d on pool %s (chain %d): the pool does not report it as supported (already removed, or not discoverable on this chain family)", remote.Selector, entry.poolRef.Address, entry.selector)
-	}
-
-	removing := make(map[uint64]map[string]struct{}, len(supportedChains))
-	for _, remote := range remotes {
-		normalized, err := deploy.RoundTripAddress(remote.Selector, remote.Remote.Address)
-		if err != nil {
-			return nil, fmt.Errorf("failed to normalize remote pool address %s for remote chain selector %d: %w", remote.Remote.Address, remote.Selector, err)
-		}
-		if removing[remote.Selector] == nil {
-			removing[remote.Selector] = make(map[string]struct{})
-		}
-		removing[remote.Selector][normalized] = struct{}{}
-	}
-
-	wipes := make([]uint64, 0, len(supportedChains))
+	lanes := make([]removeRemotePoolsLane, 0, len(supportedChains))
 	for _, remoteSelector := range supportedChains {
 		stored, err := migrator.GetRemotePools(p.env, entry.selector, entry.poolBytes, entry.tokenBytes, remoteSelector)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
+			return fmt.Errorf("failed to get remote pools for remote chain selector %d: %w", remoteSelector, err)
 		}
-		remaining := 0
+		lane := removeRemotePoolsLane{selector: remoteSelector, listed: make([]string, 0, len(stored))}
 		for _, remotePool := range stored {
 			normalized, err := deploy.BytesToString(remoteSelector, remotePool)
 			if err != nil {
-				return nil, fmt.Errorf("failed to normalize remote pool address for remote chain selector %d: %w", remoteSelector, err)
+				return fmt.Errorf("failed to normalize remote pool address for remote chain selector %d: %w", remoteSelector, err)
 			}
-			if _, beingRemoved := removing[remoteSelector][normalized]; !beingRemoved {
-				remaining++
-			}
+			lane.listed = append(lane.listed, normalized)
 		}
-		if remaining == 0 {
-			wipes = append(wipes, remoteSelector)
-		}
+		lanes = append(lanes, lane)
 	}
 
-	return wipes, nil
+	return p.addWipeCandidate(entry.chainRemover, RemoveRemoteChainConfigsSequenceInput{
+		Selector:     entry.selector,
+		TokenPoolRef: entry.poolRef,
+		TokenRef:     entry.tokenRef,
+	}, lanes, true)
+}
+
+func (p *removeRemotePoolsPlanner) addWipeCandidate(remover RemoteChainConfigRemover, input RemoveRemoteChainConfigsSequenceInput, lanes []removeRemotePoolsLane, ownPool bool) error {
+	key, err := newRemovalKey(input.Selector, input.TokenPoolRef, input.TokenRef)
+	if err != nil {
+		return err
+	}
+	p.wipeCandidates = append(p.wipeCandidates, &removeRemotePoolsWipeCandidate{key: key, remover: remover, input: input, lanes: lanes, ownPool: ownPool})
+	return nil
+}
+
+// resolveWipes queues a wipe for every candidate lane that the merged removals queued for the
+// candidate's pool leave empty. Candidates resolve in registration order, so an entry's peers are
+// still wiped before its own pool. For an own-pool candidate, a merged removal whose selector the
+// pool does not report as supported is warned about once per pool and selector, however many
+// entries or remote pools name it.
+func (p *removeRemotePoolsPlanner) resolveWipes() error {
+	warned := make(map[removeRemotePoolsRemovalKey]map[uint64]struct{})
+	for _, candidate := range p.wipeCandidates {
+		removing := make(map[uint64]map[string]struct{})
+		if removal, ok := p.removalsByPool[candidate.key]; ok {
+			for _, remote := range removal.input.RemotePoolsToRemove {
+				if candidate.ownPool && !slices.ContainsFunc(candidate.lanes, func(lane removeRemotePoolsLane) bool { return lane.selector == remote.Selector }) {
+					if warned[candidate.key] == nil {
+						warned[candidate.key] = make(map[uint64]struct{})
+					}
+					if _, done := warned[candidate.key][remote.Selector]; !done {
+						warned[candidate.key][remote.Selector] = struct{}{}
+						p.env.Logger.Warnf("not wiping the chain config for remote chain %d on pool %s (chain %d): the pool does not report it as supported (already removed, or not discoverable on this chain family)", remote.Selector, candidate.input.TokenPoolRef.Address, candidate.input.Selector)
+					}
+				}
+				normalized, err := deploy.RoundTripAddress(remote.Selector, remote.Remote.Address)
+				if err != nil {
+					return fmt.Errorf("failed to normalize remote pool address %s for remote chain selector %d: %w", remote.Remote.Address, remote.Selector, err)
+				}
+				if removing[remote.Selector] == nil {
+					removing[remote.Selector] = make(map[string]struct{})
+				}
+				removing[remote.Selector][normalized] = struct{}{}
+			}
+		}
+
+		var wipes []uint64
+		for _, lane := range candidate.lanes {
+			emptied := true
+			for _, listed := range lane.listed {
+				if _, beingRemoved := removing[lane.selector][listed]; !beingRemoved {
+					emptied = false
+					break
+				}
+			}
+			if emptied {
+				wipes = append(wipes, lane.selector)
+			}
+		}
+		if len(wipes) == 0 {
+			continue
+		}
+
+		input := candidate.input
+		input.RemoteChainSelectors = wipes
+		if err := p.queueWipe(candidate.remover, input); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // planReverse queues the removal of the entry's pool from its peers. See RemoveRemotePools for why
@@ -726,14 +766,16 @@ func (p *removeRemotePoolsPlanner) planReverseTarget(entry *removeRemotePoolsEnt
 	// One match is enough even if the peer stores the pool in several encodings: the remover removes
 	// every stored encoding of the address, and a duplicate entry would queue duplicate removals.
 	// allListLocalPool additionally tracks whether every entry is the local pool, i.e. removing it
-	// leaves the peer with no remote pools for this chain (the wipe precondition).
+	// alone leaves the peer with no remote pools for this chain.
 	allListLocalPool := len(listed) > 0
 	listsLocalPool := false
+	listedAddrs := make([]string, 0, len(listed))
 	for _, stored := range listed {
 		storedAddr, err := deploy.BytesToString(entry.selector, stored)
 		if err != nil {
 			return fmt.Errorf("failed to normalize peer remote pool address for chain selector %d: %w", entry.selector, err)
 		}
+		listedAddrs = append(listedAddrs, storedAddr)
 		if storedAddr == localPoolAddr {
 			listsLocalPool = true
 		} else {
@@ -747,22 +789,30 @@ func (p *removeRemotePoolsPlanner) planReverseTarget(entry *removeRemotePoolsEnt
 
 	p.removedPairings[key] = struct{}{}
 
-	// With wipeChainConfigs, removing the peer's last remote pool for this chain also retires the
-	// peer's chain config for it. A peer adapter that cannot wipe is an unsupported peer: fail, or
-	// with skipUnsupportedPeers warn and remove only the pool entry below.
-	if entry.pool.WipeChainConfigs && allListLocalPool {
-		if chainRemover, ok := remoteAdapter.(RemoteChainConfigRemover); ok && chainRemover.SupportsRemoteChainConfigRemoval() {
-			return p.queueWipe(chainRemover, RemoveRemoteChainConfigsSequenceInput{
-				Selector:             remoteSelector,
-				TokenPoolRef:         target,
-				TokenRef:             remoteTokenRef,
-				RemoteChainSelectors: []uint64{entry.selector},
-			})
-		}
-		if !entry.pool.SkipUnsupportedPeers {
+	// With wipeChainConfigs, the peer's lane for this chain is a wipe candidate: resolveWipes wipes it
+	// if the merged removals empty it. A peer adapter that cannot wipe is an unsupported peer when this
+	// removal alone empties the lane: fail, or with skipUnsupportedPeers warn and remove only the pool
+	// entry below. Known limitation: such a peer is not recorded as a candidate, so a lane emptied only
+	// by removals merged from several entries keeps its chain config without a warning. No current
+	// adapter reaches this: the EVM versions that cannot wipe (1.2.0, 1.4.0) also fail every remote
+	// pool removal, so it only applies to a future family that removes pools but cannot wipe.
+	if entry.pool.WipeChainConfigs {
+		chainRemover, canWipe := remoteAdapter.(RemoteChainConfigRemover)
+		canWipe = canWipe && chainRemover.SupportsRemoteChainConfigRemoval()
+		switch {
+		case canWipe:
+			if err := p.addWipeCandidate(chainRemover, RemoveRemoteChainConfigsSequenceInput{
+				Selector:     remoteSelector,
+				TokenPoolRef: target,
+				TokenRef:     remoteTokenRef,
+			}, []removeRemotePoolsLane{{selector: entry.selector, listed: listedAddrs}}, false); err != nil {
+				return err
+			}
+		case allListLocalPool && !entry.pool.SkipUnsupportedPeers:
 			return fmt.Errorf("peer on remote chain selector %d is not supported: adapter for peer pool %s does not support removing remote chain configs (set skipUnsupportedPeers to remove the peer's pool entry while leaving its chain config)", remoteSelector, target.Address)
+		case allListLocalPool:
+			p.env.Logger.Warnf("removing pool %s on chain %d from peer pool %s on chain %d, but leaving the peer's chain config for chain %d in place: the peer adapter does not support removing remote chain configs; clean it up on chain %d with its own tooling", entry.poolRef.Address, entry.selector, target.Address, remoteSelector, entry.selector, remoteSelector)
 		}
-		p.env.Logger.Warnf("removing pool %s on chain %d from peer pool %s on chain %d, but leaving the peer's chain config for chain %d in place: the peer adapter does not support removing remote chain configs; clean it up on chain %d with its own tooling", entry.poolRef.Address, entry.selector, target.Address, remoteSelector, entry.selector, remoteSelector)
 	}
 
 	return p.queueRemoval(remoteRemover, RemoveRemotePoolsSequenceInput{
