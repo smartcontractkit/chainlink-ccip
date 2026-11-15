@@ -1323,3 +1323,41 @@ func TestRemoveRemotePools_WipeChainConfigs_LaneEmptiedByAnotherEntrysReversePas
 	}))
 	requirePoolSupports(t, poolA, tc.selB, false, "the lane emptied by the merged removals should be wiped")
 }
+
+// TestRemoveRemotePools_WipeChainConfigs_PeerWipeIndependentOfEntryOrder covers a pairing queued by
+// an earlier entry: A removes B without wiping, and B's bidirectional entry wipes. B's reverse pass
+// must still register A's lane as a wipe candidate even though A's forward pass already queued the
+// removal, so A's emptied lane is wiped whichever entry comes first.
+func TestRemoveRemotePools_WipeChainConfigs_PeerWipeIndependentOfEntryOrder(t *testing.T) {
+	for _, wipeEntryFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("wipe_entry_first=%v", wipeEntryFirst), func(t *testing.T) {
+			tc := setupV2PoolsForConfigureImpl(t, fmt.Sprintf("RRP_WIPE_ORDER_%v", wipeEntryFirst), false)
+
+			poolA, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+			require.NoError(t, err)
+			poolB, err := tokenpoolV2_0_0.NewTokenPool(tc.poolB, tc.clientB)
+			require.NoError(t, err)
+
+			plainA := tokensapi.RemoveRemotePoolsPerPool{
+				ChainSelector:       tc.selA,
+				Pool:                datastore.AddressRef{Address: tc.poolA.Hex()},
+				RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selB, Remote: datastore.AddressRef{Address: tc.poolB.Hex()}}},
+			}
+			wipeB := tokensapi.RemoveRemotePoolsPerPool{
+				ChainSelector:       tc.selB,
+				Pool:                datastore.AddressRef{Address: tc.poolB.Hex()},
+				Bidirectional:       true,
+				WipeChainConfigs:    true,
+				RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selA, Remote: datastore.AddressRef{Address: tc.poolA.Hex()}}},
+			}
+			pools := []tokensapi.RemoveRemotePoolsPerPool{plainA, wipeB}
+			if wipeEntryFirst {
+				pools = []tokensapi.RemoveRemotePoolsPerPool{wipeB, plainA}
+			}
+
+			require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{MCMS: mcms.Input{}, Pools: pools}))
+			requirePoolSupports(t, poolB, tc.selA, false, "B's own lane to A should be wiped")
+			requirePoolSupports(t, poolA, tc.selB, false, "A's lane to B, emptied as B's peer, should be wiped")
+		})
+	}
+}

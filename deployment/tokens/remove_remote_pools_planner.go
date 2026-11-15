@@ -734,7 +734,11 @@ func (p *removeRemotePoolsPlanner) reverseTargets(entry *removeRemotePoolsEntry,
 // that peer pool lists it.
 func (p *removeRemotePoolsPlanner) planReverseTarget(entry *removeRemotePoolsEntry, localPoolAddr string, remoteSelector uint64, remoteTokenRef, target datastore.AddressRef) error {
 	key := removeRemotePoolsPairingKey{localSelector: remoteSelector, localPool: target.Address, remoteSelector: entry.selector, remotePool: localPoolAddr}
-	if _, already := p.removedPairings[key]; already {
+	// A pairing an earlier entry already queued is not removed twice. With wipeChainConfigs the peer
+	// is still read so its lane is registered as a wipe candidate (and validated); returning here would
+	// make whether the peer's emptied lane is wiped depend on entry order.
+	_, alreadyQueued := p.removedPairings[key]
+	if alreadyQueued && !entry.pool.WipeChainConfigs {
 		p.env.Logger.Warnf("skipping reverse removal of pool %s on chain %d from peer pool %s on chain %d: pairing already removed", entry.poolRef.Address, entry.selector, target.Address, remoteSelector)
 		return nil
 	}
@@ -787,8 +791,6 @@ func (p *removeRemotePoolsPlanner) planReverseTarget(entry *removeRemotePoolsEnt
 		return nil
 	}
 
-	p.removedPairings[key] = struct{}{}
-
 	// With wipeChainConfigs, the peer's lane for this chain is a wipe candidate: resolveWipes wipes it
 	// if the merged removals empty it. A peer adapter that cannot wipe is an unsupported peer when this
 	// removal alone empties the lane: fail, or with skipUnsupportedPeers warn and remove only the pool
@@ -814,6 +816,12 @@ func (p *removeRemotePoolsPlanner) planReverseTarget(entry *removeRemotePoolsEnt
 			p.env.Logger.Warnf("removing pool %s on chain %d from peer pool %s on chain %d, but leaving the peer's chain config for chain %d in place: the peer adapter does not support removing remote chain configs; clean it up on chain %d with its own tooling", entry.poolRef.Address, entry.selector, target.Address, remoteSelector, entry.selector, remoteSelector)
 		}
 	}
+
+	if alreadyQueued {
+		p.env.Logger.Warnf("skipping reverse removal of pool %s on chain %d from peer pool %s on chain %d: pairing already removed", entry.poolRef.Address, entry.selector, target.Address, remoteSelector)
+		return nil
+	}
+	p.removedPairings[key] = struct{}{}
 
 	return p.queueRemoval(remoteRemover, RemoveRemotePoolsSequenceInput{
 		Selector:            remoteSelector,
