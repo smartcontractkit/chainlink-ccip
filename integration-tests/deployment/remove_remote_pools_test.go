@@ -1361,3 +1361,26 @@ func TestRemoveRemotePools_WipeChainConfigs_PeerWipeIndependentOfEntryOrder(t *t
 		})
 	}
 }
+
+// TestRemoveRemotePools_WipeChainConfigs_RerunExplicitRemovalRetiresNamedLane covers re-running an
+// earlier explicit removal with wipeChainConfigs added: the named lane is already empty (its remote
+// pool is gone, so the removal is skipped with a warning), and it counts as emptied, so the lane's
+// chain config is wiped.
+func TestRemoveRemotePools_WipeChainConfigs_RerunExplicitRemovalRetiresNamedLane(t *testing.T) {
+	tc := setupV2PoolsForConfigureImpl(t, "RRP_WIPE_RERUN", false)
+
+	poolA, err := tokenpoolV2_0_0.NewTokenPool(tc.poolA, tc.clientA)
+	require.NoError(t, err)
+
+	entry := tokensapi.RemoveRemotePoolsPerPool{
+		ChainSelector:       tc.selA,
+		Pool:                datastore.AddressRef{Address: tc.poolA.Hex()},
+		RemotePoolsToRemove: []tokensapi.RemotePoolToRemove{{Selector: tc.selB, Remote: datastore.AddressRef{Address: tc.poolB.Hex()}}},
+	}
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{MCMS: mcms.Input{}, Pools: []tokensapi.RemoveRemotePoolsPerPool{entry}}))
+	requirePoolSupports(t, poolA, tc.selB, true, "a removal without wipeChainConfigs leaves the lane supported")
+
+	entry.WipeChainConfigs = true
+	require.NoError(t, applyRemoveRemotePools(t, tc.env, tokensapi.RemoveRemotePoolsInput{MCMS: mcms.Input{}, Pools: []tokensapi.RemoveRemotePoolsPerPool{entry}}))
+	requirePoolSupports(t, poolA, tc.selB, false, "re-running with wipeChainConfigs retires the named, already-empty lane")
+}

@@ -518,6 +518,7 @@ var reverseTestOtherSel = chainsel.APTOS_MAINNET.Selector
 // TOKEN_LOCAL; peers are on reverseTestRemoteSel with token TOKEN_REMOTE.
 type planPoolTestConfig struct {
 	entry                RemoveRemotePoolsPerPool
+	extraEntries         []RemoveRemotePoolsPerPool
 	localSupported       []uint64
 	localRemotePools     map[uint64]map[string][]string // remote selector -> local pool -> remote pools it lists
 	peerPools            []reverseTestPool
@@ -611,8 +612,11 @@ func runPlanPoolTest(t *testing.T, cfg planPoolTestConfig) ([]RemoveRemotePoolsS
 	reg.RegisterTokenAdminRegistryManager(remoteFamily, &reverseTestTAR{activePool: cfg.activePool})
 
 	planner := newRemoveRemotePoolsPlanner(e, reg)
-	if err := planner.planPool(cfg.entry); err != nil {
-		return nil, nil, err
+	entries := append([]RemoveRemotePoolsPerPool{cfg.entry}, cfg.extraEntries...)
+	for _, entry := range entries {
+		if err := planner.planPool(entry); err != nil {
+			return nil, nil, err
+		}
 	}
 	_, _, err = planner.execute()
 	return removed, wiped, err
@@ -819,4 +823,79 @@ func TestRemoveRemotePoolsWipe_UnsupportedVersionFailsPlanning(t *testing.T) {
 		localWipeUnsupported: true,
 	})
 	require.ErrorContains(t, err, "does not support removing remote chain configs")
+}
+
+// Test that an explicit remotePoolsToRemove scopes wipeChainConfigs to the lanes it names: an
+// already-empty lane on the same pool is left alone, so the blast radius equals the removal's scope.
+func TestRemoveRemotePoolsWipe_ExplicitScopesToNamedLane(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_OLD"}}},
+		},
+		localSupported: []uint64{reverseTestRemoteSel, reverseTestOtherSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {"B_OLD"}},
+			reverseTestOtherSel:  {"A_OLD": {}},
+		},
+		localWithWipe: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, removed)
+	require.Len(t, wiped, 1)
+	require.Equal(t, []uint64{reverseTestRemoteSel}, wiped[0].RemoteChainSelectors, "only the named lane is wiped, not the already-empty one")
+}
+
+// Test that two explicit entries on the same pool, naming different lanes, each wipe only their own
+// lane; the wipes merge into one call.
+func TestRemoveRemotePoolsWipe_TwoExplicitEntriesScopeToTheirLanes(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestRemoteSel, Remote: datastore.AddressRef{Address: "B_OLD"}}},
+		},
+		extraEntries: []RemoveRemotePoolsPerPool{{
+			ChainSelector:       reverseTestLocalSel,
+			Pool:                datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs:    true,
+			RemotePoolsToRemove: []RemotePoolToRemove{{Selector: reverseTestOtherSel, Remote: datastore.AddressRef{Address: "C_OLD"}}},
+		}},
+		localSupported: []uint64{reverseTestRemoteSel, reverseTestOtherSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {"B_OLD"}},
+			reverseTestOtherSel:  {"A_OLD": {"C_OLD"}},
+		},
+		localWithWipe: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, removed)
+	require.Len(t, wiped, 1)
+	require.ElementsMatch(t, []uint64{reverseTestRemoteSel, reverseTestOtherSel}, wiped[0].RemoteChainSelectors)
+}
+
+// Test that allRemotes still considers every supported lane: the one with a remote pool is emptied by
+// the run's removals and the already-empty one is swept.
+func TestRemoveRemotePoolsWipe_AllRemotesWipesEveryLane(t *testing.T) {
+	removed, wiped, err := runPlanPoolTest(t, planPoolTestConfig{
+		entry: RemoveRemotePoolsPerPool{
+			ChainSelector:    reverseTestLocalSel,
+			Pool:             datastore.AddressRef{Address: "A_OLD"},
+			WipeChainConfigs: true,
+			AllRemotes:       true,
+		},
+		localSupported: []uint64{reverseTestRemoteSel, reverseTestOtherSel},
+		localRemotePools: map[uint64]map[string][]string{
+			reverseTestRemoteSel: {"A_OLD": {"B_OLD"}},
+			reverseTestOtherSel:  {"A_OLD": {}},
+		},
+		localWithWipe: true,
+	})
+	require.NoError(t, err)
+	require.Empty(t, removed)
+	require.Len(t, wiped, 1)
+	require.ElementsMatch(t, []uint64{reverseTestRemoteSel, reverseTestOtherSel}, wiped[0].RemoteChainSelectors)
 }
