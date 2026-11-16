@@ -481,6 +481,16 @@ func (p *poolOpsV140) RemoveRemotePools(_ cldf_ops.Bundle, chain evm.Chain, pool
 	)
 }
 
+// RemoveRemoteChainConfigs errors: this tooling does not remove chain configs for v1.4.0 pools (the
+// contract could, via applyChainUpdates(allowed=false), but that is out of scope).
+// SupportsRemoteChainConfigRemoval returns false, so the planner rejects a wipeChainConfigs request
+// on a v1.4.0 pool before planning any write; this method exists only to satisfy PoolOps.
+func (p *poolOpsV140) RemoveRemoteChainConfigs(_ cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, _ []uint64) ([]evm_contract.WriteOutput, error) {
+	return nil, fmt.Errorf("removing remote chain configs is not supported on v1.4.0 token pools (pool %s on chain %d)", poolAddr.Hex(), chain.Selector)
+}
+
+func (p *poolOpsV140) SupportsRemoteChainConfigRemoval() bool { return false }
+
 func (p *poolOpsV140) GetCurrentRateLimits(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteSelector uint64, ff bool) (tokensapi.OnchainRateLimits, error) {
 	if ff {
 		return tokensapi.OnchainRateLimits{}, fmt.Errorf("fast finality buckets are not supported on v1.4.0 token pools")

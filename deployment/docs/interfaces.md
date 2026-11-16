@@ -91,6 +91,7 @@ Registered once per **token pool version**, because pool versions configure diff
 | `TokenPoolDynamicConfigAdapter` | type assertion | `ConfigureTokenPool` (router, rate-limit admin, fee admin) |
 | `TokenAdminRoleAdapter` | type assertion | `GrantTokenAdminRole`, `RevokeTokenAdminRole` |
 | `RemotePoolRemover` | type assertion | `RemoveRemotePools` |
+| `RemoteChainConfigRemover` | type assertion | `RemoveRemotePools` (`wipeChainConfigs`) |
 | `RateLimitReaderAdapter` | type assertion | `SetTokenPoolRateLimits` (outbound-only path), auto-migrate |
 | `TokenPoolMigrator` | type assertion | `ConfigureTokensForTransfers` auto-migrate, `RemoveRemotePools` |
 

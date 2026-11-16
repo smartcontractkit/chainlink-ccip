@@ -33,6 +33,7 @@ var (
 	_ tokensapi.TokenRefResolver          = &EVMPoolAdapter{}
 	_ tokensapi.TokenAdapter              = &EVMPoolAdapter{}
 	_ tokensapi.RemotePoolRemover         = &EVMPoolAdapter{}
+	_ tokensapi.RemoteChainConfigRemover  = &EVMPoolAdapter{}
 	_ tokensapi.TokenPoolOwnershipChecker = &EVMPoolAdapter{}
 )
 
@@ -58,6 +59,13 @@ type PoolOps interface {
 	// is not configured is skipped (with a warning) rather than emitting a no-op transaction, so
 	// re-runs are idempotent.
 	RemoveRemotePools(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remotes []tokensapi.RemotePoolToRemove) ([]evm_contract.WriteOutput, error)
+	// RemoveRemoteChainConfigs removes the whole remote chain config (remote pools, remote token
+	// and rate limits) for each given selector via applyChainUpdates. The caller gates the
+	// selectors on the pool's live supported chains, so implementations emit the removal directly.
+	RemoveRemoteChainConfigs(b cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, remoteChainSelectors []uint64) ([]evm_contract.WriteOutput, error)
+	// SupportsRemoteChainConfigRemoval reports whether RemoveRemoteChainConfigs is implemented for
+	// this version, so the changeset can reject an unsupported version before any write.
+	SupportsRemoteChainConfigRemoval() bool
 	Version() *semver.Version
 }
 
@@ -339,6 +347,48 @@ func (a *EVMPoolAdapter) RemoveRemotePools() *cldf_ops.Sequence[tokensapi.Remove
 			return result, nil
 		},
 	)
+}
+
+// RemoveRemoteChainConfigs removes remote chain configs from an EVM token pool. Version-specific
+// contract calls live in PoolOps.RemoveRemoteChainConfigs; the planner rejects a version that does
+// not support it (SupportsRemoteChainConfigRemoval false) before planning any write. No-op (zero
+// BatchOps) when there are no writes.
+func (a *EVMPoolAdapter) RemoveRemoteChainConfigs() *cldf_ops.Sequence[tokensapi.RemoveRemoteChainConfigsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
+	return cldf_ops.NewSequence(
+		"evm-pool-adapter:remove-remote-chain-configs",
+		a.Ops.Version(),
+		"Removes remote chain configs from an EVM token pool",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.RemoveRemoteChainConfigsSequenceInput) (sequences.OnChainOutput, error) {
+			chain, ok := chains.EVMChains()[input.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not defined", input.Selector)
+			}
+			if !common.IsHexAddress(input.TokenPoolRef.Address) {
+				return sequences.OnChainOutput{}, fmt.Errorf("invalid pool address for chain %d: %s", input.Selector, input.TokenPoolRef.Address)
+			}
+			poolAddr := common.HexToAddress(input.TokenPoolRef.Address)
+
+			writes, err := a.Ops.RemoveRemoteChainConfigs(b, chain, poolAddr, input.RemoteChainSelectors)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to remove remote chain configs from pool %s on chain %d: %w", poolAddr.Hex(), input.Selector, err)
+			}
+			if len(writes) == 0 {
+				return sequences.OnChainOutput{}, nil
+			}
+
+			var result sequences.OnChainOutput
+			batchOp, err := evm_contract.NewBatchOperationFromWrites(writes)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to create batch operation from writes: %w", err)
+			}
+			result.BatchOps = append(result.BatchOps, batchOp)
+			return result, nil
+		},
+	)
+}
+
+func (a *EVMPoolAdapter) SupportsRemoteChainConfigRemoval() bool {
+	return a.Ops.SupportsRemoteChainConfigRemoval()
 }
 
 func (a *EVMPoolAdapter) ManualRegistration() *cldf_ops.Sequence[tokensapi.ManualRegistrationSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains] {

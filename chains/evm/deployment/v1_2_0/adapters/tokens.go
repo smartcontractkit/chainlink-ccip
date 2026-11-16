@@ -405,6 +405,15 @@ func (p *poolOpsV120) RemoveRemotePools(_ cldf_ops.Bundle, chain evm.Chain, pool
 		poolAddr.Hex(), chain.Selector)
 }
 
+// RemoveRemoteChainConfigs errors: this tooling does not remove chain configs for v1.2.0 pools.
+// SupportsRemoteChainConfigRemoval returns false, so the planner rejects a wipeChainConfigs request
+// on a v1.2.0 pool before planning any write; this method exists only to satisfy PoolOps.
+func (p *poolOpsV120) RemoveRemoteChainConfigs(_ cldf_ops.Bundle, chain evm.Chain, poolAddr common.Address, _ []uint64) ([]evm_contract.WriteOutput, error) {
+	return nil, fmt.Errorf("removing remote chain configs is not supported on v1.2.0 token pools (pool %s on chain %d)", poolAddr.Hex(), chain.Selector)
+}
+
+func (p *poolOpsV120) SupportsRemoteChainConfigRemoval() bool { return false }
+
 // GetCurrentRateLimits is unreachable in practice: TokenAdapter overrides
 // GetOnchainRateLimits so the read resolves the fronting proxy, which this
 // signature has no datastore to do. It errors rather than returning the pool's

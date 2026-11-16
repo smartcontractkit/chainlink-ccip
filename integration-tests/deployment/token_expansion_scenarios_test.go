@@ -1664,6 +1664,49 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 				})
 				require.NoError(t, err)
 			})
+
+			// WipeChainConfigs deletes the whole remote chain config. After RemoveRemotePools the
+			// Solana pool still supports EVM with an empty pool list, so a standalone wipe sweeps it
+			// and the chain config account is removed. This exercises the Solana delete_chain_config
+			// path end to end.
+			t.Run("WipeChainConfigs", func(t *testing.T) {
+				chainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evmChainSel, solTokenMint, solPoolProgramID)
+				require.NoError(t, err)
+				solPoolPDA, _ := tokens.TokenPoolConfigAddress(solTokenMint, solPoolProgramID)
+
+				var preCfg lockrelease_token_pool.ChainConfig
+				require.NoError(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &preCfg))
+				require.Empty(t, preCfg.Base.Remote.PoolAddresses, "Solana pool should still support EVM with an empty pool list")
+
+				out, err := tokensapi.RemoveRemotePools().Apply(*env, tokensapi.RemoveRemotePoolsInput{
+					MCMS: NewDefaultInputForMCMS("Scenario 5 WipeChainConfigs"),
+					Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+						ChainSelector:    solChainSel,
+						Pool:             datastore.AddressRef{Address: solPoolPDA.String()},
+						WipeChainConfigs: true,
+					}},
+				})
+				require.NoError(t, err)
+				testhelpers.ProcessTimelockProposals(t, *env, out.MCMSTimelockProposals, false)
+
+				// The chain config account is deleted, so the pool no longer supports EVM.
+				var postCfg lockrelease_token_pool.ChainConfig
+				require.ErrorIs(t, solChain.GetAccountDataBorshInto(t.Context(), chainCfgPDA, &postCfg), rpc.ErrNotFound)
+
+				// Refresh the bundle so the re-run re-reads on-chain state.
+				env.OperationsBundle = testsetupV2_0_0.BundleWithFreshReporter(env.OperationsBundle)
+
+				// Idempotent re-run: the selector is no longer supported, so no delete is emitted.
+				_, err = tokensapi.RemoveRemotePools().Apply(*env, tokensapi.RemoveRemotePoolsInput{
+					MCMS: NewDefaultInputForMCMS("Scenario 5 WipeChainConfigs idempotency"),
+					Pools: []tokensapi.RemoveRemotePoolsPerPool{{
+						ChainSelector:    solChainSel,
+						Pool:             datastore.AddressRef{Address: solPoolPDA.String()},
+						WipeChainConfigs: true,
+					}},
+				})
+				require.NoError(t, err)
+			})
 		})
 
 		// SkipIfMissingPermissions on Solana: the Solana pool's per-mint config is handed to a foreign
@@ -2566,9 +2609,10 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			require.NoError(t, applyRemoveRemotePools(t, env, tokensapi.RemoveRemotePoolsInput{
 				MCMS: NewDefaultInputForMCMS("RemoveRemotePoolsCrossFamily deactivate EVM1 pool"),
 				Pools: []tokensapi.RemoveRemotePoolsPerPool{{
-					ChainSelector: evm1ChainSel,
-					Pool:          datastore.AddressRef{Address: evm1PoolAddr.Hex()},
-					Deactivate:    true,
+					ChainSelector:    evm1ChainSel,
+					Pool:             datastore.AddressRef{Address: evm1PoolAddr.Hex()},
+					Deactivate:       true,
+					WipeChainConfigs: true,
 				}},
 			}))
 
@@ -2585,6 +2629,12 @@ func TestTokenExpansionScenariosSolana(t *testing.T) {
 			evm1ActivePool, err := evmTAR.GetActivePool(*env, evm1ChainSel, evm1TokenRef)
 			require.NoError(t, err)
 			require.Empty(t, evm1ActivePool, "EVM1 pool should be unregistered from the EVM1 TAR")
+
+			// wipeChainConfigs: the reverse pass also deletes the Solana peer's chain config for EVM1.
+			evm1ChainCfgPDA, _, err := tokens.TokenPoolChainConfigPDA(evm1ChainSel, solMint, solPoolProgID)
+			require.NoError(t, err)
+			var solEvm1Cfg lockrelease_token_pool.ChainConfig
+			require.ErrorIs(t, solChain.GetAccountDataBorshInto(t.Context(), evm1ChainCfgPDA, &solEvm1Cfg), rpc.ErrNotFound, "Solana peer chain config for EVM1 should be deleted")
 		})
 
 		t.Run("RemovalsFromTwoEntriesOnOneSolanaPool", func(t *testing.T) {

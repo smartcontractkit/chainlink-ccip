@@ -111,6 +111,33 @@ type RemotePoolToRemove struct {
 	Remote   datastore.AddressRef `json:"remote" yaml:"remote"`
 }
 
+// RemoteChainConfigRemover is an interface for adapters that can remove a token pool's remote
+// chain configuration, not just its remote pool entries. Removing a chain config deletes the remote
+// token and rate-limit buckets for that selector as well as every remote pool entry, so
+// implementations must only remove selectors the caller has deliberately decided to retire.
+// RemoveRemotePools gates the selectors it passes on the pool's live supported chains, so
+// implementations emit the removal directly rather than re-checking it. An adapter may implement
+// this interface while a specific pool version cannot remove chain configs (e.g. EVM 1.2.0/1.4.0):
+// SupportsRemoteChainConfigRemoval reports false and the planner rejects the request before
+// planning any write.
+type RemoteChainConfigRemover interface {
+	RemoveRemoteChainConfigs() *cldf_ops.Sequence[RemoveRemoteChainConfigsSequenceInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	// SupportsRemoteChainConfigRemoval reports whether this adapter can remove chain configs for the
+	// resolved pool version. Adapters that cannot return false, so the planner fails before any
+	// write and can route unsupported peers through skipUnsupportedPeers.
+	SupportsRemoteChainConfigRemoval() bool
+}
+
+// RemoveRemoteChainConfigsSequenceInput defines the input for removing remote chain configurations
+// from a token pool. Each selector in RemoteChainSelectors has its whole remote chain config
+// removed (remote pools, remote token and rate limits).
+type RemoveRemoteChainConfigsSequenceInput struct {
+	Selector             uint64               `json:"selector" yaml:"selector"`
+	TokenPoolRef         datastore.AddressRef `json:"tokenPoolRef" yaml:"tokenPoolRef"`
+	TokenRef             datastore.AddressRef `json:"tokenRef" yaml:"tokenRef"`
+	RemoteChainSelectors []uint64             `json:"remoteChainSelectors" yaml:"remoteChainSelectors"`
+}
+
 // TokenRefResolver is an optional interface that can be implemented by TokenAdapters. It acts as a form of middleware that allows token
 // and pool references to be resolved in a particular way before they are passed into the adapter logic. For example, a ref resolver can
 // reconstruct refs from onchain data, normalize addresses, apply transformations on the raw input ref, etc.
