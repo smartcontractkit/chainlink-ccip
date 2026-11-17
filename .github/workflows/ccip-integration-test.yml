@@ -184,7 +184,7 @@ jobs:
           path: chainlink
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        uses: actions/setup-go@v7
         with:
           # Use the Chainlink clone's go.mod: setup-go v6+ exports GOTOOLCHAIN=local,
           # so the installed toolchain must already satisfy Chainlink's go directive.
@@ -367,7 +367,7 @@ jobs:
           path: chainlink
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        uses: actions/setup-go@v7
         with:
           # The upload action shells out to junit-enhancer, which `go install`
           # writes to $GOPATH/bin. Only setup-go puts that directory on PATH.
