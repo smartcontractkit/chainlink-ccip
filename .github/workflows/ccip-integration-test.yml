@@ -237,10 +237,10 @@ jobs:
           for i in 1 2 3; do
             go mod tidy && go run ./tools/plugout --update && break
             if [ "$i" -eq 3 ]; then
-              echo "go mod tidy failed after 3 attempts"
+              echo "go mod tidy and plugin update failed after 3 attempts"
               exit 1
             fi
-            echo "retry $i - go mod tidy failed, sleeping 10s"
+            echo "retry $i - go mod tidy and plugin update failed, sleeping 10s"
             sleep 10
           done
 
@@ -303,16 +303,16 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip"
           run="${{ matrix.type.run }}"
-          if ! go test -list "$run" . | grep -q '^Test'; then
-            echo "No tests matched -run '$run'"
-            exit 1
-          fi
           parallel_flag=""
           if [ -n "${{ matrix.type.go_parallel }}" ]; then
             parallel_flag="-parallel=${{ matrix.type.go_parallel }}"
           fi
           echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run '${run}'"
-          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run "$run"
+          gotestsum \
+            --junitfile=test-results.xml \
+            --format=github-actions \
+            --post-run-command="bash -c 'if [[ \$TESTS_TOTAL -eq 0 && \$TESTS_ERRORS -eq 0 ]]; then echo \"::error::No tests matched -run $run\" >&2; exit 1; fi'" \
+            -- . -timeout "${{ matrix.type.timeout }}" ${parallel_flag} -run "$run"
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
@@ -346,7 +346,7 @@ jobs:
           retention-days: 1
 
   upload-test-results:
-    name: Upload Test Results (${{ matrix.type.name }})
+    name: Upload Test Results
     needs: [integration-test-matrix, resolve-chainlink-ref]
     if: always() && needs.integration-test-matrix.result != 'skipped'
     runs-on: ubuntu-latest
@@ -354,28 +354,11 @@ jobs:
       contents: read
       # The upload action reads PR metadata with the default token.
       pull-requests: read
-    strategy:
-      fail-fast: false
-      # Keep names and order aligned with integration-test-matrix; job-index links each result artifact.
-      matrix:
-        type:
-          - name: "Fees Test"
-          - name: "Token Transfer Test"
-          - name: "USDC Test"
-          - name: "OOO Execution Test"
-          - name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
-          - name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
-          - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
-          - name: "Messaging Test Test_CCIPMessaging_MultiExecReports_EVM2Solana"
-          - name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
-          - name: "Batching Test Test_CCIPBatching_MultiSource"
-          - name: "Batching Test Test_CCIPBatching_MultiSource_MultiRoot"
-          - name: "Batching Test Test_CCIPBatching_SingleSource"
-          - name: "Batching Test Test_CCIPBatching_SingleSource_MultiRoot"
-          - name: "Gas Price Updates Test"
-          - name: "CCIPReader Test"
-          - name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
     steps:
+      - name: Checkout the chainlink-ccip repo
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Checkout Chainlink test sources
         uses: actions/checkout@v7
         with:
@@ -390,41 +373,123 @@ jobs:
           # writes to $GOPATH/bin. Only setup-go puts that directory on PATH.
           go-version-file: chainlink/go.mod
           cache-dependency-path: "**/go.sum"
-      - name: Download test result artifact
-        id: download-results
+      - name: Download test result artifacts
         uses: actions/download-artifact@v8
         with:
-          name: ccip-integration-test-results-${{ strategy.job-index }}
+          pattern: ccip-integration-test-results-*
           path: test-results
-      - name: Read test outcome
-        id: test-results
-        if: steps.download-results.outcome == 'success'
-        shell: bash
-        run: |
-          outcome="$(cat test-results/test-outcome.txt)"
-          if [[ "$outcome" != "success" && "$outcome" != "failure" ]]; then
-            echo "::error::Invalid test outcome in result artifact."
-            exit 1
-          fi
-          test_job_url="$(cat test-results/test-job-url.txt)"
-          expected_job_url_prefix="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/job/"
-          test_job_url_suffix="${test_job_url#"$expected_job_url_prefix"}"
-          if [[ "$test_job_url" != "$expected_job_url_prefix"* || ! "$test_job_url_suffix" =~ ^[0-9]+/attempts/[0-9]+$ ]]; then
-            echo "::error::Invalid test job URL in result artifact."
-            exit 1
-          fi
-          echo "outcome=$outcome" | tee -a "$GITHUB_OUTPUT"
-          echo "test-job-url=$test_job_url" | tee -a "$GITHUB_OUTPUT"
-      - name: Analyze and upload test results
-        if: steps.test-results.outcome == 'success'
-        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
+      - name: Upload Fees Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
         with:
-          junit-file-path: ${{ github.workspace }}/test-results/test-results.xml
-          trunk-org-slug: chainlink
-          trunk-previous-step-outcome: ${{ steps.test-results.outputs.outcome }}
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-0
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          trunk-job-url: ${{ steps.test-results.outputs.test-job-url }}
-          artifact-name: ccip-integration-test-logs-${{ strategy.job-index }}-${{ github.run_attempt }}
+          artifact-name: ccip-integration-test-logs-0-${{ github.run_attempt }}
+      - name: Upload Token Transfer Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-1
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-1-${{ github.run_attempt }}
+      - name: Upload USDC Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-2
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-2-${{ github.run_attempt }}
+      - name: Upload OOO Execution Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-3
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-3-${{ github.run_attempt }}
+      - name: Upload EVM2EVM Messaging Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-4
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-4-${{ github.run_attempt }}
+      - name: Upload EVM2Solana Messaging Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-5
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-5-${{ github.run_attempt }}
+      - name: Upload Solana2EVM Messaging Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-6
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-6-${{ github.run_attempt }}
+      - name: Upload MultiExecReports EVM2Solana Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-7
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-7-${{ github.run_attempt }}
+      - name: Upload MaxBatchSizeEVM Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-8
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-8-${{ github.run_attempt }}
+      - name: Upload MultiSource Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-9
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-9-${{ github.run_attempt }}
+      - name: Upload MultiSource_MultiRoot Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-10
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-10-${{ github.run_attempt }}
+      - name: Upload SingleSource Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-11
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-11-${{ github.run_attempt }}
+      - name: Upload SingleSource_MultiRoot Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-12
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-12-${{ github.run_attempt }}
+      - name: Upload Gas Price Updates Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-13
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-13-${{ github.run_attempt }}
+      - name: Upload CCIPReader Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-14
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-14-${{ github.run_attempt }}
+      - name: Upload EVM2EVM RoleDON Topology Test results
+        if: always()
+        uses: ./.github/actions/upload-ccip-test-result
+        with:
+          result-directory: ${{ github.workspace }}/test-results/ccip-integration-test-results-15
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          artifact-name: ccip-integration-test-logs-15-${{ github.run_attempt }}
 
   integration-test-ccip-ocr3:
     if: always()
