@@ -166,9 +166,9 @@ abstract contract e2e_mttpSetup is TokenFixture {
 
     for (uint256 i = 0; i < 3; ++i) {
       c.tokens[i] = address(_deployCrossChainToken(string.concat("T", vm.toString(i + 1), label), _decimalsOf(i)));
-      CrossChainTokenLike(c.tokens[i]).grantMintAndBurnRoles(address(c.pool));
-      CrossChainTokenLike(c.tokens[i]).grantMintAndBurnRoles(OWNER);
-      CrossChainTokenLike(c.tokens[i]).mint(s_allowedSender, 1e30);
+      ICrossChainTokenLike(c.tokens[i]).grantMintAndBurnRoles(address(c.pool));
+      ICrossChainTokenLike(c.tokens[i]).grantMintAndBurnRoles(OWNER);
+      ICrossChainTokenLike(c.tokens[i]).mint(s_allowedSender, 1e30);
     }
 
     // Same as Router.applyRampUpdates: the pool accepts the local onRamp and offRamp.
@@ -197,7 +197,8 @@ abstract contract e2e_mttpSetup is TokenFixture {
     uint8 decimals
   ) internal returns (address token) {
     token = address(_deployCrossChainToken(name, decimals));
-    CrossChainTokenLike(token).grantMintAndBurnRoles(address(c.pool));
+    ICrossChainTokenLike(token).grantMintAndBurnRoles(address(c.pool));
+    return token;
   }
 
   /// @dev Registers an extra token with the full policy set and a remote token mapping, the same way the baseline
@@ -322,6 +323,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
       _send(src, dst, tokenIndex, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
     received = _deliver(dst, src, dst.tokens[tokenIndex], postFeeAmount, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     fee = _balance(src.tokens[tokenIndex], address(src.pool)) - poolBefore;
+    return (received, fee);
   }
 
   function _feeConfig(
@@ -380,6 +382,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
   ) internal pure returns (PolicyConfig.PolicyRecordKey[] memory keys) {
     keys = new PolicyConfig.PolicyRecordKey[](1);
     keys[0] = PolicyConfig.PolicyRecordKey({policyName: policyName, remoteChainSelector: remoteChainSelector});
+    return keys;
   }
 
   function _twoAddresses(
@@ -389,6 +392,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
     arr = new address[](2);
     arr[0] = a;
     arr[1] = b;
+    return arr;
   }
 
   /// @dev Sets a token profile with an explicit lock or burn address. The BurnToAddress flavor needs a nonzero
@@ -549,6 +553,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
   ) internal pure returns (PolicyConfig.TokenPolicyArgs[] memory tokenPolicies) {
     tokenPolicies = new PolicyConfig.TokenPolicyArgs[](1);
     tokenPolicies[0] = PolicyConfig.TokenPolicyArgs({localToken: token, policyName: policyName});
+    return tokenPolicies;
   }
 
   function _setConnectionPolicyConfig(
@@ -807,7 +812,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
       address(c.router)
     );
     legacyPool = address(pool);
-    CrossChainTokenLike(c.tokens[tokenIndex]).grantMintAndBurnRoles(legacyPool);
+    ICrossChainTokenLike(c.tokens[tokenIndex]).grantMintAndBurnRoles(legacyPool);
     c.tar.setPool(c.tokens[tokenIndex], legacyPool);
 
     RateLimiter.Config memory disabled;
@@ -822,6 +827,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
       inboundRateLimiterConfig: disabled
     });
     pool.applyChainUpdates(new uint64[](0), updates);
+    return legacyPool;
   }
 
   /// @dev Points the token admin registry at a different pool for a token. Call as the token admin.
@@ -910,6 +916,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
   ) internal pure returns (IPoolConfigManager.LaneKey[] memory lanes) {
     lanes = new IPoolConfigManager.LaneKey[](1);
     lanes[0] = IPoolConfigManager.LaneKey({localToken: token, remoteChainSelector: remoteChainSelector});
+    return lanes;
   }
 
   function _fee(
@@ -954,6 +961,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
     vm.prank(dst.offRamp);
     (success,) =
       address(dst.pool).call{gas: gasLimit}(abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, finality)));
+    return success;
   }
 
   function _removeInlineRateLimit(
@@ -968,7 +976,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
 }
 
 /// @dev The CrossChainToken functions these tests call. The full token interface pulls in a lot of extra imports.
-interface CrossChainTokenLike {
+interface ICrossChainTokenLike {
   function grantMintAndBurnRoles(
     address burnMintPool
   ) external;
