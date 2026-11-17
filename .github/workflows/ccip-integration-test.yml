@@ -187,7 +187,17 @@ jobs:
 
           cd "$GITHUB_WORKSPACE/chainlink"
           update_ccip_modules
-          make gomodtidy
+          # gomods tidy fetches every module in the Chainlink repo in parallel and
+          # occasionally dies on a transient proxy.golang.org stream reset, so retry.
+          for i in 1 2 3; do
+            make gomodtidy && break
+            if [ "$i" -eq 3 ]; then
+              echo "make gomodtidy failed after 3 attempts"
+              exit 1
+            fi
+            echo "retry $i - make gomodtidy failed, sleeping 10s"
+            sleep 10
+          done
 
           cd "$GITHUB_WORKSPACE/chainlink/integration-tests"
           update_ccip_modules
