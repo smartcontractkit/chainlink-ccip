@@ -197,9 +197,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+            COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
           elif [ "${{ github.event_name }}" == "merge_group" ]; then
-            COMMIT_SHA=${{ github.event.merge_group.head_sha }}
+            COMMIT_SHA="${{ github.event.merge_group.head_sha }}"
           else
             COMMIT_SHA=$(curl -fsS -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.ref }}" | jq -r .sha)
@@ -333,6 +333,10 @@ jobs:
     needs: [integration-test-matrix, resolve-chainlink-ref]
     if: always() && needs.integration-test-matrix.result != 'skipped'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The upload action reads PR metadata with the default token.
+      pull-requests: read
     strategy:
       fail-fast: false
       # Keep names and order aligned with integration-test-matrix; job-index links each result artifact.
@@ -362,6 +366,13 @@ jobs:
           ref: ${{ needs.resolve-chainlink-ref.outputs.core-ref }}
           path: chainlink
           persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          # The upload action shells out to junit-enhancer, which `go install`
+          # writes to $GOPATH/bin. Only setup-go puts that directory on PATH.
+          go-version-file: chainlink/go.mod
+          cache-dependency-path: "**/go.sum"
       - name: Download test result artifact
         id: download-results
         uses: actions/download-artifact@v8
