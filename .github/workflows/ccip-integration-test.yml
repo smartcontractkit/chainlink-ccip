@@ -49,15 +49,50 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      core-ref: ${{ steps.refs.outputs.core-ref || steps.default-ref.outputs.core-ref }}
+      core-ref: ${{ steps.refs.outputs.core-ref || steps.merge-ref.outputs.core-ref || steps.default-ref.outputs.core-ref }}
     steps:
       - name: Resolve and verify PR body refs
         id: refs
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
         uses: smartcontractkit/.github/actions/get-refs-from-pr-body@get-refs-from-pr-body/v1
         with:
           sigscanner-url: ${{ secrets.SIGSCANNER_URL }}
           sigscanner-api-key: ${{ secrets.SIGSCANNER_API_KEY }}
+      - name: Resolve and verify merge-group PR body core ref
+        id: merge-ref
+        if: github.event_name == 'merge_group'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          SIGSCANNER_URL: ${{ secrets.SIGSCANNER_URL }}
+          SIGSCANNER_API_KEY: ${{ secrets.SIGSCANNER_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$MERGE_GROUP_HEAD_REF" =~ pr-([0-9]+)-[a-fA-F0-9]+ ]]; then
+            echo "::error::Could not determine the PR number from merge-group ref: $MERGE_GROUP_HEAD_REF"
+            exit 1
+          fi
+          pr_number="${BASH_REMATCH[1]}"
+          pr_body="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.body // ""')"
+          # The pre-merge-queue workflow accepted full commit SHAs only. Keep
+          # that contract here, but verify the SHA before it reaches checkout.
+          core_ref="$(printf '%s\n' "$pr_body" | grep -ioE 'core ref:[[:space:]]*[a-f0-9]{40}' | awk '{print $NF}' | head -n 1 || true)"
+          if [ -z "$core_ref" ]; then
+            echo "core-ref=develop" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          core_ref="$(printf '%s' "$core_ref" | tr '[:upper:]' '[:lower:]')"
+          verification="$(curl -fsS --max-time 300 --get "$SIGSCANNER_URL" \
+            --data-urlencode "commit=${core_ref}" \
+            --data-urlencode "repository=smartcontractkit/chainlink" \
+            --data-urlencode "disable_gpg=true" \
+            -H "X-SIGSCANNER-SECRET: ${SIGSCANNER_API_KEY}")"
+          if [ "$(printf '%s' "$verification" | jq -r '.verified == true')" != "true" ]; then
+            echo "::error::SigScanner did not verify Chainlink commit $core_ref"
+            exit 1
+          fi
+          echo "core-ref=$core_ref" >> "$GITHUB_OUTPUT"
       - name: Use the trusted default for fork pull requests
         id: default-ref
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
@@ -295,7 +330,7 @@ jobs:
 
   upload-test-results:
     name: Upload Test Results (${{ matrix.type.name }})
-    needs: [integration-test-matrix]
+    needs: [integration-test-matrix, resolve-chainlink-ref]
     if: always() && needs.integration-test-matrix.result != 'skipped'
     runs-on: ubuntu-latest
     strategy:
@@ -320,6 +355,13 @@ jobs:
           - name: "CCIPReader Test"
           - name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
     steps:
+      - name: Checkout Chainlink test sources
+        uses: actions/checkout@v7
+        with:
+          repository: smartcontractkit/chainlink
+          ref: ${{ needs.resolve-chainlink-ref.outputs.core-ref }}
+          path: chainlink
+          persist-credentials: false
       - name: Download test result artifact
         id: download-results
         uses: actions/download-artifact@v8
