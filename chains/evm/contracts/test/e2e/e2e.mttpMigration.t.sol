@@ -93,7 +93,7 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     vm.prank(OWNER);
     BurnMintTokenPool(legacyT1B).removeRemotePool(s_a.localSelector, abi.encode(address(s_a.pool)));
     (poolData, postFee,) = _send(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-    vm.expectRevert();
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.InvalidSourcePoolAddress.selector, abi.encode(address(s_a.pool))));
     _legacyReleaseOrMint(legacyT1B, s_b, s_a.localSelector, address(s_a.pool), 0, postFee, poolData);
 
     // Restore trust and retry the same message.
