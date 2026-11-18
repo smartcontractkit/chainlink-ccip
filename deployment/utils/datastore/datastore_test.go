@@ -231,12 +231,39 @@ func TestFindLatestVersionRef(t *testing.T) {
 		require.Equal(t, "2.1.0", got.Version.String())
 	})
 
-	t.Run("errors when several refs share the highest version", func(t *testing.T) {
+	t.Run("allows refs that agree on type and address at the highest version", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{
+			ref("41FG", "2.1.0", "CLLCCIP"),
+			ref("41FG", "2.1.0", "TokenPoolProgram"),
+		})
+		require.NoError(t, err)
+		require.Equal(t, "41FG", got.Address)
+	})
+
+	t.Run("errors when the highest version disagrees on type", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{
 			ref("41FG", "2.1.0", "CLLCCIP"),
-			ref("41FG", "2.1.0", "TokenPoolProgram"),
+			{
+				ChainSelector: 124615329519749607,
+				Address:       "41FG",
+				Type:          datastore.ContractType("USDCTokenPool"),
+				Version:       semver.MustParse("2.1.0"),
+				Qualifier:     "USDC",
+			},
+		})
+		require.ErrorContains(t, err, "multiple refs found at latest version")
+	})
+
+	t.Run("errors when the highest version disagrees on address", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{
+			ref("41FG", "2.1.0", "A"),
+			ref("8eqh", "2.1.0", "B"),
 		})
 		require.ErrorContains(t, err, "multiple refs found at latest version")
 	})

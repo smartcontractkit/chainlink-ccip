@@ -653,8 +653,8 @@ func ResolveTokenPoolRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint
 	case len(results) > 1:
 		// Several refs can share one address under different qualifiers (e.g. a Solana shared pool
 		// program registered under a deployment qualifier and the generic program qualifier). Here
-		// we resolve the latest version; FindLatestVersionRef is strict and fails if more than one
-		// ref shares that version.
+		// we resolve the latest version; FindLatestVersionRef returns the first ref at that version
+		// when they agree on type and address, and fails otherwise.
 		if latest, err := datastore_utils.FindLatestVersionRef(results); err != nil {
 			return datastore.AddressRef{}, fmt.Errorf("multiple refs found in datastore for ref %s and chain selector %d: %w", datastore_utils.SprintRef(maybeNormalized), sel, err)
 		} else {

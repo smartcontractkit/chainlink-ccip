@@ -292,10 +292,12 @@ func FindLatestRef(ds datastore.DataStore, ref datastore.AddressRef, minVersion,
 	return latestRef, nil
 }
 
-// FindLatestVersionRef returns the ref with the highest version among refs. It is strict: it
-// returns an error when refs is empty, when any ref has no version, or when more than one ref
-// shares the highest version. It exists for lookups where several refs can share one address under
-// different qualifiers, so the caller gets the current registration instead of an ambiguous match.
+// FindLatestVersionRef returns the ref with the highest version among refs. It returns an error
+// when refs is empty, when any ref has no version, or when the highest version holds refs that
+// disagree on type or address, since those could select a different contract. Refs that agree on
+// type and address at the highest version are one contract registered under several qualifiers (for
+// example a Solana pool program under its own qualifier and the generic TokenPoolProgram alias), so
+// the first is returned.
 func FindLatestVersionRef(refs []datastore.AddressRef) (datastore.AddressRef, error) {
 	if len(refs) == 0 {
 		return datastore.AddressRef{}, errors.New("no refs to select from")
@@ -309,15 +311,10 @@ func FindLatestVersionRef(refs []datastore.AddressRef) (datastore.AddressRef, er
 	latest := slices.MaxFunc(refs, func(a, b datastore.AddressRef) int {
 		return a.Version.Compare(b.Version)
 	})
-
-	matches := 0
 	for _, r := range refs {
-		if r.Version.Equal(latest.Version) {
-			matches++
+		if r.Version.Equal(latest.Version) && (r.Type != latest.Type || r.Address != latest.Address) {
+			return datastore.AddressRef{}, fmt.Errorf("multiple refs found at latest version %s: %v", latest.Version, refs)
 		}
-	}
-	if matches > 1 {
-		return datastore.AddressRef{}, fmt.Errorf("multiple refs found at latest version %s: %v", latest.Version, refs)
 	}
 
 	return latest, nil
