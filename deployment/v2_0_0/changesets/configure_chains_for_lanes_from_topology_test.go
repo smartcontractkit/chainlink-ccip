@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -109,6 +110,7 @@ func (m *mockChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(_, _ uint64,
 		DefaultTxGasLimit:           ptrTo(uint32(200_000)),
 		NetworkFeeUSDCents:          ptrTo(uint16(10)),
 		LinkFeeMultiplierPercent:    ptrTo(uint8(90)),
+		USDPerUnitGas:               big.NewInt(1_000_000),
 	}
 }
 
@@ -1081,6 +1083,8 @@ func TestConfigureChainsForLanesFromTopology_EmptyConfigUsesAdapterDefaults(t *t
 	assert.False(t, *remote.TokenReceiverAllowed, "adapter default TokenReceiverAllowed is false")
 	assert.Equal(t, uint16(10), remote.MessageNetworkFeeUSDCents, "adapter default MessageNetworkFeeUSDCents")
 	assert.Equal(t, uint16(25), remote.TokenNetworkFeeUSDCents, "adapter default TokenNetworkFeeUSDCents")
+	assert.Equal(t, big.NewInt(1_000_000), remote.FeeQuoterDestChainConfig.USDPerUnitGas)
+	assert.True(t, remote.USDPerUnitGasDefaultOnly, "adapter gas price default must not replace an existing price")
 	assert.NotEmpty(t, remote.DefaultInboundCCVs, "auto-resolved inbound CCVs from default qualifier")
 	assert.NotEmpty(t, remote.DefaultOutboundCCVs, "auto-resolved outbound CCVs from default qualifier")
 }
@@ -1140,6 +1144,9 @@ func TestConfigureChainsForLanesFromTopology_PointerOverridesReplaceDefaults(t *
 					AllowTrafficFrom:          ptrTo(false),
 					MessageNetworkFeeUSDCents: ptrTo[uint16](50),
 					TokenNetworkFeeUSDCents:   ptrTo[uint16](75),
+					FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfigOverrides{
+						USDPerUnitGas: big.NewInt(2_000_000),
+					},
 				},
 			},
 		}},
@@ -1152,6 +1159,8 @@ func TestConfigureChainsForLanesFromTopology_PointerOverridesReplaceDefaults(t *
 	assert.False(t, *remote.AllowTrafficFrom, "override AllowTrafficFrom=false")
 	assert.Equal(t, uint16(50), remote.MessageNetworkFeeUSDCents, "override MessageNetworkFeeUSDCents")
 	assert.Equal(t, uint16(75), remote.TokenNetworkFeeUSDCents, "override TokenNetworkFeeUSDCents")
+	assert.Equal(t, big.NewInt(2_000_000), remote.FeeQuoterDestChainConfig.USDPerUnitGas)
+	assert.False(t, remote.USDPerUnitGasDefaultOnly, "explicit gas price must remain writable")
 }
 
 func TestConfigureChainsForLanesFromTopology_EmptyCVConfigUsesAdapterDefaults(t *testing.T) {

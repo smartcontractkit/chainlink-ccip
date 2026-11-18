@@ -88,6 +88,9 @@ type RemoteChainConfig[RemoteContract any, LocalContract any] struct {
 	LaneMandatedOutboundCCVs []LocalContract
 	DefaultExecutor          LocalContract
 	FeeQuoterDestChainConfig FeeQuoterDestChainConfigOverrides
+	// USDPerUnitGasDefaultOnly initializes an unset gas price without replacing an
+	// existing one; explicit caller overrides leave this false.
+	USDPerUnitGasDefaultOnly bool
 	ExecutorDestChainConfig  ExecutorDestChainConfig
 	// SkipExecutorConfig mirrors RemoteChainDefaults.SkipExecutorConfig: when set, the
 	// local chain's sequence must not read or write an Executor contract for this lane.

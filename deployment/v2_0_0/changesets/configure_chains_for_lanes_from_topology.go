@@ -540,6 +540,7 @@ func resolveRemoteChainConfig(
 		DefaultOutboundCCVs:       defaultOutboundCCVs,
 		LaneMandatedOutboundCCVs:  laneMandatedOutboundCCVs,
 		FeeQuoterDestChainConfig:  fqConfig,
+		USDPerUnitGasDefaultOnly:  inCfg.FeeQuoterDestChainConfig.USDPerUnitGas == nil && fqConfig.USDPerUnitGas != nil,
 		ExecutorDestChainConfig:   utils.Coalesce(inCfg.ExecutorDestChainConfig, defaults.ExecutorDestChainConfig),
 		SkipExecutorConfig:        defaults.SkipExecutorConfig,
 		AddressBytesLength:        remoteAdapter.GetAddressBytesLength(),
