@@ -204,3 +204,85 @@ func TestFindAndFormatFirstRef(t *testing.T) {
 		})
 	}
 }
+
+func TestFindLatestVersionRef(t *testing.T) {
+	t.Parallel()
+
+	ref := func(address, version, qualifier string) datastore.AddressRef {
+		return datastore.AddressRef{
+			ChainSelector: 124615329519749607,
+			Address:       address,
+			Type:          datastore.ContractType("BurnMintTokenPool"),
+			Version:       semver.MustParse(version),
+			Qualifier:     qualifier,
+		}
+	}
+
+	t.Run("picks the highest version", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{
+			ref("41FG", "1.6.0", "CLLCCIP"),
+			ref("41FG", "2.0.0", "TESTTR"),
+			ref("41FG", "2.1.0", "TokenPoolProgram"),
+		})
+		require.NoError(t, err)
+		require.Equal(t, "TokenPoolProgram", got.Qualifier)
+		require.Equal(t, "2.1.0", got.Version.String())
+	})
+
+	t.Run("allows refs that agree on type and address at the highest version", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{
+			ref("41FG", "2.1.0", "CLLCCIP"),
+			ref("41FG", "2.1.0", "TokenPoolProgram"),
+		})
+		require.NoError(t, err)
+		require.Equal(t, "41FG", got.Address)
+	})
+
+	t.Run("errors when the highest version disagrees on type", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{
+			ref("41FG", "2.1.0", "CLLCCIP"),
+			{
+				ChainSelector: 124615329519749607,
+				Address:       "41FG",
+				Type:          datastore.ContractType("USDCTokenPool"),
+				Version:       semver.MustParse("2.1.0"),
+				Qualifier:     "USDC",
+			},
+		})
+		require.ErrorContains(t, err, "multiple refs found at latest version")
+	})
+
+	t.Run("errors when the highest version disagrees on address", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{
+			ref("41FG", "2.1.0", "A"),
+			ref("8eqh", "2.1.0", "B"),
+		})
+		require.ErrorContains(t, err, "multiple refs found at latest version")
+	})
+
+	t.Run("errors on an empty input", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := datastore_utils.FindLatestVersionRef(nil)
+		require.ErrorContains(t, err, "no refs to select from")
+	})
+
+	t.Run("errors on a ref without a version", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := datastore_utils.FindLatestVersionRef([]datastore.AddressRef{{
+			ChainSelector: 124615329519749607,
+			Address:       "41FG",
+			Type:          datastore.ContractType("BurnMintTokenPool"),
+		}})
+		require.ErrorContains(t, err, "has no version")
+	})
+}

@@ -2,7 +2,9 @@ package datastore
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -159,7 +161,8 @@ func GetAddressRef(
 	selector uint64,
 	contractType cldf.ContractType,
 	contractVersion *semver.Version,
-	contractQualifier string) datastore.AddressRef {
+	contractQualifier string,
+) datastore.AddressRef {
 	for _, ref := range input {
 		if ref.ChainSelector == selector &&
 			ref.Type == datastore.ContractType(contractType) &&
@@ -287,6 +290,34 @@ func FindLatestRef(ds datastore.DataStore, ref datastore.AddressRef, minVersion,
 		return datastore.AddressRef{}, fmt.Errorf("no address found for ref (%s) in version range [%s, %s)", SprintRef(ref), minVersion.String(), maxVersion.String())
 	}
 	return latestRef, nil
+}
+
+// FindLatestVersionRef returns the ref with the highest version among refs. It returns an error
+// when refs is empty, when any ref has no version, or when the highest version holds refs that
+// disagree on type or address, since those could select a different contract. Refs that agree on
+// type and address at the highest version are one contract registered under several qualifiers (for
+// example a Solana pool program under its own qualifier and the generic TokenPoolProgram alias), so
+// the first is returned.
+func FindLatestVersionRef(refs []datastore.AddressRef) (datastore.AddressRef, error) {
+	if len(refs) == 0 {
+		return datastore.AddressRef{}, errors.New("no refs to select from")
+	}
+	for _, r := range refs {
+		if r.Version == nil {
+			return datastore.AddressRef{}, fmt.Errorf("ref %s has no version", SprintRef(r))
+		}
+	}
+
+	latest := slices.MaxFunc(refs, func(a, b datastore.AddressRef) int {
+		return a.Version.Compare(b.Version)
+	})
+	for _, r := range refs {
+		if r.Version.Equal(latest.Version) && (r.Type != latest.Type || r.Address != latest.Address) {
+			return datastore.AddressRef{}, fmt.Errorf("multiple refs found at latest version %s: %v", latest.Version, refs)
+		}
+	}
+
+	return latest, nil
 }
 
 // Takes in two refs and merges them, giving precedence to non-empty fields in the first ref.
