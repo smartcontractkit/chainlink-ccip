@@ -289,6 +289,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
     bytes4 finality,
     address originalSender
   ) internal returns (bytes memory destPoolData, uint256 destAmount, bytes memory destTokenAddress) {
+    assertEq(src.tar.getPool(src.tokens[tokenIndex]), address(src.pool), "MTTP send must use the active TAR pool");
     _approvePool(src, src.tokens[tokenIndex], amount, originalSender);
     return _lockOrBurn(src, dst, tokenIndex, amount, finality, originalSender);
   }
@@ -888,8 +889,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
     _setInlineRemotePoolConfig(c.pcm, c.tokens[tokenIndex], remoteChainSelector, false, config);
   }
 
-  /// @dev A remote-pool list that keeps the legacy pool trusted for the short-format cohort and adds the MTTP for
-  /// long-format sends.
+  /// @dev Keeps the normal pool trusted for historical messages and adds the MTTP without a legacy-receive exception.
   function _legacyThenMttpPools(
     address legacyPool,
     address mttp
@@ -918,6 +918,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
     uint256 tokenIndex,
     uint256 amount
   ) internal returns (bytes memory poolData, uint256 destAmount) {
+    assertEq(c.tar.getPool(c.tokens[tokenIndex]), legacyPool, "legacy send must precede TAR cutover");
     _fundAddress(c.tokens[tokenIndex], legacyPool, amount);
     Pool.LockOrBurnInV1 memory lockOrBurnIn = Pool.LockOrBurnInV1({
       receiver: abi.encode(s_receiver),

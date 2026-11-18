@@ -14,6 +14,12 @@ import {e2e_mttpSetup} from "./e2e.mttpSetup.t.sol";
 /// messages, the legacy pool data formats, remote trust repair, retry with realistic gas, and policy adoption after
 /// migration. The source and destination use a legacy BurnMintTokenPool next to the MTTP.
 contract e2e_mttpMigration is e2e_mttpSetup {
+  struct RetainedLegacyTransfer {
+    address sourcePool;
+    bytes poolData;
+    uint256 amount;
+  }
+
   /// @dev Normal source to migrated destination. A message produced before A switches to the MTTP and one
   /// produced after both execute against whatever pool A's token admin registry points at.
   function test_mttp_normalSourceToMigratedDestination() public {
@@ -109,97 +115,105 @@ contract e2e_mttpMigration is e2e_mttpSetup {
   /// @dev Finishes the migration. A retained legacy message executes once after B switches, both long directions
   /// succeed, and the temporary legacy receive permission is only turned off after the short-format cohort drains.
   function test_mttp_finishMigrationAndDrainTransitionalData() public {
-    address legacyT1B;
+    RetainedLegacyTransfer memory fromA;
+    RetainedLegacyTransfer memory fromB;
     vm.startPrank(OWNER);
-    legacyT1B = _deployLegacyPoolOn(s_b, s_a, 0);
-    // A's MTTP sends legacy to B's legacy pool and accepts legacy from it.
-    _setMigrationRemotePool(s_a, 0, s_b.localSelector, legacyT1B, true, true);
+    fromA.sourcePool = _deployLegacyPoolOn(s_a, s_b, 0);
+    fromB.sourcePool = _deployLegacyPoolOn(s_b, s_a, 0);
+    BurnMintTokenPool(fromA.sourcePool).addRemotePool(s_b.localSelector, abi.encode(fromB.sourcePool));
+    BurnMintTokenPool(fromB.sourcePool).addRemotePool(s_a.localSelector, abi.encode(fromA.sourcePool));
     vm.stopPrank();
 
-    // Retain a legacy-format message from A's MTTP before B switches.
+    // Both normal-pool transfers are created while their source TARs still select those pools.
+    (fromA.poolData, fromA.amount) = _legacyLockOrBurn(fromA.sourcePool, s_a, s_b, 0, 1e18);
+    (fromB.poolData, fromB.amount) = _legacyLockOrBurn(fromB.sourcePool, s_b, s_a, 0, 1e18);
+
+    vm.startPrank(OWNER);
+    _switchPool(s_a, 0, address(s_a.pool));
+    _revokeMintAndBurnRoles(s_a.tokens[0], fromA.sourcePool);
+    _setMigrationRemotePool(s_a, 0, s_b.localSelector, fromB.sourcePool, true, true);
+    _setInlineDestOverheadConfig(s_a.pcm, s_a.tokens[0], s_b.localSelector, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, 32);
+    vm.stopPrank();
+
+    // Retain A's transitional MTTP message while B is still on its normal pool.
     (bytes memory retainedData, uint256 retainedAmount,) =
       _send(s_a, s_b, 0, 100e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
     assertEq(retainedData.length, LEGACY_POOL_DATA_LENGTH, "retained legacy pool data");
 
-    // Switch B to the MTTP. B sends long and still accepts the retained short data from A's MTTP.
     vm.startPrank(OWNER);
     _switchPool(s_b, 0, address(s_b.pool));
-    _setMigrationRemotePool(s_b, 0, s_a.localSelector, address(s_a.pool), false, true);
-    // A trusts B's MTTP for B's long sends, keeps the legacy source entry for messages already in
-    // flight, and keeps sending legacy until it switches.
-    _setMigrationRemotePools(s_a, 0, s_b.localSelector, true, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
+    _revokeMintAndBurnRoles(s_b.tokens[0], fromB.sourcePool);
+    IPoolConfigManager.RemotePool[] memory pools = _legacyThenMttpPools(fromA.sourcePool, address(s_a.pool));
+    pools[1].allowLegacyPoolDataOnReceive = true;
+    _setMigrationRemotePools(s_b, 0, s_a.localSelector, false, pools);
+    _setMigrationRemotePools(s_a, 0, s_b.localSelector, true, _legacyThenMttpPools(fromB.sourcePool, address(s_b.pool)));
+    _setInlineDestOverheadConfig(
+      s_b.pcm, s_b.tokens[0], s_a.localSelector, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, MIN_DEST_BYTES_OVERHEAD
+    );
     vm.stopPrank();
 
-    // The retained A->B short message executes once against B's MTTP.
-    uint256 received = _deliverFromPool(
-      s_b,
-      s_a.localSelector,
-      address(s_a.pool),
-      s_b.tokens[0],
-      retainedAmount,
-      retainedData,
-      FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    assertEq(
+      _deliver(s_b, s_a, s_b.tokens[0], retainedAmount, retainedData, FinalityCodec.WAIT_FOR_FINALITY_FLAG),
+      100e18,
+      "retained short message settles after B switches"
     );
-    assertEq(received, 100e18, "retained short message succeeds once");
-
-    // B->A long send succeeds at B's switch.
     (bytes memory bData, uint256 bAmount,) =
       _send(s_b, s_a, 0, 50e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-    assertEq(bData.length, LONG_POOL_DATA_LENGTH, "B sends long format");
-    received = _deliverFromPool(
-      s_a, s_b.localSelector, address(s_b.pool), s_a.tokens[0], bAmount, bData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    assertEq(bData.length, LONG_POOL_DATA_LENGTH, "B sends long format at its switch");
+    assertEq(
+      _deliver(s_a, s_b, s_a.tokens[0], bAmount, bData, FinalityCodec.WAIT_FOR_FINALITY_FLAG),
+      50e18,
+      "B->A long send succeeds"
     );
-    assertEq(received, 50e18, "B->A long send succeeds");
 
-    // Switch A to long format, keeping the legacy source entry for messages already in flight.
-    vm.prank(OWNER);
-    _setMigrationRemotePools(s_a, 0, s_b.localSelector, false, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
-
-    (bytes memory aData, uint256 aAmount,) =
-      _send(s_a, s_b, 0, 50e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-    assertEq(aData.length, LONG_POOL_DATA_LENGTH, "A sends long format");
-    received = _deliverFromPool(
-      s_b, s_a.localSelector, address(s_a.pool), s_b.tokens[0], aAmount, aData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    vm.startPrank(OWNER);
+    // Raise the byte allowance before enabling long sends.
+    _setInlineDestOverheadConfig(
+      s_a.pcm, s_a.tokens[0], s_b.localSelector, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, MIN_DEST_BYTES_OVERHEAD
     );
-    assertEq(received, 50e18, "A->B long send succeeds");
+    _setMigrationRemotePools(
+      s_a, 0, s_b.localSelector, false, _legacyThenMttpPools(fromB.sourcePool, address(s_b.pool))
+    );
+    // The transitional cohort is drained. Keep normal-pool history while removing only the MTTP exception.
+    _setMigrationRemotePools(
+      s_b, 0, s_a.localSelector, false, _legacyThenMttpPools(fromA.sourcePool, address(s_a.pool))
+    );
+    vm.stopPrank();
 
-    // Drain the short-format cohort, then disable B's legacy receive for A's MTTP.
-    vm.prank(OWNER);
-    _setMigrationRemotePool(s_b, 0, s_a.localSelector, address(s_a.pool), false, false);
-
-    // Produce one more legacy message by temporarily reverting A to legacy sends, then disable again.
-    vm.prank(OWNER);
-    _setMigrationRemotePools(s_a, 0, s_b.localSelector, true, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
-    (bytes memory leftoverData, uint256 leftoverAmount,) =
-      _send(s_a, s_b, 0, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-    vm.prank(OWNER);
-    _setMigrationRemotePools(s_a, 0, s_b.localSelector, false, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
+    assertEq(_transfer(s_a, s_b, 0, 50e18), 50e18, "A->B long send succeeds after cleanup");
 
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_b.tokens[0], s_a.localSelector)
     );
-    _deliverFromPool(
-      s_b,
-      s_a.localSelector,
-      address(s_a.pool),
-      s_b.tokens[0],
-      leftoverAmount,
-      leftoverData,
-      FinalityCodec.WAIT_FOR_FINALITY_FLAG
-    );
+    _deliver(s_b, s_a, s_b.tokens[0], retainedAmount, retainedData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
 
-    // Save a B->A legacy transfer from the retired pool while it still has its roles, then revoke them.
-    (bytes memory savedData, uint256 savedAmount) = _legacyLockOrBurn(legacyT1B, s_b, s_a, 0, 1e18);
-    vm.startPrank(OWNER);
-    _revokeMintAndBurnRoles(s_b.tokens[0], legacyT1B);
-    vm.stopPrank();
-
-    // A's retained legacy remote-pool entry lets the saved B->A transfer settle on A's active pool even
-    // after the retired pool can no longer mint or burn.
-    uint256 legacyReceived = _deliverFromPool(
-      s_a, s_b.localSelector, legacyT1B, s_a.tokens[0], savedAmount, savedData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    // These messages were genuinely in flight before cutover. Retired pools already lost their token roles.
+    assertEq(
+      _deliverFromPool(
+        s_a,
+        s_b.localSelector,
+        fromB.sourcePool,
+        s_a.tokens[0],
+        fromB.amount,
+        fromB.poolData,
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      ),
+      1e18,
+      "historical B->A normal-pool message settles after role revocation"
     );
-    assertEq(legacyReceived, 1e18, "saved B->A legacy transfer settles after the retired pool is revoked");
+    assertEq(
+      _deliverFromPool(
+        s_b,
+        s_a.localSelector,
+        fromA.sourcePool,
+        s_b.tokens[0],
+        fromA.amount,
+        fromA.poolData,
+        FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      ),
+      1e18,
+      "historical A->B normal-pool message survives MTTP exception cleanup"
+    );
   }
 
   /// @dev Adopts policies after migration while keeping an inline remote pool record that still trusts the old
