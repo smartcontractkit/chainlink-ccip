@@ -647,11 +647,21 @@ func ResolveTokenPoolRef(e cldf.Environment, reg *TokenAdapterRegistry, sel uint
 
 	// Check the cache first (i.e. datastore)
 	results := e.DataStore.Addresses().Filter(datastore_utils.AddressRefToFilters(maybeNormalized)...)
-	if len(results) > 1 {
-		return datastore.AddressRef{}, fmt.Errorf("multiple refs found in datastore for ref %s and chain selector %d: %v", datastore_utils.SprintRef(maybeNormalized), sel, results)
-	}
-	if len(results) == 1 {
+	switch {
+	case len(results) == 1:
 		return results[0], nil
+	case len(results) > 1:
+		// Several refs can share one address under different qualifiers (e.g. a Solana shared pool
+		// program registered under a deployment qualifier and the generic program qualifier). Here
+		// we resolve the latest version; FindLatestVersionRef is strict and fails if more than one
+		// ref shares that version.
+		if latest, err := datastore_utils.FindLatestVersionRef(results); err != nil {
+			return datastore.AddressRef{}, fmt.Errorf("multiple refs found in datastore for ref %s and chain selector %d: %w", datastore_utils.SprintRef(maybeNormalized), sel, err)
+		} else {
+			return latest, nil
+		}
+	default:
+		// no hits, continue to on-chain resolution
 	}
 
 	// If the cache had no hits, then check if we have the capability to retrieve this info from the chain
