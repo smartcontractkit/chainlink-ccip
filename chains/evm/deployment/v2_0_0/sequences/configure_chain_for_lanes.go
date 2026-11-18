@@ -157,7 +157,7 @@ var ConfigureChainForLanes = cldf_ops.NewSequence(
 			// A FeeQuoter with no gas price for the destination reverts with
 			// NoGasPriceAvailable on the first send, so the lane needs one either already
 			// on chain or supplied with this config.
-			gasPriceUpdate, err := resolveGasPriceUpdate(b, chain, feeQuoterAddr, remoteSelector, remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas)
+			gasPriceUpdate, err := resolveGasPriceUpdate(b, chain, feeQuoterAddr, remoteSelector, remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas, remoteConfig.USDPerUnitGasDefaultOnly)
 			if err != nil {
 				return seqtypes.OnChainOutput{}, err
 			}
@@ -388,6 +388,7 @@ func resolveGasPriceUpdate(
 	feeQuoterAddr common.Address,
 	remoteSelector uint64,
 	desired *big.Int,
+	defaultOnly bool,
 ) (*fee_quoter.GasPriceUpdate, error) {
 	gasPriceReport, err := cldf_ops.ExecuteOperation(b, fee_quoter.GetDestinationChainGasPrice, chain, contract.FunctionInput[uint64]{
 		ChainSelector: chain.Selector,
@@ -401,7 +402,7 @@ func resolveGasPriceUpdate(
 
 	switch {
 	case desired != nil && desired.Sign() > 0:
-		if desired.Cmp(onChainGasPrice) == 0 {
+		if desired.Cmp(onChainGasPrice) == 0 || defaultOnly && onChainGasPrice.Sign() > 0 {
 			return nil, nil
 		}
 		return &fee_quoter.GasPriceUpdate{
@@ -438,7 +439,7 @@ func ValidateGasPricesForLanes(
 ) error {
 	for _, remoteSelector := range slices.Sorted(maps.Keys(remoteChains)) {
 		remoteConfig := remoteChains[remoteSelector]
-		if _, err := resolveGasPriceUpdate(b, chain, feeQuoterAddr, remoteSelector, remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas); err != nil {
+		if _, err := resolveGasPriceUpdate(b, chain, feeQuoterAddr, remoteSelector, remoteConfig.FeeQuoterDestChainConfig.USDPerUnitGas, remoteConfig.USDPerUnitGasDefaultOnly); err != nil {
 			return err
 		}
 	}

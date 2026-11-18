@@ -1227,6 +1227,7 @@ func TestConfigureChainForLanes_RequiresDestinationGasPrice(t *testing.T) {
 		name          string
 		usdPerUnitGas *big.Int
 		seedOnChain   bool
+		defaultOnly   bool
 		wantErr       error
 		wantOnChain   int64
 	}{
@@ -1239,6 +1240,25 @@ func TestConfigureChainForLanes_RequiresDestinationGasPrice(t *testing.T) {
 			name:        "Success - gas price already on the FeeQuoter",
 			seedOnChain: true,
 			wantOnChain: seededGasPrice,
+		},
+		{
+			name:          "Success - default initializes an unset gas price",
+			usdPerUnitGas: big.NewInt(1_000_000),
+			defaultOnly:   true,
+			wantOnChain:   1_000_000,
+		},
+		{
+			name:          "Success - default preserves an existing gas price",
+			usdPerUnitGas: big.NewInt(1_000_000),
+			defaultOnly:   true,
+			seedOnChain:   true,
+			wantOnChain:   seededGasPrice,
+		},
+		{
+			name:          "Success - explicit override replaces an existing gas price",
+			usdPerUnitGas: big.NewInt(42_000),
+			seedOnChain:   true,
+			wantOnChain:   42_000,
 		},
 		{
 			name:    "Failure - no gas price supplied and none on the FeeQuoter",
@@ -1285,6 +1305,7 @@ func TestConfigureChainForLanes_RequiresDestinationGasPrice(t *testing.T) {
 			input := buildConfigureChainForLanesInput(local, chainSelector, remote, remoteChainSelector)
 			rc := input.RemoteChains[remoteChainSelector]
 			rc.FeeQuoterDestChainConfig.USDPerUnitGas = tc.usdPerUnitGas
+			rc.USDPerUnitGasDefaultOnly = tc.defaultOnly
 			input.RemoteChains[remoteChainSelector] = rc
 
 			_, err = operations.ExecuteSequence(
