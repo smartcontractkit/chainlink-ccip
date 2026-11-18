@@ -95,7 +95,7 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     _setInlineDestOverheadConfig(s_a.pcm, s_a.tokens[0], s_b.localSelector, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, 32);
     vm.stopPrank();
 
-    _fundPool(s_a, s_a.tokens[0], 100e18);
+    _approvePool(s_a, s_a.tokens[0], 100e18);
     uint256 poolBefore = _balance(s_a.tokens[0], address(s_a.pool));
     vm.expectRevert(
       abi.encodeWithSelector(

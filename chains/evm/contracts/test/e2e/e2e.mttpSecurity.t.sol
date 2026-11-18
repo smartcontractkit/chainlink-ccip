@@ -88,7 +88,7 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
       s_a.pcm, s_a.tokens[0], s_a.remoteSelector, new address[](0), new address[](0), address(populated)
     );
     assertEq(_transfer(s_a, s_b, 0, 10e18), 10e18, "allowed before switch");
-    _fundPool(s_a, s_a.tokens[0], 10e18);
+    _approvePool(s_a, s_a.tokens[0], 10e18, s_disallowedSender);
     vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_disallowedSender));
     _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_disallowedSender);
 
@@ -100,7 +100,7 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
     );
     vm.stopPrank();
     assertEq(_transfer(s_a, s_b, 0, 10e18), 10e18, "allowed after switch");
-    _fundPool(s_a, s_a.tokens[0], 10e18);
+    _approvePool(s_a, s_a.tokens[0], 10e18, s_disallowedSender);
     vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_disallowedSender));
     _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_disallowedSender);
 
@@ -110,7 +110,7 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
     _setInlineSecurityConfig(
       s_a.pcm, s_a.tokens[0], s_a.remoteSelector, new address[](0), new address[](0), address(enabledEmpty)
     );
-    _fundPool(s_a, s_a.tokens[0], 10e18);
+    _approvePool(s_a, s_a.tokens[0], 10e18);
     vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_allowedSender));
     _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
 
@@ -122,7 +122,7 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
     );
     vm.stopPrank();
     assertTrue(enabledEmptyReplacement.getAllowListEnabled(), "replacement keeps the allowlist enabled");
-    _fundPool(s_a, s_a.tokens[0], 10e18);
+    _approvePool(s_a, s_a.tokens[0], 10e18);
     vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_allowedSender));
     _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
   }
@@ -156,7 +156,7 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
 
     // A later global deny applies to the inherited target.
     engine.setDefaultPolicyAllow(false);
-    _fundPool(s_a, s_a.tokens[0], 10e18);
+    _approvePool(s_a, s_a.tokens[0], 10e18);
     vm.expectRevert();
     _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
 
@@ -167,7 +167,7 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
     // An explicit deny survives a global allow.
     engine.setTargetDefaultPolicyAllow(address(hook2), false);
     engine.setDefaultPolicyAllow(true);
-    _fundPool(s_a, s_a.tokens[0], 10e18);
+    _approvePool(s_a, s_a.tokens[0], 10e18);
     vm.expectRevert();
     _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
   }

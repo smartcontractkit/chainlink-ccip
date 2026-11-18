@@ -106,11 +106,13 @@ contract e2e_mttpCore is e2e_mttpSetup {
     assertEq(_balance(s_a.tokens[0], address(s_a.pool)) - poolBefore, 0, "no fee");
 
     // Disallowed sender reverts on the preflight hook, and no burn is committed.
-    _fundPool(s_a, s_a.tokens[0], 100e18);
+    _approvePool(s_a, s_a.tokens[0], 100e18, s_disallowedSender);
+    uint256 senderBeforeReject = _balance(s_a.tokens[0], s_disallowedSender);
     uint256 poolBeforeReject = _balance(s_a.tokens[0], address(s_a.pool));
     vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_disallowedSender));
     _lockOrBurn(s_a, s_b, 0, 100e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_disallowedSender);
     assertEq(_balance(s_a.tokens[0], address(s_a.pool)), poolBeforeReject, "no burn on hook rejection");
+    assertEq(_balance(s_a.tokens[0], s_disallowedSender), senderBeforeReject, "sender unchanged on hook rejection");
 
     // allowed message still delivers.
     uint256 received = _deliver(s_b, s_a, s_b.tokens[0], postFee, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
@@ -130,7 +132,7 @@ contract e2e_mttpCore is e2e_mttpSetup {
     assertEq(received, 100e18, "T1 first send");
 
     // T1 cannot send again. The bucket is empty and refills at 1 wei per second, so the next 1e18 needs 1e18 seconds.
-    _fundPool(s_a, s_a.tokens[0], 1e18);
+    _approvePool(s_a, s_a.tokens[0], 1e18);
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.TokenRateLimitReached.selector, 1e18, 0, s_a.tokens[0]));
     _lockOrBurn(s_a, s_b, 0, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
 
@@ -185,16 +187,19 @@ contract e2e_mttpCore is e2e_mttpSetup {
 
     // T2 and T3 cannot send. Rejected sends leave balances and fees unchanged.
     for (uint256 i = 1; i < 3; ++i) {
+      uint256 senderBefore = _balance(s_a.tokens[i], s_allowedSender);
       uint256 poolBefore = _balance(s_a.tokens[i], address(s_a.pool));
       uint256 receiverBefore = _balance(s_b.tokens[i], s_receiver);
-      _fundPool(s_a, s_a.tokens[i], 100e18);
+      _approvePool(s_a, s_a.tokens[i], 100e18);
       vm.expectRevert(
         abi.encodeWithSelector(
           ConnectionPolicyStore.SubsetTokenNotFound.selector, CONNECTION_POLICY, s_a.remoteSelector, s_a.tokens[i]
         )
       );
       _lockOrBurn(s_a, s_b, i, 100e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-      // The funding and the rejected send are one transaction, so the pool is untouched.
+      // transferFrom and lockOrBurn share one call, so rejection leaves every balance unchanged.
+      assertEq(_balance(s_a.tokens[i], s_allowedSender), senderBefore, "sender unchanged on rejected send");
+      assertEq(_balance(s_a.tokens[i], address(s_a.harness)), 0, "no tokens stranded in harness");
       assertEq(_balance(s_a.tokens[i], address(s_a.pool)), poolBefore, "no burn on rejected send");
       assertEq(_balance(s_b.tokens[i], s_receiver), receiverBefore, "no mint on rejected send");
     }
@@ -205,7 +210,7 @@ contract e2e_mttpCore is e2e_mttpSetup {
     assertEq(_transfer(s_a, s_b, 1, 100e18), 100e18, "T2 transfers after activation");
 
     // T3 remains excluded.
-    _fundPool(s_a, s_a.tokens[2], 100e18);
+    _approvePool(s_a, s_a.tokens[2], 100e18);
     vm.expectRevert(
       abi.encodeWithSelector(
         ConnectionPolicyStore.SubsetTokenNotFound.selector, CONNECTION_POLICY, s_a.remoteSelector, s_a.tokens[2]

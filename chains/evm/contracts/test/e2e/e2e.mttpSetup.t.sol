@@ -24,6 +24,7 @@ import {TokenFixture} from "../TokenFixture.t.sol";
 import {AuthorizedCallers} from "@chainlink/contracts/src/v0.8/shared/access/AuthorizedCallers.sol";
 
 import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Remote token address provider backed by explicit mappings. The spec wants a provider for policy
 /// connections. SameAddressRemoteTokenAddressProvider only works when the local and remote token addresses match, and
@@ -173,6 +174,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
       ICrossChainTokenLike(c.tokens[i]).grantMintAndBurnRoles(address(c.pool));
       ICrossChainTokenLike(c.tokens[i]).grantMintAndBurnRoles(OWNER);
       ICrossChainTokenLike(c.tokens[i]).mint(s_allowedSender, 1e30);
+      ICrossChainTokenLike(c.tokens[i]).mint(s_disallowedSender, 1e30);
     }
 
     // Same as Router.applyRampUpdates: the pool accepts the local onRamp and offRamp.
@@ -278,7 +280,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
   // │                       Transfer helpers                       │
   // ================================================================
 
-  /// @dev Funds the source pool and calls lockOrBurn, returning the pool data and the amount after the token fee.
+  /// @dev Approves the harness, then atomically pulls the sender's tokens and burns the post-fee amount.
   function _send(
     MttpChain storage src,
     MttpChain storage dst,
@@ -287,8 +289,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
     bytes4 finality,
     address originalSender
   ) internal returns (bytes memory destPoolData, uint256 destAmount, bytes memory destTokenAddress) {
-    // The Router transfers the amount to the pool before calling lockOrBurn.
-    _fundPool(src, src.tokens[tokenIndex], amount);
+    _approvePool(src, src.tokens[tokenIndex], amount, originalSender);
     return _lockOrBurn(src, dst, tokenIndex, amount, finality, originalSender);
   }
 
@@ -476,14 +477,24 @@ abstract contract e2e_mttpSetup is TokenFixture {
     );
   }
 
-  /// @dev Stands in for the sender funding the Router, which then moves the amount into the pool inside the same
-  /// transaction. The harness holds the amount until lockOrBurn runs, so a rejected send leaves the pool untouched.
-  function _fundPool(
+  /// @dev Approval does not move funds. The harness pulls tokens inside the same call as lockOrBurn, so a
+  /// rejection restores the sender's balance, the pool balance and the allowance.
+  function _approvePool(
     MttpChain storage c,
     address token,
     uint256 amount
   ) internal {
-    _fundAddress(token, address(c.harness), amount);
+    _approvePool(c, token, amount, s_allowedSender);
+  }
+
+  function _approvePool(
+    MttpChain storage c,
+    address token,
+    uint256 amount,
+    address sender
+  ) internal {
+    vm.prank(sender);
+    IERC20(token).approve(address(c.harness), amount);
   }
 
   function _fundAddress(
@@ -1019,6 +1030,8 @@ abstract contract e2e_mttpSetup is TokenFixture {
 /// @notice Stands in for the Router: moves the amount into the pool and calls lockOrBurn in one transaction, so a
 /// rejected send rolls the funding back with it.
 contract MttpRouterHarness {
+  using SafeERC20 for IERC20;
+
   function forward(
     address token,
     address pool,
@@ -1026,7 +1039,7 @@ contract MttpRouterHarness {
     bytes4 finality,
     bytes calldata tokenArgs
   ) external returns (bytes memory destPoolData, uint256 destAmount, bytes memory destTokenAddress) {
-    IERC20(token).transfer(pool, lockOrBurnIn.amount);
+    IERC20(token).safeTransferFrom(lockOrBurnIn.originalSender, pool, lockOrBurnIn.amount);
     (Pool.LockOrBurnOutV1 memory out, uint256 postFeeAmount) =
       BurnMintMultiTokenPool(pool).lockOrBurn(lockOrBurnIn, finality, tokenArgs);
     return (out.destPoolData, postFeeAmount, out.destTokenAddress);
