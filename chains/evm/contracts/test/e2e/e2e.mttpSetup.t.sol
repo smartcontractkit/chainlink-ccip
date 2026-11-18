@@ -52,7 +52,7 @@ contract MappingRemoteTokenAddressProvider is IRemoteTokenAddressProvider {
 /// @dev Each chain has T1/T2/T3 (6 tokens total), one BurnMintMultiTokenPool, one PoolConfigManager and the three
 /// stores. The pool config manager is an authorized caller on its stores, and the pool is registered in the token
 /// admin registry for every token. The baseline is a working long-format lane in both directions: no fees, rate limits disabled, minimum destination overhead, and no hook or
-/// CCVs.
+/// CCVs. These are pool integration tests: ramps and replay protection are outside this harness.
 abstract contract e2e_mttpSetup is TokenFixture {
   // One policy name per type so a swapped field fails the assertions.
   bytes32 internal constant CONNECTION_POLICY = "CONNECTION";
@@ -1011,9 +1011,9 @@ abstract contract e2e_mttpSetup is TokenFixture {
       offchainTokenData: ""
     });
 
+    address pool = dst.tar.getPool(localToken);
     vm.prank(dst.offRamp);
-    (success,) =
-      address(dst.pool).call{gas: gasLimit}(abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, finality)));
+    (success,) = pool.call{gas: gasLimit}(abi.encodeCall(IPoolV2.releaseOrMint, (releaseOrMintIn, finality)));
     return success;
   }
 

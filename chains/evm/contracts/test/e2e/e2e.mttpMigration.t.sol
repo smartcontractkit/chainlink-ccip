@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IPoolV2} from "../../interfaces/IPoolV2.sol";
+
+import {FeeQuoter} from "../../FeeQuoter.sol";
 import {IPoolConfigManager} from "../../interfaces/IPoolConfigManager.sol";
 
 import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
+import {Internal} from "../../libraries/Internal.sol";
 import {PolicyConfig} from "../../libraries/PolicyConfig.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {ConnectionPolicyStore} from "../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
 import {FeePolicyStore} from "../../pools/MultiTokenPool/policies/FeePolicyStore.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 import {e2e_mttpSetup} from "./e2e.mttpSetup.t.sol";
+
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
 
 /// @notice Migration behavior: moving from normal single-token pools to MTTP in stages. Covers retained transitional
 /// messages, the legacy pool data formats, remote trust repair, retry with realistic gas, and policy adoption after
@@ -281,22 +288,59 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     assertEq(received, 10e18, "policy-trusted remote MTTP works");
   }
 
-  /// @dev Retries a retained message with realistic gas. The message fails under the destination overhead the source
-  /// quoted, then succeeds with a larger budget and pays out once.
+  /// @dev Uses the active legacy pool's FeeQuoter fallback, captured before the transfer, for both gas budgets.
+  /// This is pool-call gas recovery; OffRamp execution state and replay protection are covered separately.
   function test_mttp_retryWithRealisticGas() public {
-    address legacyT1B;
+    _assertRetryWithLegacyQuote(false);
+  }
+
+  function test_mttp_retryWithCustomLegacyPoolQuote() public {
+    _assertRetryWithLegacyQuote(true);
+  }
+
+  function _assertRetryWithLegacyQuote(
+    bool customPoolFee
+  ) internal {
     vm.startPrank(OWNER);
-    legacyT1B = _deployLegacyPoolOn(s_b, s_a, 0);
+    address legacyT1B = _deployLegacyPoolOn(s_b, s_a, 0);
+    address legacyT1A = _deployLegacyPoolOn(s_a, s_b, 0);
     _setMigrationRemotePool(s_a, 0, s_b.localSelector, legacyT1B, false, true);
+    FeeQuoter feeQuoter = _deployLegacyFeeQuoter();
+    if (customPoolFee) {
+      TokenPool.TokenTransferFeeConfigArgs[] memory configs = new TokenPool.TokenTransferFeeConfigArgs[](1);
+      configs[0] = TokenPool.TokenTransferFeeConfigArgs({
+        destChainSelector: s_a.localSelector,
+        tokenTransferFeeConfig: IPoolV2.TokenTransferFeeConfig({
+          finalityFeeUSDCents: 1,
+          fastFinalityFeeUSDCents: 1,
+          finalityTransferFeeBps: 0,
+          fastFinalityTransferFeeBps: 0,
+          destGasOverhead: 85_000,
+          destBytesOverhead: 32,
+          isEnabled: true
+        })
+      });
+      BurnMintTokenPool(legacyT1B).applyTokenTransferFeeConfigUpdates(configs, new uint64[](0));
+    }
     vm.stopPrank();
 
-    // A source message produced before the cutover, deferred.
+    // OnRamp resolves the TAR pool first, then uses its custom fee or the FeeQuoter fallback.
+    assertEq(s_b.tar.getPool(s_b.tokens[0]), legacyT1B, "legacy source is still registered");
+    uint32 quotedGas = _quotedDestGasOverhead(s_b, 0, 100e18, feeQuoter);
+    assertEq(quotedGas, customPoolFee ? 85_000 : DEFAULT_TOKEN_DEST_GAS_OVERHEAD, "active legacy lane quote");
+
+    // An MTTP-only config change must not alter a quote while the legacy pool is registered.
+    vm.prank(OWNER);
+    _setInlineDestOverheadConfig(s_b.pcm, s_b.tokens[0], s_a.localSelector, 1_000_000, MIN_DEST_BYTES_OVERHEAD);
+    assertEq(_quotedDestGasOverhead(s_b, 0, 100e18, feeQuoter), quotedGas, "inactive MTTP quote is ignored");
+
     (bytes memory poolData, uint256 postFee) = _legacyLockOrBurn(legacyT1B, s_b, s_a, 0, 100e18);
-
-    uint32 destGasOverhead = _fee(s_b.pcm, s_b.tokens[0], s_a.localSelector).destGasOverhead;
-    assertEq(destGasOverhead, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, "source quotes the configured B->A overhead");
-
+    vm.startPrank(OWNER);
+    _switchPool(s_a, 0, address(s_a.pool));
+    _revokeMintAndBurnRoles(s_a.tokens[0], legacyT1A);
+    vm.stopPrank();
     uint256 receiverBefore = _balance(s_a.tokens[0], s_receiver);
+    uint256 supplyBefore = IERC20(s_a.tokens[0]).totalSupply();
     bool success = _tryDeliver(
       s_a,
       s_b.localSelector,
@@ -305,12 +349,12 @@ contract e2e_mttpMigration is e2e_mttpSetup {
       postFee,
       poolData,
       FinalityCodec.WAIT_FOR_FINALITY_FLAG,
-      destGasOverhead
+      quotedGas
     );
-    assertFalse(success, "the quoted overhead alone cannot execute the receive");
-    assertEq(_balance(s_a.tokens[0], s_receiver), receiverBefore, "no mint under the quoted overhead");
+    assertFalse(success, "the legacy quoted overhead alone cannot execute the MTTP receive");
+    assertEq(_balance(s_a.tokens[0], s_receiver), receiverBefore, "no payout on failed attempt");
+    assertEq(IERC20(s_a.tokens[0]).totalSupply(), supplyBefore, "no mint on failed attempt");
 
-    // The same message with a sufficient budget executes and pays out once.
     uint256 gasBefore = gasleft();
     success = _tryDeliver(
       s_a,
@@ -320,12 +364,47 @@ contract e2e_mttpMigration is e2e_mttpSetup {
       postFee,
       poolData,
       FinalityCodec.WAIT_FOR_FINALITY_FLAG,
-      destGasOverhead * 2
+      uint256(quotedGas) * 2
     );
     uint256 gasUsed = gasBefore - gasleft();
-    assertTrue(success, "retry with a sufficient budget succeeds");
-    assertEq(_balance(s_a.tokens[0], s_receiver), receiverBefore + 100e18, "one payout only");
-    assertGt(gasUsed, 0, "receive gas measured");
-    emit log_named_uint("measured receive gas", gasUsed);
+    assertTrue(success, "retry with twice the captured quote succeeds");
+    assertEq(_balance(s_a.tokens[0], s_receiver), receiverBefore + postFee, "one successful payout");
+    assertEq(IERC20(s_a.tokens[0]).totalSupply(), supplyBefore + postFee, "one successful mint");
+    emit log_named_uint("measured receive gas including test harness overhead", gasUsed);
+  }
+
+  /// @dev A real FeeQuoter with B->A lane defaults; no token-specific override.
+  function _deployLegacyFeeQuoter() internal returns (FeeQuoter) {
+    FeeQuoter.DestChainConfigArgs[] memory lanes = new FeeQuoter.DestChainConfigArgs[](1);
+    FeeQuoter.DestChainConfig memory config;
+    config.isEnabled = true;
+    config.defaultTokenDestGasOverhead = DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
+    config.defaultTxGasLimit = GAS_LIMIT;
+    config.maxPerMsgGasLimit = 3_000_000;
+    config.linkFeeMultiplierPercent = 100;
+    config.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
+    lanes[0] = FeeQuoter.DestChainConfigArgs({destChainSelector: s_a.localSelector, destChainConfig: config});
+    return new FeeQuoter(
+      FeeQuoter.StaticConfig({maxFeeJuelsPerMsg: 1e18, linkToken: s_b.tokens[0]}),
+      new address[](0),
+      new FeeQuoter.TokenTransferFeeConfigArgs[](0),
+      lanes
+    );
+  }
+
+  /// @dev Mirrors OnRamp's pool-first, FeeQuoter-second selection for these IPoolV2 fixtures.
+  function _quotedDestGasOverhead(
+    MttpChain storage src,
+    uint256 tokenIndex,
+    uint256 amount,
+    FeeQuoter feeQuoter
+  ) internal view returns (uint32 overhead) {
+    address token = src.tokens[tokenIndex];
+    bool hasCustomFee;
+    (, overhead,,, hasCustomFee) = IPoolV2(src.tar.getPool(token))
+      .getFee(token, src.remoteSelector, amount, address(0), FinalityCodec.WAIT_FOR_FINALITY_FLAG, "");
+    if (!hasCustomFee) {
+      (, overhead,) = feeQuoter.getTokenTransferFee(src.remoteSelector, token);
+    }
   }
 }
