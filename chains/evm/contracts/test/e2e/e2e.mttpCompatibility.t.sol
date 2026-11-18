@@ -21,10 +21,16 @@ contract e2e_mttpCompatibility is e2e_mttpSetup {
     vm.stopPrank();
 
     uint256 amount = 1_234_567_890_123_456_789; // 1.234567890123456789 with 18 decimals.
-    (bytes memory poolData, uint256 postFee,) =
+    (bytes memory poolData, uint256 postFee, bytes memory destTokenAddress) =
       _send(s_a, s_b, 0, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
     uint256 received = _deliverFromPool(
-      s_b, s_a.localSelector, address(s_a.pool), dest6, postFee, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+      s_b,
+      s_a.localSelector,
+      address(s_a.pool),
+      abi.decode(destTokenAddress, (address)),
+      postFee,
+      poolData,
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
     assertEq(received, amount / 1e12, "18 to 6 floor scaling");
     assertEq(_balance(dest6, s_receiver), received, "exact minted amount");
