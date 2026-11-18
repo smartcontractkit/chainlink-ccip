@@ -11,17 +11,16 @@ import {IPolicyEngine} from "@chainlink/policy-management/interfaces/IPolicyEngi
 /// replacement.
 contract e2e_mttpSecurity is e2e_mttpSetup {
   /// @dev A wrong source token cannot mint another asset. Long-format pool data carries the source token, so
-  /// delivering T1's data to T2 is rejected, and the already-emitted message cannot be repaired by changing the
-  /// source.
+  /// delivering T1's data to T2, or T2's data to T1, is rejected. The emitted data names the source token, so the
+  /// mismatch cannot be repaired by changing which token the source pool points at.
   function test_mttp_wrongSourceTokenCannotMintAnotherAsset() public {
     // The correct pairing works.
     assertEq(_transfer(s_a, s_b, 0, 10e18), 10e18, "correct T1 pairing");
 
-    // Produce long-format pool data for T1 and deliver it to T2 on B.
+    // T1's long-format pool data delivered to T2 on B is rejected.
     (bytes memory poolData, uint256 postFee,) =
       _send(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
     uint256 t2ReceiverBefore = _balance(s_b.tokens[1], s_receiver);
-
     vm.expectRevert(
       abi.encodeWithSelector(
         ConnectionPolicyStore.SourceTokenMismatch.selector,
@@ -34,12 +33,23 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
     _deliver(s_b, s_a, s_b.tokens[1], postFee, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     assertEq(_balance(s_b.tokens[1], s_receiver), t2ReceiverBefore, "no T2 mint on mismatch");
 
-    // Can't fix an already-emitted message by changing the source; still fails against T2.
-    vm.expectRevert();
-    _deliver(s_b, s_a, s_b.tokens[1], postFee, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
-    assertEq(_balance(s_b.tokens[1], s_receiver), t2ReceiverBefore, "still no T2 mint");
+    // The reverse misroute fails too: T2's data delivered to T1 on B.
+    (bytes memory t2Data, uint256 t2PostFee,) =
+      _send(s_a, s_b, 1, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
+    uint256 t1ReceiverBefore = _balance(s_b.tokens[0], s_receiver);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        ConnectionPolicyStore.SourceTokenMismatch.selector,
+        s_b.tokens[0],
+        s_a.localSelector,
+        abi.encode(s_a.tokens[0]),
+        abi.encode(s_a.tokens[1])
+      )
+    );
+    _deliver(s_b, s_a, s_b.tokens[0], t2PostFee, t2Data, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    assertEq(_balance(s_b.tokens[0], s_receiver), t1ReceiverBefore, "no T1 mint on reverse mismatch");
 
-    // Same message to its matching token succeeds.
+    // The same immutable T1 message delivered to its matching token succeeds.
     uint256 received = _deliver(s_b, s_a, s_b.tokens[0], postFee, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
     assertEq(received, 10e18, "legitimate pairing recovers");
   }
@@ -93,6 +103,28 @@ contract e2e_mttpSecurity is e2e_mttpSetup {
     _fundPool(s_a, s_a.tokens[0], 10e18);
     vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_disallowedSender));
     _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_disallowedSender);
+
+    // An enabled-empty hook stays deny-all across a replacement. Rebuilding the list from getAllowList() returns
+    // [] and would silently disable the allowlist, so the replacement is built from [address(0)].
+    vm.prank(OWNER);
+    _setInlineSecurityConfig(
+      s_a.pcm, s_a.tokens[0], s_a.remoteSelector, new address[](0), new address[](0), address(enabledEmpty)
+    );
+    _fundPool(s_a, s_a.tokens[0], 10e18);
+    vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_allowedSender));
+    _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
+
+    vm.startPrank(OWNER);
+    MultiTokenPoolHooks enabledEmptyReplacement =
+      new MultiTokenPoolHooks(_arrayOf(address(0)), IPolicyEngine(address(0)), _arrayOf(address(s_a.pool)));
+    _setInlineSecurityConfig(
+      s_a.pcm, s_a.tokens[0], s_a.remoteSelector, new address[](0), new address[](0), address(enabledEmptyReplacement)
+    );
+    vm.stopPrank();
+    assertTrue(enabledEmptyReplacement.getAllowListEnabled(), "replacement keeps the allowlist enabled");
+    _fundPool(s_a, s_a.tokens[0], 10e18);
+    vm.expectRevert(abi.encodeWithSelector(MultiTokenPoolHooks.SenderNotAllowed.selector, s_allowedSender));
+    _lockOrBurn(s_a, s_b, 0, 10e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
   }
 
   /// @dev Replacing the ACE hook preserves default inheritance. A fresh hook with no explicit target default

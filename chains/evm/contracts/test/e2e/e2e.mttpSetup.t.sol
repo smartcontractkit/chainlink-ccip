@@ -95,6 +95,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
     SecurityPolicyStore securityStore;
     PoolConfigManager pcm;
     BurnMintMultiTokenPool pool;
+    MttpRouterHarness harness;
     MappingRemoteTokenAddressProvider remoteTokenProvider;
     address[3] tokens; // T1, T2, T3 on this chain.
   }
@@ -142,7 +143,10 @@ abstract contract e2e_mttpSetup is TokenFixture {
     c.localSelector = localSelector;
     c.remoteSelector = remoteSelector;
     c.router = router;
-    c.onRamp = makeAddr(string.concat("onRamp", label));
+    // The Router funds the pool and calls lockOrBurn in one transaction. The harness does the same, so a rejected
+    // send rolls the funding back with it.
+    c.harness = new MttpRouterHarness();
+    c.onRamp = address(c.harness);
     c.offRamp = makeAddr(string.concat("offRamp", label));
     c.tar = new TokenAdminRegistry();
 
@@ -288,8 +292,8 @@ abstract contract e2e_mttpSetup is TokenFixture {
     return _lockOrBurn(src, dst, tokenIndex, amount, finality, originalSender);
   }
 
-  /// @dev Calls lockOrBurn on a pool that already holds the amount. Split out from _send so a test can put
-  /// expectRevert directly on the pool call, since expectRevert only covers the next external call.
+  /// @dev Calls the router harness, which moves the amount from the sender into the pool and calls lockOrBurn in one
+  /// transaction. Split out from _send so a test can put expectRevert directly on that call.
   function _lockOrBurn(
     MttpChain storage src,
     MttpChain storage dst,
@@ -306,9 +310,7 @@ abstract contract e2e_mttpSetup is TokenFixture {
       localToken: src.tokens[tokenIndex]
     });
 
-    vm.prank(src.onRamp);
-    (Pool.LockOrBurnOutV1 memory out, uint256 postFeeAmount) = src.pool.lockOrBurn(lockOrBurnIn, finality, "");
-    return (out.destPoolData, postFeeAmount, out.destTokenAddress);
+    return src.harness.forward(src.tokens[tokenIndex], address(src.pool), lockOrBurnIn, finality, "");
   }
 
   /// @dev Sends and delivers in one call, and also returns the fee that stayed on the source pool.
@@ -319,9 +321,11 @@ abstract contract e2e_mttpSetup is TokenFixture {
     uint256 amount
   ) internal returns (uint256 received, uint256 fee) {
     uint256 poolBefore = _balance(src.tokens[tokenIndex], address(src.pool));
-    (bytes memory poolData, uint256 postFeeAmount,) =
+    (bytes memory poolData, uint256 postFeeAmount, bytes memory destTokenAddress) =
       _send(src, dst, tokenIndex, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-    received = _deliver(dst, src, dst.tokens[tokenIndex], postFeeAmount, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    received = _deliver(
+      dst, src, abi.decode(destTokenAddress, (address)), postFeeAmount, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
     fee = _balance(src.tokens[tokenIndex], address(src.pool)) - poolBefore;
     return (received, fee);
   }
@@ -464,19 +468,22 @@ abstract contract e2e_mttpSetup is TokenFixture {
     uint256 tokenIndex,
     uint256 amount
   ) internal returns (uint256 destAmount) {
-    (bytes memory poolData, uint256 postFeeAmount,) =
+    (bytes memory poolData, uint256 postFeeAmount, bytes memory destTokenAddress) =
       _send(src, dst, tokenIndex, amount, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-    return _deliver(dst, src, dst.tokens[tokenIndex], postFeeAmount, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG);
+    // Deliver to the token the source pool chose, so a wrong remote-token mapping fails here.
+    return _deliver(
+      dst, src, abi.decode(destTokenAddress, (address)), postFeeAmount, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
   }
 
-  /// @dev Stands in for the Router, which moves the amount from the sender into the pool before calling lockOrBurn.
-  /// The fee stays on the pool's balance because the pool only burns the amount after the fee.
+  /// @dev Stands in for the sender funding the Router, which then moves the amount into the pool inside the same
+  /// transaction. The harness holds the amount until lockOrBurn runs, so a rejected send leaves the pool untouched.
   function _fundPool(
     MttpChain storage c,
     address token,
     uint256 amount
   ) internal {
-    _fundAddress(token, address(c.pool), amount);
+    _fundAddress(token, address(c.harness), amount);
   }
 
   function _fundAddress(
@@ -853,9 +860,43 @@ abstract contract e2e_mttpSetup is TokenFixture {
     pools[0] = IPoolConfigManager.RemotePool({
       remotePoolAddress: abi.encode(remotePool), allowLegacyPoolDataOnReceive: allowLegacyOnReceive
     });
+    _setMigrationRemotePools(c, tokenIndex, remoteChainSelector, useLegacyOnSend, pools);
+  }
+
+  /// @dev Sets an inline remote pool record from an explicit pool list, so a migration can keep the old pool trusted
+  /// while it adds the new one.
+  function _setMigrationRemotePools(
+    MttpChain storage c,
+    uint256 tokenIndex,
+    uint64 remoteChainSelector,
+    bool useLegacyOnSend,
+    IPoolConfigManager.RemotePool[] memory pools
+  ) internal {
     ConnectionPolicyStore.RemotePoolConfig memory config =
       ConnectionPolicyStore.RemotePoolConfig({useLegacyPoolDataOnSend: useLegacyOnSend, remotePools: pools});
     _setInlineRemotePoolConfig(c.pcm, c.tokens[tokenIndex], remoteChainSelector, false, config);
+  }
+
+  /// @dev A remote-pool list that keeps the legacy pool trusted for the short-format cohort and adds the MTTP for
+  /// long-format sends.
+  function _legacyThenMttpPools(
+    address legacyPool,
+    address mttp
+  ) internal pure returns (IPoolConfigManager.RemotePool[] memory pools) {
+    pools = new IPoolConfigManager.RemotePool[](2);
+    pools[0] =
+      IPoolConfigManager.RemotePool({remotePoolAddress: abi.encode(legacyPool), allowLegacyPoolDataOnReceive: true});
+    pools[1] = IPoolConfigManager.RemotePool({remotePoolAddress: abi.encode(mttp), allowLegacyPoolDataOnReceive: false});
+    return pools;
+  }
+
+  /// @dev Revokes a retired pool's mint and burn roles so it can no longer serve its token. Call as OWNER.
+  function _revokeMintAndBurnRoles(
+    address token,
+    address pool
+  ) internal {
+    ICrossChainTokenLike(token).revokeRole(ICrossChainTokenLike(token).MINTER_ROLE(), pool);
+    ICrossChainTokenLike(token).revokeRole(ICrossChainTokenLike(token).BURNER_ROLE(), pool);
   }
 
   /// @dev Calls lockOrBurn on a legacy pool and returns the 32-byte legacy pool data it produces.
@@ -975,11 +1016,37 @@ abstract contract e2e_mttpSetup is TokenFixture {
   }
 }
 
+/// @notice Stands in for the Router: moves the amount into the pool and calls lockOrBurn in one transaction, so a
+/// rejected send rolls the funding back with it.
+contract MttpRouterHarness {
+  function forward(
+    address token,
+    address pool,
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn,
+    bytes4 finality,
+    bytes calldata tokenArgs
+  ) external returns (bytes memory destPoolData, uint256 destAmount, bytes memory destTokenAddress) {
+    IERC20(token).transfer(pool, lockOrBurnIn.amount);
+    (Pool.LockOrBurnOutV1 memory out, uint256 postFeeAmount) =
+      BurnMintMultiTokenPool(pool).lockOrBurn(lockOrBurnIn, finality, tokenArgs);
+    return (out.destPoolData, postFeeAmount, out.destTokenAddress);
+  }
+}
+
 /// @dev The CrossChainToken functions these tests call. The full token interface pulls in a lot of extra imports.
 interface ICrossChainTokenLike {
   function grantMintAndBurnRoles(
     address burnMintPool
   ) external;
+
+  function revokeRole(
+    bytes32 role,
+    address account
+  ) external;
+
+  function MINTER_ROLE() external view returns (bytes32);
+
+  function BURNER_ROLE() external view returns (bytes32);
 
   function mint(
     address account,

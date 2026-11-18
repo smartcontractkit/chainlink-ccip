@@ -125,8 +125,9 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     vm.startPrank(OWNER);
     _switchPool(s_b, 0, address(s_b.pool));
     _setMigrationRemotePool(s_b, 0, s_a.localSelector, address(s_a.pool), false, true);
-    // A now trusts B's MTTP for B's long sends, and keeps sending legacy until it switches.
-    _setMigrationRemotePool(s_a, 0, s_b.localSelector, address(s_b.pool), true, true);
+    // A trusts B's MTTP for B's long sends, keeps the legacy source entry for messages already in
+    // flight, and keeps sending legacy until it switches.
+    _setMigrationRemotePools(s_a, 0, s_b.localSelector, true, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
     vm.stopPrank();
 
     // The retained A->B short message executes once against B's MTTP.
@@ -150,9 +151,9 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     );
     assertEq(received, 50e18, "B->A long send succeeds");
 
-    // Switch A to long format.
+    // Switch A to long format, keeping the legacy source entry for messages already in flight.
     vm.prank(OWNER);
-    _setMigrationRemotePool(s_a, 0, s_b.localSelector, address(s_b.pool), false, true);
+    _setMigrationRemotePools(s_a, 0, s_b.localSelector, false, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
 
     (bytes memory aData, uint256 aAmount,) =
       _send(s_a, s_b, 0, 50e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
@@ -168,11 +169,11 @@ contract e2e_mttpMigration is e2e_mttpSetup {
 
     // Produce one more legacy message by temporarily reverting A to legacy sends, then disable again.
     vm.prank(OWNER);
-    _setMigrationRemotePool(s_a, 0, s_b.localSelector, address(s_b.pool), true, true);
+    _setMigrationRemotePools(s_a, 0, s_b.localSelector, true, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
     (bytes memory leftoverData, uint256 leftoverAmount,) =
       _send(s_a, s_b, 0, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
     vm.prank(OWNER);
-    _setMigrationRemotePool(s_a, 0, s_b.localSelector, address(s_b.pool), false, true);
+    _setMigrationRemotePools(s_a, 0, s_b.localSelector, false, _legacyThenMttpPools(legacyT1B, address(s_b.pool)));
 
     vm.expectRevert(
       abi.encodeWithSelector(ConnectionPolicyStore.LegacyPoolDataNotAllowed.selector, s_b.tokens[0], s_a.localSelector)
@@ -187,10 +188,18 @@ contract e2e_mttpMigration is e2e_mttpSetup {
       FinalityCodec.WAIT_FOR_FINALITY_FLAG
     );
 
-    // Historical normal-pool receive entries are retained: B's legacy pool still accepts A's MTTP.
-    uint256 legacyReceived =
-      _legacyReleaseOrMint(legacyT1B, s_b, s_a.localSelector, address(s_a.pool), 0, leftoverAmount, leftoverData);
-    assertEq(legacyReceived, 1e18, "legacy pool retains historical receive");
+    // Save a B->A legacy transfer from the retired pool while it still has its roles, then revoke them.
+    (bytes memory savedData, uint256 savedAmount) = _legacyLockOrBurn(legacyT1B, s_b, s_a, 0, 1e18);
+    vm.startPrank(OWNER);
+    _revokeMintAndBurnRoles(s_b.tokens[0], legacyT1B);
+    vm.stopPrank();
+
+    // A's retained legacy remote-pool entry lets the saved B->A transfer settle on A's active pool even
+    // after the retired pool can no longer mint or burn.
+    uint256 legacyReceived = _deliverFromPool(
+      s_a, s_b.localSelector, legacyT1B, s_a.tokens[0], savedAmount, savedData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    );
+    assertEq(legacyReceived, 1e18, "saved B->A legacy transfer settles after the retired pool is revoked");
   }
 
   /// @dev Adopts policies after migration while keeping an inline remote pool record that still trusts the old
@@ -199,6 +208,12 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     address legacyT1B;
     vm.startPrank(OWNER);
     legacyT1B = _deployLegacyPoolOn(s_b, s_a, 0);
+    vm.stopPrank();
+
+    // A message from T1's old normal source, produced and saved while it is still B's registered pool.
+    (bytes memory retainedData, uint256 retainedAmount) = _legacyLockOrBurn(legacyT1B, s_b, s_a, 0, 40e18);
+
+    vm.startPrank(OWNER);
     // Legacy pool is the old source; B's live T1 pool is the MTTP here.
     _switchPool(s_b, 0, address(s_b.pool));
 
@@ -214,9 +229,6 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     _setRateLimitPolicyConfig(s_a.pcm, RATE_LIMIT_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _rateLimit(100e18));
     _setInlineRateLimitConfig(s_a.pcm, s_a.tokens[0], s_b.localSelector, _rateLimit(50e18));
     vm.stopPrank();
-
-    // A retained message from T1's old normal source, produced before adoption.
-    (bytes memory retainedData, uint256 retainedAmount) = _legacyLockOrBurn(legacyT1B, s_b, s_a, 0, 40e18);
 
     // Transfer T1 during adoption, consuming the inline bucket.
     (uint256 received,) = _sendAndDeliver(s_a, s_b, 0, 40e18);
@@ -255,8 +267,8 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     assertEq(received, 10e18, "policy-trusted remote MTTP works");
   }
 
-  /// @dev Retries a retained message with realistic gas. The message fails under a low gas limit, then succeeds
-  /// on retry and pays out once. The configured destination overhead is a price input, not a cap on the pool call.
+  /// @dev Retries a retained message with realistic gas. The message fails under the destination overhead the source
+  /// quoted, then succeeds with a larger budget and pays out once.
   function test_mttp_retryWithRealisticGas() public {
     address legacyT1B;
     vm.startPrank(OWNER);
@@ -267,27 +279,39 @@ contract e2e_mttpMigration is e2e_mttpSetup {
     // A source message produced before the cutover, deferred.
     (bytes memory poolData, uint256 postFee) = _legacyLockOrBurn(legacyT1B, s_b, s_a, 0, 100e18);
 
-    // A low-gas execution attempt fails and commits no mint.
+    uint32 destGasOverhead = _fee(s_b.pcm, s_b.tokens[0], s_a.localSelector).destGasOverhead;
+    assertEq(destGasOverhead, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, "source quotes the configured B->A overhead");
+
     uint256 receiverBefore = _balance(s_a.tokens[0], s_receiver);
     bool success = _tryDeliver(
-      s_a, s_b.localSelector, legacyT1B, s_a.tokens[0], postFee, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG, 30_000
+      s_a,
+      s_b.localSelector,
+      legacyT1B,
+      s_a.tokens[0],
+      postFee,
+      poolData,
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG,
+      destGasOverhead
     );
-    assertFalse(success, "low gas attempt fails");
-    assertEq(_balance(s_a.tokens[0], s_receiver), receiverBefore, "no mint on low gas");
+    assertFalse(success, "the quoted overhead alone cannot execute the receive");
+    assertEq(_balance(s_a.tokens[0], s_receiver), receiverBefore, "no mint under the quoted overhead");
 
-    // Retry the same message with sufficient gas.
+    // The same message with a sufficient budget executes and pays out once.
     uint256 gasBefore = gasleft();
-    uint256 received = _deliverFromPool(
-      s_a, s_b.localSelector, legacyT1B, s_a.tokens[0], postFee, poolData, FinalityCodec.WAIT_FOR_FINALITY_FLAG
+    success = _tryDeliver(
+      s_a,
+      s_b.localSelector,
+      legacyT1B,
+      s_a.tokens[0],
+      postFee,
+      poolData,
+      FinalityCodec.WAIT_FOR_FINALITY_FLAG,
+      destGasOverhead * 2
     );
     uint256 gasUsed = gasBefore - gasleft();
-    assertEq(received, 100e18, "retry succeeds");
+    assertTrue(success, "retry with a sufficient budget succeeds");
     assertEq(_balance(s_a.tokens[0], s_receiver), receiverBefore + 100e18, "one payout only");
     assertGt(gasUsed, 0, "receive gas measured");
     emit log_named_uint("measured receive gas", gasUsed);
-
-    // The configured overhead is a price input, not a cap: the lane still charges the configured value.
-    IPoolConfigManager.LaneFee memory fee = _fee(s_a.pcm, s_a.tokens[0], s_b.localSelector);
-    assertEq(fee.destGasOverhead, DEFAULT_TOKEN_DEST_GAS_OVERHEAD, "configured overhead is a price input");
   }
 }

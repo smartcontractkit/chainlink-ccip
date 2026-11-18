@@ -6,6 +6,8 @@ import {IPoolConfigManager} from "../../interfaces/IPoolConfigManager.sol";
 import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {e2e_mttpSetup} from "./e2e.mttpSetup.t.sol";
 
+import {IERC20} from "@openzeppelin/contracts@5.3.0/token/ERC20/IERC20.sol";
+
 /// @notice Compatibility behavior: token decimals, burn flavors, and empty legacy pool data.
 contract e2e_mttpCompatibility is e2e_mttpSetup {
   /// @dev An 18 decimal source to a 6 decimal destination rounds down. The destination mints the floored amount
@@ -28,21 +30,39 @@ contract e2e_mttpCompatibility is e2e_mttpSetup {
     assertEq(_balance(dest6, s_receiver), received, "exact minted amount");
   }
 
-  /// @dev Each supported burn flavor moves the exact amount off the source pool. BurnToAddress sends it to the
-  /// configured burn address instead of burning it.
+  /// @dev Each supported burn flavor moves the exact amount off the source pool and mints it on the destination.
+  /// The source supply drops for the three burn flavors and stays flat for BurnToAddress, which moves the amount to
+  /// an address that can never spend it.
   function test_mttp_burnFlavorsMoveExactAmount() public {
-    assertEq(_transfer(s_a, s_b, 0, 10e18), 10e18, "Burn flavor");
+    _assertBurnFlavor(IPoolConfigManager.LockOrBurnFlavor.Burn, address(0), 10e18);
+    _assertBurnFlavor(IPoolConfigManager.LockOrBurnFlavor.BurnFrom, address(0), 10e18);
+    _assertBurnFlavor(IPoolConfigManager.LockOrBurnFlavor.BurnWithFrom, address(0), 10e18);
+    _assertBurnFlavor(IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, address(0xdead), 0);
+  }
 
+  /// @dev Transfers 10e18 with one flavor and checks the source pool balance, the source supply drop, and where the
+  /// amount went: burned for the burn flavors, held by the burn address for BurnToAddress.
+  function _assertBurnFlavor(
+    IPoolConfigManager.LockOrBurnFlavor flavor,
+    address burnAddress,
+    uint256 expectedSupplyDrop
+  ) internal {
     vm.prank(OWNER);
-    _setProfile(s_a.pcm, s_a.tokens[0], T1_DECIMALS, IPoolConfigManager.LockOrBurnFlavor.BurnFrom);
-    assertEq(_transfer(s_a, s_b, 0, 10e18), 10e18, "BurnFrom flavor");
+    if (burnAddress == address(0)) {
+      _setProfile(s_a.pcm, s_a.tokens[0], T1_DECIMALS, flavor);
+    } else {
+      _setProfileFull(s_a.pcm, s_a.tokens[0], T1_DECIMALS, flavor, burnAddress);
+    }
 
-    vm.prank(OWNER);
-    _setProfileFull(
-      s_a.pcm, s_a.tokens[0], T1_DECIMALS, IPoolConfigManager.LockOrBurnFlavor.BurnToAddress, address(0xdead)
-    );
-    assertEq(_transfer(s_a, s_b, 0, 10e18), 10e18, "BurnToAddress flavor");
-    assertEq(_balance(s_a.tokens[0], address(0xdead)), 10e18, "BurnToAddress moved the amount to the burn address");
+    address token = s_a.tokens[0];
+    uint256 supplyBefore = IERC20(token).totalSupply();
+    uint256 poolBefore = _balance(token, address(s_a.pool));
+    uint256 burnBefore = _balance(token, burnAddress);
+
+    assertEq(_transfer(s_a, s_b, 0, 10e18), 10e18, "destination amount");
+    assertEq(_balance(token, address(s_a.pool)), poolBefore, "source pool balance unchanged");
+    assertEq(supplyBefore - IERC20(token).totalSupply(), expectedSupplyDrop, "source supply drop");
+    assertEq(_balance(token, burnAddress) - burnBefore, 10e18 - expectedSupplyDrop, "burn address balance");
   }
 
   /// @dev A migrated token still accepts empty legacy pool data from a pool it trusts.

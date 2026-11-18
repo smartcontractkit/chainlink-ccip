@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {FinalityCodec} from "../../libraries/FinalityCodec.sol";
 import {PolicyConfig} from "../../libraries/PolicyConfig.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {MultiTokenPoolHooks} from "../../pools/MultiTokenPool/MultiTokenPoolHooks.sol";
 import {ConnectionPolicyStore} from "../../pools/MultiTokenPool/policies/ConnectionPolicyStore.sol";
 import {e2e_mttpSetup} from "./e2e.mttpSetup.t.sol";
@@ -120,18 +121,17 @@ contract e2e_mttpCore is e2e_mttpSetup {
   /// share the policy config but each has its own bucket.
   function test_mttp_sharedRateLimitPolicyHasIndependentBuckets() public {
     vm.startPrank(OWNER);
-    // T1 and T2 share RATE_LIMIT_POLICY with a small capacity. T3 keeps a larger inline limit.
+    // T1 and T2 share RATE_LIMIT_POLICY with a small capacity.
     _setRateLimitPolicyConfig(s_a.pcm, RATE_LIMIT_POLICY, PolicyConfig.DEFAULT_CHAIN_SELECTOR, _rateLimit(100e18));
-    _setInlineRateLimitConfig(s_a.pcm, s_a.tokens[2], s_a.remoteSelector, _rateLimit(1000e18));
     vm.stopPrank();
 
     // T1 exhausts its outbound allowance.
     (uint256 received,) = _sendAndDeliver(s_a, s_b, 0, 100e18);
     assertEq(received, 100e18, "T1 first send");
 
-    // T1 cannot send again.
+    // T1 cannot send again. The bucket is empty and refills at 1 wei per second, so the next 1e18 needs 1e18 seconds.
     _fundPool(s_a, s_a.tokens[0], 1e18);
-    vm.expectRevert();
+    vm.expectRevert(abi.encodeWithSelector(RateLimiter.TokenRateLimitReached.selector, 1e18, 0, s_a.tokens[0]));
     _lockOrBurn(s_a, s_b, 0, 1e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
 
     // T2 still sends: the config is shared, the bucket is not.
@@ -194,8 +194,8 @@ contract e2e_mttpCore is e2e_mttpSetup {
         )
       );
       _lockOrBurn(s_a, s_b, i, 100e18, FinalityCodec.WAIT_FOR_FINALITY_FLAG, s_allowedSender);
-      // Only the funding transfer is on the pool; nothing was burned.
-      assertEq(_balance(s_a.tokens[i], address(s_a.pool)), poolBefore + 100e18, "no burn on rejected send");
+      // The funding and the rejected send are one transaction, so the pool is untouched.
+      assertEq(_balance(s_a.tokens[i], address(s_a.pool)), poolBefore, "no burn on rejected send");
       assertEq(_balance(s_b.tokens[i], s_receiver), receiverBefore, "no mint on rejected send");
     }
 
