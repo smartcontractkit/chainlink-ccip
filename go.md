@@ -102,10 +102,13 @@ flowchart LR
 	chainlink-ccip/chains/solana --> chainlink-ccip/chains/solana/gobindings
 	chainlink-ccip/chains/solana --> chainlink-common
 	click chainlink-ccip/chains/solana href "https://github.com/smartcontractkit/chainlink-ccip"
+	chainlink-ccip/chains/solana/deployment --> chainlink-ccip/chains/solana/governance
 	chainlink-ccip/chains/solana/deployment --> cld-changesets
 	click chainlink-ccip/chains/solana/deployment href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/chains/solana/gobindings
 	click chainlink-ccip/chains/solana/gobindings href "https://github.com/smartcontractkit/chainlink-ccip"
+	chainlink-ccip/chains/solana/governance
+	click chainlink-ccip/chains/solana/governance href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/cmd/carpenter --> chainlink-ccip
 	click chainlink-ccip/cmd/carpenter href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/deployment
@@ -288,6 +291,7 @@ flowchart LR
 		 chainlink-ccip/chains/solana
 		 chainlink-ccip/chains/solana/deployment
 		 chainlink-ccip/chains/solana/gobindings
+		 chainlink-ccip/chains/solana/governance
 		 chainlink-ccip/cmd/carpenter
 		 chainlink-ccip/deployment
 		 chainlink-ccip/devenv
