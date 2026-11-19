@@ -7,9 +7,6 @@ import (
 
 // GetAddressRef returns the first ref matching the chain, type and version, and the qualifier
 // when one is given (an empty qualifier matches any). It returns an empty ref when none matches.
-//
-// This has the same logic as chainlink-ccip/deployment/utils/datastore.GetAddressRef, which this
-// module cannot import without pulling in the whole deployment module.
 func GetAddressRef(
 	input []cldf_datastore.AddressRef,
 	selector uint64,

@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/governance"
 )
 
-// GetAllMCMS returns the 1.6.0 MCMS refs of the chain in a fixed order; see governance.GetAllMCMS.
+// GetAllMCMS returns the 1.6.0 MCMS refs of the chain; see governance.GetAllMCMS.
 func GetAllMCMS(
 	chain cldf_solana.Chain,
 	qualifier string,

@@ -3,7 +3,6 @@ package changesets
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 	solstate "github.com/smartcontractkit/cld-changesets/legacy/pkg/family/solana"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared"
 	solanastateview "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared/stateview/solana"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/governance"
 )
 
 type CCIPSolanaContractVersion string
@@ -223,27 +223,7 @@ func BuildManyMCMSTxsFrom(input []MCMSTxParams) ([]*mcmsTypes.Transaction, error
 }
 
 func BuildMCMSTxn(ixn solana.Instruction, programID string, contractType cldf.ContractType) (*mcmsTypes.Transaction, error) {
-	data, err := ixn.Data()
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract data: %w", err)
-	}
-	for _, account := range ixn.Accounts() {
-		if account.IsSigner {
-			account.IsSigner = false
-		}
-	}
-	tx, err := mcmsSolana.NewTransaction(
-		programID,
-		data,
-		big.NewInt(0),        // e.g. value
-		ixn.Accounts(),       // pass along needed accounts
-		string(contractType), // some string identifying the target
-		[]string{},           // any relevant metadata
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transaction: %w", err)
-	}
-	return &tx, nil
+	return governance.BuildMCMSTxn(ixn, programID, string(contractType))
 }
 
 // mcmsQualifier returns the qualifier of the MCMS bundle a proposal targets: the one configured

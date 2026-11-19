@@ -13,9 +13,6 @@ import (
 	cldf_datastore "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
-// Characterization tests: they pin the current behavior of the governance helpers so the move
-// into the shared governance module is provably behavior-preserving.
-
 func TestBuildMCMSBatchOperation_Golden(t *testing.T) {
 	t.Parallel()
 	from := solana.MustPublicKeyFromBase58("DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA")

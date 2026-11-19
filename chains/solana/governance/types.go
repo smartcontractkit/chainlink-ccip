@@ -1,7 +1,6 @@
 // Package governance holds the Solana MCMS/governance helpers shared by the CCIP 1.6 and 2.0
-// deployment code. It deliberately depends on neither chainlink-ccip's deployment module nor any
-// MCMS gobindings: the mcms library registers decoders for the MCM programs, and registering a
-// second decoder for the same program panics.
+// deployment code. It must not import chainlink-ccip's deployment module or any MCMS gobindings:
+// the mcms library registers the decoders for those programs, and a second registration panics.
 package governance
 
 import (
@@ -26,8 +25,7 @@ const (
 	BypasserAccessControllerAccount  cldf_datastore.ContractType = "BypasserAccessControllerAccount"
 )
 
-// Instance ref types of the MCMS deployment. They mirror the constants of the same names in
-// chainlink-ccip/deployment/utils, which this module cannot import.
+// Ref types of the MCMS instances.
 const (
 	RBACTimelock               cldf_datastore.ContractType = "RBACTimelock"
 	ProposerManyChainMultisig  cldf_datastore.ContractType = "ProposerManyChainMultiSig"

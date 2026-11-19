@@ -18,9 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/governance"
 )
 
-// The governance helpers live in the shared chains/solana/governance module so the CCIP 2.0
-// deployment code can use them without importing this module. The names below are kept so callers
-// of this package do not change.
 const (
 	TimelockProgramType         cldf_deployment.ContractType = cldf_deployment.ContractType(governance.TimelockProgramType)
 	McmProgramType              cldf_deployment.ContractType = cldf_deployment.ContractType(governance.McmProgramType)

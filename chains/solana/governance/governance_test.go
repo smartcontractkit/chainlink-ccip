@@ -91,7 +91,7 @@ func TestGetAllMCMS_Golden(t *testing.T) {
 	}
 }
 
-// The strings are written to datastores, so they must never change.
+// The strings are written to datastores and must not change.
 func TestContractTypes_Golden(t *testing.T) {
 	t.Parallel()
 	require.Equal(t, "RBACTimelockProgram", string(TimelockProgramType))
@@ -111,8 +111,7 @@ func TestContractTypes_Golden(t *testing.T) {
 	require.Equal(t, "BypasserManyChainMultiSig", string(BypasserManyChainMultisig))
 }
 
-// The module must stay importable from the CCIP 2.0 deployment module without dragging chainlink-ccip's
-// deployment module (and the Go and dependency versions it forces) along.
+// Importing chainlink-ccip's deployment module would force its Go and dependency versions on every consumer.
 func TestDoesNotDependOnDeploymentModule(t *testing.T) {
 	t.Parallel()
 	out, err := exec.CommandContext(t.Context(), "go", "list", "-deps", ".").CombinedOutput()
@@ -126,3 +125,22 @@ func TestDoesNotDependOnDeploymentModule(t *testing.T) {
 }
 
 const goldenBatchOperation = `{"chainSelector":124615329519749607,"transactions":[{"contractType":"Router","tags":[],"to":"11111111111111111111111111111111","data":"AgAAAAUAAAAAAAAA","additionalFields":{"accounts":[{"PublicKey":"DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA","IsWritable":true,"IsSigner":false},{"PublicKey":"11111111111111111111111111111112","IsWritable":true,"IsSigner":false}],"value":0}},{"contractType":"Router","tags":[],"to":"11111111111111111111111111111111","data":"AgAAAAUAAAAAAAAA","additionalFields":{"accounts":[{"PublicKey":"DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA","IsWritable":true,"IsSigner":false},{"PublicKey":"11111111111111111111111111111112","IsWritable":true,"IsSigner":false}],"value":0}}]}`
+
+func TestBuildMCMSTxn(t *testing.T) {
+	t.Parallel()
+	from := solana.MustPublicKeyFromBase58("DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA")
+	to := solana.MustPublicKeyFromBase58("11111111111111111111111111111112")
+	ix, err := system.NewTransferInstruction(5, from, to).ValidateAndBuild()
+	require.NoError(t, err)
+
+	tx, err := BuildMCMSTxn(ix, solana.SystemProgramID.String(), "Router")
+	require.NoError(t, err)
+	got, err := json.Marshal(tx)
+	require.NoError(t, err)
+	require.JSONEq(t, goldenTxn, string(got))
+
+	_, err = BuildMCMSTxn(ix, "not-a-key", "Router")
+	require.ErrorContains(t, err, "failed to create transaction")
+}
+
+const goldenTxn = `{"contractType":"Router","tags":[],"to":"11111111111111111111111111111111","data":"AgAAAAUAAAAAAAAA","additionalFields":{"accounts":[{"PublicKey":"DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA","IsWritable":true,"IsSigner":false},{"PublicKey":"11111111111111111111111111111112","IsWritable":true,"IsSigner":false}],"value":0}}`
