@@ -177,6 +177,14 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 	chainSel := input.ChainSelector
 	exactMode := input.IsExactSiloMode()
 
+	// SkipUnsiloed is only meaningful in exact mode; a legacy Amount/BasisPoints would fall through to
+	// the proportional branch and still withdraw the shared bucket. Reject it here so a direct caller
+	// of this sequence cannot bypass the safety rule (the composer's Validate enforces the same).
+	if input.SkipUnsiloed && (len(input.SiloExactAmounts) == 0 || input.UnsiloedExactAmount != nil) {
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"SkipUnsiloed requires SiloExactAmounts and cannot be combined with UnsiloedExactAmount")
+	}
+
 	// The custom XERC20 group pool's unsiloed balance is the shared XERC20LockBox collateral that
 	// backs every XERC20 minted against the lockbox, not pool-owned liquidity. Withdrawing it would
 	// leave that XERC20 under-collateralized, so it must never be migrated; require the caller to opt
@@ -294,6 +302,14 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+	}
+
+	// Defense in depth: the guard above relies on the input shape, but the safety property is about
+	// the resolved amount. Never withdraw shared collateral, even if the inputs combine unexpectedly.
+	if cciputils.IsSharedCollateralUnsiloedPool(string(oldTV.Type)) && unsiloedAmount.Sign() > 0 {
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"old pool %s is a %s: refusing to withdraw %s of its shared XERC20LockBox collateral",
+			oldPool, oldTV.Type, unsiloedAmount)
 	}
 
 	// Resolve every siloed chain's migration amount and validate it against the on-chain balance.
