@@ -55,3 +55,33 @@ func TestPoolTypePredicates_StandardTypes(t *testing.T) {
 	require.False(t, IsLockReleasePoolType(HybridLockReleaseUSDCTokenPool.String()))
 	require.False(t, IsLockReleasePoolType(BurnMintWithLockReleaseFlag.String()))
 }
+
+// TestPoolTypePredicates_SiloedLockReleaseVariants pins the custom legacy XERC20 group pool's
+// classification. It implements the v1.6.1 siloed interface and must take the siloed migration
+// source path, but must NOT be a deployable lock-release type: the v2.0.0 deploy dispatch has no
+// contract for it and would deploy an orphaned lockbox and hooks before failing.
+func TestPoolTypePredicates_SiloedLockReleaseVariants(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, IsSiloedLockReleasePoolType(SiloedLockReleaseTokenPool.String()),
+		"the standard siloed pool is a siloed migration source")
+	require.True(t, IsSiloedLockReleasePoolType(SiloedWithUnsiloedXERC20GroupTokenPool.String()),
+		"the custom XERC20 group pool implements the siloed interface and is a siloed migration source")
+
+	// Not siloed migration sources: the plain pool is not siloed, and the v1.5.0 *AndProxy pool has
+	// no siloed variant.
+	require.False(t, IsSiloedLockReleasePoolType(LockReleaseTokenPool.String()))
+	require.False(t, IsSiloedLockReleasePoolType(LockReleaseTokenPoolAndProxy.String()))
+
+	// The custom type must stay out of the deploy dispatch predicate.
+	require.False(t, IsLockReleasePoolType(SiloedWithUnsiloedXERC20GroupTokenPool.String()),
+		"SiloedWithUnsiloedXERC20GroupTokenPool must NOT be a deployable lock-release type: the v2.0.0 "+
+			"deploy dispatch would deploy a lockbox and hooks before failing on the missing bytecode")
+
+	// Its unsiloed balance is shared XERC20LockBox collateral, not pool-owned liquidity.
+	require.True(t, IsSharedCollateralUnsiloedPool(SiloedWithUnsiloedXERC20GroupTokenPool.String()),
+		"the custom pool's unsiloed balance backs the XERC20 token and must be gated")
+	require.False(t, IsSharedCollateralUnsiloedPool(SiloedLockReleaseTokenPool.String()),
+		"the standard siloed pool holds its own unsiloed liquidity")
+	require.False(t, IsSharedCollateralUnsiloedPool(LockReleaseTokenPool.String()))
+}

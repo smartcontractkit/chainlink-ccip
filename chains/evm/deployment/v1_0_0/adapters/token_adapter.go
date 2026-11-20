@@ -291,10 +291,12 @@ func (a *EVMTokenBase) IsLockReleasePoolType(poolType string) bool {
 
 // IsLegacyLockReleasePoolType returns true if the pool type is a legacy lock-release variant that can be
 // migrated from. It is broader than IsLockReleasePoolType: it also accepts the v1.5.0
-// LockReleaseTokenPoolAndProxy, which is a valid migration source but excluded from the deploy dispatch
-// predicate.
+// LockReleaseTokenPoolAndProxy and the v1.6.0 SiloedWithUnsiloedXERC20GroupTokenPool, both of which
+// are valid migration sources but excluded from the deploy dispatch predicate.
 func (a *EVMTokenBase) IsLegacyLockReleasePoolType(poolType string) bool {
-	return a.IsLockReleasePoolType(poolType) || poolType == cciputils.LockReleaseTokenPoolAndProxy.String()
+	return a.IsLockReleasePoolType(poolType) ||
+		poolType == cciputils.LockReleaseTokenPoolAndProxy.String() ||
+		poolType == cciputils.SiloedWithUnsiloedXERC20GroupTokenPool.String()
 }
 
 // GetTypeAndVersion reads typeAndVersion() from addr.

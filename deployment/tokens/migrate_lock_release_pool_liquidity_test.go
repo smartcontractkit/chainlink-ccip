@@ -93,6 +93,30 @@ func TestMigrateLockReleasePoolLiquidity_VerifyPreconditions_ExactAmounts(t *tes
 			},
 			expectedErr: "",
 		},
+		{
+			name: "SkipUnsiloed and UnsiloedExactAmount mutually exclusive",
+			mutate: func(m *LockReleasePoolMigration) {
+				m.SiloExactAmounts = []SiloExactAmount{{ChainSelector: 2, Amount: big.NewInt(100)}}
+				m.UnsiloedExactAmount = big.NewInt(50)
+				m.SkipUnsiloed = true
+			},
+			expectedErr: "SkipUnsiloed and UnsiloedExactAmount are mutually exclusive",
+		},
+		{
+			name: "SkipUnsiloed without SiloExactAmounts",
+			mutate: func(m *LockReleasePoolMigration) {
+				m.SkipUnsiloed = true
+			},
+			expectedErr: "SkipUnsiloed requires SiloExactAmounts to also be set",
+		},
+		{
+			name: "valid SkipUnsiloed with SiloExactAmounts",
+			mutate: func(m *LockReleasePoolMigration) {
+				m.SiloExactAmounts = []SiloExactAmount{{ChainSelector: 2, Amount: big.NewInt(100)}}
+				m.SkipUnsiloed = true
+			},
+			expectedErr: "",
+		},
 	}
 
 	for _, tc := range tests {

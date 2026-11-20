@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	erc20_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
+	type_and_version "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
 	lrtp_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/lock_release_token_pool"
 	siloed_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_1/operations/siloed_lock_release_token_pool"
 	siloed_sink_ops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/siloed_lock_release_token_pool"
@@ -24,9 +25,10 @@ import (
 
 // MigrateLockReleasePoolLiquiditySequence returns the SOURCE half of a lock-release liquidity
 // migration for v1.6.0-v1.6.2 pools, also serving v1.6.2 which registers this adapter. v1.6.0 was
-// only released for SiloedLockReleaseTokenPool, so v1.6.0 here is siloed in practice; plain pools
-// start at v1.6.1. It extracts liquidity from the old pool to the timelock with the v1.6.1 bindings
-// and records the moved amounts in input.Resolved for the v2.0.0 sink.
+// only released for siloed pools (SiloedLockReleaseTokenPool and the custom
+// SiloedWithUnsiloedXERC20GroupTokenPool), so v1.6.0 here is siloed in practice; plain pools start at
+// v1.6.1. It extracts liquidity from the old pool to the timelock with the v1.6.1 bindings and
+// records the moved amounts in input.Resolved for the v2.0.0 sink.
 func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Sequence[tokensapi.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"evm-v1.6.1-adapter:migrate-lock-release-pool-liquidity-source",
@@ -48,7 +50,8 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 			// The adapter may have been resolved from a datastore version; only drive pools whose
 			// on-chain version actually shares the v1.6.1 bindings. v1.6.0 is byte-for-byte
 			// ABI-compatible with v1.6.1 for every operation this source uses. v1.6.0 was only
-			// released for SiloedLockReleaseTokenPool: the plain LockReleaseTokenPool line goes
+			// released for siloed pools (SiloedLockReleaseTokenPool and the custom
+			// SiloedWithUnsiloedXERC20GroupTokenPool): the plain LockReleaseTokenPool line goes
 			// v1.5.1 -> v1.6.1, so accepting v1.6.0 here is siloed-only in practice.
 			if !oldTV.Version.Equal(cciputils.Version_1_6_0) &&
 				!oldTV.Version.Equal(cciputils.Version_1_6_1) &&
@@ -57,8 +60,8 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 					"old pool %s is %s %s on-chain; the v1.6.1 liquidity migration source only supports v1.6.0, v1.6.1, and v1.6.2 pools",
 					oldPool, oldTV.Type, oldTV.Version)
 			}
-			if string(oldTV.Type) == cciputils.SiloedLockReleaseTokenPool.String() {
-				return t.migrateSiloedLockReleaseSource(b, evmChain, input, oldPool, newPool, timelock)
+			if cciputils.IsSiloedLockReleasePoolType(string(oldTV.Type)) {
+				return t.migrateSiloedLockReleaseSource(b, evmChain, input, oldTV, oldPool, newPool, timelock)
 			}
 			if input.IsExactSiloMode() {
 				return sequences.OnChainOutput{}, fmt.Errorf("SiloExactAmounts/UnsiloedExactAmount are only supported for siloed pools")
@@ -168,10 +171,23 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 	b cldf_ops.Bundle,
 	evmChain evm.Chain,
 	input tokensapi.MigrateLockReleasePoolLiquidityInput,
+	oldTV type_and_version.TypeAndVersion,
 	oldPool, newPool, timelock common.Address,
 ) (sequences.OnChainOutput, error) {
 	chainSel := input.ChainSelector
 	exactMode := input.IsExactSiloMode()
+
+	// The custom XERC20 group pool's unsiloed balance is the shared XERC20LockBox collateral that
+	// backs every XERC20 minted against the lockbox, not pool-owned liquidity. Withdrawing it would
+	// leave that XERC20 under-collateralized, so it must never be migrated; require the caller to opt
+	// out explicitly.
+	if cciputils.IsSharedCollateralUnsiloedPool(string(oldTV.Type)) && !input.SkipUnsiloed {
+		return sequences.OnChainOutput{}, fmt.Errorf(
+			"old pool %s is a %s: its unsiloed balance is the shared XERC20LockBox collateral backing "+
+				"the XERC20 token, not pool-owned liquidity, so it must not be migrated; set SkipUnsiloed "+
+				"to migrate only the siloed buckets",
+			oldPool, oldTV.Type)
+	}
 
 	if _, err := t.ResolveMigrationToken(b, evmChain, oldPool, newPool); err != nil {
 		return sequences.OnChainOutput{}, err
@@ -249,23 +265,29 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 
 	var unsiloedAmount *big.Int
 	if exactMode {
-		if unsiloedReport.Output.Sign() > 0 && input.UnsiloedExactAmount == nil {
-			return sequences.OnChainOutput{}, fmt.Errorf(
-				"old pool %s holds %s unsiloed liquidity to migrate but UnsiloedExactAmount was not set; "+
-					"exact mode requires an explicit amount for the shared bucket",
-				oldPool, unsiloedReport.Output,
-			)
-		}
-		if input.UnsiloedExactAmount != nil {
-			unsiloedAmount = new(big.Int).Set(input.UnsiloedExactAmount)
-		} else {
+		if input.SkipUnsiloed {
+			// Leave the shared bucket untouched. The balance is not withdrawn, so no destination
+			// lockbox is needed and the unsiloed rebalancer is not handed over below.
 			unsiloedAmount = big.NewInt(0)
-		}
-		if unsiloedAmount.Cmp(unsiloedReport.Output) > 0 {
-			return sequences.OnChainOutput{}, fmt.Errorf(
-				"UnsiloedExactAmount %s exceeds old pool %s unsiloed balance %s",
-				unsiloedAmount, oldPool, unsiloedReport.Output,
-			)
+		} else {
+			if unsiloedReport.Output.Sign() > 0 && input.UnsiloedExactAmount == nil {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"old pool %s holds %s unsiloed liquidity to migrate but UnsiloedExactAmount was not set; "+
+						"set UnsiloedExactAmount, or set SkipUnsiloed to leave the shared bucket untouched",
+					oldPool, unsiloedReport.Output,
+				)
+			}
+			if input.UnsiloedExactAmount != nil {
+				unsiloedAmount = new(big.Int).Set(input.UnsiloedExactAmount)
+			} else {
+				unsiloedAmount = big.NewInt(0)
+			}
+			if unsiloedAmount.Cmp(unsiloedReport.Output) > 0 {
+				return sequences.OnChainOutput{}, fmt.Errorf(
+					"UnsiloedExactAmount %s exceeds old pool %s unsiloed balance %s",
+					unsiloedAmount, oldPool, unsiloedReport.Output,
+				)
+			}
 		}
 	} else {
 		unsiloedAmount, err = input.ComputeAmount(unsiloedReport.Output)
@@ -327,8 +349,10 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 	}
 	originalUnsiloedRebalancer := rebalancerReport.Output
 	// Each rebalancer (unsiloed and per silo) that already is the timelock is left alone: its
-	// take-over and restore would be no-op writes in the proposal.
-	handOverUnsiloed := originalUnsiloedRebalancer != timelock
+	// take-over and restore would be no-op writes in the proposal. The unsiloed rebalancer is also
+	// left alone when nothing is withdrawn from the shared bucket (unsiloedAmount == 0), which is
+	// the case for a silo-only migration.
+	handOverUnsiloed := unsiloedAmount.Sign() > 0 && originalUnsiloedRebalancer != timelock
 
 	if handOverUnsiloed {
 		setRebalancerReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
@@ -419,7 +443,14 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 		ops = append(ops, restoreReport.Output)
 	}
 
-	if handOverUnsiloed {
+	// Restore the unsiloed rebalancer whenever it was changed, except when the pool rejects the
+	// original value. v1.6.0 (standard and custom) reverts on setRebalancer(0x0). A standard v1.6.0
+	// pool can accrue unsiloed liquidity from lockOrBurn on non-siloed lanes even when its rebalancer
+	// was never set, so a 0x0 original cannot be restored; the timelock is left in place instead. The
+	// custom pool never reaches here (SkipUnsiloed forces unsiloedAmount == 0, so no handover). Every
+	// other supported version is restored, including a 0x0 original.
+	zeroRebalancerUnrestorable := oldTV.Version.Equal(cciputils.Version_1_6_0)
+	if handOverUnsiloed && !(zeroRebalancerUnrestorable && originalUnsiloedRebalancer == (common.Address{})) {
 		restoreUnsiloedReport, err := cldf_ops.ExecuteOperation(b, siloed_ops.SetRebalancer, evmChain, evm_contract.FunctionInput[common.Address]{
 			ChainSelector: chainSel,
 			Address:       oldPool,

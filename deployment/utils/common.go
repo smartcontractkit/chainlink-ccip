@@ -42,20 +42,25 @@ const (
 	EVMSignerRegistry                   cldf.ContractType = "SignerRegistry"
 
 	// Pools
-	TokenPoolFactory                    cldf.ContractType = "TokenPoolFactory"
-	LinkToken                           cldf.ContractType = "LinkToken"
-	BurnMintToken                       cldf.ContractType = "BurnMintToken"
-	FactoryBurnMintERC20Token           cldf.ContractType = "FactoryBurnMintERC20Token"
-	ERC677TokenHelper                   cldf.ContractType = "ERC677TokenHelper"
-	USDCTokenPool                       cldf.ContractType = "USDCTokenPool"
-	CCTPMessageTransmitterProxy         cldf.ContractType = "CCTPMessageTransmitterProxy"
-	SiloedLockReleaseTokenPool          cldf.ContractType = "SiloedLockReleaseTokenPool"
-	HybridLockReleaseUSDCTokenPool      cldf.ContractType = "HybridLockReleaseUSDCTokenPool"
-	BurnMintWithExternalMinterTokenPool cldf.ContractType = "BurnMintWithExternalMinterTokenPool"
-	HybridWithExternalMinterTokenPool   cldf.ContractType = "HybridWithExternalMinterTokenPool"
-	BurnMintTokenPool                   cldf.ContractType = "BurnMintTokenPool"
-	BurnMintTokenPoolAndProxy           cldf.ContractType = "BurnMintTokenPoolAndProxy"
-	LockReleaseTokenPool                cldf.ContractType = "LockReleaseTokenPool"
+	TokenPoolFactory            cldf.ContractType = "TokenPoolFactory"
+	LinkToken                   cldf.ContractType = "LinkToken"
+	BurnMintToken               cldf.ContractType = "BurnMintToken"
+	FactoryBurnMintERC20Token   cldf.ContractType = "FactoryBurnMintERC20Token"
+	ERC677TokenHelper           cldf.ContractType = "ERC677TokenHelper"
+	USDCTokenPool               cldf.ContractType = "USDCTokenPool"
+	CCTPMessageTransmitterProxy cldf.ContractType = "CCTPMessageTransmitterProxy"
+	SiloedLockReleaseTokenPool  cldf.ContractType = "SiloedLockReleaseTokenPool"
+	// SiloedWithUnsiloedXERC20GroupTokenPool is the legacy (v1.6.0) custom pool that stores its
+	// unsiloed liquidity in an XERC20LockBox. It implements the v1.6.1 siloed pool interface and is
+	// migrated through the siloed source, but is NOT a deployable type in this repo: it is
+	// deliberately excluded from IsLockReleasePoolType (see below).
+	SiloedWithUnsiloedXERC20GroupTokenPool cldf.ContractType = "SiloedWithUnsiloedXERC20GroupTokenPool"
+	HybridLockReleaseUSDCTokenPool         cldf.ContractType = "HybridLockReleaseUSDCTokenPool"
+	BurnMintWithExternalMinterTokenPool    cldf.ContractType = "BurnMintWithExternalMinterTokenPool"
+	HybridWithExternalMinterTokenPool      cldf.ContractType = "HybridWithExternalMinterTokenPool"
+	BurnMintTokenPool                      cldf.ContractType = "BurnMintTokenPool"
+	BurnMintTokenPoolAndProxy              cldf.ContractType = "BurnMintTokenPoolAndProxy"
+	LockReleaseTokenPool                   cldf.ContractType = "LockReleaseTokenPool"
 	// LockReleaseTokenPoolAndProxy is the v1.5.0 lock-release pool, which is its own proxy (one
 	// contract, one address). Like BurnMintTokenPoolAndProxy it has no equivalent at v1.5.1 or
 	// later.
@@ -85,6 +90,29 @@ const (
 func IsLockReleasePoolType(poolType string) bool {
 	return poolType == LockReleaseTokenPool.String() ||
 		poolType == SiloedLockReleaseTokenPool.String()
+}
+
+// IsSiloedLockReleasePoolType reports whether poolType is a siloed lock-release variant that the
+// liquidity migration treats as siloed. Unlike IsLockReleasePoolType, this predicate is about the
+// migration source shape, not the v2.0.0 deploy dispatch, so it also accepts the legacy
+// SiloedWithUnsiloedXERC20GroupTokenPool: that pool exposes the v1.6.1 siloed interface
+// (getSupportedChains/isSiloed/getAvailableTokens/withdrawSiloedLiquidity, plus the unsiloed
+// getUnsiloedLiquidity/withdrawLiquidity) and must take the siloed source path rather than the plain
+// one. The unsiloed calls are NOT equivalent across types, though: for the custom pool they operate
+// on shared XERC20LockBox collateral, not pool-owned liquidity (see IsSharedCollateralUnsiloedPool).
+// It is intentionally NOT added to IsLockReleasePoolType: the deploy dispatch has no contract
+// for the custom type and would deploy an orphaned lockbox and hooks before failing.
+func IsSiloedLockReleasePoolType(poolType string) bool {
+	return poolType == SiloedLockReleaseTokenPool.String() ||
+		poolType == SiloedWithUnsiloedXERC20GroupTokenPool.String()
+}
+
+// IsSharedCollateralUnsiloedPool reports whether poolType's unsiloed balance is shared XERC20LockBox
+// collateral rather than pool-owned liquidity. The custom SiloedWithUnsiloedXERC20GroupTokenPool
+// holds the token in a public lockbox that backs every XERC20 minted against it; withdrawing it
+// would leave that XERC20 under-collateralized, so the migration must never touch that balance.
+func IsSharedCollateralUnsiloedPool(poolType string) bool {
+	return poolType == SiloedWithUnsiloedXERC20GroupTokenPool.String()
 }
 
 // IsBurnMintPoolType reports whether poolType is a standard burn-mint pool variant.
