@@ -1,7 +1,7 @@
 package glamsterdam
 
 import (
-	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/glamsterdam"
+	glamsterdamutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/glamsterdam"
 )
 
 // Field specs for the v2.0 Glamsterdam gas-config mapping table. Values sourced from
