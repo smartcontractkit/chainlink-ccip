@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"github.com/xssnick/tonutils-go/tlb"
+	"github.com/xssnick/tonutils-go/tvm/cell"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -25,8 +25,6 @@ import (
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
-	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 
@@ -238,9 +236,9 @@ func (a *EVMAdapter) SendMessage(ctx context.Context, destChainSelector uint64, 
 		if !it.Next() {
 			return 0, messageID, fmt.Errorf("no CCIP message sent event found")
 		}
-	messageID = hex.EncodeToString(it.Event.Message.Header.MessageId[:])
+		messageID = hex.EncodeToString(it.Event.Message.Header.MessageId[:])
 
-	return it.Event.SequenceNumber, messageID, nil
+		return it.Event.SequenceNumber, messageID, nil
 	}
 }
 
@@ -328,24 +326,35 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		// EVM allows empty extraArgs
 		return nil, nil
 	case chain_selectors.FamilyTon:
-		// TODO: maybe for 1.6 we should look up the source adapter and use a 1.6 method to encode? would be good to avoid other chain SDKs
-		extraArgs := ton_onramp.GenericExtraArgsV2{
-			GasLimit:                 big.NewInt(1000000),
-			AllowOutOfOrderExecution: true,
-		}
+		// Hand-encode TON GenericExtraArgsV2 so this module does not depend on
+		// chainlink-ton binding types (which change across chainlink-ton versions).
+		// TL-B: #181dcf10 gasLimit:(Maybe uint256) allowOutOfOrderExecution:Bool
+		// TODO[NONEVM-6985]: Delegate TON extra-args encoding in the EVM test adapter to chainlink-ton
+		gasLimit := big.NewInt(1000000)
 		for _, opt := range opts {
 			switch opt.Name {
 			case testadapters.ExtraArgGasLimit:
-				extraArgs.GasLimit = opt.Value.(*big.Int)
+				gasLimit = opt.Value.(*big.Int)
 			default:
 				// unsupported arg
 			}
 		}
-		extraArgsCell, err := tlb.ToCell(extraArgs)
-		if err != nil {
+		b := cell.BeginCell()
+		if err := b.StoreUInt(0x181dcf10, 32); err != nil {
 			return nil, err
 		}
-		return extraArgsCell.ToBOC(), nil
+		if err := b.StoreBoolBit(gasLimit != nil); err != nil {
+			return nil, err
+		}
+		if gasLimit != nil {
+			if err := b.StoreBigUInt(gasLimit, 256); err != nil {
+				return nil, err
+			}
+		}
+		if err := b.StoreBoolBit(true); err != nil { // AllowOutOfOrderExecution
+			return nil, err
+		}
+		return b.EndCell().ToBOC(), nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)
