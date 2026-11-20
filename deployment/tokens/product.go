@@ -308,15 +308,20 @@ type MigrateLockReleasePoolLiquidityInput struct {
 	SiloExactAmounts []SiloExactAmount
 	// UnsiloedExactAmount specifies the exact amount to migrate from the unsiloed (shared) balance.
 	// Mutually exclusive with Amount/BasisPoints. Required when SiloExactAmounts is set and the old
-	// pool holds unsiloed liquidity. Nil means unset, not zero.
+	// pool holds unsiloed liquidity, unless SkipUnsiloed is set. Nil means unset, not zero.
 	UnsiloedExactAmount *big.Int
+	// SkipUnsiloed, when true, migrates nothing from the unsiloed (shared) balance even when the old
+	// pool holds some. Valid only in exact mode (SiloExactAmounts set) and mutually exclusive with
+	// UnsiloedExactAmount. Use when the shared bucket has no destination on the new pool or is not
+	// part of this migration; the balance is left untouched in the old pool.
+	SkipUnsiloed bool
 	// UnsiloedLockBoxAddress names the lockbox that receives the old pool's unsiloed (shared) balance.
 	//
-	// Required when migrating a siloed pool that holds unsiloed liquidity. The shared balance backs
-	// the pool's non-siloed chains, and those chains may map to a different lockbox than any siloed
-	// chain, so there is nothing on-chain to infer the destination from. Guessing here would send the
-	// shared balance to a silo that does not own it: no funds are lost, but the chains that should
-	// draw on the shared balance cannot release.
+	// Required when migrating a siloed pool that holds unsiloed liquidity, unless SkipUnsiloed is
+	// set. The shared balance backs the pool's non-siloed chains, and those chains may map to a
+	// different lockbox than any siloed chain, so there is nothing on-chain to infer the destination
+	// from. Guessing here would send the shared balance to a silo that does not own it: no funds are
+	// lost, but the chains that should draw on the shared balance cannot release.
 	//
 	// Must match one of the lockboxes in the new pool's getAllLockBoxConfigs. Ignored for
 	// non-siloed pools, which have a single lockbox.
@@ -353,6 +358,16 @@ func (input MigrateLockReleasePoolLiquidityInput) Validate() error {
 	exactMode := input.IsExactSiloMode()
 	legacyMode := input.Amount != nil || input.BasisPoints != nil
 
+	// Checked before the mode checks so a SkipUnsiloed misuse gets its own message rather than the
+	// generic "one of ... must be provided".
+	if input.SkipUnsiloed {
+		if input.UnsiloedExactAmount != nil {
+			return errors.New("SkipUnsiloed and UnsiloedExactAmount are mutually exclusive")
+		}
+		if len(input.SiloExactAmounts) == 0 {
+			return errors.New("SkipUnsiloed requires SiloExactAmounts to also be set; exact mode cannot migrate the unsiloed bucket alone")
+		}
+	}
 	if exactMode && legacyMode {
 		return errors.New("SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with Amount/BasisPoints")
 	}

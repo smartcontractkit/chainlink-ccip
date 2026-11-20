@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations/optest"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
@@ -255,6 +256,32 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 			},
 			expectedErr: "TimelockAddress must be provided",
 		},
+		{
+			name: "SkipUnsiloed and UnsiloedExactAmount mutually exclusive",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   chainSel,
+				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
+				TimelockAddress: "0x0000000000000000000000000000000000000003",
+				SiloExactAmounts: []tokens_core.SiloExactAmount{
+					{ChainSelector: 1, Amount: big.NewInt(100)},
+				},
+				UnsiloedExactAmount: big.NewInt(50),
+				SkipUnsiloed:        true,
+			},
+			expectedErr: "SkipUnsiloed and UnsiloedExactAmount are mutually exclusive",
+		},
+		{
+			name: "SkipUnsiloed without SiloExactAmounts",
+			input: tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   chainSel,
+				OldPoolAddress:  "0x0000000000000000000000000000000000000001",
+				NewPoolAddress:  "0x0000000000000000000000000000000000000002",
+				TimelockAddress: "0x0000000000000000000000000000000000000003",
+				SkipUnsiloed:    true,
+			},
+			expectedErr: "SkipUnsiloed requires SiloExactAmounts to also be set",
+		},
 	}
 
 	for _, tc := range tests {
@@ -266,6 +293,46 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 			)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+// TestMigrateLockReleasePoolLiquidity_SourceAdaptersValidateInput pins that every registered source
+// adapter enforces MigrateLockReleasePoolLiquidityInput.Validate for direct callers of the public
+// sequence, not just the composer. Amount and BasisPoints are mutually exclusive in Validate, so a
+// direct caller passing both must be rejected before any chain access.
+func TestMigrateLockReleasePoolLiquidity_SourceAdaptersValidateInput(t *testing.T) {
+	t.Parallel()
+
+	versions := []*semver.Version{
+		cciputils.Version_1_2_0,
+		cciputils.Version_1_4_0,
+		cciputils.Version_1_5_0,
+		cciputils.Version_1_5_1,
+		cciputils.Version_1_6_1,
+	}
+
+	for _, version := range versions {
+		t.Run(version.String(), func(t *testing.T) {
+			t.Parallel()
+
+			adapter, ok := tokens_core.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, version)
+			require.True(t, ok, "no source adapter registered for %s", version)
+			seq := adapter.MigrateLockReleasePoolLiquiditySequence()
+			require.NotNil(t, seq)
+
+			input := tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   5009297550715157269,
+				OldPoolAddress:  common.HexToAddress("0x0000000000000000000000000000000000000001").Hex(),
+				NewPoolAddress:  common.HexToAddress("0x0000000000000000000000000000000000000002").Hex(),
+				TimelockAddress: common.HexToAddress("0x0000000000000000000000000000000000000003").Hex(),
+				Amount:          big.NewInt(1),
+				BasisPoints:     new(uint16(5000)),
+			}
+
+			_, err := operations.ExecuteSequence(optest.NewBundle(t), seq, chain.BlockChains{}, input)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "Amount and BasisPoints are mutually exclusive")
 		})
 	}
 }
@@ -1624,6 +1691,10 @@ type siloedTopology struct {
 	siloedChains   []siloedChainSpec
 	sharedChains   []uint64
 	unsiloedAmount *big.Int
+	// skipUnsiloedRebalancer leaves the old pool's unsiloed rebalancer unset (0x0). Used to model a
+	// v1.6.0 pool whose rebalancer was never set; the pool must not be given unsiloed liquidity via
+	// provideLiquidity, which would require the rebalancer.
+	skipUnsiloedRebalancer bool
 }
 
 type siloedMigrationSetup struct {
@@ -1792,9 +1863,11 @@ func setupSiloedMigrationTestWithOldVersion(t *testing.T, chainSel uint64, topol
 		})
 	require.NoError(t, err)
 
-	_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.SetRebalancer, chain,
-		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: oldPoolAddr, Args: deployer})
-	require.NoError(t, err)
+	if !topology.skipUnsiloedRebalancer {
+		_, err = operations.ExecuteOperation(e.OperationsBundle, old_siloed.SetRebalancer, chain,
+			evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: oldPoolAddr, Args: deployer})
+		require.NoError(t, err)
+	}
 
 	_, err = operations.ExecuteOperation(e.OperationsBundle, burn_mint_erc20_with_drip.GrantMintAndBurnRoles, chain,
 		evm_contract.FunctionInput[common.Address]{ChainSelector: chainSel, Address: tokenAddr, Args: deployer})
@@ -2682,6 +2755,256 @@ func TestMigrateSiloedPool_ZeroUnsiloedLiquidity_OmittedDestination(t *testing.T
 
 	require.Equal(t, 0, big.NewInt(0).Cmp(s.balanceOf(t, s.oldPoolAddr)), "Old pool balance should be zero")
 	require.Equal(t, 0, siloAmount.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed1])), "Silo lockbox should have its correct balance")
+}
+
+// A silo-only dusting can skip the shared bucket entirely: with SkipUnsiloed the source migrates
+// only the named silo and leaves the unsiloed liquidity untouched, even though the old pool holds a
+// non-zero shared balance and the caller supplies no unsiloed destination. A distinct timelock keeps
+// every source write in the proposal batch so the test can assert the unsiloed rebalancer is never
+// handed over or restored.
+func TestMigrateSiloedPool_SkipUnsiloedLeavesSharedBucket(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	shared1 := uint64(15971525489660198786)
+	siloAmount := big.NewInt(3000)
+	unsiloedAmount := big.NewInt(1000)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains:   []siloedChainSpec{{selector: siloed1, amount: siloAmount}},
+		sharedChains:   []uint64{shared1},
+		unsiloedAmount: unsiloedAmount,
+	})
+	chain := s.env.BlockChains.EVMChains()[chainSel]
+
+	// A distinct timelock keeps every source write in the proposal batch, so the test can assert on
+	// the emitted calls. With the deployer as owner the framework executes them directly.
+	timelockKey := newFundedKey(t, chain)
+	timelock := timelockKey.From
+
+	pool, err := siloed_lock_release_token_pool_v161.NewSiloedLockReleaseTokenPool(s.oldPoolAddr, chain.Client)
+	require.NoError(t, err)
+	confirm := func(tx *types.Transaction, err error) {
+		t.Helper()
+		require.NoError(t, err)
+		_, err = chain.Confirm(tx)
+		require.NoError(t, err)
+	}
+	// Leave the unsiloed rebalancer on a distinct address so the new "only hand over when the amount
+	// is non-zero" gate decides whether a handover happens. If the gate were removed, the source
+	// would emit a setRebalancer(timelock)/restore pair even though it withdraws nothing.
+	originalRebalancer := common.HexToAddress("0x0000000000000000000000000000000000000B0B")
+	confirm(pool.SetRebalancer(chain.DeployerKey, originalRebalancer))
+	confirm(pool.TransferOwnership(chain.DeployerKey, timelock))
+	confirm(pool.AcceptOwnership(timelockKey))
+
+	dust := big.NewInt(1)
+	report, err := migrateLockReleasePoolLiquidity(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:   chainSel,
+			OldPoolAddress:  s.oldPoolAddr.Hex(),
+			NewPoolAddress:  s.newPoolAddr.Hex(),
+			TimelockAddress: timelock.Hex(),
+			SiloExactAmounts: []tokens_core.SiloExactAmount{
+				{ChainSelector: siloed1, Amount: dust},
+			},
+			SkipUnsiloed: true,
+			// No UnsiloedLockBoxAddress: the shared bucket is not migrated.
+		},
+	)
+	require.NoError(t, err)
+
+	// Nothing may move before the proposal executes: the timelock owns the pool, not the deployer.
+	require.Equal(t, 0, s.totalMint.Cmp(s.balanceOf(t, s.oldPoolAddr)),
+		"old pool must keep its liquidity before the proposal executes")
+
+	// No unsiloed handover: no setRebalancer or withdrawLiquidity op may target the old pool.
+	setRebalancerSelector := crypto.Keccak256([]byte("setRebalancer(address)"))[:4]
+	withdrawLiquiditySelector := crypto.Keccak256([]byte("withdrawLiquidity(uint256)"))[:4]
+	for _, batch := range report.BatchOps {
+		for _, tx := range batch.Transactions {
+			if common.HexToAddress(tx.To) != s.oldPoolAddr || len(tx.Data) < 4 {
+				continue
+			}
+			require.NotEqual(t, setRebalancerSelector, tx.Data[:4],
+				"SkipUnsiloed must not hand over the unsiloed rebalancer")
+			require.NotEqual(t, withdrawLiquiditySelector, tx.Data[:4],
+				"SkipUnsiloed must not withdraw unsiloed liquidity")
+		}
+	}
+
+	executeBatchOpsAs(t, chain, timelockKey, report.BatchOps)
+
+	require.Equal(t, 0, dust.Cmp(s.balanceOf(t, s.siloLockBoxes[siloed1])),
+		"silo lockbox should hold exactly the dusted amount")
+	require.Equal(t, 0, s.balanceOf(t, s.sharedLockBox).Sign(),
+		"shared lockbox must not be funded when SkipUnsiloed is set")
+
+	expectedOldPoolBalance := new(big.Int).Sub(s.totalMint, dust)
+	require.Equal(t, 0, expectedOldPoolBalance.Cmp(s.balanceOf(t, s.oldPoolAddr)),
+		"only the dusted amount should leave the old pool; the shared bucket stays behind")
+
+	rebalancerReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		old_siloed.GetRebalancer,
+		chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, originalRebalancer, rebalancerReport.Output,
+		"the unsiloed rebalancer must be left untouched when SkipUnsiloed is set")
+}
+
+// A v1.6.1 pool whose unsiloed rebalancer is the zero address must be restored to it after a
+// handover: v1.6.1's setRebalancer accepts 0x0. (v1.6.0 rejects 0x0 and is covered by
+// TestMigrateSiloedPool_V160ZeroUnsiloedRebalancerRestoreSkipped; the custom pool never reaches a
+// handover because it is migrated with SkipUnsiloed.)
+func TestMigrateSiloedPool_ZeroUnsiloedRebalancerRestored(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	shared1 := uint64(15971525489660198786)
+
+	s := setupSiloedMigrationTest(t, chainSel, siloedTopology{
+		siloedChains:   []siloedChainSpec{{selector: siloed1, amount: big.NewInt(3000)}},
+		sharedChains:   []uint64{shared1},
+		unsiloedAmount: big.NewInt(1000),
+	})
+
+	chain := s.env.BlockChains.EVMChains()[chainSel]
+
+	// The standard v1.6.1 pool allows the zero address; the custom pool does not, but the custom
+	// pool never reaches this path (it is migrated with SkipUnsiloed).
+	_, err := operations.ExecuteOperation(
+		s.env.OperationsBundle,
+		old_siloed.SetRebalancer,
+		chain,
+		evm_contract.FunctionInput[common.Address]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+			Args:          common.Address{},
+		},
+	)
+	require.NoError(t, err)
+
+	basisPoints := uint16(10000)
+	executeMigrationSequence(t,
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:          chainSel,
+			OldPoolAddress:         s.oldPoolAddr.Hex(),
+			NewPoolAddress:         s.newPoolAddr.Hex(),
+			TimelockAddress:        s.deployer.Hex(),
+			BasisPoints:            &basisPoints,
+			UnsiloedLockBoxAddress: s.sharedLockBox.Hex(),
+		},
+	)
+
+	rebalancerReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		old_siloed.GetRebalancer,
+		chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, common.Address{}, rebalancerReport.Output,
+		"v1.6.1 accepts 0x0; the zero original rebalancer must be restored")
+}
+
+// A standard v1.6.0 pool rejects setRebalancer(0x0), and it can accrue unsiloed liquidity from
+// lockOrBurn on non-siloed lanes even when its rebalancer was never set. The source must therefore
+// skip the restore for a 0x0 original on v1.6.0 rather than emit a setRebalancer(0x0) that would
+// revert the whole merged batch at timelock execution. Modelled by leaving the rebalancer unset and
+// moving the silo balance into the unsiloed bucket via updateSiloDesignations.
+func TestMigrateSiloedPool_V160ZeroUnsiloedRebalancerRestoreSkipped(t *testing.T) {
+	chainSel := uint64(5009297550715157269)
+	siloed1 := uint64(3379446385462418246)
+	shared1 := uint64(15971525489660198786)
+	siloAmount := big.NewInt(3000)
+
+	s := setupSiloedMigrationTestWithOldVersion(t, chainSel, siloedTopology{
+		siloedChains:           []siloedChainSpec{{selector: siloed1, amount: siloAmount}},
+		sharedChains:           []uint64{shared1},
+		unsiloedAmount:         big.NewInt(0),
+		skipUnsiloedRebalancer: true,
+	}, cciputils.Version_1_6_0)
+	chain := s.env.BlockChains.EVMChains()[chainSel]
+
+	// Removing the silo moves its balance into the unsiloed bucket; the unsiloed rebalancer stays 0x0.
+	_, err := operations.ExecuteOperation(s.env.OperationsBundle, old_siloed.UpdateSiloDesignations, chain,
+		evm_contract.FunctionInput[old_siloed.UpdateSiloDesignationsArgs]{
+			ChainSelector: chainSel, Address: s.oldPoolAddr,
+			Args: old_siloed.UpdateSiloDesignationsArgs{Removes: []uint64{siloed1}, Adds: []old_siloed.SiloConfigUpdate{}},
+		})
+	require.NoError(t, err)
+
+	// A distinct timelock keeps the source writes in the proposal batch.
+	timelockKey := newFundedKey(t, chain)
+	timelock := timelockKey.From
+
+	pool, err := siloed_lock_release_token_pool_v160.NewSiloedLockReleaseTokenPool(s.oldPoolAddr, chain.Client)
+	require.NoError(t, err)
+	confirm := func(tx *types.Transaction, err error) {
+		t.Helper()
+		require.NoError(t, err)
+		_, err = chain.Confirm(tx)
+		require.NoError(t, err)
+	}
+	confirm(pool.TransferOwnership(chain.DeployerKey, timelock))
+	confirm(pool.AcceptOwnership(timelockKey))
+
+	basisPoints := uint16(10000)
+	report, err := migrateLockReleasePoolLiquidity(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		s.env.BlockChains,
+		tokens_core.MigrateLockReleasePoolLiquidityInput{
+			ChainSelector:          chainSel,
+			OldPoolAddress:         s.oldPoolAddr.Hex(),
+			NewPoolAddress:         s.newPoolAddr.Hex(),
+			TimelockAddress:        timelock.Hex(),
+			BasisPoints:            &basisPoints,
+			UnsiloedLockBoxAddress: s.sharedLockBox.Hex(),
+		},
+	)
+	require.NoError(t, err)
+
+	// No setRebalancer(0x0) may be emitted: v1.6.0 would revert it and kill the batch.
+	setRebalancerSelector := crypto.Keccak256([]byte("setRebalancer(address)"))[:4]
+	zeroWord := common.BigToHash(big.NewInt(0))
+	for _, batch := range report.BatchOps {
+		for _, tx := range batch.Transactions {
+			if common.HexToAddress(tx.To) != s.oldPoolAddr || len(tx.Data) < 36 {
+				continue
+			}
+			if string(tx.Data[:4]) == string(setRebalancerSelector) {
+				require.NotEqual(t, zeroWord, common.BytesToHash(tx.Data[4:36]),
+					"v1.6.0 rejects setRebalancer(0x0); the restore must be skipped")
+			}
+		}
+	}
+
+	// The proposal must execute: the timelock is left as the unsiloed rebalancer.
+	executeBatchOpsAs(t, chain, timelockKey, report.BatchOps)
+
+	rebalancerReport, err := operations.ExecuteOperation(
+		testsetup.BundleWithFreshReporter(s.env.OperationsBundle),
+		old_siloed.GetRebalancer,
+		chain,
+		evm_contract.FunctionInput[struct{}]{
+			ChainSelector: chainSel,
+			Address:       s.oldPoolAddr,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, timelock, rebalancerReport.Output,
+		"the timelock must be left in place: v1.6.0 cannot restore 0x0")
 }
 
 func TestMigrateSiloedPool_PartialBasisPoints(t *testing.T) {

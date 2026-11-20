@@ -44,10 +44,15 @@ type LockReleasePoolMigration struct {
 	// UnsiloedExactAmount specifies the exact amount to migrate from the unsiloed (shared) balance.
 	// Mutually exclusive with LiquidityMigrationAmount. See MigrateLockReleasePoolLiquidityInput.UnsiloedExactAmount.
 	UnsiloedExactAmount *big.Int
+	// SkipUnsiloed, when true, migrates nothing from the unsiloed (shared) balance even when the old
+	// pool holds some. Valid only in exact mode (SiloExactAmounts set) and mutually exclusive with
+	// UnsiloedExactAmount. See MigrateLockReleasePoolLiquidityInput.SkipUnsiloed.
+	SkipUnsiloed bool
 	// UnsiloedLockBoxRef references the lockbox that receives the old pool's unsiloed (shared)
-	// balance. Required when migrating a siloed pool that holds unsiloed liquidity; ignored for
-	// non-siloed pools. See MigrateLockReleasePoolLiquidityInput.UnsiloedLockBoxAddress for why
-	// this is specified rather than inferred.
+	// balance. Required when migrating a siloed pool that holds unsiloed liquidity, unless
+	// SkipUnsiloed is set; ignored for non-siloed pools. See
+	// MigrateLockReleasePoolLiquidityInput.UnsiloedLockBoxAddress for why this is specified rather
+	// than inferred.
 	UnsiloedLockBoxRef *datastore.AddressRef
 	// UsePlainTransfer, when true, transfers tokens directly to the lockbox via ERC20.transfer instead of
 	// using the lockbox's deposit() function, bypassing the Deposit event emission. This is a break-glass
@@ -82,6 +87,16 @@ func makeMigrationVerify() func(cldf.Environment, MigrateLockReleasePoolLiquidit
 			exactMode := len(migration.SiloExactAmounts) > 0 || migration.UnsiloedExactAmount != nil
 			legacyMode := migration.LiquidityMigrationAmount != nil
 
+			// Checked before the mode checks so a SkipUnsiloed misuse gets its own message rather than
+			// the generic "one of ... must be provided".
+			if migration.SkipUnsiloed {
+				if migration.UnsiloedExactAmount != nil {
+					return fmt.Errorf("migration[%d]: SkipUnsiloed and UnsiloedExactAmount are mutually exclusive", i)
+				}
+				if len(migration.SiloExactAmounts) == 0 {
+					return fmt.Errorf("migration[%d]: SkipUnsiloed requires SiloExactAmounts to also be set; exact mode cannot migrate the unsiloed bucket alone", i)
+				}
+			}
 			if exactMode && legacyMode {
 				return fmt.Errorf("migration[%d]: SiloExactAmounts/UnsiloedExactAmount are mutually exclusive with LiquidityMigrationAmount", i)
 			}
@@ -207,6 +222,7 @@ func makeMigrationApply(_ *TokenAdapterRegistry, mcmsRegistry *changesets.MCMSRe
 				BasisPoints:            basisPoints,
 				SiloExactAmounts:       migration.SiloExactAmounts,
 				UnsiloedExactAmount:    migration.UnsiloedExactAmount,
+				SkipUnsiloed:           migration.SkipUnsiloed,
 				UnsiloedLockBoxAddress: unsiloedLockBoxAddress,
 				UsePlainTransfer:       migration.UsePlainTransfer,
 				SetPoolConfig:          setPoolConfig,

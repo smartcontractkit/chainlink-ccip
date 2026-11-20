@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
+	cciputils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
@@ -118,4 +119,22 @@ func TestResolveRouterAddress(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, override, got)
 	})
+}
+
+// TestIsLegacyLockReleasePoolType_CustomXERC20GroupPool pins the custom legacy pool's
+// migration-source classification: it is a valid legacy source but must stay out of the deploy
+// dispatch predicate.
+func TestIsLegacyLockReleasePoolType_CustomXERC20GroupPool(t *testing.T) {
+	a := EVMTokenBase{}
+
+	require.True(t, a.IsLegacyLockReleasePoolType(cciputils.SiloedWithUnsiloedXERC20GroupTokenPool.String()),
+		"the custom XERC20 group pool is a valid legacy migration source")
+	require.False(t, a.IsLockReleasePoolType(cciputils.SiloedWithUnsiloedXERC20GroupTokenPool.String()),
+		"the custom type must stay out of the deploy dispatch predicate")
+
+	// Standard legacy sources are unaffected.
+	require.True(t, a.IsLegacyLockReleasePoolType(cciputils.LockReleaseTokenPool.String()))
+	require.True(t, a.IsLegacyLockReleasePoolType(cciputils.SiloedLockReleaseTokenPool.String()))
+	require.True(t, a.IsLegacyLockReleasePoolType(cciputils.LockReleaseTokenPoolAndProxy.String()))
+	require.False(t, a.IsLegacyLockReleasePoolType(cciputils.HybridLockReleaseUSDCTokenPool.String()))
 }
