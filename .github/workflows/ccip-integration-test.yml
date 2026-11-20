@@ -14,6 +14,12 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # One run per ref: a new push supersedes the queued/running PR run.
+  # Never cancel for merge_group (would drop queue entries) or main pushes.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   changes:
     name: Detect changes
@@ -105,6 +111,7 @@ jobs:
       # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
       # when they should not be using it, while still allowing us to DRY up the setup
       DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
+      GOTESTSUM_VERSION: v1.13.0
 
     strategy:
       fail-fast: false
@@ -169,6 +176,8 @@ jobs:
 
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest
+    # Longest matrix row is 35m of tests; this bounds a hung job's cost.
+    timeout-minutes: 60
     steps:
       - name: Free Disk Space
         uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
@@ -222,15 +231,16 @@ jobs:
 
           cd "$GITHUB_WORKSPACE/chainlink"
           update_ccip_modules
-          # gomods tidy fetches every module in the Chainlink repo in parallel and
-          # occasionally dies on a transient proxy.golang.org stream reset, so retry.
+          # `make gomodtidy` runs `gomods tidy` over all 45 modules in the Chainlink
+          # repo, the biggest source of module downloads in this job. Tidy only the
+          # module we changed, then refresh the plugin refs like the make target does.
           for i in 1 2 3; do
-            make gomodtidy && break
+            go mod tidy && go run ./tools/plugout --update && break
             if [ "$i" -eq 3 ]; then
-              echo "make gomodtidy failed after 3 attempts"
+              echo "go mod tidy and plugin update failed after 3 attempts"
               exit 1
             fi
-            echo "retry $i - make gomodtidy failed, sleeping 10s"
+            echo "retry $i - go mod tidy and plugin update failed, sleeping 10s"
             sleep 10
           done
 
@@ -279,23 +289,23 @@ jobs:
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Install gotestsum
-        run: go install gotest.tools/gotestsum@latest
+        run: go install gotest.tools/gotestsum@${{ env.GOTESTSUM_VERSION }}
       - name: ${{ matrix.type.name }}
         id: run-tests
         continue-on-error: true
         run: |
           cd "$GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip"
           run="${{ matrix.type.run }}"
-          if ! go test -list "$run" . | grep -q '^Test'; then
-            echo "No tests matched -run '$run'"
-            exit 1
-          fi
           parallel_flag=""
           if [ -n "${{ matrix.type.go_parallel }}" ]; then
             parallel_flag="-parallel=${{ matrix.type.go_parallel }}"
           fi
           echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run '${run}'"
-          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run "$run"
+          gotestsum \
+            --junitfile=test-results.xml \
+            --format=github-actions \
+            --post-run-command="bash -c 'if [[ \$TESTS_TOTAL -eq 0 && \$TESTS_ERRORS -eq 0 ]]; then echo \"::error::No tests matched -run $run\" >&2; exit 1; fi'" \
+            -- . -timeout "${{ matrix.type.timeout }}" ${parallel_flag} -run "$run"
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
@@ -331,7 +341,7 @@ jobs:
   upload-test-results:
     name: Upload Test Results (${{ matrix.type.name }})
     needs: [integration-test-matrix, resolve-chainlink-ref]
-    if: always() && needs.integration-test-matrix.result != 'skipped'
+    if: always() && !cancelled() && needs.integration-test-matrix.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -410,7 +420,7 @@ jobs:
           artifact-name: ccip-integration-test-logs-${{ strategy.job-index }}-${{ github.run_attempt }}
 
   integration-test-ccip-ocr3:
-    if: always()
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     needs: [integration-test-matrix]
     steps:
