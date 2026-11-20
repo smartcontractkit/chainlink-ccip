@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations/optest"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/erc20"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/type_and_version"
@@ -292,6 +293,46 @@ func TestMigrateLockReleasePoolLiquidity_Validation(t *testing.T) {
 			)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+// TestMigrateLockReleasePoolLiquidity_SourceAdaptersValidateInput pins that every registered source
+// adapter enforces MigrateLockReleasePoolLiquidityInput.Validate for direct callers of the public
+// sequence, not just the composer. Amount and BasisPoints are mutually exclusive in Validate, so a
+// direct caller passing both must be rejected before any chain access.
+func TestMigrateLockReleasePoolLiquidity_SourceAdaptersValidateInput(t *testing.T) {
+	t.Parallel()
+
+	versions := []*semver.Version{
+		cciputils.Version_1_2_0,
+		cciputils.Version_1_4_0,
+		cciputils.Version_1_5_0,
+		cciputils.Version_1_5_1,
+		cciputils.Version_1_6_1,
+	}
+
+	for _, version := range versions {
+		t.Run(version.String(), func(t *testing.T) {
+			t.Parallel()
+
+			adapter, ok := tokens_core.GetTokenAdapterRegistry().GetTokenAdapter(chainsel.FamilyEVM, version)
+			require.True(t, ok, "no source adapter registered for %s", version)
+			seq := adapter.MigrateLockReleasePoolLiquiditySequence()
+			require.NotNil(t, seq)
+
+			input := tokens_core.MigrateLockReleasePoolLiquidityInput{
+				ChainSelector:   5009297550715157269,
+				OldPoolAddress:  common.HexToAddress("0x0000000000000000000000000000000000000001").Hex(),
+				NewPoolAddress:  common.HexToAddress("0x0000000000000000000000000000000000000002").Hex(),
+				TimelockAddress: common.HexToAddress("0x0000000000000000000000000000000000000003").Hex(),
+				Amount:          big.NewInt(1),
+				BasisPoints:     new(uint16(5000)),
+			}
+
+			_, err := operations.ExecuteSequence(optest.NewBundle(t), seq, chain.BlockChains{}, input)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "Amount and BasisPoints are mutually exclusive")
 		})
 	}
 }

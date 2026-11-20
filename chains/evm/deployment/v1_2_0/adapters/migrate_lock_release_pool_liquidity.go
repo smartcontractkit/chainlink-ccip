@@ -49,6 +49,12 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 		semver.MustParse("1.2.0"),
 		"Rescue lock-release liquidity from a v1.2.0 pool to the timelock via releaseOrMint",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
+			// This sequence is exposed through the adapter interface and can be invoked directly, so
+			// enforce the full input contract here rather than relying on the composer's Validate.
+			if err := input.Validate(); err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
 			evmChain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)

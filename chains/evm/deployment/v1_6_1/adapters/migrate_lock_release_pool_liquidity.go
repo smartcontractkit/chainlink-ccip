@@ -35,6 +35,14 @@ func (t *TokenAdapter) MigrateLockReleasePoolLiquiditySequence() *cldf_ops.Seque
 		semver.MustParse("1.6.1"),
 		"Extract lock-release liquidity from a v1.6.0-v1.6.2 pool (plain or siloed) to the timelock",
 		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokensapi.MigrateLockReleasePoolLiquidityInput) (sequences.OnChainOutput, error) {
+			// This sequence is exposed through the adapter interface and can be invoked directly, so
+			// enforce the full input contract here rather than relying on the composer's Validate. Among
+			// other things this rejects contradictory exact+legacy inputs (a legacy Amount/BasisPoints
+			// silently ignored when SiloExactAmounts is present) and SkipUnsiloed outside exact mode.
+			if err := input.Validate(); err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
 			evmChain, ok := chains.EVMChains()[input.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
@@ -176,14 +184,6 @@ func (t *TokenAdapter) migrateSiloedLockReleaseSource(
 ) (sequences.OnChainOutput, error) {
 	chainSel := input.ChainSelector
 	exactMode := input.IsExactSiloMode()
-
-	// SkipUnsiloed is only meaningful in exact mode; a legacy Amount/BasisPoints would fall through to
-	// the proportional branch and still withdraw the shared bucket. Reject it here so a direct caller
-	// of this sequence cannot bypass the safety rule (the composer's Validate enforces the same).
-	if input.SkipUnsiloed && (len(input.SiloExactAmounts) == 0 || input.UnsiloedExactAmount != nil) {
-		return sequences.OnChainOutput{}, fmt.Errorf(
-			"SkipUnsiloed requires SiloExactAmounts and cannot be combined with UnsiloedExactAmount")
-	}
 
 	// The custom XERC20 group pool's unsiloed balance is the shared XERC20LockBox collateral that
 	// backs every XERC20 minted against the lockbox, not pool-owned liquidity. Withdrawing it would
