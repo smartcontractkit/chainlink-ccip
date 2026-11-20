@@ -2,7 +2,6 @@ package v0_1_0
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared"
 	solanastateview "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/shared/stateview/solana"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/governance"
 )
 
 func ValidateMCMSConfigSolana(
@@ -125,27 +125,7 @@ func BuildProposalsForTxns(
 }
 
 func BuildMCMSTxn(ixn solana.Instruction, programID string, contractType cldf.ContractType) (*mcmsTypes.Transaction, error) {
-	data, err := ixn.Data()
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract data: %w", err)
-	}
-	for _, account := range ixn.Accounts() {
-		if account.IsSigner {
-			account.IsSigner = false
-		}
-	}
-	tx, err := mcmsSolana.NewTransaction(
-		programID,
-		data,
-		big.NewInt(0),        // e.g. value
-		ixn.Accounts(),       // pass along needed accounts
-		string(contractType), // some string identifying the target
-		[]string{},           // any relevant metadata
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transaction: %w", err)
-	}
-	return &tx, nil
+	return governance.BuildMCMSTxn(ixn, programID, string(contractType))
 }
 
 func FetchTimelockSigner(e cldf.Environment, chainSelector uint64) (solana.PublicKey, error) {
