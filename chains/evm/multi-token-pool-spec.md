@@ -52,7 +52,7 @@ OnRamp / OffRamp -- transfer call --> BurnMintMultiTokenPool
 
 | Contract | Responsibilities |
 | --- | --- |
-| MTTP | Holds token fees and the permissions required by each token's burn flavor. Checks the ramp, RMN curse, and burn flavor. Calls hooks, moves tokens, and pays out fees. |
+| MTTP | Holds mint and burn roles and token fees. Checks the ramp, RMN curse, and burn flavor. Calls hooks, moves tokens, and pays out fees. |
 | PCM | Provides operator functions and views. Checks roles, callers against the TAR, and lane records. Forwards configuration writes to the stores. |
 | Connection store | Stores token profiles, connections, subset tokens, trusted remote pools, and pause flags. Builds and validates pool data, checks source tokens and additional pool data, and converts inbound amounts. |
 | Fee store | Stores fee and destination overhead records. |
@@ -79,9 +79,8 @@ The pool owner configures only its Router and PCM. A new PCM applies to the next
 | New PCM, same stores | Configuration and live buckets remain in the stores. Roles belong to the new PCM and do not carry over. |
 | New store | The store starts empty. Its replacement requires a new PCM because the PCM's store addresses are immutable. |
 
-No contract call copies records into a new store. To select an MTTP, `TAR.setPool` calls its `isSupportedToken`,
-which checks registration and burn flavor. The TAR can select a pool whose stores lack required lane records.
-Transfers on those lanes then revert.
+No contract call copies records into a new store. `TAR.setPool` checks only that the PCM has the token profile.
+It can therefore accept a pool whose stores lack required records. Transfers then revert.
 
 The connection store builds and decodes pool data and converts inbound amounts. Replacing it can change these
 behaviors without replacing the pool. A new pool data format is usable only after every receiving remote pool
@@ -346,9 +345,9 @@ A profile contains:
 - Allowed FTF finality.
 - Additional pool data provider.
 
-On registration, the connection store calls the token's `decimals()`. A returned value must match the supplied
-decimals. If the token reverts, the store accepts the supplied value. Verify it independently in that case.
-Decimals are fixed while the token is registered and determine the amount minted on receive.
+On registration, the connection store checks the supplied decimals against the token's `decimals()`, as the
+`TokenPool` constructor does. Decimals cannot change while the token is registered; incorrect decimals would mint an
+incorrect amount.
 
 Updating a registered token replaces its profile and preserves its policies. It runs the registration checks, except
 for the external `decimals()` call. The supplied decimals must still match the registered value.
@@ -546,7 +545,7 @@ overhead record permits.
 
 | Configuration | Guarantee |
 | --- | --- |
-| Legacy receive disabled for every trusted pool | Every accepted message includes a source token matching the destination's configured remote token. Reciprocal configuration errors can pass this check. See [UID validation](#uid-validation). |
+| Legacy receive disabled for every trusted pool | Every accepted message includes a source token, which the destination checks. An incorrect remote token in the source configuration fails at the destination without minting. |
 | Legacy receive enabled for a pool | Messages without a source token do not prove which token was burned. The destination trusts the pool to send the correct asset. |
 | Policy connection | The check proves only that the source token matches the policy provider's expected remote token. |
 
@@ -580,10 +579,10 @@ set it. Zero means no provider. A non-zero address must contain code, or the upd
 
 | Path | Behavior |
 | --- | --- |
-| Send long data with a provider | The store calls `getAdditionalPoolData(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs)` with the source token and destination chain selector. The pool data includes the result. |
+| Send long data with a provider | The store calls `getAdditionalPoolData(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs)` with the source token and destination chain selector. The pool data includes its response. |
 | Send long data without a provider | The additional data is empty. |
 | Send legacy data | The store does not call the provider. There is no additional data. |
-| Receive with a provider | The store calls `isAdditionalPoolDataValid(localToken, remoteChainSelector, requestedFinalityConfig, additionalPoolData)` with the destination token and source chain selector. Accepted legacy formats supply empty additional data. A `false` response fails the message. |
+| Receive with a provider | The store calls `isAdditionalPoolDataValid(localToken, remoteChainSelector, requestedFinalityConfig, additionalPoolData)` with the destination token and source chain selector. Empty or 32-byte pool data supplies empty additional data. A `false` response fails the message. |
 | Receive without a provider | The store ignores the additional data. |
 
 Provider calls are views and cannot change state. A revert, missing code, or response that cannot decode stops the
@@ -599,7 +598,7 @@ revert that sender's send or fail its message.
 
 ### Empty data and migration
 
-On receive, the call arguments omit the source pool, source token, and send time. These sources all produce empty additional data:
+The provider cannot see the source pool, source token, or send time. These sources all produce empty additional data:
 
 - A legacy pool.
 - An MTTP lane with `useLegacyPoolDataOnSend` enabled.
@@ -657,7 +656,7 @@ Tokens with that history need another provider, or none.
 ### Addresses and legacy flags
 
 The store hashes remote pool addresses exactly as supplied, as in `TokenPool`. EVM pool addresses must use
-`abi.encode(pool)`, matching the OffRamp's source pool encoding. Each address in a list must be nonempty and unique within that list.
+`abi.encode(pool)`, matching the OffRamp's source pool encoding.
 
 | Record | Pools and flags |
 | --- | --- |
@@ -741,8 +740,8 @@ For example, a provider returning 32 bytes needs a 224-byte allowance. See
 [lanes to non-MTTP pools](#lanes-to-non-mttp-pools)
 for the legacy requirement.
 
-A 32-byte allowance on a lane sending the source token makes every send revert before the burn. Before opening the lane,
-check the selected destination overhead record. Once the connection exists, verify the allowance through `getFeeBatch`.
+A 32-byte allowance on a lane sending the source token makes every send revert before the burn. No funds move. Tooling
+must detect this through `getFeeBatch` before opening the lane, as described in the [workflow checks](#workflow-rules).
 
 ## Rate limits
 
@@ -787,9 +786,8 @@ as in `TokenPool`. For policy records, this decision reads the policy configurat
 
 ### Stops and pauses
 
-A **stop** is an enabled configuration with capacity 0 and rate 0. It rejects positive amounts in local units. To stop both finality classes,
-stop the default bucket and any enabled FTF bucket. A disabled FTF bucket uses the default. An inbound amount that
-rounds to zero skips consumption. A policy stop affects every token using the record.
+A **stop** is an enabled configuration with capacity 0 and rate 0. Stopping all transfers in a direction requires
+stops for both finality classes. A policy stop affects every token using the record.
 
 A stop is a configuration change, so lifting it does not require `UNPAUSER_ROLE`. Pauses do not change buckets;
 buckets continue to refill while paused.
@@ -801,7 +799,7 @@ A bucket configuration consists of its enabled flag, capacity, and rate.
 - Writing a different configuration sets the bucket balance to the new capacity. Even lowering capacity can increase
   the remaining balance.
 - Writing an identical configuration preserves the balance. Repeating a write does not add capacity.
-- `TokenPool` 2.0 resets the balance to capacity on every set. Version 1.6.1 clamps the available balance to the new capacity.
+- `TokenPool` instead resets the balance to capacity on every set, including unchanged values.
 
 Inline and policy updates take effect differently:
 
@@ -862,8 +860,7 @@ token fee = floor(send amount * bps / 10,000)
 
 Each bps value must be less than 10,000. A fee record has no disabled state; zero fees mean no pool fee.
 
-The pool retains the basis-point fee in the bridged token and burns the remainder. The OnRamp pays the pool's USD fee
-in the message's fee token, which can be a different asset. A caller with
+The pool burns the amount after the token fee. Its remaining token balance consists of fees. A caller with
 `FEE_COLLECTOR_ROLE` withdraws the entire balance of each listed token through the PCM. Tokens sent directly to the pool also
 count as fees, as in `TokenPool`.
 
@@ -913,8 +910,6 @@ reverts the send and burn in the same transaction.
 
 This allowance is necessary for sends to work. The separate [pool data size check](#pool-data-size-check) enforces the
 lane's format limit before the burn. Legacy sends use 32 bytes and fit the default byte allowance.
-The FeeQuoter also enforces per-message gas and byte limits. The v2 wire format limits the entire encoded token
-transfer, including pool data, to 65,535 bytes.
 
 ## Security records and hooks
 
@@ -983,8 +978,7 @@ support requires the default CCVs.
 The source selected its outbound CCVs at send time. Changing the inbound list or TAR pool can therefore fail an
 in-flight message with `RequiredCCVMissing`. It can execute after the inbound list accepts the CCVs that verified it.
 
-- An empty pool list requests the defaults. A nonempty pool list requests them only if it includes `address(0)`.
-  Lane or receiver requirements can independently require the same CCVs.
+- Omitting `address(0)` drops the default CCVs. A policy record update can do this for every assigned token.
 - Pending messages remain executable across a pool switch only if the new pool's inbound CCVs accept their
   verification. The [hook and CCV workflow](#changing-hooks-and-inbound-ccvs) preserves the old pool's requirements
   until those messages have executed.
@@ -1007,8 +1001,8 @@ It covers every pool and PCM using the connection store, including tokens and ch
 - A pause call that changes nothing emits no event.
 - A new connection store starts with all pauses disabled.
 
-PCM pause flags apply only to MTTP transfers. For a legacy pool, the legacy pool's controls, a ramp lane closure,
-TAR delisting, or an RMN curse can stop transfers.
+A token whose TAR pool is legacy does not read these flags. Only its legacy pool, that pool's rate limits, or an
+RMN curse can stop its transfers.
 
 ## The pool
 
@@ -1041,7 +1035,7 @@ Three parties control whether a pool serves a token:
 | --- | --- |
 | PCM roles | Register and connect the token. |
 | Token admin | Select the pool in the TAR. |
-| Issuer | Grant mint authority and any burn permission required by the token. `BurnToAddress` uses an ERC-20 transfer. |
+| Issuer | Grant the pool mint and burn roles. |
 
 ### OffRamp authorization
 
@@ -1200,8 +1194,7 @@ therefore own the pools and stores and hold the PCM's `DEFAULT_ADMIN_ROLE`.
 The PCM accepts validation calls only from the token's TAR pool. A second pool using the same PCM cannot consume that
 token's buckets. The PCM must use the same TAR as the ramps; its constructor does not verify this.
 
-A transfer consumes only the bridged token's bucket and leaves fee configurations unchanged. The pool can accrue
-fees in another asset when the sender pays in that asset.
+A transfer of one token cannot change another token's buckets or fees. Tokens share configuration and pause state only.
 
 The three stores have the same registered tokens unless an authorized caller writes directly to one store.
 If the lists differ:
@@ -1323,7 +1316,7 @@ In a hub-and-spoke deployment, spokes have lanes only to the hub.
 
 Tooling must validate the planned remote token mappings before any of these changes:
 
-- Setting an inline connection or removing one to adopt a policy connection.
+- Setting an inline connection.
 - Assigning a connection policy to a token.
 - Setting a connection policy record.
 - Adding a subset token.
@@ -1332,16 +1325,15 @@ Tooling must validate the planned remote token mappings before any of these chan
 For every token and chain affected by the change:
 
 1. Check that the remote token exists and is the same asset as the local token.
-2. Verify the reciprocal mapping and the issuer pool selected by the remote TAR. If these are being set up together,
-   check the planned values before configuration and verify the live values on both chains before enabling sends.
+2. Check that the remote chain maps that token back to the local token, and that its TAR selects an issuer pool.
 3. Check the address encoding. EVM source tokens use `abi.encode(address)`; other chain families require their raw
    token bytes in inline connections.
 4. Before setting a connection policy record, check the chain family. A connection policy using
    `SameAddressRemoteTokenAddressProvider` may contain only EVM chains. Every policy token must have the same address
    on every policy chain, including its original deployment chain.
 
-Read `getLaneConnectionBatch` on each MTTP endpoint. On a legacy EVM endpoint, read the selected pool's
-`getRemoteToken`. Use the corresponding chain configuration on non-EVM endpoints.
+Use `getLaneConnectionBatch` on both chains to inspect existing mappings. The planned configuration must satisfy the
+[remote token requirements](#remote-token-checks-in-tooling) before it takes effect.
 
 #### Checking remote pool compatibility
 
@@ -1356,8 +1348,8 @@ applies to these writes:
 - Opening a lane that will use a remote pool policy record.
 
 Check only lanes affected by the write. For a policy record update, check each assigned token with a lane to that
-chain and no inline remote pool record. An inline record still controls the send format. If it enables `trustPolicyRemotePools`,
-the policy update also changes which source pools the lane trusts on receive.
+chain and no inline remote pool record. Tokens without a lane, or whose inline record remains in use, are unaffected
+by that policy update.
 
 There is one exception: if the token is paused outbound locally, the remote TAR may name no pool. Repeat the check
 before unpausing.
@@ -1387,8 +1379,7 @@ Before a chain switches a token to an MTTP:
    | Legacy pool with an enabled `IPoolV2.getFee` configuration | Legacy pool owner | Pool fee configuration |
    | Legacy pool priced by the FeeQuoter | CCIP owner | FeeQuoter token transfer configuration |
 
-3. **Tooling:** read the gas and byte allowances from the pricing source above using pool `getFee` or FeeQuoter
-   `getTokenTransferFee`. The Router quote returns the total fee. For an open MTTP lane, also check `getFeeBatch`.
+3. **Tooling:** check the source quote for the gas and byte allowances. For an MTTP source, also check `getFeeBatch`.
    Long data needs 192 bytes plus padded additional data. Lanes to non-MTTP pools require a PCM
    `destBytesOverhead` of 32.
 
@@ -1418,17 +1409,13 @@ token's TAR pool:
 2. **Store owners:** authorize a new PCM on its stores before it writes configuration or validates transfers.
 3. **`DEFAULT_ADMIN_ROLE` of the new PCM:** grant its roles. Roles do not carry over from the old PCM.
 4. **PCM roles:** copy every configuration record into each new store. **Tooling:** compare the old and new
-   configuration views before the switch. A new security store starts with full buckets. Live balances cannot be
-   copied. A new connection store starts unpaused. Restore the intended token, chain, and global pauses before switching.
+   configuration views before the switch. A new security store starts with full buckets, and a new connection store
+   starts with all pauses disabled; live bucket state cannot be copied.
 5. **Tooling:** if the new connection store changes the pool data format, verify that every receiving remote pool
    accepts that format before any pool sends it.
-6. **For a new pool address:** the issuer grants the token permissions required by its flavor, and each hook owner
-   authorizes the new pool. On every destination, trust the new source pool before it sends. Retain trust in a healthy
-   old source pool until its pending messages execute.
-7. **Pool owner or token admin:** switch the PCM or TAR pool after preparation. For each token moved to a new pool,
-   its role admin revokes the old pool's token permissions. Hook owners remove the old pool's authorization once it
-   no longer serves any token using their hook.
-8. **Store owners:** once no pool uses the old PCM, remove it from each store's authorized callers with
+6. **Pool owner or token admin:** switch the pool's PCM or the token's TAR pool only after the applicable preparation
+   above is complete.
+7. **Store owners:** once no pool uses the old PCM, remove it from each store's authorized callers with
    `applyAuthorizedCallerUpdates`.
    Until then, the old PCM's role holders can still change configuration and pause state.
 
@@ -1489,10 +1476,9 @@ contract does not check that those messages have completed.
 
 To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
 
-1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist and the old hook's
-   `getPolicyEngine()`. Preserve both `getAllowListEnabled()` and `getAllowList()`. Use `[]` for a disabled allowlist,
-   the existing members for a populated one, and `[address(0)]` for an enabled empty one. The constructor uses the
-   array length to enable checks and skips the zero address when adding members. Verify both getters before switching.
+1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist, and with the old
+   hook's `getAllowList()` and `getPolicyEngine()`. If `getAllowListEnabled()` is true and the list is empty,
+   pass `[address(0)]` to keep the allowlist enabled with no members. Passing `[]` disables it.
 2. **Hook owner:** authorize every pool that serves a token using the new hook.
 3. **Policy engine admin:** give the new hook the old hook's policies with `addPolicy`, and the same target default
    with `setTargetDefaultPolicyAllow`. The engine keys policies by hook address.
@@ -1502,7 +1488,8 @@ Authorization is also required when reusing `AdvancedPoolHooks` or `MultiTokenPo
 new pool before it handles transfers.
 
 Before a pool switch, preserve the old pool's inbound CCVs in the token's security record. Wait for in-flight messages
-to execute before changing that inbound list. A policy record change affects every token using it.
+to execute before changing that inbound list. A policy record change affects every token using it. A list without
+`address(0)` no longer includes the ramps' default CCVs.
 
 #### Retrying messages with empty additional data
 
@@ -1538,7 +1525,7 @@ Migrated tokens and tokens with legacy lanes must remain compatible with empty d
 The chain order does not matter.
 
 1. **`PAUSER_ROLE`:** call `pauseTokens([T], Outbound)` before step 6. Selecting the pool in the TAR makes T usable.
-2. **Role admin of T:** grant mint authority and the permissions required by T's burn flavor.
+2. **Role admin of T:** grant the MTTP mint and burn roles, for example with `grantMintAndBurnRoles(mttp)`.
 3. **Owner or CCIP admin of T:** call `registerAdminViaOwner(T)` or `registerAdminViaGetCCIPAdmin(T)` on the registry
    module. Then the **token admin** calls `TAR.acceptAdminRole(T)`.
 4. **`CONFIG_ROLE`:** register T with `applyTokenProfileUpdates([], [profileOfT])`. Then assign its five
@@ -1591,7 +1578,7 @@ Set inline connections before assigning the connection policy. Their priority pr
 selecting the wrong token. Do not replace a shared provider just to support T; that changes resolution for every policy
 token.
 
-If T's `decimals()` reverts, verify the supplied decimals before step 4. Its rate limit policy must use the same local decimals, or assignment
+Step 4 checks T's decimals against `decimals()`. Its rate limit policy must use the same local decimals, or assignment
 reverts. If one chain uses different decimals, select a matching rate limit policy there or use inline rate limits.
 Limits must represent the same token amounts across chains.
 
@@ -1625,8 +1612,7 @@ Run these checks in phase 2:
 | `getLaneConnectionBatch` | Correct remote token and MTTP; outbound paused, inbound unpaused |
 | `getCurrentRateLimiterStateBatch` | Each inbound limit covers the other side's outbound limit. |
 | `getFeeBatch` | Correct fees, `isEnabled` true, and correct byte allowance on every lane |
-| `getLaneVerificationBatch` | Correct CCVs and hook address. |
-| Configured hook | Verify pool authorization and simulate the relevant transfer checks for T. |
+| `getLaneVerificationBatch` | Correct CCVs and hook; the hook accepts T. |
 | Remote TAR | The remote token maps to the remote MTTP. |
 | `getLaneConnectionBatch` on both ends | Matching `hasConnection` for T |
 
@@ -1692,7 +1678,7 @@ Complete this phase before opening the hub's lanes.
      Set its provider with `applyRemoteTokenAddressProviderUpdates`; it must resolve tokens on the hub.
 5. **`CONFIG_ROLE`:** register the selected tokens with `applyTokenProfileUpdates`, then assign their policies, with
    connection last. The connection assignment opens hub lanes without a lane check.
-6. **Role admin of each token:** grant mint authority and any required burn permission.
+6. **Role admin of each token:** grant the MTTP mint and burn roles.
 7. **Owner of each token, then token admin:** register the TAR admin, call `acceptAdminRole`, then
    `setPool(token, mttp)`. Pool selection requires step 5.
 
@@ -1787,8 +1773,7 @@ Without that pause, early messages fail on the hub and need retries after step 1
 | --- | --- |
 | New chain, after step 7 | PCM `getTokenAdminRegistry` matches the ramps' TAR, which maps each token to the MTTP. |
 | New chain, after step 7 | `getLaneRecordLevelBatch` shows every type for each token. `getLaneConnectionBatch` shows the hub token and MTTP. `getLaneVerificationBatch` shows the correct CCVs and hook. |
-| Hub, before step 13 | For each selected token, check the five other record types with `getLaneRecordLevelBatch` and inspect their inline or policy records. |
-| Hub, after step 13 and before unpausing | Verify CCVs and hook through `getLaneVerificationBatch`. Check resolved buckets with `getCurrentRateLimiterStateBatch` and fees and overhead with `getFeeBatch`. Each inbound limit covers the other side's outbound limit. |
+| Hub, before step 13 | For each token in the batch on the new chain, `getLaneRecordLevelBatch` shows the five other types. `getLaneVerificationBatch` shows the correct CCVs and hook. Each inbound limit covers the other side's outbound limit. |
 | Hub, before step 14 | For all tokens from `getAllConfiguredTokens`, only the selected tokens have `hasConnection` to the new chain. Their remote tokens and MTTP are correct. The complete `getSubsetTokens` scan lists the selected tokens. |
 | Both chains, before step 14 | `getLaneConnectionBatch` reports matching `hasConnection` for each token. |
 
@@ -1826,13 +1811,7 @@ on both chains and wait for all in-flight messages before removing any connectio
 | Legacy pool owner | Upgrade every 1.5.0 pool to 1.5.1 or later before phase 2, including chains that will remain legacy. See [the upgrade procedure](#upgrade-pools-older-than-151). |
 | `CONFIG_ROLE` | Use no additional pool data provider, or one that accepts empty data. This remains a permanent requirement. |
 | Issuer | Before phase 1, choose fees for each token on every lane, including lanes to legacy pools. Fees can be zero. |
-| Hook owner | For each legacy hook with a non-zero `getThresholdAmount`, use `applyCCVConfigUpdates` to move threshold CCVs into the base lists in the order below. |
-
-For each affected lane, first ensure every new send requests the CCVs the destination will require at all amounts.
-Move any threshold outbound CCVs into the source's base outbound list. Keep the destination's inbound requirements
-in place until older messages have executed or have attestations satisfying the new list.
-Then move threshold inbound CCVs into the destination's base inbound list. Preserve the other directions and chains
-on every update. Call `setThresholdAmount(0)` only after updating all affected lanes on that hook.
+| Hook owner | For legacy hooks with a non-zero `getThresholdAmount`, use `applyCCVConfigUpdates` to move threshold CCVs into the base lists. Update outbound lists first so new messages request every CCV the destination will require. Wait for earlier messages to execute before updating the inbound list on that lane. Call `setThresholdAmount(0)` after updating every affected lane on the hook. |
 
 See [destination gas budgets](#destination-gas-budget), [source byte allowances](#source-byte-allowance), and
 [empty data compatibility](#empty-data-and-migration).
@@ -1843,8 +1822,8 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
 
 1. **Deployer and `DEFAULT_ADMIN_ROLE`:** deploy the five contracts, authorize the PCM, transfer ownership, and grant roles
    as in [chain expansion](#chain-expansion). For each legacy pool older than 2.0 with `getAllowListEnabled()` true,
-   deploy a `MultiTokenPoolHooks` that preserves the enabled flag and membership as described in
-   [changing hooks](#changing-hooks-and-inbound-ccvs). Pools with identical allowlist settings can share one hook.
+   also deploy a `MultiTokenPoolHooks` with the pool's `getAllowList()`, using `[address(0)]` if the list is empty. Pools with the same allowlist can share one
+   hook.
 2. **`CONFIG_ROLE`:** create policy defaults:
    - Fee: the issuer's chosen fees.
    - Destination overhead: the measured MTTP receive gas and 32 bytes. The byte limit prevents long-format sends
@@ -1860,8 +1839,7 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
      | Older than 2.0, with `getAllowListEnabled()` true | The `MultiTokenPoolHooks` from step 1 |
 
 3. **`CONFIG_ROLE`:** register the tokens with `applyTokenProfileUpdates`. Copy each legacy pool's decimals, pool
-   flavor, burn address, and allowed finality. For 1.5.0, verify decimals from the token or issuer. For pools without
-   `IPoolV2`, set default-only finality. Assign the three policies with `applyTokenFeePolicyUpdates`,
+   flavor, burn address, and allowed finality. Assign the three policies with `applyTokenFeePolicyUpdates`,
    `applyTokenDestOverheadPolicyUpdates`, and `applyTokenSecurityPolicyUpdates`. Each token gets the security policy
    for its hook from step 2, or the policy without a hook.
    Keep the additional pool data provider unset or compatible with empty data permanently.
@@ -1882,7 +1860,7 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
    | Switches first on this lane | Disabled |
    | Switches second on this lane | Enabled |
 
-5. **Role admin of each token:** grant mint authority and any required burn permission. Before the switch, the PCM prevents their use
+5. **Role admin of each token:** grant the MTTP mint and burn roles. Before the switch, the PCM prevents their use
    through transfers because it accepts validation calls only from the token's TAR pool.
 6. **Hook owner:** authorize the MTTP on each hook from step 2.
 7. **Legacy pool owner:** before each remote switch, call
@@ -1922,7 +1900,7 @@ Start only after phase 1 is complete on every chain.
    - If both keep `useLegacyPoolDataOnSend` enabled, both accept a period of legacy-format MTTP traffic.
    - If both disable it, a message arriving before the other switch fails until that switch and needs a retry.
 
-9. **Role admin of each token:** after the switch, revoke the legacy pool's token permissions. The owner of a legacy
+9. **Role admin of each token:** after the switch, revoke the legacy pool's mint and burn roles. The owner of a legacy
    2.0 pool also withdraws its fees. The OffRamp uses the TAR pool at execution time, so the legacy pool no longer
    executes messages.
 
@@ -1936,19 +1914,17 @@ ends of these lanes must continue to use the same decimals.
 
 For a 1.5.0 pool on chain C:
 
-1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the same burn flavor. Preserve the old pool's
-   allowlist enablement and members. If the allowlist is enabled and the replacement is 2.0, configure it on an
-   `AdvancedPoolHooks` instance and authorize the replacement pool to call it.
-   For each lane, copy and verify the remote token, trusted source pool and both directional rate configurations.
-   Include each remote replacement pool before its chain switches.
+1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's allowlist settings. Preserve both
+   `getAllowListEnabled()` and `getAllowList()`. For a 2.0 replacement, use its hook for the allowlist.
+   For each remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
 2. **Legacy pool owner on each remote chain already using 1.5.1 or later:** call
    `addRemotePool(chainC, abi.encode(newPool))` before C's TAR switch.
 3. Upgrade any remote 1.5.0 pool too. Its replacement must trust both C's old and new pools.
-4. **Role admin of the token on C:** grant the new pool mint authority and any required burn permission before the TAR switch.
+4. **Role admin of the token on C:** grant the new pool mint and burn roles before the TAR switch.
 5. **Token admin on C:** call `TAR.setPool(token, newPool)`.
    A new-pool message can arrive before the remote upgrade switches and fail on that chain's 1.5.0 pool. Tooling
    must list these messages and retry them through `OffRamp.execute` after the remote switch.
-6. **Role admin of the token on C:** revoke the 1.5.0 pool's token permissions after the switch.
+6. **Role admin of the token on C:** revoke the 1.5.0 pool's mint and burn roles after the switch.
    The OffRamp uses the TAR pool at execution time, so it no longer executes on that old pool.
 7. **`CONFIG_ROLE` on remote chains with phase 1 records already configured:** add C's new pool to the token's inline
    remote pool record with `allowLegacyPoolDataOnReceive` enabled. Keep the old pool permanently; its messages never expire.
@@ -2003,8 +1979,8 @@ Other requirements for pending messages:
 - **OffRamps:** retain each OffRamp with pending messages on the MTTP's Router. A message cannot move to another
   OffRamp.
 - **Rate limits:** legacy bucket balances do not migrate. MTTP buckets start full, so the switch can allow an additional
-  amount equal to each bucket's capacity. Retry after refill when the amount fits within capacity and the bucket refills.
-  An amount above capacity or an insufficient balance at zero refill rate requires a configuration change.
+  amount equal to each bucket's capacity. Messages that exceed the available inbound limit fail and can be retried
+  after refill.
 
 #### Checks before migration step 8
 
@@ -2028,7 +2004,7 @@ Then verify the following:
 | Source fee configurations | Gas estimates cover measured receive cost with a margin, including legacy sources priced through the pool or FeeQuoter. |
 | MTTP Router | Includes every OffRamp with pending messages for the token's remote chains. |
 | `getLaneVerificationBatch` | Matches the legacy pool's `getRequiredCCVs`. For a pool without `IPoolV2` support, empty lists select default CCVs. |
-| Hook from `getLaneVerificationBatch` | The legacy 2.0 pool's `getAdvancedPoolHooks()`, or the step 1 hook with the legacy pool's allowlist enablement and members. Zero if the legacy pool has neither. |
+| Hook from `getLaneVerificationBatch` | The legacy 2.0 pool's `getAdvancedPoolHooks()`, or the step 1 hook with the legacy pool's `getAllowList()`. Zero if the legacy pool has neither. |
 | Additional pool data provider | Not configured, or accepts empty data from every relevant remote chain |
 | Second chain's switch batch | Sets inline overhead toward the first chain to 192 bytes plus padded provider data. |
 | TARs and old 1.5.0 pools | No TAR selects a 1.5.0 pool for the token; replaced 1.5.0 pools have no mint or burn role. |
@@ -2057,9 +2033,9 @@ For one chain, follow this order. Each step can be a separate call.
    - Where `onlySubsetTokens` is enabled, **`CONFIG_ROLE`** must add the token with `applySubsetTokenUpdates`.
      This runs the lane check. Without membership, step 2 closes that lane.
 2. **`CONFIG_ROLE`:** remove the inline connection.
-   - Before removal, simulate it and read `getLaneConnectionBatch` in the resulting state. Require `hasConnection`
-     and a nonempty remote token matching the intended inline bytes exactly. A missing or failing provider can leave
-     the connection open with an empty remote token.
+   - The store rejects removal if the policy resolves different remote token bytes.
+   - Tooling must reject removal if `getLaneConnectionBatch` would report `hasConnection` false afterward. Keep the
+     lane open.
 3. **`CONFIG_ROLE`:** assign the rate limit, fee, destination overhead, and security policies. Then remove those
    inline records. Before each assignment and removal, **tooling** checks that the selected policy record has the
    required values for that token and chain, including the hook.
@@ -2171,12 +2147,10 @@ Every unpause must wait for all checks in step 5.
    - Removal deletes all remote pools for X and blocks inbound messages too.
    - Re-add X before retrying those messages; any party can retry afterward.
 
-   Until a legacy or ramp control stops sends, the affected legacy lanes can still send to X.
-
 #### Contain the incident on chain X
 
-8. **Role admin of each token served by P:** revoke P's mint authority and any burn permission it holds using that token's role API.
-   Until mint authority is revoked, the attacker can mint locally without a message through a Router and PCM of its choice.
+8. **Role admin of each token served by P:** revoke P's mint and burn roles. Each token requires two calls. Until then,
+   the attacker can mint locally without a message through a Router and PCM of its choice.
 
 #### Recover with a new pool
 
