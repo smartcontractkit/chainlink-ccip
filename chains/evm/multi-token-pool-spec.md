@@ -579,10 +579,10 @@ set it. Zero means no provider. A non-zero address must contain code, or the upd
 
 | Path | Behavior |
 | --- | --- |
-| Send long data with a provider | The store calls the provider with the token, requested finality, and token args. The pool data includes its response. |
+| Send long data with a provider | The store calls `getAdditionalPoolData(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs)` with the source token and destination chain selector. The pool data includes its response. |
 | Send long data without a provider | The additional data is empty. |
 | Send legacy data | The store does not call the provider. There is no additional data. |
-| Receive with a provider | The store passes the additional data and requested finality to the provider. Empty or 32-byte pool data supplies empty additional data. A `false` response fails the message. |
+| Receive with a provider | The store calls `isAdditionalPoolDataValid(localToken, remoteChainSelector, requestedFinalityConfig, additionalPoolData)` with the destination token and source chain selector. Empty or 32-byte pool data supplies empty additional data. A `false` response fails the message. |
 | Receive without a provider | The store ignores the additional data. |
 
 Provider calls are views and cannot change state. A revert, missing code, or response that cannot decode stops the
@@ -1477,7 +1477,8 @@ contract does not check that those messages have completed.
 To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
 
 1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist, and with the old
-   hook's `getAllowList()` and `getPolicyEngine()`.
+   hook's `getAllowList()` and `getPolicyEngine()`. If `getAllowListEnabled()` is true and the list is empty,
+   pass `[address(0)]` to keep the allowlist enabled with no members. Passing `[]` disables it.
 2. **Hook owner:** authorize every pool that serves a token using the new hook.
 3. **Policy engine admin:** give the new hook the old hook's policies with `addPolicy`, and the same target default
    with `setTargetDefaultPolicyAllow`. The engine keys policies by hook address.
@@ -1810,7 +1811,7 @@ on both chains and wait for all in-flight messages before removing any connectio
 | Legacy pool owner | Upgrade every 1.5.0 pool to 1.5.1 or later before phase 2, including chains that will remain legacy. See [the upgrade procedure](#upgrade-pools-older-than-151). |
 | `CONFIG_ROLE` | Use no additional pool data provider, or one that accepts empty data. This remains a permanent requirement. |
 | Issuer | Before phase 1, choose fees for each token on every lane, including lanes to legacy pools. Fees can be zero. |
-| Hook owner | For each legacy hook with a non-zero `getThresholdAmount`, move `thresholdOutboundCCVs` and `thresholdInboundCCVs` into `outboundCCVs` and `inboundCCVs` with `applyCCVConfigUpdates`. Then call `setThresholdAmount(0)`. MTTP has no threshold amount, so these CCVs then apply to every amount. |
+| Hook owner | For legacy hooks with a non-zero `getThresholdAmount`, use `applyCCVConfigUpdates` to move threshold CCVs into the base lists. Update outbound lists first so new messages request every CCV the destination will require. Wait for earlier messages to execute before updating the inbound list on that lane. Call `setThresholdAmount(0)` after updating every affected lane on the hook. |
 
 See [destination gas budgets](#destination-gas-budget), [source byte allowances](#source-byte-allowance), and
 [empty data compatibility](#empty-data-and-migration).
@@ -1821,7 +1822,7 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
 
 1. **Deployer and `DEFAULT_ADMIN_ROLE`:** deploy the five contracts, authorize the PCM, transfer ownership, and grant roles
    as in [chain expansion](#chain-expansion). For each legacy pool older than 2.0 with `getAllowListEnabled()` true,
-   also deploy a `MultiTokenPoolHooks` with the pool's `getAllowList()`. Pools with the same allowlist can share one
+   also deploy a `MultiTokenPoolHooks` with the pool's `getAllowList()`, using `[address(0)]` if the list is empty. Pools with the same allowlist can share one
    hook.
 2. **`CONFIG_ROLE`:** create policy defaults:
    - Fee: the issuer's chosen fees.
@@ -1913,8 +1914,9 @@ ends of these lanes must continue to use the same decimals.
 
 For a 1.5.0 pool on chain C:
 
-1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's `getAllowList()`. For each
-   remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
+1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's allowlist settings. Preserve both
+   `getAllowListEnabled()` and `getAllowList()`. For a 2.0 replacement, use its hook for the allowlist.
+   For each remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
 2. **Legacy pool owner on each remote chain already using 1.5.1 or later:** call
    `addRemotePool(chainC, abi.encode(newPool))` before C's TAR switch.
 3. Upgrade any remote 1.5.0 pool too. Its replacement must trust both C's old and new pools.
@@ -2144,8 +2146,6 @@ Every unpause must wait for all checks in step 5.
    - **Tooling:** before removal, save the remote token, trusted pools, and rate limit configurations.
    - Removal deletes all remote pools for X and blocks inbound messages too.
    - Re-add X before retrying those messages; any party can retry afterward.
-
-   Until these legacy limits or removals take effect, only an RMN curse of X stops those sends.
 
 #### Contain the incident on chain X
 
