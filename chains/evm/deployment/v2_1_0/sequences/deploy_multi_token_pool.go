@@ -80,7 +80,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		}
 
 		existingAddresses := input.ExistingDataStore.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
-		connectionStoreRef, err := contract.MaybeDeployContract(b, connection_policy_store.Deploy, chain, contract.DeployInput[connection_policy_store.ConstructorArgs]{
+		connectionStoreRef, err := maybeDeployMultiTokenPoolContract(b, connection_policy_store.Deploy, chain, contract.DeployInput[connection_policy_store.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(connection_policy_store.ContractType, *connection_policy_store.Version),
 			Args:           connection_policy_store.ConstructorArgs{},
@@ -89,7 +89,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ConnectionPolicyStore: %w", err)
 		}
-		feeStoreRef, err := contract.MaybeDeployContract(b, fee_policy_store.Deploy, chain, contract.DeployInput[fee_policy_store.ConstructorArgs]{
+		feeStoreRef, err := maybeDeployMultiTokenPoolContract(b, fee_policy_store.Deploy, chain, contract.DeployInput[fee_policy_store.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(fee_policy_store.ContractType, *fee_policy_store.Version),
 			Args:           fee_policy_store.ConstructorArgs{},
@@ -98,7 +98,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FeePolicyStore: %w", err)
 		}
-		securityStoreRef, err := contract.MaybeDeployContract(b, security_policy_store.Deploy, chain, contract.DeployInput[security_policy_store.ConstructorArgs]{
+		securityStoreRef, err := maybeDeployMultiTokenPoolContract(b, security_policy_store.Deploy, chain, contract.DeployInput[security_policy_store.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(security_policy_store.ContractType, *security_policy_store.Version),
 			Args:           security_policy_store.ConstructorArgs{},
@@ -111,7 +111,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		connectionStore := common.HexToAddress(connectionStoreRef.Address)
 		feeStore := common.HexToAddress(feeStoreRef.Address)
 		securityStore := common.HexToAddress(securityStoreRef.Address)
-		poolConfigManagerRef, err := contract.MaybeDeployContract(b, pool_config_manager.Deploy, chain, contract.DeployInput[pool_config_manager.ConstructorArgs]{
+		poolConfigManagerRef, err := maybeDeployMultiTokenPoolContract(b, pool_config_manager.Deploy, chain, contract.DeployInput[pool_config_manager.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(pool_config_manager.ContractType, *pool_config_manager.Version),
 			Args: pool_config_manager.ConstructorArgs{
@@ -128,7 +128,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		}
 		poolConfigManagerAddress := common.HexToAddress(poolConfigManagerRef.Address)
 
-		poolRef, err := contract.MaybeDeployContract(b, burn_mint_multi_token_pool.Deploy, chain, contract.DeployInput[burn_mint_multi_token_pool.ConstructorArgs]{
+		poolRef, err := maybeDeployMultiTokenPoolContract(b, burn_mint_multi_token_pool.Deploy, chain, contract.DeployInput[burn_mint_multi_token_pool.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(burn_mint_multi_token_pool.ContractType, *burn_mint_multi_token_pool.Version),
 			Args: burn_mint_multi_token_pool.ConstructorArgs{
@@ -198,6 +198,28 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 	},
 )
 
+// maybeDeployMultiTokenPoolContract reuses an existing deployment and makes the skip visible
+// to operators. The actual type/version/qualifier matching remains in MaybeDeployContract.
+func maybeDeployMultiTokenPoolContract[ARGS any](
+	b cldf_ops.Bundle,
+	op *cldf_ops.Operation[contract.DeployInput[ARGS], datastore.AddressRef, evm.Chain],
+	chain evm.Chain,
+	input contract.DeployInput[ARGS],
+	existingAddresses []datastore.AddressRef,
+) (datastore.AddressRef, error) {
+	ref, err := contract.MaybeDeployContract(b, op, chain, input, existingAddresses)
+	if err != nil {
+		return datastore.AddressRef{}, err
+	}
+	for _, existing := range existingAddresses {
+		if existing.Key() == ref.Key() && existing.Address == ref.Address {
+			b.Logger.Infof("%s already deployed on chain %d at %s; skipping deployment", ref.Type, chain.Selector, ref.Address)
+			break
+		}
+	}
+	return ref, nil
+}
+
 // authorizePoolConfigManager adds the PCM to a store only when it is not already authorized.
 // The read and write are forced so a retry cannot reuse a stale authorization list or an
 // already-executed write report after out-of-band ownership or authorization changes.
@@ -221,6 +243,12 @@ func authorizePoolConfigManager[ARGS any](
 		return contract.WriteOutput{}, false, err
 	}
 	if slices.Contains(authorizedCallers.Output, poolConfigManagerAddress) {
+		b.Logger.Infof(
+			"PoolConfigManager %s already authorized on store %s on chain %d; skipping authorization",
+			poolConfigManagerAddress,
+			storeAddress,
+			chain.Selector,
+		)
 		return contract.WriteOutput{}, false, nil
 	}
 

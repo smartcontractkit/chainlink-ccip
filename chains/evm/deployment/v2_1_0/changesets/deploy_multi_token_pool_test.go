@@ -6,7 +6,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
@@ -193,7 +195,9 @@ func TestDeployMultiTokenPoolsApplyIsIdempotent(t *testing.T) {
 		require.NoError(t, ds.Addresses().Add(ref))
 	}
 	e.DataStore = ds.Seal()
-	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+	observedLogger, observedLogs := logger.TestObserved(t, zapcore.InfoLevel)
+	e.Logger = observedLogger
+	e.OperationsBundle = cldf_ops.NewBundle(e.OperationsBundle.GetContext, observedLogger, cldf_ops.NewMemoryReporter())
 	secondOut := applyMultiTokenPoolDeployment(t, e, admin)
 	secondRefs, err := secondOut.DataStore.Addresses().Fetch()
 	require.NoError(t, err)
@@ -203,6 +207,8 @@ func TestDeployMultiTokenPoolsApplyIsIdempotent(t *testing.T) {
 		require.Equal(t, firstRef.Address, secondRef.Address)
 	}
 	require.Empty(t, secondOut.MCMSTimelockProposals)
+	require.Len(t, observedLogs.FilterMessageSnippet("skipping deployment").All(), 5, "every existing contract deployment should be skipped with a log")
+	require.Len(t, observedLogs.FilterMessageSnippet("skipping authorization").All(), 3, "every existing store authorization should be skipped with a log")
 }
 
 func TestDeployMultiTokenPoolPreparesStoreAuthorizationForNonDeployerOwner(t *testing.T) {
