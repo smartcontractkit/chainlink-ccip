@@ -895,7 +895,7 @@ The budget must cover the MTTP receive path, including:
 The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The value is used to price execution, and the
 executor must supply enough transaction gas.
 
-MTTP receive gas includes the full `releaseOrMint` call and the token work in `OffRamp.executeSingleMessage`. Count both
+For `destGasOverhead`, measure MTTP receive gas in `OffRamp.executeSingleMessage`. Count the full `releaseOrMint` call, both
 `TAR.getPool` lookups, ERC-165 checks, `getRequiredCCVs`, and the token's `balanceOf` before verification and again
 after `releaseOrMint` if the token receiver differs from the pool. Exclude separately priced base, verifier and callback gas.
 In simulation with the destination TAR selecting the MTTP, measure each format the lane will use (legacy or long) from
