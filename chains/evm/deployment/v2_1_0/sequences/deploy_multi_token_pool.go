@@ -53,7 +53,8 @@ func ValidateDeployMultiTokenPoolInput(input tokens.DeployMultiTokenPoolInput) e
 }
 
 // ValidateDeployMultiTokenPoolState runs the read-only checks that depend on existing state: the
-// TokenAdminRegistry must match the recorded ramps' and the existing stack must be consistent.
+// TokenAdminRegistry, RMNProxy and Router must resolve, the TokenAdminRegistry must match the
+// recorded ramps', and the existing stack must be consistent.
 // It sends no transactions. The changeset runs it during verification for every chain, and the
 // sequence runs it again before its first deployment.
 func ValidateDeployMultiTokenPoolState(b cldf_ops.Bundle, chain evm.Chain, ds datastore.DataStore, input tokens.DeployMultiTokenPoolInput) error {
@@ -63,6 +64,12 @@ func ValidateDeployMultiTokenPoolState(b cldf_ops.Bundle, chain evm.Chain, ds da
 	poolUtils := adapters_v1_0_0.EVMTokenBase{}
 	tokenAdminRegistry, err := poolUtils.GetTokenAdminRegistryAddress(ds, input.ChainSelector)
 	if err != nil {
+		return err
+	}
+	if _, err := poolUtils.GetRMNProxyAddress(ds, input.ChainSelector); err != nil {
+		return err
+	}
+	if _, err := poolUtils.ResolveRouterAddress(ds, input.ChainSelector, nil); err != nil {
 		return err
 	}
 	existing := ds.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
