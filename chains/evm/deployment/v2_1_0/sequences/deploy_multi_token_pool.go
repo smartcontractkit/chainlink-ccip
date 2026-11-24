@@ -25,9 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
-// ValidateDeployMultiTokenPoolInput checks the chain-independent parts of the input that the EVM
-// sequence requires. The changeset runs it during verification so that unsupported input fails
-// before any chain is deployed to.
+// ValidateDeployMultiTokenPoolInput checks the pool version, type, qualifier, and admin address.
 func ValidateDeployMultiTokenPoolInput(input tokens.DeployMultiTokenPoolInput) error {
 	if input.PoolVersion == nil {
 		return errors.New("pool version is required")
@@ -52,31 +50,46 @@ func ValidateDeployMultiTokenPoolInput(input tokens.DeployMultiTokenPoolInput) e
 	return nil
 }
 
-// ValidateDeployMultiTokenPoolState runs the read-only checks that depend on existing state: the
-// TokenAdminRegistry, RMNProxy and Router must resolve, the TokenAdminRegistry must match the
-// recorded ramps', and the existing stack must be consistent.
-// It sends no transactions. The changeset runs it during verification for every chain, and the
-// sequence runs it again before its first deployment.
+// multiTokenPoolDependencies holds the existing contracts the stack is wired to.
+type multiTokenPoolDependencies struct {
+	tokenAdminRegistry common.Address
+	rmnProxy           common.Address
+	router             common.Address
+}
+
+// ValidateDeployMultiTokenPoolState checks that the TokenAdminRegistry, RMNProxy, and Router
+// resolve, that the TokenAdminRegistry matches the recorded ramps', and that any existing stack
+// is consistent. It sends no transactions.
 func ValidateDeployMultiTokenPoolState(b cldf_ops.Bundle, chain evm.Chain, ds datastore.DataStore, input tokens.DeployMultiTokenPoolInput) error {
+	_, err := validateDeployMultiTokenPoolState(b, chain, ds, input)
+	return err
+}
+
+func validateDeployMultiTokenPoolState(b cldf_ops.Bundle, chain evm.Chain, ds datastore.DataStore, input tokens.DeployMultiTokenPoolInput) (multiTokenPoolDependencies, error) {
 	if ds == nil {
-		return errors.New("existing datastore is required")
+		return multiTokenPoolDependencies{}, errors.New("existing datastore is required")
 	}
+	// Resolve the dependencies here so a missing ref fails verification.
 	poolUtils := adapters_v1_0_0.EVMTokenBase{}
-	tokenAdminRegistry, err := poolUtils.GetTokenAdminRegistryAddress(ds, input.ChainSelector)
-	if err != nil {
-		return err
+	var deps multiTokenPoolDependencies
+	var err error
+	if deps.tokenAdminRegistry, err = poolUtils.GetTokenAdminRegistryAddress(ds, input.ChainSelector); err != nil {
+		return multiTokenPoolDependencies{}, err
 	}
-	if _, err := poolUtils.GetRMNProxyAddress(ds, input.ChainSelector); err != nil {
-		return err
+	if deps.rmnProxy, err = poolUtils.GetRMNProxyAddress(ds, input.ChainSelector); err != nil {
+		return multiTokenPoolDependencies{}, err
 	}
-	if _, err := poolUtils.ResolveRouterAddress(ds, input.ChainSelector, nil); err != nil {
-		return err
+	if deps.router, err = poolUtils.ResolveRouterAddress(ds, input.ChainSelector, nil); err != nil {
+		return multiTokenPoolDependencies{}, err
 	}
 	existing := ds.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
-	if err := checkTokenAdminRegistryMatchesRamps(b, chain, existing, tokenAdminRegistry); err != nil {
-		return err
+	if err := checkTokenAdminRegistryMatchesRamps(b, chain, existing, deps.tokenAdminRegistry); err != nil {
+		return multiTokenPoolDependencies{}, err
 	}
-	return checkReusedStackIsConsistent(existing, input.PoolQualifier, input.ChainSelector)
+	if err := checkReusedStackIsConsistent(existing, input.PoolQualifier, input.ChainSelector); err != nil {
+		return multiTokenPoolDependencies{}, err
+	}
+	return deps, nil
 }
 
 // DeployMultiTokenPool deploys a BurnMintMultiTokenPool and its configuration stack on one
@@ -93,12 +106,9 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		if err := ValidateDeployMultiTokenPoolInput(input); err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		if input.ExistingDataStore == nil {
-			return sequences.OnChainOutput{}, errors.New("existing datastore is required")
-		}
-		// Everything that can reject the input runs before the first deployment so that nothing is
-		// left orphaned in a failed run.
-		if err := ValidateDeployMultiTokenPoolState(b, chain, input.ExistingDataStore, input); err != nil {
+		// Validate before the first deployment so a failure leaves nothing orphaned.
+		deps, err := validateDeployMultiTokenPoolState(b, chain, input.ExistingDataStore, input)
+		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
 
@@ -111,20 +121,6 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		}
 		if admin == (common.Address{}) {
 			return sequences.OnChainOutput{}, errors.New("PoolConfigManager admin must be non-zero")
-		}
-
-		poolUtils := adapters_v1_0_0.EVMTokenBase{}
-		tokenAdminRegistry, err := poolUtils.GetTokenAdminRegistryAddress(input.ExistingDataStore, input.ChainSelector)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		rmnProxy, err := poolUtils.GetRMNProxyAddress(input.ExistingDataStore, input.ChainSelector)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
-		}
-		router, err := poolUtils.ResolveRouterAddress(input.ExistingDataStore, input.ChainSelector, nil)
-		if err != nil {
-			return sequences.OnChainOutput{}, err
 		}
 
 		existingAddresses := input.ExistingDataStore.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
@@ -163,7 +159,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(pool_config_manager.ContractType, *pool_config_manager.Version),
 			Args: pool_config_manager.ConstructorArgs{
-				TokenAdminRegistry: tokenAdminRegistry,
+				TokenAdminRegistry: deps.tokenAdminRegistry,
 				ConnectionStore:    connectionStore,
 				FeeStore:           feeStore,
 				SecurityStore:      securityStore,
@@ -180,8 +176,8 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(burn_mint_multi_token_pool.ContractType, *burn_mint_multi_token_pool.Version),
 			Args: burn_mint_multi_token_pool.ConstructorArgs{
-				RmnProxy:          rmnProxy,
-				Router:            router,
+				RmnProxy:          deps.rmnProxy,
+				Router:            deps.router,
 				PoolConfigManager: poolConfigManagerAddress,
 			},
 			Qualifier: &input.PoolQualifier,
@@ -276,9 +272,8 @@ func checkReusedStackIsConsistent(existing []datastore.AddressRef, qualifier str
 	return nil
 }
 
-// maybeDeployMultiTokenPoolContract reuses an existing deployment and makes the skip visible
-// to operators. The actual type/version/qualifier matching remains in MaybeDeployContract; the
-// returned bool reports whether the returned ref is an existing deployment that was reused.
+// maybeDeployMultiTokenPoolContract deploys the contract unless a matching one already exists,
+// and reports whether it was reused. MaybeDeployContract does the matching.
 func maybeDeployMultiTokenPoolContract[ARGS any](
 	b cldf_ops.Bundle,
 	op *cldf_ops.Operation[contract.DeployInput[ARGS], datastore.AddressRef, evm.Chain],
@@ -300,8 +295,7 @@ func maybeDeployMultiTokenPoolContract[ARGS any](
 }
 
 // authorizePoolConfigManager adds the PCM to a store only when it is not already authorized.
-// The read and write are forced so a retry cannot reuse a stale authorization list or an
-// already-executed write report after out-of-band ownership or authorization changes.
+// The read and write bypass the operations cache so retries see current on-chain state.
 func authorizePoolConfigManager[ARGS any](
 	b cldf_ops.Bundle,
 	chain evm.Chain,

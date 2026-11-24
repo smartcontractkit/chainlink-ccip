@@ -17,8 +17,7 @@ var _ tokens.MultiTokenPoolAdapter = (*MultiTokenPoolAdapter)(nil)
 // MultiTokenPoolAdapter implements EVM multi-token pool deployment.
 type MultiTokenPoolAdapter struct{}
 
-// ValidateDeployMultiTokenPool validates the input and the existing on-chain and datastore state
-// against what the EVM sequence requires. It only reads; it never sends transactions.
+// ValidateDeployMultiTokenPool validates the input and the existing state. It sends no transactions.
 func (a *MultiTokenPoolAdapter) ValidateDeployMultiTokenPool(e cldf.Environment, input tokens.DeployMultiTokenPoolInput) error {
 	if err := sequences.ValidateDeployMultiTokenPoolInput(input); err != nil {
 		return err

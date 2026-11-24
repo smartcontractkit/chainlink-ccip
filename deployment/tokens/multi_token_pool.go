@@ -35,10 +35,9 @@ type DeployMultiTokenPoolInput struct {
 // It is separate from TokenAdapter because an MTTP is deployed before, and independently of, any
 // particular token it will serve.
 type MultiTokenPoolAdapter interface {
-	// ValidateDeployMultiTokenPool rejects input the chain family's sequence cannot deploy, such
-	// as an unsupported pool type or version, a malformed admin address, an inconsistent existing
-	// stack, or a TokenAdminRegistry that differs from the ramps'. It may read chain state but
-	// must not send transactions. The changeset calls it for every chain before deploying to any.
+	// ValidateDeployMultiTokenPool rejects input that DeployMultiTokenPool cannot deploy. It may
+	// read chain state but must not send transactions. The changeset calls it for every chain
+	// before deploying to any.
 	ValidateDeployMultiTokenPool(e cldf.Environment, input DeployMultiTokenPoolInput) error
 	// DeployMultiTokenPool returns a sequence that deploys or reuses the stack identified by
 	// PoolType, PoolVersion, and PoolQualifier. Implementations must resolve well-known addresses

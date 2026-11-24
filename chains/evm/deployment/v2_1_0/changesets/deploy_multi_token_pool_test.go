@@ -426,78 +426,127 @@ func TestDeployMultiTokenPoolVerifyRejectsZeroAdminBeforeDeploying(t *testing.T)
 	require.ErrorContains(t, err, "must be non-zero")
 }
 
+func deployTestOnRampV160(t *testing.T, e *cldf.Environment, tar common.Address) datastore.AddressRef {
+	t.Helper()
+	ref, err := contract.MaybeDeployContract(e.OperationsBundle, onramp_v1_6_0.Deploy, e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel], contract.DeployInput[onramp_v1_6_0.ConstructorArgs]{
+		ChainSelector:  multiTokenPoolEVMTestChainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(onramp_v1_6_0.ContractType, *onramp_v1_6_0.Version),
+		Args: onramp_v1_6_0.ConstructorArgs{
+			StaticConfig: onramp_v1_6_0.StaticConfig{
+				ChainSelector:      multiTokenPoolEVMTestChainSel,
+				RmnRemote:          common.HexToAddress("0x1"),
+				NonceManager:       common.HexToAddress("0x2"),
+				TokenAdminRegistry: tar,
+			},
+			DynamicConfig: onramp_v1_6_0.DynamicConfig{FeeQuoter: common.HexToAddress("0x3"), FeeAggregator: common.HexToAddress("0x4")},
+		},
+	}, nil)
+	require.NoError(t, err)
+	return ref
+}
+
+func deployTestOnRampV200(t *testing.T, e *cldf.Environment, tar common.Address) datastore.AddressRef {
+	t.Helper()
+	ref, err := contract.MaybeDeployContract(e.OperationsBundle, onramp_v2_0_0.Deploy, e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel], contract.DeployInput[onramp_v2_0_0.ConstructorArgs]{
+		ChainSelector:  multiTokenPoolEVMTestChainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(onramp_v2_0_0.ContractType, *onramp_v2_0_0.Version),
+		Args: onramp_v2_0_0.ConstructorArgs{
+			StaticConfig: onramp_v2_0_0.StaticConfig{
+				ChainSelector:         multiTokenPoolEVMTestChainSel,
+				RmnRemote:             common.HexToAddress("0x1"),
+				MaxUSDCentsPerMessage: 1,
+				TokenAdminRegistry:    tar,
+			},
+			DynamicConfig: onramp_v2_0_0.DynamicConfig{FeeQuoter: common.HexToAddress("0x3"), FeeAggregator: common.HexToAddress("0x4")},
+		},
+	}, nil)
+	require.NoError(t, err)
+	return ref
+}
+
+// verifyWithRamps verifies the test config on a chain whose datastore holds the prerequisites
+// and the ramps returned by deployRamps.
+func verifyWithRamps(t *testing.T, deployRamps func(e *cldf.Environment, tar common.Address) []datastore.AddressRef) error {
+	t.Helper()
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+	require.NoError(t, err)
+	prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+	chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+	tar := common.HexToAddress(findMultiTokenPoolRef(t, prerequisites, token_admin_registry.ContractType).Address)
+
+	ds := datastore.NewMemoryDataStore()
+	for _, ref := range append(prerequisites, deployRamps(e, tar)...) {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	e.DataStore = ds.Seal()
+
+	changeset := tokens.DeployMultiTokenPools(tokens.GetMultiTokenPoolAdapterRegistry(), changeset_utils.NewMCMSReaderRegistry())
+	return changeset.VerifyPreconditions(*e, multiTokenPoolTestConfig(chain.DeployerKey.From.Hex()))
+}
+
 func TestDeployMultiTokenPoolVerifyChecksTokenAdminRegistryAgainstRamps(t *testing.T) {
+	wrongTAR := common.HexToAddress("0xdead")
 	deployers := map[string]func(t *testing.T, e *cldf.Environment, tar common.Address) datastore.AddressRef{
-		"OnRamp 1.6.0": func(t *testing.T, e *cldf.Environment, tar common.Address) datastore.AddressRef {
-			ref, err := contract.MaybeDeployContract(e.OperationsBundle, onramp_v1_6_0.Deploy, e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel], contract.DeployInput[onramp_v1_6_0.ConstructorArgs]{
-				ChainSelector:  multiTokenPoolEVMTestChainSel,
-				TypeAndVersion: cldf.NewTypeAndVersion(onramp_v1_6_0.ContractType, *onramp_v1_6_0.Version),
-				Args: onramp_v1_6_0.ConstructorArgs{
-					StaticConfig: onramp_v1_6_0.StaticConfig{
-						ChainSelector:      multiTokenPoolEVMTestChainSel,
-						RmnRemote:          common.HexToAddress("0x1"),
-						NonceManager:       common.HexToAddress("0x2"),
-						TokenAdminRegistry: tar,
-					},
-					DynamicConfig: onramp_v1_6_0.DynamicConfig{FeeQuoter: common.HexToAddress("0x3"), FeeAggregator: common.HexToAddress("0x4")},
-				},
-			}, nil)
-			require.NoError(t, err)
-			return ref
-		},
-		"OnRamp 2.0.0": func(t *testing.T, e *cldf.Environment, tar common.Address) datastore.AddressRef {
-			ref, err := contract.MaybeDeployContract(e.OperationsBundle, onramp_v2_0_0.Deploy, e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel], contract.DeployInput[onramp_v2_0_0.ConstructorArgs]{
-				ChainSelector:  multiTokenPoolEVMTestChainSel,
-				TypeAndVersion: cldf.NewTypeAndVersion(onramp_v2_0_0.ContractType, *onramp_v2_0_0.Version),
-				Args: onramp_v2_0_0.ConstructorArgs{
-					StaticConfig: onramp_v2_0_0.StaticConfig{
-						ChainSelector:         multiTokenPoolEVMTestChainSel,
-						RmnRemote:             common.HexToAddress("0x1"),
-						MaxUSDCentsPerMessage: 1,
-						TokenAdminRegistry:    tar,
-					},
-					DynamicConfig: onramp_v2_0_0.DynamicConfig{FeeQuoter: common.HexToAddress("0x3"), FeeAggregator: common.HexToAddress("0x4")},
-				},
-			}, nil)
-			require.NoError(t, err)
-			return ref
-		},
+		"OnRamp 1.6.0": deployTestOnRampV160,
+		"OnRamp 2.0.0": deployTestOnRampV200,
 	}
 	for rampName, deployRamp := range deployers {
-		for _, matching := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s matching=%t", rampName, matching), func(t *testing.T) {
-				e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
-				require.NoError(t, err)
-				prerequisites := deployMultiTokenPoolPrerequisites(t, e)
-				chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
-				tar := common.HexToAddress(findMultiTokenPoolRef(t, prerequisites, token_admin_registry.ContractType).Address)
-				rampTAR := common.HexToAddress("0xdead")
-				if matching {
-					rampTAR = tar
-				}
-				rampRef := deployRamp(t, e, rampTAR)
-
-				ds := datastore.NewMemoryDataStore()
-				for _, ref := range append(prerequisites, rampRef) {
-					require.NoError(t, ds.Addresses().Add(ref))
-				}
-				e.DataStore = ds.Seal()
-
-				changeset := tokens.DeployMultiTokenPools(tokens.GetMultiTokenPoolAdapterRegistry(), changeset_utils.NewMCMSReaderRegistry())
-				err = changeset.VerifyPreconditions(*e, multiTokenPoolTestConfig(chain.DeployerKey.From.Hex()))
-				if matching {
-					require.NoError(t, err)
-				} else {
-					require.ErrorContains(t, err, "must use the ramps' TokenAdminRegistry")
-					require.ErrorContains(t, err, rampName)
-				}
+		t.Run(rampName+" mismatched", func(t *testing.T) {
+			err := verifyWithRamps(t, func(e *cldf.Environment, _ common.Address) []datastore.AddressRef {
+				return []datastore.AddressRef{deployRamp(t, e, wrongTAR)}
 			})
-		}
+			require.ErrorContains(t, err, "must use the ramps' TokenAdminRegistry")
+			require.ErrorContains(t, err, rampName)
+		})
+		t.Run(rampName+" matching", func(t *testing.T) {
+			err := verifyWithRamps(t, func(e *cldf.Environment, tar common.Address) []datastore.AddressRef {
+				return []datastore.AddressRef{deployRamp(t, e, tar)}
+			})
+			require.NoError(t, err)
+		})
 	}
 }
 
-// The deploy changeset leaves the pool and stores owned by the deployer. This proves the generic
-// ownership sequence handles them, so no MTTP-specific transfer is needed.
+func TestDeployMultiTokenPoolVerifyOnlyChecksNewestRampVersion(t *testing.T) {
+	wrongTAR := common.HexToAddress("0xdead")
+	t.Run("retired older ramp with a different TAR is ignored", func(t *testing.T) {
+		err := verifyWithRamps(t, func(e *cldf.Environment, tar common.Address) []datastore.AddressRef {
+			return []datastore.AddressRef{deployTestOnRampV160(t, e, wrongTAR), deployTestOnRampV200(t, e, tar)}
+		})
+		require.NoError(t, err)
+	})
+	t.Run("newest ramp with a different TAR is rejected", func(t *testing.T) {
+		err := verifyWithRamps(t, func(e *cldf.Environment, tar common.Address) []datastore.AddressRef {
+			return []datastore.AddressRef{deployTestOnRampV160(t, e, tar), deployTestOnRampV200(t, e, wrongTAR)}
+		})
+		require.ErrorContains(t, err, "OnRamp 2.0.0")
+	})
+}
+
+func TestDeployMultiTokenPoolVerifyFailsBeforeAnyChainDeploysWhenALaterChainIsInvalid(t *testing.T) {
+	const invalidChainSel = uint64(15971525489660198786) // has no prerequisites in the datastore
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel, invalidChainSel}))
+	require.NoError(t, err)
+	deployMultiTokenPoolPrerequisites(t, e) // prerequisites for the valid chain only
+	chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+
+	cfg := multiTokenPoolTestConfig(chain.DeployerKey.From.Hex())
+	cfg.Chains[invalidChainSel] = cfg.Chains[multiTokenPoolEVMTestChainSel]
+	nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+
+	changeset := tokens.DeployMultiTokenPools(tokens.GetMultiTokenPoolAdapterRegistry(), changeset_utils.NewMCMSReaderRegistry())
+	err = changeset.VerifyPreconditions(*e, cfg)
+	require.ErrorContains(t, err, "failed to find token admin registry address")
+	require.ErrorContains(t, err, fmt.Sprint(invalidChainSel))
+
+	nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+	require.Equal(t, nonceBefore, nonceAfter, "verification must not deploy anything on the valid chain")
+}
+
+// The pool and stores stay owned by the deployer after deployment. The generic ownership
+// sequence transfers them.
 func TestDeployedMultiTokenPoolContractsSupportGenericOwnershipTransfer(t *testing.T) {
 	e, err := environment.New(t.Context(), environment.WithEVMSimulatedWithConfig(t, []uint64{multiTokenPoolEVMTestChainSel}, onchain.EVMSimLoaderConfig{NumAdditionalAccounts: 1}))
 	require.NoError(t, err)
@@ -507,8 +556,8 @@ func TestDeployedMultiTokenPoolContractsSupportGenericOwnershipTransfer(t *testi
 	refs, err := out.DataStore.Addresses().Fetch()
 	require.NoError(t, err)
 
-	// A non-deployer address stands in for the timelock: the deployer's transfer executes
-	// on-chain and the accept step comes back as a proposal for the "timelock" to execute.
+	// A non-deployer address stands in for the timelock. The transfer executes and the accept
+	// step is returned as a proposal.
 	timelock := chain.Users[0].From
 	ownable := []datastore.AddressRef{
 		findMultiTokenPoolRef(t, refs, connection_policy_store.ContractType),
@@ -527,7 +576,7 @@ func TestDeployedMultiTokenPoolContractsSupportGenericOwnershipTransfer(t *testi
 		require.Equal(t, common.HexToAddress(ref.Address), common.HexToAddress(tx.To), "%s proposal targets the contract", ref.Type)
 		require.Equal(t, acceptOwnershipSelector, tx.Data, "%s proposal calls acceptOwnership()", ref.Type)
 
-		// The transfer already executed, so the deployer remains owner until the accept runs.
+		// Ownership stays with the deployer until the accept executes.
 		owner, _, err := ownership_sequences.LoadOwnableContract(common.HexToAddress(ref.Address), chain.Client)
 		require.NoError(t, err)
 		require.Equal(t, chain.DeployerKey.From, owner, "%s ownership is pending, not yet accepted", ref.Type)

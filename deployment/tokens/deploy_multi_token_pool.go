@@ -108,6 +108,10 @@ func makeApplyDeployMultiTokenPools(registry *MultiTokenPoolAdapterRegistry, mcm
 				return cldf.ChangesetOutput{}, err
 			}
 
+			if admin == "" {
+				e.Logger.Warnf("no timelock found for chain selector %d; PoolConfigManager admin will fall back to the deployer", selector)
+			}
+
 			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.DeployMultiTokenPool(), e.BlockChains, DeployMultiTokenPoolInput{
 				ChainSelector:     selector,
 				PoolType:          chainCfg.PoolType,
@@ -120,8 +124,7 @@ func makeApplyDeployMultiTokenPools(registry *MultiTokenPoolAdapterRegistry, mcm
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy multi-token pool on chain selector %d: %w", selector, err)
 			}
 			for _, ref := range report.Output.Addresses {
-				// Refs reused from the existing datastore are not new; re-emitting them would
-				// collide when the output is merged back.
+				// Skip refs already in the datastore; re-emitting them would collide on merge.
 				existing, err := e.DataStore.Addresses().Get(ref.Key())
 				switch {
 				case err == nil:
@@ -164,7 +167,6 @@ func resolveMultiTokenPoolAdmin(e cldf.Environment, mcmsRegistry *changesets.MCM
 		if mcmsInput.Qualifier != "" {
 			return "", fmt.Errorf("MCMS qualifier %q was provided but no timelock was found for chain selector %d; refusing to fall back to the deployer as PoolConfigManager admin", mcmsInput.Qualifier, selector)
 		}
-		e.Logger.Warnf("no timelock found for chain selector %d; PoolConfigManager admin will fall back to the deployer", selector)
 		return "", nil
 	}
 	return timelockRef.Address, nil
