@@ -45,7 +45,7 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment, selectors []
 			"message to eoa",
 			func(t *testing.T, lane chainPair) {
 				receiver := lane.dest.EOAReceiver(t)
-				extraArgs, err := lane.dest.GetExtraArgs(receiver, lane.src.Family())
+				extraArgs, err := testadapters.BuildExtraArgs(lane.src, lane.dest, receiver)
 				require.NoError(t, err)
 
 				msg, err := lane.src.BuildMessage(testadapters.MessageComponents{
@@ -71,7 +71,7 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment, selectors []
 			func(t *testing.T, lane chainPair) {
 				receiver := lane.dest.CCIPReceiver()
 
-				extraArgs, err := lane.dest.GetExtraArgs(receiver, lane.src.Family(), testadapters.NewGasLimitExtraArg(lane.dest.LowGasLimit()))
+				extraArgs, err := testadapters.BuildExtraArgs(lane.src, lane.dest, receiver, testadapters.NewGasLimitExtraArg(lane.dest.LowGasLimit()))
 				require.NoError(t, err)
 
 				msg, err := lane.src.BuildMessage(testadapters.MessageComponents{
@@ -107,7 +107,7 @@ func RunQAInteractiveTests(t *testing.T, e *deployment.Environment, selectors []
 
 				setReceiverRejectAll(true)
 
-				extraArgs, err := lane.dest.GetExtraArgs(receiver, lane.src.Family())
+				extraArgs, err := testadapters.BuildExtraArgs(lane.src, lane.dest, receiver)
 				require.NoError(t, err)
 
 				msg, err := lane.src.BuildMessage(testadapters.MessageComponents{

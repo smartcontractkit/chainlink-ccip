@@ -68,7 +68,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 
 		t.Run(fmt.Sprintf("%s message to contract", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, receiver)
 			require.NoError(t, err)
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
@@ -90,7 +90,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			}
 
 			receiver := toImpl.EOAReceiver(t)
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, receiver)
 			require.NoError(t, err)
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
@@ -108,7 +108,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 
 		t.Run(fmt.Sprintf("%s token transfer", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, receiver)
 			require.NoError(t, err)
 
 			fromImplTokenExpansionConfig, err := fromImpl.GetTokenExpansionConfig()
@@ -190,7 +190,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			}
 			receiver := toImpl.CCIPReceiver()
 
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxUint32)))
+			extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, receiver, testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxUint32)))
 			require.NoError(t, err)
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
@@ -207,7 +207,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 		t.Run(fmt.Sprintf("%s payload larger than limit", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
 
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, receiver)
 			require.NoError(t, err)
 
 			// Construct a payload that exceeds the typical 32KB limit
@@ -264,7 +264,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 
 		t.Run(fmt.Sprintf("%s invalid/unconfigured chain selector", laneTag), func(t *testing.T) {
 			receiver := toImpl.CCIPReceiver()
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family())
+			extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, receiver)
 			require.NoError(t, err)
 
 			const invalidUnconfiguredChainSelector = 1
@@ -294,7 +294,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 
 			for _, invalidReceiver := range invalidReceivers {
 
-				extraArgs, err := toImpl.GetExtraArgs(invalidReceiver, fromImpl.Family(), testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
+				extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, invalidReceiver, testadapters.NewGasLimitExtraArg(big.NewInt(math.MaxInt64)))
 				require.NoError(t, err)
 
 				msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{
@@ -326,7 +326,7 @@ func RunSmokeTests(t *testing.T, e *deployment.Environment, selectors []uint64) 
 			}
 
 			receiver := toImpl.CCIPReceiver()
-			extraArgs, err := toImpl.GetExtraArgs(receiver, fromImpl.Family(), testadapters.NewOutOfOrderExtraArg(false))
+			extraArgs, err := testadapters.BuildExtraArgs(fromImpl, toImpl, receiver, testadapters.NewOutOfOrderExtraArg(false))
 			require.NoError(t, err)
 
 			msg, err := fromImpl.BuildMessage(testadapters.MessageComponents{

@@ -306,24 +306,59 @@ func (a *EVMAdapter) NativeFeeToken() string {
 	return "0x0"
 }
 
+var (
+	_ testadapters.ExtraArgsDataSource = (*EVMAdapter)(nil)
+	_ testadapters.EVMExtraArgsV2      = (*EVMAdapter)(nil)
+	_ testadapters.SVMExtraArgsV1      = (*EVMAdapter)(nil)
+)
+
+const defaultEVMDestGasLimit = 100_000
+
+func (a *EVMAdapter) ExtraArgsData(_ []byte, opts ...testadapters.ExtraArgOpt) (testadapters.ExtraArgsDataProvider, error) {
+	gasLimit, allowOOO, err := testadapters.ParseGasLimitAndOOOExtraArgs(new(big.Int).SetUint64(defaultEVMDestGasLimit), true, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return testadapters.EVMExtraArgsV2Data{GasLimit: gasLimit, AllowOutOfOrderExecution: allowOOO}, nil
+}
+
+func (a *EVMAdapter) BuildEVMExtraArgsV2(provider testadapters.ExtraArgsDataProvider) ([]byte, error) {
+	data, ok := provider.(testadapters.EVMExtraArgsV2Data)
+	if !ok {
+		return nil, fmt.Errorf("provider is not a EVMExtraArgsV2Data: %T", provider)
+	}
+	return extraargs.SerializeClientGenericExtraArgsV2(extraargs.ClientGenericExtraArgsV2{
+		GasLimit:                 data.GasLimit,
+		AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+	})
+}
+
+func (a *EVMAdapter) BuildSVMExtraArgsV1(provider testadapters.ExtraArgsDataProvider) ([]byte, error) {
+	data, ok := provider.(testadapters.SVMExtraArgsV1Data)
+	if !ok {
+		return nil, fmt.Errorf("provider is not a SVMExtraArgsV1Data: %T", provider)
+	}
+	return extraargs.SerializeClientSVMExtraArgsV1(extraargs.ClientSVMExtraArgsV1{
+		ComputeUnits:             data.ComputeUnits,
+		AccountIsWritableBitmap:  data.AccountIsWritableBitmap,
+		AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+		TokenReceiver:            data.TokenReceiver,
+		Accounts:                 data.Accounts,
+	})
+}
+
+// GetExtraArgs is kept for callers that have not moved to testadapters.BuildExtraArgs yet, and as its fallback.
 func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		extraArgs := extraargs.ClientGenericExtraArgsV2{
-			GasLimit:                 new(big.Int).SetUint64(100_000),
-			AllowOutOfOrderExecution: true,
+		data, err := a.ExtraArgsData(receiver, opts...)
+		if err != nil {
+			return nil, err
 		}
-		for _, opt := range opts {
-			switch opt.Name {
-			case testadapters.ExtraArgGasLimit:
-				extraArgs.GasLimit = opt.Value.(*big.Int)
-			default:
-				// unsupported arg
-			}
-		}
-		return extraargs.SerializeClientGenericExtraArgsV2(extraArgs)
+		return a.BuildEVMExtraArgsV2(data)
 	case chain_selectors.FamilySolana:
-		// EVM allows empty extraArgs
+		// EVM allows empty extraArgs.
+		// TODO: send real extra args once the Solana adapter implements testadapters.EVMExtraArgsV2.
 		return nil, nil
 	case chain_selectors.FamilyTon:
 		// Hand-encode TON GenericExtraArgsV2 so this module does not depend on

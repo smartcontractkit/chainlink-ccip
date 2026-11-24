@@ -38,6 +38,7 @@ import (
 	rmnremoteops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/rmn_remote"
 	routerops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/router"
 	solanaseqs "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/sequences"
+	soltestadapter "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/testadapter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/rmn_remote"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/testadapters"
@@ -61,7 +62,9 @@ type AnyMsgSentEvent struct {
 type CCIP16Solana struct {
 	e            *deployment.Environment
 	chainDetails chainsel.ChainDetails
-	testadapters.TestAdapter
+	// The concrete adapter is embedded rather than testadapters.TestAdapter so that its optional interfaces
+	// (e.g. the extra-args ones used by testadapters.BuildExtraArgs) are promoted to CCIP16Solana.
+	*soltestadapter.SVMAdapter
 }
 
 func NewEmptyCCIP16Solana(chainDetails chainsel.ChainDetails) *CCIP16Solana {
@@ -84,7 +87,12 @@ func (m *CCIP16Solana) SetCLDF(e *deployment.Environment) {
 	if !found {
 		panic(fmt.Sprintf("failed to find testadapter factory for %s", chain_selectors.FamilySolana))
 	}
-	m.TestAdapter = factory(e, m.chainDetails.ChainSelector)
+	adapter := factory(e, m.chainDetails.ChainSelector)
+	svmAdapter, ok := adapter.(*soltestadapter.SVMAdapter)
+	if !ok {
+		panic(fmt.Sprintf("unexpected %s testadapter type %T", chain_selectors.FamilySolana, adapter))
+	}
+	m.SVMAdapter = svmAdapter
 }
 
 func (m *CCIP16Solana) ChainSelector() uint64 {
