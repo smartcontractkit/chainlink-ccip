@@ -892,8 +892,9 @@ The budget must cover the MTTP receive path, including:
 - The lane's hook, where configured.
 - Copying a changed policy configuration into an inbound bucket.
 
-The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The value is used to price execution, and the
-executor must supply enough transaction gas.
+The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The OnRamp prices the value and adds it to the
+message's `executionGasLimit`. The default executor sets its transaction gas from that field. A low value can give the
+first execution too little gas, and the message then needs a retry with enough gas.
 
 For `destGasOverhead`, measure MTTP receive gas in `OffRamp.executeSingleMessage`. Count the full `releaseOrMint` call, both
 `TAR.getPool` lookups, ERC-165 checks, `getRequiredCCVs`, and the token's `balanceOf` before verification and again
@@ -1490,12 +1491,15 @@ To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
    target unset, using a fresh hook if already overridden. With incomplete history, establish the old mode on the fork.
    On a cutover fork, set the engine default to allow and then deny. At each setting call `PolicyEngine.check` as each
    hook with a selector that has no policies on either. Success means allow and only `PolicyRunRejected` with a zero
-   policy address means deny. A constant decision identifies an override. Require both hooks to agree at each setting.
-4. **`CONFIG_ROLE`:** point the affected security records to the new hook.
+   policy address means deny. A constant decision identifies an override. With complete or incomplete history, require
+   both hooks to agree at each setting.
+4. **`CONFIG_ROLE`:** verify the allowlist as described below, then point the affected security records to the new hook.
 
 Use step 1's constructor rule for pool upgrades too. Just before a hook or TAR switch, require matching
 `getAllowListEnabled()` flags and `getAllowList()` member sets on the enforcing pools or hooks. A delegating pool with
-no hook has a disabled list. Simulate an outbound send from the same unlisted sender and require matching allowlist decisions.
+no hook has a disabled list. Then check one sender that is in neither list. On a hook, call `checkAllowList(sender)`.
+On a pool older than 2.0, simulate `lockOrBurn` with that `originalSender`. Only a `SenderNotAllowed` revert means
+deny. A `CursedByRMN` or `InvalidToken` revert gives no result. Require the same decision from the old and new contracts.
 
 Authorization is also required when reusing `AdvancedPoolHooks` or `MultiTokenPoolHooks` with a new pool. Authorize the
 new pool before it handles transfers.
@@ -1928,7 +1932,8 @@ ends of these lanes must continue to use the same decimals.
 For a 1.5.0 pool on chain C:
 
 1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's allowlist settings. Preserve both
-   `getAllowListEnabled()` and `getAllowList()`. For a 2.0 replacement, use its hook for the allowlist.
+   `getAllowListEnabled()` and `getAllowList()`. Pass `[address(0)]` for an enabled empty list. For a 2.0 replacement,
+   use its hook for the allowlist.
    For each remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
 2. **Legacy pool owner on each remote chain already using 1.5.1 or later:** call
    `addRemotePool(chainC, abi.encode(newPool))` before C's TAR switch.
