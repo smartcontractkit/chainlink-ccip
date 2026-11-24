@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
@@ -34,6 +35,11 @@ type DeployMultiTokenPoolInput struct {
 // It is separate from TokenAdapter because an MTTP is deployed before, and independently of, any
 // particular token it will serve.
 type MultiTokenPoolAdapter interface {
+	// ValidateDeployMultiTokenPool rejects input the chain family's sequence cannot deploy, such
+	// as an unsupported pool type or version, a malformed admin address, an inconsistent existing
+	// stack, or a TokenAdminRegistry that differs from the ramps'. It may read chain state but
+	// must not send transactions. The changeset calls it for every chain before deploying to any.
+	ValidateDeployMultiTokenPool(e cldf.Environment, input DeployMultiTokenPoolInput) error
 	// DeployMultiTokenPool returns a sequence that deploys or reuses the stack identified by
 	// PoolType, PoolVersion, and PoolQualifier. Implementations must resolve well-known addresses
 	// from ExistingDataStore, use native address strings in inputs, and emit only missing writes.

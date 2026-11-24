@@ -19,8 +19,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/rmn_proxy"
+	ownership_sequences "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_5_0/operations/token_admin_registry"
+	onramp_v1_6_0 "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/operations/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/testsetup"
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_1_0/operations/burn_mint_multi_token_pool"
@@ -201,10 +203,11 @@ func TestDeployMultiTokenPoolsApplyIsIdempotent(t *testing.T) {
 	secondOut := applyMultiTokenPoolDeployment(t, e, admin)
 	secondRefs, err := secondOut.DataStore.Addresses().Fetch()
 	require.NoError(t, err)
-	require.Len(t, secondRefs, len(firstRefs))
+	require.Empty(t, secondRefs, "reused refs must not be re-emitted in the changeset output")
 	for _, firstRef := range firstRefs {
-		secondRef := findMultiTokenPoolRef(t, secondRefs, cldf.ContractType(firstRef.Type))
-		require.Equal(t, firstRef.Address, secondRef.Address)
+		existing, err := e.DataStore.Addresses().Get(firstRef.Key())
+		require.NoError(t, err)
+		require.Equal(t, firstRef.Address, existing.Address)
 	}
 	require.Empty(t, secondOut.MCMSTimelockProposals)
 	require.Len(t, observedLogs.FilterMessageSnippet("skipping deployment").All(), 5, "every existing contract deployment should be skipped with a log")
@@ -361,4 +364,144 @@ func TestDeployMultiTokenPoolRejectsUnsupportedInputsBeforeDeployment(t *testing
 			require.ErrorContains(t, err, test.expectedErr)
 		})
 	}
+}
+
+func TestDeployMultiTokenPoolRejectsMixedReuseBeforeDeploying(t *testing.T) {
+	tests := []struct {
+		name        string
+		missing     cldf.ContractType
+		expectedErr string
+	}{
+		{name: "reused PoolConfigManager with missing store", missing: fee_policy_store.ContractType, expectedErr: "FeePolicyStore does not"},
+		{name: "reused pool with missing PoolConfigManager", missing: pool_config_manager.ContractType, expectedErr: "PoolConfigManager does not"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+			require.NoError(t, err)
+			prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+			chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+			admin := chain.DeployerKey.From.Hex()
+
+			firstOut := applyMultiTokenPoolDeployment(t, e, admin)
+			firstRefs, err := firstOut.DataStore.Addresses().Fetch()
+			require.NoError(t, err)
+
+			ds := datastore.NewMemoryDataStore()
+			for _, ref := range append(prerequisites, firstRefs...) {
+				if ref.Type == datastore.ContractType(test.missing) {
+					continue
+				}
+				require.NoError(t, ds.Addresses().Add(ref))
+			}
+			e.DataStore = ds.Seal()
+			// A fresh bundle stops the first run's cached sequence report from being replayed.
+			e.OperationsBundle = cldf_ops.NewBundle(e.OperationsBundle.GetContext, e.Logger, cldf_ops.NewMemoryReporter())
+
+			nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+			require.NoError(t, err)
+			changeset := tokens.DeployMultiTokenPools(tokens.GetMultiTokenPoolAdapterRegistry(), changeset_utils.NewMCMSReaderRegistry())
+			_, err = changeset.Apply(*e, multiTokenPoolTestConfig(admin))
+			require.ErrorContains(t, err, test.expectedErr)
+			nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+			require.NoError(t, err)
+			require.Equal(t, nonceBefore, nonceAfter, "no transaction may be sent when the existing stack is inconsistent")
+		})
+	}
+}
+
+func TestDeployMultiTokenPoolVerifyRejectsInvalidAdminBeforeDeploying(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+	require.NoError(t, err)
+	deployMultiTokenPoolPrerequisites(t, e)
+
+	changeset := tokens.DeployMultiTokenPools(tokens.GetMultiTokenPoolAdapterRegistry(), changeset_utils.NewMCMSReaderRegistry())
+	err = changeset.VerifyPreconditions(*e, multiTokenPoolTestConfig("not-an-address"))
+	require.ErrorContains(t, err, "invalid PoolConfigManager admin address")
+}
+
+func TestDeployMultiTokenPoolVerifyRejectsZeroAdminBeforeDeploying(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+	require.NoError(t, err)
+	deployMultiTokenPoolPrerequisites(t, e)
+
+	changeset := tokens.DeployMultiTokenPools(tokens.GetMultiTokenPoolAdapterRegistry(), changeset_utils.NewMCMSReaderRegistry())
+	err = changeset.VerifyPreconditions(*e, multiTokenPoolTestConfig(common.Address{}.Hex()))
+	require.ErrorContains(t, err, "must be non-zero")
+}
+
+func TestDeployMultiTokenPoolVerifyChecksTokenAdminRegistryAgainstRamps(t *testing.T) {
+	tests := []struct {
+		name        string
+		rampTAR     func(datastoreTAR common.Address) common.Address
+		expectedErr string
+	}{
+		{name: "ramp uses a different TokenAdminRegistry", rampTAR: func(common.Address) common.Address { return common.HexToAddress("0xdead") }, expectedErr: "must use the ramps' TokenAdminRegistry"},
+		{name: "ramp uses the datastore TokenAdminRegistry", rampTAR: func(tar common.Address) common.Address { return tar }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+			require.NoError(t, err)
+			prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+			chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+			tarRef := findMultiTokenPoolRef(t, prerequisites, token_admin_registry.ContractType)
+
+			onRampRef, err := contract.MaybeDeployContract(e.OperationsBundle, onramp_v1_6_0.Deploy, chain, contract.DeployInput[onramp_v1_6_0.ConstructorArgs]{
+				ChainSelector:  multiTokenPoolEVMTestChainSel,
+				TypeAndVersion: cldf.NewTypeAndVersion(onramp_v1_6_0.ContractType, *onramp_v1_6_0.Version),
+				Args: onramp_v1_6_0.ConstructorArgs{
+					StaticConfig: onramp_v1_6_0.StaticConfig{
+						ChainSelector:      multiTokenPoolEVMTestChainSel,
+						RmnRemote:          common.HexToAddress("0x1"),
+						NonceManager:       common.HexToAddress("0x2"),
+						TokenAdminRegistry: test.rampTAR(common.HexToAddress(tarRef.Address)),
+					},
+					DynamicConfig: onramp_v1_6_0.DynamicConfig{
+						FeeQuoter:     common.HexToAddress("0x3"),
+						FeeAggregator: common.HexToAddress("0x4"),
+					},
+				},
+			}, nil)
+			require.NoError(t, err)
+
+			ds := datastore.NewMemoryDataStore()
+			for _, ref := range append(prerequisites, onRampRef) {
+				require.NoError(t, ds.Addresses().Add(ref))
+			}
+			e.DataStore = ds.Seal()
+
+			changeset := tokens.DeployMultiTokenPools(tokens.GetMultiTokenPoolAdapterRegistry(), changeset_utils.NewMCMSReaderRegistry())
+			err = changeset.VerifyPreconditions(*e, multiTokenPoolTestConfig(chain.DeployerKey.From.Hex()))
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, test.expectedErr)
+			}
+		})
+	}
+}
+
+// The deploy changeset leaves the pool and stores owned by the deployer. This proves the generic
+// ownership changeset's sequence handles them, so no MTTP-specific transfer is needed.
+func TestDeployedMultiTokenPoolContractsSupportGenericOwnershipTransfer(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulatedWithConfig(t, []uint64{multiTokenPoolEVMTestChainSel}, onchain.EVMSimLoaderConfig{NumAdditionalAccounts: 1}))
+	require.NoError(t, err)
+	deployMultiTokenPoolPrerequisites(t, e)
+	chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+	out := applyMultiTokenPoolDeployment(t, e, chain.DeployerKey.From.Hex())
+	refs, err := out.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+
+	// A non-deployer address stands in for the timelock, so the accept step becomes a proposal.
+	timelock := chain.Users[0].From
+	ownable := []datastore.AddressRef{
+		findMultiTokenPoolRef(t, refs, connection_policy_store.ContractType),
+		findMultiTokenPoolRef(t, refs, fee_policy_store.ContractType),
+		findMultiTokenPoolRef(t, refs, security_policy_store.ContractType),
+		findMultiTokenPoolRef(t, refs, burn_mint_multi_token_pool.ContractType),
+	}
+	batchOps, err := ownership_sequences.TransferOwnership(e.OperationsBundle, chain, ownership_sequences.OwnershipInputsFromRefs(multiTokenPoolEVMTestChainSel, timelock, ownable))
+	require.NoError(t, err)
+	require.Len(t, batchOps, len(ownable), "each Ownable2Step contract yields one transfer/accept batch")
 }

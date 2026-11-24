@@ -1,6 +1,7 @@
 package tokens_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -22,7 +23,14 @@ import (
 const multiTokenPoolTestChainSelector = uint64(5009297550715157269)
 
 type mockMultiTokenPoolAdapter struct {
-	sequence *cldf_ops.Sequence[tokens.DeployMultiTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	sequence    *cldf_ops.Sequence[tokens.DeployMultiTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	validateErr error
+	validated   []tokens.DeployMultiTokenPoolInput
+}
+
+func (m *mockMultiTokenPoolAdapter) ValidateDeployMultiTokenPool(_ cldf.Environment, input tokens.DeployMultiTokenPoolInput) error {
+	m.validated = append(m.validated, input)
+	return m.validateErr
 }
 
 func (m *mockMultiTokenPoolAdapter) DeployMultiTokenPool() *cldf_ops.Sequence[tokens.DeployMultiTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains] {
@@ -160,4 +168,72 @@ func TestDeployMultiTokenPoolsApply(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, refs, 1)
 	require.Equal(t, "test-pool", refs[0].Qualifier)
+}
+
+func TestDeployMultiTokenPoolsVerifyUsesAdapterValidation(t *testing.T) {
+	timelockAddress := "0x0000000000000000000000000000000000000002"
+	adapter := &mockMultiTokenPoolAdapter{validateErr: errors.New("unsupported pool type")}
+	registry := tokens.NewMultiTokenPoolAdapterRegistry()
+	registry.RegisterMultiTokenPoolAdapter(chain_selectors.FamilyEVM, semver.MustParse("2.1.0"), adapter)
+	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, &mockMultiTokenPoolMCMSReader{timelockRef: datastore.AddressRef{
+		ChainSelector: multiTokenPoolTestChainSelector,
+		Address:       timelockAddress,
+	}})
+	cfg := tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{
+		multiTokenPoolTestChainSelector: {PoolType: "Bogus", PoolVersion: semver.MustParse("2.1.0"), PoolQualifier: "test-pool"},
+	}}
+
+	err := tokens.DeployMultiTokenPools(registry, mcmsRegistry).VerifyPreconditions(cldf.Environment{}, cfg)
+	require.ErrorContains(t, err, "unsupported pool type")
+	require.Len(t, adapter.validated, 1)
+	require.Equal(t, timelockAddress, adapter.validated[0].Admin, "validation receives the resolved admin")
+	require.Equal(t, "Bogus", adapter.validated[0].PoolType)
+}
+
+func TestDeployMultiTokenPoolsRejectsMissingTimelockWithMCMSQualifier(t *testing.T) {
+	registry := tokens.NewMultiTokenPoolAdapterRegistry()
+	registry.RegisterMultiTokenPoolAdapter(chain_selectors.FamilyEVM, semver.MustParse("2.1.0"), &mockMultiTokenPoolAdapter{})
+	mcmsRegistry := changesets.NewMCMSReaderRegistry()
+	mcmsRegistry.RegisterMCMSReader(chain_selectors.FamilyEVM, &mockMultiTokenPoolMCMSReader{})
+	cfg := tokens.DeployMultiTokenPoolsConfig{
+		MCMS: mcms.Input{Qualifier: "custom"},
+		Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{
+			multiTokenPoolTestChainSelector: {PoolType: "BurnMintMultiTokenPool", PoolVersion: semver.MustParse("2.1.0"), PoolQualifier: "test-pool"},
+		},
+	}
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolTestChainSelector}))
+	require.NoError(t, err)
+
+	err = tokens.DeployMultiTokenPools(registry, mcmsRegistry).VerifyPreconditions(*e, cfg)
+	require.ErrorContains(t, err, "refusing to fall back to the deployer")
+}
+
+func TestDeployMultiTokenPoolsApplyRejectsConflictingExistingRef(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolTestChainSelector}))
+	require.NoError(t, err)
+	ds := datastore.NewMemoryDataStore()
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		ChainSelector: multiTokenPoolTestChainSelector,
+		Type:          "BurnMintMultiTokenPool",
+		Version:       semver.MustParse("2.1.0"),
+		Qualifier:     "test-pool",
+		Address:       "0x00000000000000000000000000000000000000ff",
+	}))
+	e.DataStore = ds.Seal()
+
+	var captured tokens.DeployMultiTokenPoolInput
+	registry := tokens.NewMultiTokenPoolAdapterRegistry()
+	registry.RegisterMultiTokenPoolAdapter(chain_selectors.FamilyEVM, semver.MustParse("2.1.0"), newMockMultiTokenPoolAdapter(&captured))
+	cfg := tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{
+		multiTokenPoolTestChainSelector: {
+			PoolType:      "BurnMintMultiTokenPool",
+			PoolVersion:   semver.MustParse("2.1.0"),
+			PoolQualifier: "test-pool",
+			Admin:         "0x0000000000000000000000000000000000000002",
+		},
+	}}
+
+	_, err = tokens.DeployMultiTokenPools(registry, changesets.NewMCMSReaderRegistry()).Apply(*e, cfg)
+	require.ErrorContains(t, err, "conflicts with the existing datastore address")
 }

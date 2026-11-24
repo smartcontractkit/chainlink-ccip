@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -24,6 +25,53 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 )
 
+// ValidateDeployMultiTokenPoolInput checks the chain-independent parts of the input that the EVM
+// sequence requires. The changeset runs it during verification so that unsupported input fails
+// before any chain is deployed to.
+func ValidateDeployMultiTokenPoolInput(input tokens.DeployMultiTokenPoolInput) error {
+	if input.PoolVersion == nil {
+		return errors.New("pool version is required")
+	}
+	if !input.PoolVersion.Equal(burn_mint_multi_token_pool.Version) {
+		return fmt.Errorf("unsupported multi-token pool version %s: only %s is supported", input.PoolVersion, burn_mint_multi_token_pool.Version)
+	}
+	if input.PoolType != string(burn_mint_multi_token_pool.ContractType) {
+		return fmt.Errorf("unsupported multi-token pool type %q: only %s is supported", input.PoolType, burn_mint_multi_token_pool.ContractType)
+	}
+	if input.PoolQualifier == "" {
+		return errors.New("pool qualifier is required")
+	}
+	if input.Admin != "" {
+		if !common.IsHexAddress(input.Admin) {
+			return fmt.Errorf("invalid PoolConfigManager admin address %q", input.Admin)
+		}
+		if common.HexToAddress(input.Admin) == (common.Address{}) {
+			return errors.New("PoolConfigManager admin must be non-zero")
+		}
+	}
+	return nil
+}
+
+// ValidateDeployMultiTokenPoolState runs the read-only checks that depend on existing state: the
+// TokenAdminRegistry must match the recorded ramps' and the existing stack must be consistent.
+// It sends no transactions. The changeset runs it during verification for every chain, and the
+// sequence runs it again before its first deployment.
+func ValidateDeployMultiTokenPoolState(b cldf_ops.Bundle, chain evm.Chain, ds datastore.DataStore, input tokens.DeployMultiTokenPoolInput) error {
+	if ds == nil {
+		return errors.New("existing datastore is required")
+	}
+	poolUtils := adapters_v1_0_0.EVMTokenBase{}
+	tokenAdminRegistry, err := poolUtils.GetTokenAdminRegistryAddress(ds, input.ChainSelector)
+	if err != nil {
+		return err
+	}
+	existing := ds.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
+	if err := checkTokenAdminRegistryMatchesRamps(b, chain, existing, tokenAdminRegistry); err != nil {
+		return err
+	}
+	return checkReusedStackIsConsistent(existing, input.PoolQualifier, input.ChainSelector)
+}
+
 // DeployMultiTokenPool deploys a BurnMintMultiTokenPool and its configuration stack on one
 // EVM chain. The pool is deliberately not registered for any token by this sequence.
 var DeployMultiTokenPool = cldf_ops.NewSequence(
@@ -35,20 +83,16 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("EVM chain with selector %d not found", input.ChainSelector)
 		}
-		if input.PoolVersion == nil {
-			return sequences.OnChainOutput{}, errors.New("pool version is required")
-		}
-		if !input.PoolVersion.Equal(burn_mint_multi_token_pool.Version) {
-			return sequences.OnChainOutput{}, fmt.Errorf("unsupported multi-token pool version %s: only %s is supported", input.PoolVersion, burn_mint_multi_token_pool.Version)
-		}
-		if input.PoolType != string(burn_mint_multi_token_pool.ContractType) {
-			return sequences.OnChainOutput{}, fmt.Errorf("unsupported multi-token pool type %q: only %s is supported", input.PoolType, burn_mint_multi_token_pool.ContractType)
-		}
-		if input.PoolQualifier == "" {
-			return sequences.OnChainOutput{}, errors.New("pool qualifier is required")
+		if err := ValidateDeployMultiTokenPoolInput(input); err != nil {
+			return sequences.OnChainOutput{}, err
 		}
 		if input.ExistingDataStore == nil {
 			return sequences.OnChainOutput{}, errors.New("existing datastore is required")
+		}
+		// Everything that can reject the input runs before the first deployment so that nothing is
+		// left orphaned in a failed run.
+		if err := ValidateDeployMultiTokenPoolState(b, chain, input.ExistingDataStore, input); err != nil {
+			return sequences.OnChainOutput{}, err
 		}
 
 		admin := common.Address{}
@@ -56,9 +100,6 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 			admin = chain.DeployerKey.From
 		}
 		if input.Admin != "" {
-			if !common.IsHexAddress(input.Admin) {
-				return sequences.OnChainOutput{}, fmt.Errorf("invalid PoolConfigManager admin address %q", input.Admin)
-			}
 			admin = common.HexToAddress(input.Admin)
 		}
 		if admin == (common.Address{}) {
@@ -80,7 +121,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		}
 
 		existingAddresses := input.ExistingDataStore.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
-		connectionStoreRef, err := maybeDeployMultiTokenPoolContract(b, connection_policy_store.Deploy, chain, contract.DeployInput[connection_policy_store.ConstructorArgs]{
+		connectionStoreRef, _, err := maybeDeployMultiTokenPoolContract(b, connection_policy_store.Deploy, chain, contract.DeployInput[connection_policy_store.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(connection_policy_store.ContractType, *connection_policy_store.Version),
 			Args:           connection_policy_store.ConstructorArgs{},
@@ -89,7 +130,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy ConnectionPolicyStore: %w", err)
 		}
-		feeStoreRef, err := maybeDeployMultiTokenPoolContract(b, fee_policy_store.Deploy, chain, contract.DeployInput[fee_policy_store.ConstructorArgs]{
+		feeStoreRef, _, err := maybeDeployMultiTokenPoolContract(b, fee_policy_store.Deploy, chain, contract.DeployInput[fee_policy_store.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(fee_policy_store.ContractType, *fee_policy_store.Version),
 			Args:           fee_policy_store.ConstructorArgs{},
@@ -98,7 +139,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FeePolicyStore: %w", err)
 		}
-		securityStoreRef, err := maybeDeployMultiTokenPoolContract(b, security_policy_store.Deploy, chain, contract.DeployInput[security_policy_store.ConstructorArgs]{
+		securityStoreRef, _, err := maybeDeployMultiTokenPoolContract(b, security_policy_store.Deploy, chain, contract.DeployInput[security_policy_store.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(security_policy_store.ContractType, *security_policy_store.Version),
 			Args:           security_policy_store.ConstructorArgs{},
@@ -111,7 +152,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		connectionStore := common.HexToAddress(connectionStoreRef.Address)
 		feeStore := common.HexToAddress(feeStoreRef.Address)
 		securityStore := common.HexToAddress(securityStoreRef.Address)
-		poolConfigManagerRef, err := maybeDeployMultiTokenPoolContract(b, pool_config_manager.Deploy, chain, contract.DeployInput[pool_config_manager.ConstructorArgs]{
+		poolConfigManagerRef, _, err := maybeDeployMultiTokenPoolContract(b, pool_config_manager.Deploy, chain, contract.DeployInput[pool_config_manager.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(pool_config_manager.ContractType, *pool_config_manager.Version),
 			Args: pool_config_manager.ConstructorArgs{
@@ -128,7 +169,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		}
 		poolConfigManagerAddress := common.HexToAddress(poolConfigManagerRef.Address)
 
-		poolRef, err := maybeDeployMultiTokenPoolContract(b, burn_mint_multi_token_pool.Deploy, chain, contract.DeployInput[burn_mint_multi_token_pool.ConstructorArgs]{
+		poolRef, _, err := maybeDeployMultiTokenPoolContract(b, burn_mint_multi_token_pool.Deploy, chain, contract.DeployInput[burn_mint_multi_token_pool.ConstructorArgs]{
 			ChainSelector:  input.ChainSelector,
 			TypeAndVersion: cldf_deployment.NewTypeAndVersion(burn_mint_multi_token_pool.ContractType, *burn_mint_multi_token_pool.Version),
 			Args: burn_mint_multi_token_pool.ConstructorArgs{
@@ -143,41 +184,35 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 		}
 
 		writes := make([]contract.WriteOutput, 0, 3)
-		connectionWrite, changed, err := authorizePoolConfigManager(
-			b, chain, connectionStore, poolConfigManagerAddress,
-			connection_policy_store.GetAllAuthorizedCallers,
-			connection_policy_store.ApplyAuthorizedCallerUpdates,
-			connection_policy_store.AuthorizedCallerArgs{AddedCallers: []common.Address{poolConfigManagerAddress}},
-		)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize PoolConfigManager on ConnectionPolicyStore: %w", err)
+		callers := func(addr common.Address) []common.Address { return []common.Address{addr} }
+		authorizations := []struct {
+			name      string
+			authorize func() (contract.WriteOutput, bool, error)
+		}{
+			{"ConnectionPolicyStore", func() (contract.WriteOutput, bool, error) {
+				return authorizePoolConfigManager(b, chain, connectionStore, poolConfigManagerAddress,
+					connection_policy_store.GetAllAuthorizedCallers, connection_policy_store.ApplyAuthorizedCallerUpdates,
+					connection_policy_store.AuthorizedCallerArgs{AddedCallers: callers(poolConfigManagerAddress)})
+			}},
+			{"FeePolicyStore", func() (contract.WriteOutput, bool, error) {
+				return authorizePoolConfigManager(b, chain, feeStore, poolConfigManagerAddress,
+					fee_policy_store.GetAllAuthorizedCallers, fee_policy_store.ApplyAuthorizedCallerUpdates,
+					fee_policy_store.AuthorizedCallerArgs{AddedCallers: callers(poolConfigManagerAddress)})
+			}},
+			{"SecurityPolicyStore", func() (contract.WriteOutput, bool, error) {
+				return authorizePoolConfigManager(b, chain, securityStore, poolConfigManagerAddress,
+					security_policy_store.GetAllAuthorizedCallers, security_policy_store.ApplyAuthorizedCallerUpdates,
+					security_policy_store.AuthorizedCallerArgs{AddedCallers: callers(poolConfigManagerAddress)})
+			}},
 		}
-		if changed {
-			writes = append(writes, connectionWrite)
-		}
-		feeWrite, changed, err := authorizePoolConfigManager(
-			b, chain, feeStore, poolConfigManagerAddress,
-			fee_policy_store.GetAllAuthorizedCallers,
-			fee_policy_store.ApplyAuthorizedCallerUpdates,
-			fee_policy_store.AuthorizedCallerArgs{AddedCallers: []common.Address{poolConfigManagerAddress}},
-		)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize PoolConfigManager on FeePolicyStore: %w", err)
-		}
-		if changed {
-			writes = append(writes, feeWrite)
-		}
-		securityWrite, changed, err := authorizePoolConfigManager(
-			b, chain, securityStore, poolConfigManagerAddress,
-			security_policy_store.GetAllAuthorizedCallers,
-			security_policy_store.ApplyAuthorizedCallerUpdates,
-			security_policy_store.AuthorizedCallerArgs{AddedCallers: []common.Address{poolConfigManagerAddress}},
-		)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize PoolConfigManager on SecurityPolicyStore: %w", err)
-		}
-		if changed {
-			writes = append(writes, securityWrite)
+		for _, a := range authorizations {
+			write, changed, err := a.authorize()
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to authorize PoolConfigManager on %s: %w", a.name, err)
+			}
+			if changed {
+				writes = append(writes, write)
+			}
 		}
 
 		batchOps := make([]mcms_types.BatchOperation, 0, 1)
@@ -198,26 +233,63 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 	},
 )
 
+// hasExistingDeployment mirrors the type/version/qualifier matching of MaybeDeployContract.
+func hasExistingDeployment(existing []datastore.AddressRef, contractType cldf_deployment.ContractType, version *semver.Version, qualifier string) bool {
+	return slices.ContainsFunc(existing, func(ref datastore.AddressRef) bool {
+		return ref.Type == datastore.ContractType(contractType) &&
+			ref.Version != nil && ref.Version.String() == version.String() &&
+			ref.Qualifier == qualifier
+	})
+}
+
+// checkReusedStackIsConsistent rejects a stack where a dependent contract exists but one of its
+// constructor dependencies does not: PoolConfigManager without all three stores, or the pool
+// without its PoolConfigManager. Constructor wiring of reused contracts is not reconciled.
+func checkReusedStackIsConsistent(existing []datastore.AddressRef, qualifier string, selector uint64) error {
+	stores := []struct {
+		name string
+		ok   bool
+	}{
+		{"ConnectionPolicyStore", hasExistingDeployment(existing, connection_policy_store.ContractType, connection_policy_store.Version, qualifier)},
+		{"FeePolicyStore", hasExistingDeployment(existing, fee_policy_store.ContractType, fee_policy_store.Version, qualifier)},
+		{"SecurityPolicyStore", hasExistingDeployment(existing, security_policy_store.ContractType, security_policy_store.Version, qualifier)},
+	}
+	managerExists := hasExistingDeployment(existing, pool_config_manager.ContractType, pool_config_manager.Version, qualifier)
+	poolExists := hasExistingDeployment(existing, burn_mint_multi_token_pool.ContractType, burn_mint_multi_token_pool.Version, qualifier)
+	if managerExists {
+		for _, store := range stores {
+			if !store.ok {
+				return fmt.Errorf("PoolConfigManager exists on chain %d for qualifier %q but %s does not; its store wiring would be stale. Remove the stale refs or use a new pool qualifier", selector, qualifier, store.name)
+			}
+		}
+	}
+	if poolExists && !managerExists {
+		return fmt.Errorf("BurnMintMultiTokenPool exists on chain %d for qualifier %q but PoolConfigManager does not; its manager wiring would be stale. Remove the stale refs or use a new pool qualifier", selector, qualifier)
+	}
+	return nil
+}
+
 // maybeDeployMultiTokenPoolContract reuses an existing deployment and makes the skip visible
-// to operators. The actual type/version/qualifier matching remains in MaybeDeployContract.
+// to operators. The actual type/version/qualifier matching remains in MaybeDeployContract; the
+// returned bool reports whether the returned ref is an existing deployment that was reused.
 func maybeDeployMultiTokenPoolContract[ARGS any](
 	b cldf_ops.Bundle,
 	op *cldf_ops.Operation[contract.DeployInput[ARGS], datastore.AddressRef, evm.Chain],
 	chain evm.Chain,
 	input contract.DeployInput[ARGS],
 	existingAddresses []datastore.AddressRef,
-) (datastore.AddressRef, error) {
+) (datastore.AddressRef, bool, error) {
 	ref, err := contract.MaybeDeployContract(b, op, chain, input, existingAddresses)
 	if err != nil {
-		return datastore.AddressRef{}, err
+		return datastore.AddressRef{}, false, err
 	}
-	for _, existing := range existingAddresses {
-		if existing.Key() == ref.Key() && existing.Address == ref.Address {
-			b.Logger.Infof("%s already deployed on chain %d at %s; skipping deployment", ref.Type, chain.Selector, ref.Address)
-			break
-		}
+	reused := slices.ContainsFunc(existingAddresses, func(existing datastore.AddressRef) bool {
+		return existing.Key() == ref.Key() && existing.Address == ref.Address
+	})
+	if reused {
+		b.Logger.Infof("%s already deployed on chain %d at %s; skipping deployment", ref.Type, chain.Selector, ref.Address)
 	}
-	return ref, nil
+	return ref, reused, nil
 }
 
 // authorizePoolConfigManager adds the PCM to a store only when it is not already authorized.
