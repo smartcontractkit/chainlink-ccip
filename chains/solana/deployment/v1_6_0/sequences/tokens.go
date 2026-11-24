@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -18,6 +19,7 @@ import (
 	tokensops "github.com/smartcontractkit/chainlink-ccip/chains/solana/deployment/v1_6_0/operations/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v1_6_4/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	deployapi "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	tokenapi "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -1484,7 +1486,11 @@ func (a *SolanaAdapter) ResolveTokenPoolRef(b cldf_ops.Bundle, chains cldf_chain
 	if err != nil {
 		return datastore.AddressRef{}, err
 	}
-	poolRef, err := selectTokenPoolRef(ds, chainSelector, poolProgramID, &mint)
+	interfaceVersion, err := poolInterfaceVersion(b.GetContext(), chain, ds, chainSelector, mint)
+	if err != nil {
+		return datastore.AddressRef{}, err
+	}
+	poolRef, err := selectTokenPoolRef(ds, chainSelector, poolProgramID, &tokenPoolInstance{Mint: mint, InterfaceVersion: interfaceVersion})
 	if err != nil {
 		return datastore.AddressRef{}, fmt.Errorf("failed to find token pool ref for program id %s and mint %s: %w", poolProgramID, mint, err)
 	}
@@ -1514,13 +1520,73 @@ func poolConfigMint(configPDA, program solana.PublicKey, data []byte) (solana.Pu
 	return mint, nil
 }
 
-// selectTokenPoolRef picks the ref of a pool program that serves the given mint. A shared pool
-// program carries one ref per qualifier and version, so the address alone is ambiguous. A ref
-// under the mint's token qualifier is the pool instance and wins, at its latest version, since a
-// token migrated to 2.0 is registered that way. Otherwise the token still uses the program through
-// the 1.x interface, even when the program binary was upgraded, so the latest 1.x ref is used.
-// Without a mint, the latest ref at the address is used.
-func selectTokenPoolRef(ds datastore.DataStore, chainSelector uint64, program solana.PublicKey, mint *solana.PublicKey) (datastore.AddressRef, error) {
+// tokenPoolInstance is the mint a pool config serves and the pool interface version its Token
+// Admin Registry routes the mint through.
+type tokenPoolInstance struct {
+	Mint             solana.PublicKey
+	InterfaceVersion uint8
+}
+
+// poolInterfaceVersion reads the pool interface version from the mint's Token Admin Registry. A
+// mint without a registry, or with a layout that predates the field, uses interface 1.
+func poolInterfaceVersion(ctx context.Context, chain cldf_solana.Chain, ds datastore.DataStore, chainSelector uint64, mint solana.PublicKey) (uint8, error) {
+	// The Router is upgraded in place, so any version's ref gives the program the registry lives under.
+	routerRef, err := datastore_utils.FindLatestVersionRef(ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(routerops.ContractType)),
+	))
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve router on chain %d: %w", chainSelector, err)
+	}
+	router, err := solana.PublicKeyFromBase58(routerRef.Address)
+	if err != nil {
+		return 0, fmt.Errorf("invalid router address %q: %w", routerRef.Address, err)
+	}
+	tarPDA, _, err := state.FindTokenAdminRegistryPDA(mint, router)
+	if err != nil {
+		return 0, fmt.Errorf("failed to derive token admin registry of mint %s: %w", mint, err)
+	}
+	acct, err := chain.Client.GetAccountInfoWithOpts(ctx, tarPDA, &rpc.GetAccountInfoOpts{Commitment: cldf_solana.SolDefaultCommitment})
+	if errors.Is(err, rpc.ErrNotFound) {
+		return 1, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to read token admin registry %s of mint %s: %w", tarPDA, mint, err)
+	}
+	if acct == nil || acct.Value == nil || !acct.Value.Owner.Equals(router) {
+		return 1, nil
+	}
+	return tokenAdminRegistryInterfaceVersion(acct.Value.Data.GetBinary())
+}
+
+// tokenAdminRegistryInterfaceVersion decodes interface_version from a Token Admin Registry account.
+// Layouts before version 3 have no such field and serve interface 1.
+func tokenAdminRegistryInterfaceVersion(data []byte) (uint8, error) {
+	// discriminator, version, administrator, pending administrator, lookup table, writable indexes,
+	// mint, account_resolution_enabled, bump.
+	const versionOffset = 8
+	const interfaceVersionOffset = 8 + 1 + 32*5 + 1 + 1
+	if len(data) <= versionOffset {
+		return 0, fmt.Errorf("token admin registry is too short: %d bytes", len(data))
+	}
+	if data[versionOffset] < 3 {
+		return 1, nil
+	}
+	if len(data) <= interfaceVersionOffset {
+		return 0, fmt.Errorf("token admin registry version %d is too short for interface_version: %d bytes", data[versionOffset], len(data))
+	}
+	return data[interfaceVersionOffset], nil
+}
+
+// selectTokenPoolRef picks the ref of a pool program that serves the given instance. A shared pool
+// program carries one ref per qualifier and version, so the address alone is ambiguous.
+//
+// The Token Admin Registry decides the major version: a mint routed through interface 2 or later
+// needs a 2.x ref under its token qualifier, the instance ref the 2.0 migration registers, and fails
+// without one rather than falling back to 1.x. A mint on interface 1 uses the latest 1.x ref,
+// preferring one under its token qualifier. Without an instance, the latest ref at the address is
+// used.
+func selectTokenPoolRef(ds datastore.DataStore, chainSelector uint64, program solana.PublicKey, instance *tokenPoolInstance) (datastore.AddressRef, error) {
 	refs := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSelector),
 		datastore.AddressRefByAddress(program.String()),
@@ -1528,33 +1594,44 @@ func selectTokenPoolRef(ds datastore.DataStore, chainSelector uint64, program so
 	if len(refs) == 0 {
 		return datastore.AddressRef{}, errors.New("no ref at the program address")
 	}
-	if mint == nil {
+	if instance == nil {
 		return datastore_utils.FindLatestVersionRef(refs)
 	}
 
 	tokenQualifiers := map[string]bool{}
 	for _, ref := range ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSelector),
-		datastore.AddressRefByAddress(mint.String()),
+		datastore.AddressRefByAddress(instance.Mint.String()),
 	) {
-		tokenQualifiers[ref.Qualifier] = true
+		if ref.Qualifier != "" {
+			tokenQualifiers[ref.Qualifier] = true
+		}
 	}
-	var instance, legacy []datastore.AddressRef
+	var owned, legacy []datastore.AddressRef
 	for _, ref := range refs {
-		switch {
-		case ref.Qualifier != "" && tokenQualifiers[ref.Qualifier]:
-			instance = append(instance, ref)
-		case ref.Version != nil && ref.Version.Major() == 1:
+		if ref.Version == nil {
+			continue
+		}
+		v1 := ref.Version.Major() == 1
+		if instance.InterfaceVersion >= 2 == v1 {
+			continue
+		}
+		if tokenQualifiers[ref.Qualifier] {
+			owned = append(owned, ref)
+		} else if v1 {
 			legacy = append(legacy, ref)
 		}
 	}
-	if len(instance) > 0 {
-		return datastore_utils.FindLatestVersionRef(instance)
-	}
-	if len(legacy) > 0 {
+	switch {
+	case len(owned) > 0:
+		return datastore_utils.FindLatestVersionRef(owned)
+	case instance.InterfaceVersion >= 2:
+		return datastore.AddressRef{}, fmt.Errorf("mint %s uses pool interface %d but no 2.x ref at the program is under its token qualifier %v", instance.Mint, instance.InterfaceVersion, slices.Sorted(maps.Keys(tokenQualifiers)))
+	case len(legacy) > 0:
 		return datastore_utils.FindLatestVersionRef(legacy)
+	default:
+		return datastore.AddressRef{}, fmt.Errorf("no 1.x ref at the program address for mint %s", instance.Mint)
 	}
-	return datastore.AddressRef{}, fmt.Errorf("no ref under the token qualifier of mint %s and no 1.x ref at the program address", mint)
 }
 
 // ResolveTokenRef accepts a token mint public key and resolves it to an AddressRef in the
