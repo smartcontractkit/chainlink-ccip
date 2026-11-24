@@ -885,18 +885,20 @@ configurations and FeeQuoter token transfer configurations are separate from PCM
 
 ### Destination gas budget
 
-The budget must cover the MTTP receive path, including:
+`destGasOverhead` prices the additional gas a token transfer uses in `OffRamp.executeSingleMessage` on the destination.
 
-- Reads from the connection and security stores.
-- Remote token and additional pool data provider calls, where configured.
-- The lane's hook, where configured.
-- Copying a changed policy configuration into an inbound bucket.
+- The OffRamp calls the token's `balanceOf` before verification. It reads the balance again after `releaseOrMint`
+  when the token receiver differs from the pool.
+- The OffRamp looks up the pool with `TAR.getPool` and checks its interfaces with ERC-165 both when resolving
+  the pool's CCVs with `getRequiredCCVs` and when calling `releaseOrMint`.
+- In `releaseOrMint`, include the mint, store reads, and calls to any configured remote token provider, additional
+  pool data provider, or hook. The security store also copies changed policy rate limits into the inbound bucket.
 
-The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The value is used to price execution, and the
-executor must supply enough transaction gas.
+The v2 OnRamp prices base execution, verifier execution, and receiver callback gas separately. The executor sets the
+transaction gas limit and must supply enough gas for the whole message.
 
-With these stores, a lane's first message uses approximately 102,000 to 195,000 gas. Enabled rate limits, an empty
-receiver balance, providers, policy pool trust, hooks, and larger pool lists can increase the cost.
+Measure the first transfer on the lane with its token configuration. Enabled rate limits, an empty receiver balance,
+providers, policy pool trust, hooks, and larger pool lists can increase the cost.
 
 Every source that prices transfers of the token to this chain needs a budget covering the measured cost plus a
 margin. This also applies to lanes sending only 32 bytes. The [transfer budget workflow](#setting-transfer-budgets)
@@ -1280,8 +1282,8 @@ Unless a step says otherwise, the issuer signs the steps for one chain in one ba
 - The OnRamp selects the source pool from the TAR at send time. The OffRamp selects the destination pool at execution
   time, including retries.
 - Messages never expire. After fixing a failure, any party can retry through `OffRamp.execute`.
-- Supply enough transaction gas for pool execution. The `gasLimitOverride` argument changes only the `ccipReceive`
-  gas limit. A non-zero override must be at least the message's `ccipReceiveGasLimit`.
+- Supply enough transaction gas for the full `OffRamp.execute` call. The `gasLimitOverride` argument changes only
+  the `ccipReceive` gas limit. A non-zero override must be at least the message's `ccipReceiveGasLimit`.
 - When waiting for messages to complete, check every message's execution state on the destination OffRamp. Include all
   in-flight messages, not just failed ones. A failed retry reverts without an event, so event counts cannot establish
   completion.
@@ -1368,10 +1370,10 @@ correct local token. A legacy pool must list a remote MTTP only when its token m
 
 Before a chain switches a token to an MTTP:
 
-1. **Tooling:** measure the MTTP receive cost with that token's configuration.
+1. **Tooling:** measure the [token work in `OffRamp.executeSingleMessage`](#destination-gas-budget) for the destination
+   token and lane configuration.
 2. Set every source configuration that prices transfers of that token to this chain to the measured cost plus a
-   margin, for example 300,000 gas. This also applies to lanes sending only 32 bytes. The signer and configuration
-   depend on the source pool:
+   margin. This also applies to lanes sending only 32 bytes. The signer and configuration depend on the source pool:
 
    | Source pool | Signer | Configuration to update |
    | --- | --- | --- |
@@ -1385,6 +1387,18 @@ Before a chain switches a token to an MTTP:
 
 The migration workflow specifies when each side raises its byte allowance. The allowance must increase before
 `useLegacyPoolDataOnSend` is disabled.
+
+#### Copying an allowlist
+
+Read `getAllowListEnabled()` and `getAllowList()` from the old pool or its allowlist hook. For a replacement pool
+with a built-in allowlist or a replacement allowlist hook, pass `[]` to the constructor if disabled, the members if
+enabled and populated, or `[address(0)]` if enabled and empty. The constructor enables checks from the array length
+and skips the zero address when adding members.
+
+Immediately before switching the TAR pool or selecting the replacement hook, re-read the enabled flags and member
+sets on both sides and require them to match. For a pool that delegates allowlisting, read its hook. An unset hook
+means the allowlist is disabled. Simulate an outbound transfer from the same unlisted sender on both sides and
+verify the allowlist decision. An enabled list rejects that sender even when empty. A disabled list permits it.
 
 #### Updating existing records
 
@@ -1476,13 +1490,23 @@ contract does not check that those messages have completed.
 
 To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
 
-1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist, and with the old
-   hook's `getAllowList()` and `getPolicyEngine()`. If `getAllowListEnabled()` is true and the list is empty,
-   pass `[address(0)]` to keep the allowlist enabled with no members. Passing `[]` disables it.
+1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist, the old hook's
+   `getPolicyEngine()`, and the [allowlist constructor input](#copying-an-allowlist) for the old hook's state.
 2. **Hook owner:** authorize every pool that serves a token using the new hook.
-3. **Policy engine admin:** give the new hook the old hook's policies with `addPolicy`, and the same target default
-   with `setTargetDefaultPolicyAllow`. The engine keys policies by hook address.
-4. **`CONFIG_ROLE`:** point the affected security records to the new hook.
+3. **Policy engine admin:** if an engine is configured, copy the old hook's policies with `addPolicy`. Read that
+   engine's `TargetDefaultPolicyAllowSet` events for the old hook from engine deployment through cutover. With a
+   complete history, the latest event gives the explicit allow or deny value. A hook with no event inherits the
+   engine default. If the history is incomplete, record the admin's explicit choice of inheritance, allow, or deny.
+
+   - For inheritance, leave the new hook's target default unset. Before switching, verify that the new address has
+     no such event, including writes by the ACE coordinator. If an override already exists, use a fresh hook address
+     because ACE has no operation to clear it.
+   - For an explicit allow or deny, set that value on the new hook with `setTargetDefaultPolicyAllow`.
+
+   Simulate a transfer for which the policies defer to the default. Verify the replacement follows the intended
+   mode under both the current engine default and the opposite value.
+4. **`CONFIG_ROLE`:** [verify the replacement allowlist](#copying-an-allowlist) before pointing the affected security
+   records to the new hook.
 
 Authorization is also required when reusing `AdvancedPoolHooks` or `MultiTokenPoolHooks` with a new pool. Authorize the
 new pool before it handles transfers.
@@ -1805,7 +1829,7 @@ on both chains and wait for all in-flight messages before removing any connectio
 | Owner | Requirement |
 | --- | --- |
 | Issuer | Be each token's TAR admin, legacy pool owner, and token role admin. |
-| Tooling | Before switching a chain, measure the MTTP receive gas for each token's configuration. |
+| Tooling | Before switching a chain, measure the [destination token transfer cost](#destination-gas-budget) for each token and lane. |
 | Source configuration owners | Before switching a chain, set the destination gas estimates under [setting transfer budgets](#setting-transfer-budgets). This includes legacy sources priced through the pool or FeeQuoter. |
 | CCIP ops and MTTP owner | Keep every OffRamp with pending messages on the MTTP's Router. |
 | Legacy pool owner | Upgrade every 1.5.0 pool to 1.5.1 or later before phase 2, including chains that will remain legacy. See [the upgrade procedure](#upgrade-pools-older-than-151). |
@@ -1822,12 +1846,12 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
 
 1. **Deployer and `DEFAULT_ADMIN_ROLE`:** deploy the five contracts, authorize the PCM, transfer ownership, and grant roles
    as in [chain expansion](#chain-expansion). For each legacy pool older than 2.0 with `getAllowListEnabled()` true,
-   also deploy a `MultiTokenPoolHooks` with the pool's `getAllowList()`, using `[address(0)]` if the list is empty. Pools with the same allowlist can share one
-   hook.
+   deploy a `MultiTokenPoolHooks` with the [allowlist copied from the pool](#copying-an-allowlist). Pools with the
+   same allowlist can share one hook.
 2. **`CONFIG_ROLE`:** create policy defaults:
    - Fee: the issuer's chosen fees.
-   - Destination overhead: the measured MTTP receive gas and 32 bytes. The byte limit prevents long-format sends
-     while the destination is still legacy.
+   - Destination overhead: the gas budget from [setting transfer budgets](#setting-transfer-budgets) and 32 bytes.
+     The byte limit prevents long-format sends while the destination is still legacy.
    - Security: a policy whose default record has empty CCV lists and no hook. Also create one policy for each hook
      below. Its default record has the hook and empty CCV lists. For an `AdvancedPoolHooks`, add a chain record with
      the same hook and its `outboundCCVs` and `inboundCCVs` for each chain that sets them. A new chain then gets the
@@ -1876,7 +1900,8 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
 
 Start only after phase 1 is complete on every chain.
 
-8. **Token admin:** call `TAR.setPool(token, mttp)` to switch the token.
+8. **Token admin:** complete the [pre-switch checks](#checks-before-migration-step-8), then call
+   `TAR.setPool(token, mttp)` to switch the token.
    - Start with one token on one chain and test both directions.
    - Switch the other tokens on that chain in one batch, then proceed to the next chain.
    - Any chain order can work without a pause because both sides trust old and new pools. The order must match
@@ -1914,14 +1939,15 @@ ends of these lanes must continue to use the same decimals.
 
 For a 1.5.0 pool on chain C:
 
-1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's allowlist settings. Preserve both
-   `getAllowListEnabled()` and `getAllowList()`. For a 2.0 replacement, use its hook for the allowlist.
+1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later and [copy the old allowlist](#copying-an-allowlist).
+   For a 2.0 replacement, use its hook for the allowlist.
    For each remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
 2. **Legacy pool owner on each remote chain already using 1.5.1 or later:** call
    `addRemotePool(chainC, abi.encode(newPool))` before C's TAR switch.
 3. Upgrade any remote 1.5.0 pool too. Its replacement must trust both C's old and new pools.
 4. **Role admin of the token on C:** grant the new pool mint and burn roles before the TAR switch.
-5. **Token admin on C:** call `TAR.setPool(token, newPool)`.
+5. **Token admin on C:** [verify the replacement allowlist](#copying-an-allowlist) before calling
+   `TAR.setPool(token, newPool)`.
    A new-pool message can arrive before the remote upgrade switches and fail on that chain's 1.5.0 pool. Tooling
    must list these messages and retry them through `OffRamp.execute` after the remote switch.
 6. **Role admin of the token on C:** revoke the 1.5.0 pool's mint and burn roles after the switch.
@@ -1970,9 +1996,9 @@ Other requirements for pending messages:
 - **Additional data:** legacy pools, legacy-format MTTP sends, and source tokens without providers supply empty data.
   A migrated token can have no additional pool data provider. If configured, the provider must accept empty data from
   each relevant chain. A rejecting provider blocks retries until `CONFIG_ROLE` replaces or removes it.
-- **Gas:** messages sent before the switch may have been priced for the legacy pool's lower receive cost. Execution
-  must have enough transaction gas for the MTTP. If execution fails, tooling must list the message and retry through
-  `OffRamp.execute` with enough gas. The source quote does not cap the pool call's gas.
+- **Gas:** messages sent before the switch may have been priced for the legacy pool's lower receive cost. If execution
+  fails, tooling must list the message and retry through `OffRamp.execute` with enough gas for the full destination
+  transaction. The source quote does not cap the pool call's gas.
 - **CCVs:** the v2 OffRamp reads the destination TAR pool's inbound CCVs at execution time. Preserve the legacy pool's
   requirements in the security record, regardless of source pool. Otherwise pending messages can fail until the
   required list is restored.
@@ -2001,10 +2027,10 @@ Then verify the following:
 | Non-EVM remote token | Exact bytes from legacy `getRemoteToken` |
 | Each remote legacy pool | `isRemotePool(thisChain, abi.encode(mttp))` is true, using the required encoding for that lane. |
 | Each lane to a non-MTTP | `useLegacyPoolDataOnSend` enabled, remote pool level `Inline`, and `destBytesOverhead` equal to 32 |
-| Source fee configurations | Gas estimates cover measured receive cost with a margin, including legacy sources priced through the pool or FeeQuoter. |
+| Source fee configurations | Gas estimates cover the measured token work in `OffRamp.executeSingleMessage` plus a margin, including legacy sources priced through the pool or FeeQuoter. |
 | MTTP Router | Includes every OffRamp with pending messages for the token's remote chains. |
 | `getLaneVerificationBatch` | Matches the legacy pool's `getRequiredCCVs`. For a pool without `IPoolV2` support, empty lists select default CCVs. |
-| Hook from `getLaneVerificationBatch` | The legacy 2.0 pool's `getAdvancedPoolHooks()`, or the step 1 hook with the legacy pool's `getAllowList()`. Zero if the legacy pool has neither. |
+| Hook from `getLaneVerificationBatch` | The legacy 2.0 pool's `getAdvancedPoolHooks()`, or the step 1 hook for an enabled legacy allowlist. Zero if neither applies. For the step 1 hook, [verify the enabled flag, members, and unlisted sender decision](#copying-an-allowlist). |
 | Additional pool data provider | Not configured, or accepts empty data from every relevant remote chain |
 | Second chain's switch batch | Sets inline overhead toward the first chain to 192 bytes plus padded provider data. |
 | TARs and old 1.5.0 pools | No TAR selects a 1.5.0 pool for the token; replaced 1.5.0 pools have no mint or burn role. |
