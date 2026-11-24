@@ -892,10 +892,15 @@ The budget must cover the MTTP receive path, including:
 - The lane's hook, where configured.
 - Copying a changed policy configuration into an inbound bucket.
 
-The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The value is used to price execution, and the
-executor must supply enough transaction gas.
+The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The OnRamp prices the value and adds it to the
+message's `executionGasLimit`. The default executor sets its transaction gas from that field. A low value can give the
+first execution too little gas, and the message then needs a retry with enough gas.
 
-With these stores, a lane's first message uses approximately 102,000 to 195,000 gas. Enabled rate limits, an empty
+For `destGasOverhead`, measure MTTP receive gas in `OffRamp.executeSingleMessage`. Count the full `releaseOrMint` call, both
+`TAR.getPool` lookups, ERC-165 checks, `getRequiredCCVs`, and the token's `balanceOf` before verification and again
+after `releaseOrMint` if the token receiver differs from the pool. Exclude separately priced base, verifier and callback gas.
+In simulation with the destination TAR selecting the MTTP, measure each format the lane will use (legacy or long) from
+the same first-transfer state with representative provider data. Use the highest applicable cost. Enabled rate limits, an empty
 receiver balance, providers, policy pool trust, hooks, and larger pool lists can increase the cost.
 
 Every source that prices transfers of the token to this chain needs a budget covering the measured cost plus a
@@ -1368,9 +1373,9 @@ correct local token. A legacy pool must list a remote MTTP only when its token m
 
 Before a chain switches a token to an MTTP:
 
-1. **Tooling:** measure the MTTP receive cost with that token's configuration.
+1. **Tooling:** measure the [MTTP receive cost](#destination-gas-budget) with that token's configuration.
 2. Set every source configuration that prices transfers of that token to this chain to the measured cost plus a
-   margin, for example 300,000 gas. This also applies to lanes sending only 32 bytes. The signer and configuration
+   margin. This also applies to lanes sending only 32 bytes. The signer and configuration
    depend on the source pool:
 
    | Source pool | Signer | Configuration to update |
@@ -1480,9 +1485,24 @@ To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
    hook's `getAllowList()` and `getPolicyEngine()`. If `getAllowListEnabled()` is true and the list is empty,
    pass `[address(0)]` to keep the allowlist enabled with no members. Passing `[]` disables it.
 2. **Hook owner:** authorize every pool that serves a token using the new hook.
-3. **Policy engine admin:** give the new hook the old hook's policies with `addPolicy`, and the same target default
-   with `setTargetDefaultPolicyAllow`. The engine keys policies by hook address.
-4. **`CONFIG_ROLE`:** point the affected security records to the new hook.
+3. **Policy engine admin:** if configured, copy the old hook's policies with `addPolicy`. In a complete history of
+   `TargetDefaultPolicyAllowSet` from engine deployment through cutover, the old hook's last event gives its override
+   and no event means inheritance. Copy an override with `setTargetDefaultPolicyAllow`. For inheritance leave the new
+   target unset, using a fresh hook if already overridden.
+
+   Just before switching, test both hooks on a local fork of the chain. If the old hook's event history is incomplete,
+   this test shows whether it follows the engine default. Choose a function selector with no policies on either hook
+   to test each hook's default. Set the engine default to allow and call `PolicyEngine.check` from each hook address.
+   Then set the default to deny and repeat both calls. If a call succeeds, the engine allowed it. If it reverts, count
+   it as a denial only when the error is `PolicyRunRejected` and the policy address is zero.
+   A constant decision identifies an override. With complete or incomplete history, require both hooks to agree at each setting.
+4. **`CONFIG_ROLE`:** verify the allowlist as described below, then point the affected security records to the new hook.
+
+Use step 1's constructor rule for pool upgrades too. Just before a hook or TAR switch, require matching
+`getAllowListEnabled()` flags and `getAllowList()` member sets on the enforcing pools or hooks. A delegating pool with
+no hook has a disabled list. Then check one sender that is in neither list. On a hook, call `checkAllowList(sender)`.
+On a pool older than 2.0, simulate `lockOrBurn` with that `originalSender`. Only a `SenderNotAllowed` revert means
+deny. A `CursedByRMN` or `InvalidToken` revert gives no result. Require the same decision from the old and new contracts.
 
 Authorization is also required when reusing `AdvancedPoolHooks` or `MultiTokenPoolHooks` with a new pool. Authorize the
 new pool before it handles transfers.
@@ -1826,7 +1846,7 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
    hook.
 2. **`CONFIG_ROLE`:** create policy defaults:
    - Fee: the issuer's chosen fees.
-   - Destination overhead: the measured MTTP receive gas and 32 bytes. The byte limit prevents long-format sends
+   - Destination overhead: the [gas budget](#destination-gas-budget) and 32 bytes. The byte limit prevents long-format sends
      while the destination is still legacy.
    - Security: a policy whose default record has empty CCV lists and no hook. Also create one policy for each hook
      below. Its default record has the hook and empty CCV lists. For an `AdvancedPoolHooks`, add a chain record with
@@ -1915,13 +1935,14 @@ ends of these lanes must continue to use the same decimals.
 For a 1.5.0 pool on chain C:
 
 1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's allowlist settings. Preserve both
-   `getAllowListEnabled()` and `getAllowList()`. For a 2.0 replacement, use its hook for the allowlist.
+   `getAllowListEnabled()` and `getAllowList()`. Pass `[address(0)]` for an enabled empty list. For a 2.0 replacement,
+   use its hook for the allowlist.
    For each remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
 2. **Legacy pool owner on each remote chain already using 1.5.1 or later:** call
    `addRemotePool(chainC, abi.encode(newPool))` before C's TAR switch.
 3. Upgrade any remote 1.5.0 pool too. Its replacement must trust both C's old and new pools.
 4. **Role admin of the token on C:** grant the new pool mint and burn roles before the TAR switch.
-5. **Token admin on C:** call `TAR.setPool(token, newPool)`.
+5. **Token admin on C:** [verify the allowlist](#changing-hooks-and-inbound-ccvs), then call `TAR.setPool(token, newPool)`.
    A new-pool message can arrive before the remote upgrade switches and fail on that chain's 1.5.0 pool. Tooling
    must list these messages and retry them through `OffRamp.execute` after the remote switch.
 6. **Role admin of the token on C:** revoke the 1.5.0 pool's mint and burn roles after the switch.
@@ -2004,7 +2025,7 @@ Then verify the following:
 | Source fee configurations | Gas estimates cover measured receive cost with a margin, including legacy sources priced through the pool or FeeQuoter. |
 | MTTP Router | Includes every OffRamp with pending messages for the token's remote chains. |
 | `getLaneVerificationBatch` | Matches the legacy pool's `getRequiredCCVs`. For a pool without `IPoolV2` support, empty lists select default CCVs. |
-| Hook from `getLaneVerificationBatch` | The legacy 2.0 pool's `getAdvancedPoolHooks()`, or the step 1 hook with the legacy pool's `getAllowList()`. Zero if the legacy pool has neither. |
+| Hook from `getLaneVerificationBatch` | For 2.0, the legacy pool's `getAdvancedPoolHooks()`. For older pools, [verify the allowlist](#changing-hooks-and-inbound-ccvs) with the step 1 hook if enabled or with no hook if disabled. |
 | Additional pool data provider | Not configured, or accepts empty data from every relevant remote chain |
 | Second chain's switch batch | Sets inline overhead toward the first chain to 192 bytes plus padded provider data. |
 | TARs and old 1.5.0 pools | No TAR selects a 1.5.0 pool for the token; replaced 1.5.0 pools have no mint or burn role. |
