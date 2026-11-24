@@ -1488,11 +1488,14 @@ To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
 3. **Policy engine admin:** if configured, copy the old hook's policies with `addPolicy`. In a complete history of
    `TargetDefaultPolicyAllowSet` from engine deployment through cutover, the old hook's last event gives its override
    and no event means inheritance. Copy an override with `setTargetDefaultPolicyAllow`. For inheritance leave the new
-   target unset, using a fresh hook if already overridden. With incomplete history, establish the old mode on the fork.
-   On a cutover fork, set the engine default to allow and then deny. At each setting call `PolicyEngine.check` as each
-   hook with a selector that has no policies on either. Success means allow and only `PolicyRunRejected` with a zero
-   policy address means deny. A constant decision identifies an override. With complete or incomplete history, require
-   both hooks to agree at each setting.
+   target unset, using a fresh hook if already overridden.
+
+   Just before switching, test both hooks on a local fork of the chain. If the old hook's event history is incomplete,
+   this test shows whether it follows the engine default. Choose a function selector with no policies on either hook
+   to test each hook's default. Set the engine default to allow and call `PolicyEngine.check` from each hook address.
+   Then set the default to deny and repeat both calls. If a call succeeds, the engine allowed it. If it reverts, count
+   it as a denial only when the error is `PolicyRunRejected` and the policy address is zero.
+   A constant decision identifies an override. With complete or incomplete history, require both hooks to agree at each setting.
 4. **`CONFIG_ROLE`:** verify the allowlist as described below, then point the affected security records to the new hook.
 
 Use step 1's constructor rule for pool upgrades too. Just before a hook or TAR switch, require matching
