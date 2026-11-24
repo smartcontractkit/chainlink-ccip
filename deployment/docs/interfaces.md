@@ -31,6 +31,7 @@ Both API generations use these. A v2 chain family still needs them.
 | `TransferOwnershipAdapter` | `deploy.GetTransferOwnershipRegistry().RegisterAdapter` | family-version | [deploy/product.go](../deploy/product.go) |
 | `AddressNormalizer` | `deploy.GetAddressNormalizerRegistry().RegisterAddressNormalizer` | family | [deploy/product.go](../deploy/product.go) |
 | `TokenAdapter` (+ optional token interfaces below) | `tokens.GetTokenAdapterRegistry().RegisterTokenAdapter` | family-version (pool version) | [tokens/product.go](../tokens/product.go) |
+| `MultiTokenPoolAdapter` | `tokens.GetMultiTokenPoolAdapterRegistry().RegisterMultiTokenPoolAdapter` | family-version (pool version) | [tokens/multi_token_pool.go](../tokens/multi_token_pool.go) |
 | `CurseAdapter` + `CurseSubjectAdapter` | `fastcurse.GetCurseRegistry().RegisterNewCurse` | family-version / family | [fastcurse/product.go](../fastcurse/product.go) |
 | `FeeAggregatorAdapter` | `fees.GetFeeAggregatorRegistry().RegisterFeeAggregatorAdapter` | family-version | [fees/fee_aggregator.go](../fees/fee_aggregator.go) |
 | `AuthorizedCallersAdapter` | `authorizedcallers.GetAuthorizedCallersRegistry().RegisterAdapter` | family + contract type + version | [authorizedcallers/product.go](../authorizedcallers/product.go) |
@@ -111,6 +112,10 @@ On Solana, allowed finality and token transfer fees are stored per lane, in the 
 4. If that fails, it calls `ResolveTokenRef` on the user's token ref.
 
 A resolver may tag reconstructed refs with the label `tokens.ArtificialAddressRefLabel` ("ArtificialAddressRef"). Solana does this when the user passes a pool config PDA instead of the program ID.
+
+### MultiTokenPoolAdapter
+
+Multi-token pools use a separate adapter because they are deployed independently of any particular token. `DeployMultiTokenPool()` returns the sequence that deploys the policy stores, PoolConfigManager, and pool on one chain and authorizes the manager on its stores. Token registration, policy configuration, roles, and ownership are separate workflows.
 
 ### CurseAdapter / CurseSubjectAdapter
 
