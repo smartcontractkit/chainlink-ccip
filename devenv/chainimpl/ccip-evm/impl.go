@@ -55,6 +55,14 @@ type CCIP16EVM struct {
 	*evmtestadapter.EVMAdapter
 }
 
+// Embedding testadapters.TestAdapter instead would still compile but silently send every lane through the
+// GetExtraArgs fallback.
+var (
+	_ testadapters.ExtraArgsDataSource = (*CCIP16EVM)(nil)
+	_ testadapters.EVMExtraArgsV2      = (*CCIP16EVM)(nil)
+	_ testadapters.SVMExtraArgsV1      = (*CCIP16EVM)(nil)
+)
+
 func NewEmptyCCIP16EVM(chainDetails chainsel.ChainDetails) *CCIP16EVM {
 	return &CCIP16EVM{
 		chainDetails: chainDetails,

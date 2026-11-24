@@ -67,6 +67,10 @@ type CCIP16Solana struct {
 	*soltestadapter.SVMAdapter
 }
 
+// Embedding testadapters.TestAdapter instead would still compile but silently send every lane through the
+// GetExtraArgs fallback.
+var _ testadapters.ExtraArgsDataSource = (*CCIP16Solana)(nil)
+
 func NewEmptyCCIP16Solana(chainDetails chainsel.ChainDetails) *CCIP16Solana {
 	return &CCIP16Solana{
 		chainDetails: chainDetails,
