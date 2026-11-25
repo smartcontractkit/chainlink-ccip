@@ -166,7 +166,7 @@ func TestDeployMultiTokenPoolsVerifyPreconditions(t *testing.T) {
 		{name: "valid", cfg: tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{multiTokenPoolTestChainSelector: validChainCfg}}},
 		{name: "no chains", cfg: tokens.DeployMultiTokenPoolsConfig{}, expectedErr: "at least one chain is required"},
 		{name: "invalid MCMS", cfg: tokens.DeployMultiTokenPoolsConfig{MCMS: mcms.Input{TimelockAction: "invalid"}, Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{multiTokenPoolTestChainSelector: validChainCfg}}, expectedErr: "invalid MCMS input"},
-		{name: "missing MCMS reader allows deployer fallback", cfg: tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{multiTokenPoolTestChainSelector: {PoolType: validChainCfg.PoolType, PoolVersion: validChainCfg.PoolVersion, PoolQualifier: validChainCfg.PoolQualifier}}}},
+		{name: "missing MCMS reader requires an explicit admin", cfg: tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{multiTokenPoolTestChainSelector: {PoolType: validChainCfg.PoolType, PoolVersion: validChainCfg.PoolVersion, PoolQualifier: validChainCfg.PoolQualifier}}}, expectedErr: "refusing to fall back to the deployer"},
 		{name: "missing pool type", cfg: tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{multiTokenPoolTestChainSelector: {PoolVersion: validChainCfg.PoolVersion, PoolQualifier: validChainCfg.PoolQualifier}}}, expectedErr: "poolType is required"},
 		{name: "missing pool version", cfg: tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{multiTokenPoolTestChainSelector: {PoolType: validChainCfg.PoolType, PoolQualifier: validChainCfg.PoolQualifier}}}, expectedErr: "poolVersion is required"},
 		{name: "missing qualifier", cfg: tokens.DeployMultiTokenPoolsConfig{Chains: map[uint64]tokens.DeployMultiTokenPoolChainConfig{multiTokenPoolTestChainSelector: {PoolType: validChainCfg.PoolType, PoolVersion: validChainCfg.PoolVersion}}}, expectedErr: "poolQualifier is required"},
@@ -294,6 +294,15 @@ func TestDeployMultiTokenPoolsRejectsMissingTimelockWithMCMSQualifier(t *testing
 	require.ErrorContains(t, err, "refusing to fall back to the deployer")
 	err = tokens.DeployMultiTokenPools(registry, changesets.NewMCMSReaderRegistry()).VerifyPreconditions(*e, cfg)
 	require.ErrorContains(t, err, "refusing to fall back to the deployer", "a custom qualifier must not fall back when no reader is registered")
+
+	cfg.MCMS = mcms.Input{}
+	err = tokens.DeployMultiTokenPools(registry, mcmsRegistry).VerifyPreconditions(*e, cfg)
+	require.ErrorContains(t, err, "refusing to fall back to the deployer", "an omitted admin never falls back to the deployer without a timelock")
+
+	chainCfg := cfg.Chains[multiTokenPoolTestChainSelector]
+	chainCfg.Admin = "0x0000000000000000000000000000000000000002"
+	cfg.Chains[multiTokenPoolTestChainSelector] = chainCfg
+	require.NoError(t, tokens.DeployMultiTokenPools(registry, mcmsRegistry).VerifyPreconditions(*e, cfg), "an explicit admin is accepted without a timelock")
 }
 
 func TestDeployMultiTokenPoolsApplyRejectsConflictingExistingRef(t *testing.T) {
@@ -445,14 +454,11 @@ func TestDeployMultiTokenPoolsApplyReplaysDeploymentAndReauthorizesWithSameRepor
 	})
 	changeset := tokens.DeployMultiTokenPools(registry, changesets.NewMCMSReaderRegistry())
 	cfg := newMultiTokenPoolTestConfig(multiTokenPoolTestChainSelector)
-	chainCfg := cfg.Chains[multiTokenPoolTestChainSelector]
-	chainCfg.Admin = ""
-	cfg.Chains[multiTokenPoolTestChainSelector] = chainCfg
 	e := newMockMultiTokenPoolEnvironment(t)
 	reporter := cldf_ops.NewMemoryReporter()
 	e.OperationsBundle = cldf_ops.NewBundle(t.Context, e.Logger, reporter)
 
-	require.NoError(t, changeset.VerifyPreconditions(e, cfg), "a missing reader and timelock allow the direct deployer-owned flow")
+	require.NoError(t, changeset.VerifyPreconditions(e, cfg))
 	first, err := changeset.Apply(e, cfg)
 	require.NoError(t, err)
 	second, err := changeset.Apply(e, cfg)
@@ -639,4 +645,41 @@ func TestDeployMultiTokenPoolsApplyPreservesOutputOnProposalBuildError(t *testin
 	require.NoError(t, fetchErr)
 	require.Len(t, refs, 1)
 	require.Equal(t, "0x0000000000000000000000000000000000000002", captured.SelectedTimelockAddress)
+}
+
+func TestDeployMultiTokenPoolsApplyFailureListsContractsDeployedBeforeIt(t *testing.T) {
+	deployedAddress := "0x00000000000000000000000000000000000000aa"
+	deployOperation := cldf_ops.NewOperation(
+		"mock-deploy-multi-token-pool-contract-before-failure",
+		semver.MustParse("2.1.0"),
+		"Deploys a contract",
+		func(_ cldf_ops.Bundle, _ cldf_chain.BlockChains, selector uint64) (datastore.AddressRef, error) {
+			return datastore.AddressRef{
+				ChainSelector: selector,
+				Type:          "PoolConfigManager",
+				Version:       semver.MustParse("2.1.0"),
+				Qualifier:     "test-pool",
+				Address:       deployedAddress,
+			}, nil
+		},
+	)
+	failingSequence := cldf_ops.NewSequence(
+		"mock-deploy-multi-token-pool-fails-after-deploying",
+		semver.MustParse("2.1.0"),
+		"Deploys a contract and then fails",
+		func(b cldf_ops.Bundle, chains cldf_chain.BlockChains, input tokens.DeployMultiTokenPoolInput) (sequences.OnChainOutput, error) {
+			if _, err := cldf_ops.ExecuteOperation(b, deployOperation, chains, input.ChainSelector); err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			return sequences.OnChainOutput{}, errors.New("pool deployment failed")
+		},
+	)
+	registry := newMultiTokenPoolTestRegistry(&mockMultiTokenPoolAdapter{sequence: failingSequence})
+	changeset := tokens.DeployMultiTokenPools(registry, changesets.NewMCMSReaderRegistry())
+
+	out, err := changeset.Apply(newMockMultiTokenPoolEnvironment(t), newMultiTokenPoolTestConfig(multiTokenPoolTestChainSelector))
+	require.ErrorContains(t, err, "pool deployment failed")
+	require.ErrorContains(t, err, "add them to the datastore before retrying")
+	require.ErrorContains(t, err, deployedAddress, "the error must list the contract deployed before the failure")
+	require.NotEmpty(t, out.Reports, "the reports of the failed run are still returned")
 }

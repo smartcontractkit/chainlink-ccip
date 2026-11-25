@@ -24,9 +24,13 @@ type DeployMultiTokenPoolInput struct {
 	// not tied to a single token whose address could otherwise be used as the qualifier.
 	PoolQualifier string `json:"poolQualifier" yaml:"poolQualifier"`
 	// Admin is the initial PoolConfigManager default admin, in the chain family's native
-	// string format. When empty, the changeset uses the selected MCMS timelock when available;
-	// otherwise the chain adapter may use its deployer.
+	// string format. It is required: the changeset resolves it from the selected MCMS timelock
+	// when the config leaves it empty.
 	Admin string `json:"admin,omitempty" yaml:"admin,omitempty"`
+	// AdminExplicit is true when Admin was set in the changeset config rather than resolved. A
+	// reused PoolConfigManager is compared against Admin only then. It is populated by the
+	// changeset and is not user input.
+	AdminExplicit bool `json:"-" yaml:"-"`
 	// SelectedTimelockAddress is the MCMS timelock selected by the changeset, even when Admin
 	// is explicitly set. It is populated by the changeset and is not user input.
 	SelectedTimelockAddress string `json:"-" yaml:"-"`

@@ -67,6 +67,26 @@ func (c *BurnMintMultiTokenPoolContract) GetPoolConfigManager(opts *bind.CallOpt
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *BurnMintMultiTokenPoolContract) GetRmnProxy(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRmnProxy")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
+func (c *BurnMintMultiTokenPoolContract) GetRouter(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "getRouter")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
 type ConstructorArgs struct {
 	RmnProxy          common.Address
 	Router            common.Address
@@ -97,5 +117,27 @@ var GetPoolConfigManager = contract.NewRead(contract.ReadParams[struct{}, common
 	NewContract:  NewBurnMintMultiTokenPoolContract,
 	CallContract: func(c *BurnMintMultiTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
 		return c.GetPoolConfigManager(opts)
+	},
+})
+
+var GetRmnProxy = contract.NewRead(contract.ReadParams[struct{}, common.Address, *BurnMintMultiTokenPoolContract]{
+	Name:         "burn-mint-multi-token-pool:get-rmn-proxy",
+	Version:      Version,
+	Description:  "Calls getRmnProxy on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintMultiTokenPoolContract,
+	CallContract: func(c *BurnMintMultiTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRmnProxy(opts)
+	},
+})
+
+var GetRouter = contract.NewRead(contract.ReadParams[struct{}, common.Address, *BurnMintMultiTokenPoolContract]{
+	Name:         "burn-mint-multi-token-pool:get-router",
+	Version:      Version,
+	Description:  "Calls getRouter on the contract",
+	ContractType: ContractType,
+	NewContract:  NewBurnMintMultiTokenPoolContract,
+	CallContract: func(c *BurnMintMultiTokenPoolContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.GetRouter(opts)
 	},
 })

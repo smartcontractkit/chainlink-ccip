@@ -708,6 +708,8 @@ contracts:
   - contract_name: PoolConfigManager
     version: "2.1.0"
     functions:
+      - name: defaultAdmin
+        access: public
       - name: getStaticConfig
         access: public
 
@@ -715,6 +717,10 @@ contracts:
     version: "2.1.0"
     functions:
       - name: getPoolConfigManager
+        access: public
+      - name: getRmnProxy
+        access: public
+      - name: getRouter
         access: public
 
   - contract_name: RegistryModuleExternalAccessControl

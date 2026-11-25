@@ -40,13 +40,14 @@ func ValidateDeployMultiTokenPoolInput(input tokens.DeployMultiTokenPoolInput) e
 	if input.PoolQualifier == "" {
 		return errors.New("pool qualifier is required")
 	}
-	if input.Admin != "" {
-		if !common.IsHexAddress(input.Admin) {
-			return fmt.Errorf("invalid PoolConfigManager admin address %q", input.Admin)
-		}
-		if common.HexToAddress(input.Admin) == (common.Address{}) {
-			return errors.New("PoolConfigManager admin must be non-zero")
-		}
+	if input.Admin == "" {
+		return errors.New("PoolConfigManager admin is required")
+	}
+	if !common.IsHexAddress(input.Admin) {
+		return fmt.Errorf("invalid PoolConfigManager admin address %q", input.Admin)
+	}
+	if common.HexToAddress(input.Admin) == (common.Address{}) {
+		return errors.New("PoolConfigManager admin must be non-zero")
 	}
 	return nil
 }
@@ -93,7 +94,7 @@ func validateDeployMultiTokenPoolState(b cldf_ops.Bundle, chain evm.Chain, ds da
 	if err := checkTokenAdminRegistryMatchesRamps(b, chain, existing, deps.tokenAdminRegistry); err != nil {
 		return multiTokenPoolDependencies{}, err
 	}
-	if err := checkReusedStackOnChain(b, chain, existing, input.PoolQualifier, deps.tokenAdminRegistry); err != nil {
+	if err := checkReusedStackOnChain(b, chain, existing, input, deps); err != nil {
 		return multiTokenPoolDependencies{}, err
 	}
 	return deps, nil
@@ -119,16 +120,7 @@ var DeployMultiTokenPool = cldf_ops.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		admin := common.Address{}
-		if chain.DeployerKey != nil {
-			admin = chain.DeployerKey.From
-		}
-		if input.Admin != "" {
-			admin = common.HexToAddress(input.Admin)
-		}
-		if admin == (common.Address{}) {
-			return sequences.OnChainOutput{}, errors.New("PoolConfigManager admin must be non-zero")
-		}
+		admin := common.HexToAddress(input.Admin)
 
 		existingAddresses := input.ExistingDataStore.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
 		connectionStoreRef, err := maybeDeployMultiTokenPoolContract(b, connection_policy_store.Deploy, chain, contract.DeployInput[connection_policy_store.ConstructorArgs]{
@@ -392,9 +384,11 @@ func checkReusedStackOnChain(
 	b cldf_ops.Bundle,
 	chain evm.Chain,
 	existing []datastore.AddressRef,
-	qualifier string,
-	tokenAdminRegistry common.Address,
+	input tokens.DeployMultiTokenPoolInput,
+	deps multiTokenPoolDependencies,
 ) error {
+	qualifier := input.PoolQualifier
+	tokenAdminRegistry := deps.tokenAdminRegistry
 	managerRef, managerExists := findExistingDeployment(existing, pool_config_manager.ContractType, pool_config_manager.Version, qualifier)
 	if !managerExists {
 		return nil
@@ -421,6 +415,25 @@ func checkReusedStackOnChain(
 			"reused PoolConfigManager at %s on chain %d has TokenAdminRegistry %s but the recorded TokenAdminRegistry is %s",
 			managerRef.Address, chain.Selector, staticConfig.Output.TokenAdminRegistry, tokenAdminRegistry,
 		)
+	}
+
+	if input.AdminExplicit {
+		defaultAdmin, err := cldf_ops.ExecuteOperation(
+			b,
+			pool_config_manager.DefaultAdmin,
+			chain,
+			contract.FunctionInput[struct{}]{ChainSelector: chain.Selector, Address: managerAddress},
+			cldf_ops.WithForceExecute[contract.FunctionInput[struct{}], evm.Chain](),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to read default admin of reused PoolConfigManager at %s on chain %d: %w", managerRef.Address, chain.Selector, err)
+		}
+		if configured := common.HexToAddress(input.Admin); defaultAdmin.Output != configured {
+			return fmt.Errorf(
+				"reused PoolConfigManager at %s on chain %d has default admin %s but the configured admin is %s; the admin is not changed on reuse",
+				managerRef.Address, chain.Selector, defaultAdmin.Output, configured,
+			)
+		}
 	}
 
 	stores := []struct {
@@ -472,6 +485,34 @@ func checkReusedStackOnChain(
 			"reused BurnMintMultiTokenPool at %s on chain %d uses PoolConfigManager %s but the recorded PoolConfigManager is %s; refusing to authorize a retired manager",
 			poolRef.Address, chain.Selector, poolManager.Output, managerAddress,
 		)
+	}
+	// Router and RMNProxy are fixed at construction time, so a mismatch means the recorded refs
+	// changed since the pool was deployed.
+	poolDependencies := []struct {
+		name     string
+		op       *cldf_ops.Operation[contract.FunctionInput[struct{}], common.Address, evm.Chain]
+		expected common.Address
+	}{
+		{"Router", burn_mint_multi_token_pool.GetRouter, deps.router},
+		{"RMNProxy", burn_mint_multi_token_pool.GetRmnProxy, deps.rmnProxy},
+	}
+	for _, dependency := range poolDependencies {
+		actual, err := cldf_ops.ExecuteOperation(
+			b,
+			dependency.op,
+			chain,
+			contract.FunctionInput[struct{}]{ChainSelector: chain.Selector, Address: common.HexToAddress(poolRef.Address)},
+			cldf_ops.WithForceExecute[contract.FunctionInput[struct{}], evm.Chain](),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to read the %s of reused BurnMintMultiTokenPool at %s on chain %d: %w", dependency.name, poolRef.Address, chain.Selector, err)
+		}
+		if actual.Output != dependency.expected {
+			return fmt.Errorf(
+				"reused BurnMintMultiTokenPool at %s on chain %d uses %s %s but the recorded %s is %s",
+				poolRef.Address, chain.Selector, dependency.name, actual.Output, dependency.name, dependency.expected,
+			)
+		}
 	}
 	return nil
 }

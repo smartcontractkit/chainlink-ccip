@@ -57,6 +57,16 @@ func (c *PoolConfigManagerContract) Owner(opts *bind.CallOpts) (common.Address, 
 	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
 }
 
+func (c *PoolConfigManagerContract) DefaultAdmin(opts *bind.CallOpts) (common.Address, error) {
+	var out []any
+	err := c.contract.Call(opts, &out, "defaultAdmin")
+	if err != nil {
+		var zero common.Address
+		return zero, err
+	}
+	return *abi.ConvertType(out[0], new(common.Address)).(*common.Address), nil
+}
+
 func (c *PoolConfigManagerContract) GetStaticConfig(opts *bind.CallOpts) (GetStaticConfigResult, error) {
 	var out []any
 	err := c.contract.Call(opts, &out, "getStaticConfig")
@@ -102,6 +112,17 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 		},
 	},
 	Validate: func(ConstructorArgs) error { return nil },
+})
+
+var DefaultAdmin = contract.NewRead(contract.ReadParams[struct{}, common.Address, *PoolConfigManagerContract]{
+	Name:         "pool-config-manager:default-admin",
+	Version:      Version,
+	Description:  "Calls defaultAdmin on the contract",
+	ContractType: ContractType,
+	NewContract:  NewPoolConfigManagerContract,
+	CallContract: func(c *PoolConfigManagerContract, opts *bind.CallOpts, args struct{}) (common.Address, error) {
+		return c.DefaultAdmin(opts)
+	},
 })
 
 var GetStaticConfig = contract.NewRead(contract.ReadParams[struct{}, GetStaticConfigResult, *PoolConfigManagerContract]{
