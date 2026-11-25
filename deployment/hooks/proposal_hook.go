@@ -305,7 +305,7 @@ func runPostProposalCCIPSends(
 
 					receiver := destAdapter.CCIPReceiver()
 					srcAdapter := factory(&env, srcSel)
-					extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
+					extraArgs, err := testadapters.BuildExtraArgs(extraArgsSource(srcAdapter, family), destAdapter, receiver)
 					if err != nil {
 						destGroup.warnf("verify-ccip-send: failed to build extra args for src=%d dest=%d: %v", srcSel, destSel, err)
 						failuresMu.Lock()

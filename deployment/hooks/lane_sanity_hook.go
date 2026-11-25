@@ -376,7 +376,8 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 		addLaneFailureSummary(failed, srcSel, destSel, allFeeTokensSummaryLabel)
 		return fmt.Errorf("failed message probes: %s", buildLaneFailureSummary(failed))
 	}
-	extraArgs, err := destAdapter.GetExtraArgs(receiver, family, testadapters.NewFinalityExtraArg(1))
+	srcAdapter := factory(&env, srcSel)
+	extraArgs, err := testadapters.BuildExtraArgs(extraArgsSource(srcAdapter, family), destAdapter, receiver, testadapters.NewFinalityExtraArg(1))
 	if err != nil {
 		lggr.Warnf("%s: extra args %s→%s: %v",
 			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel), err)
@@ -384,7 +385,6 @@ func runLaneSanityMessageSendWithAllFeeTokens(
 		return fmt.Errorf("failed message probes: %s", buildLaneFailureSummary(failed))
 	}
 
-	srcAdapter := factory(&env, srcSel)
 	messageData := []byte("lane-sanity-check")
 
 	for _, feeToken := range feeTokens {
@@ -505,7 +505,7 @@ func runLaneSanityTokenChecksForPair(
 		addLaneFailureSummary(failed, srcSel, destSel, "n/a")
 		return fmt.Errorf("failed token-transfer probes: %s", buildLaneSanityFailureSummary(failed))
 	}
-	extraArgs, err := destAdapter.GetExtraArgs(receiver, family)
+	extraArgs, err := testadapters.BuildExtraArgs(extraArgsSource(srcAdapter, family), destAdapter, receiver)
 	if err != nil {
 		lggr.Warnf("%s: extra args %s→%s: %v",
 			laneSanityCheckName, chainLabel(srcSel), chainLabel(destSel), err)
@@ -529,7 +529,7 @@ func runLaneSanityTokenChecksForPair(
 			continue
 		}
 		pttData := []byte("lane-sanity-check-payload")
-		mockExtraArgs, mockErr := destAdapter.GetExtraArgs(mockReceiver, family)
+		mockExtraArgs, mockErr := testadapters.BuildExtraArgs(extraArgsSource(srcAdapter, family), destAdapter, mockReceiver)
 		if mockErr != nil {
 			lggr.Warnf("%s: PTT token=%s: extra args for MockReceiver dest=%s: %v",
 				laneSanityCheckName, tok, chainLabel(destSel), mockErr)
