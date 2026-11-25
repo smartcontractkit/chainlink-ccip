@@ -9,6 +9,6 @@ import {Test} from "forge-std/Test.sol";
 contract SameAddressRemoteTokenAddressProvider_typeAndVersion is Test {
   function test_typeAndVersion() public {
     SameAddressRemoteTokenAddressProvider provider = new SameAddressRemoteTokenAddressProvider();
-    assertEq("SameAddressRemoteTokenAddressProvider 2.1.0-dev", provider.typeAndVersion());
+    assertEq("SameAddressRemoteTokenAddressProvider 2.1.0", provider.typeAndVersion());
   }
 }

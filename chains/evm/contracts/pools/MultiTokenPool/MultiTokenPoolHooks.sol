@@ -53,7 +53,7 @@ contract MultiTokenPoolHooks is IMultiTokenPoolHooks, ITypeAndVersion, Authorize
   }
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "MultiTokenPoolHooks 2.1.0-dev";
+    return "MultiTokenPoolHooks 2.1.0";
   }
 
   /// @inheritdoc IMultiTokenPoolHooks

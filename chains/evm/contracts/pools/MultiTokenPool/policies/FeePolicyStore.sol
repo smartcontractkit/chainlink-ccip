@@ -147,7 +147,7 @@ contract FeePolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) AuthorizedCallers(authorizedCallers) {}
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "FeePolicyStore 2.1.0-dev";
+    return "FeePolicyStore 2.1.0";
   }
 
   // ================================================================
