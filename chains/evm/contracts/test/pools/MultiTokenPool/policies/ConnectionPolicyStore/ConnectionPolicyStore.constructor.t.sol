@@ -14,7 +14,7 @@ contract ConnectionPolicyStore_constructor is ConnectionPolicyStoreSetup {
     emit AuthorizedCallers.AuthorizedCallerAdded(s_poolConfigManager);
     ConnectionPolicyStore connectionStore = new ConnectionPolicyStore(_arrayOf(s_poolConfigManager));
 
-    assertEq("ConnectionPolicyStore 2.1.0-dev", connectionStore.typeAndVersion());
+    assertEq("ConnectionPolicyStore 2.1.0", connectionStore.typeAndVersion());
     assertEq(OWNER, connectionStore.owner());
     assertEq(_arrayOf(s_poolConfigManager), connectionStore.getAllAuthorizedCallers());
     IPoolConfigManager.LaneConnection[] memory connections =

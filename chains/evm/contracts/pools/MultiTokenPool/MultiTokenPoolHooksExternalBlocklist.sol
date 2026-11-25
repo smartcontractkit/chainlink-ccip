@@ -34,7 +34,7 @@ contract MultiTokenPoolHooksExternalBlocklist is MultiTokenPoolHooks {
   }
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "MultiTokenPoolHooksExternalBlocklist 2.1.0-dev";
+    return "MultiTokenPoolHooksExternalBlocklist 2.1.0";
   }
 
   /// @inheritdoc MultiTokenPoolHooks

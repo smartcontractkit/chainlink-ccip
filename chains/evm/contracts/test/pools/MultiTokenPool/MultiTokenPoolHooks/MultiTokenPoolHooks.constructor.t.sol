@@ -20,7 +20,7 @@ contract MultiTokenPoolHooks_constructor is MultiTokenPoolHooksSetup {
     emit MultiTokenPoolHooks.PolicyEngineAttached(s_policyEngine);
     MultiTokenPoolHooks hooks = new MultiTokenPoolHooks(allowlist, s_policyEngine, _arrayOf(s_pool));
 
-    assertEq("MultiTokenPoolHooks 2.1.0-dev", hooks.typeAndVersion());
+    assertEq("MultiTokenPoolHooks 2.1.0", hooks.typeAndVersion());
     assertTrue(hooks.getAllowListEnabled());
     assertEq(allowlist, hooks.getAllowList());
     assertEq(address(s_policyEngine), address(hooks.getPolicyEngine()));

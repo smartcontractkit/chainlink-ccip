@@ -21,7 +21,7 @@ contract PoolConfigManager_constructor is PoolConfigManagerSetup {
 
     assertEq(address(s_tokenAdminRegistry), poolConfigManager.getTokenAdminRegistry());
     assertEq(OWNER, poolConfigManager.defaultAdmin());
-    assertEq("PoolConfigManager 2.1.0-dev", poolConfigManager.typeAndVersion());
+    assertEq("PoolConfigManager 2.1.0", poolConfigManager.typeAndVersion());
   }
 
   // Reverts

@@ -251,7 +251,7 @@ contract SecurityPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) AuthorizedCallers(authorizedCallers) {}
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "SecurityPolicyStore 2.1.0-dev";
+    return "SecurityPolicyStore 2.1.0";
   }
 
   // ================================================================
