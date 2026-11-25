@@ -12,7 +12,7 @@ contract FactoryTokenWithUIDPoolDataProvider_constructor is FactoryTokenWithUIDP
   function test_constructor() public {
     FactoryTokenWithUIDPoolDataProvider provider = new FactoryTokenWithUIDPoolDataProvider(s_tokenFactory);
 
-    assertEq("FactoryTokenWithUIDPoolDataProvider 2.1.0-dev", provider.typeAndVersion());
+    assertEq("FactoryTokenWithUIDPoolDataProvider 2.1.0", provider.typeAndVersion());
     assertEq(address(s_tokenFactory), address(provider.getTokenFactory()));
   }
 

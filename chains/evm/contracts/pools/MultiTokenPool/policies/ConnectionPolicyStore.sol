@@ -263,7 +263,7 @@ contract ConnectionPolicyStore is ITypeAndVersion, AuthorizedCallers {
   ) AuthorizedCallers(authorizedCallers) {}
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "ConnectionPolicyStore 2.1.0-dev";
+    return "ConnectionPolicyStore 2.1.0";
   }
 
   // ================================================================

@@ -20,7 +20,7 @@ contract BurnMintMultiTokenPool is MultiTokenPool, ITypeAndVersion {
   error InvalidBurnAddress(address token, address burnAddress);
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BurnMintMultiTokenPool 2.1.0-dev";
+    return "BurnMintMultiTokenPool 2.1.0";
   }
 
   constructor(
