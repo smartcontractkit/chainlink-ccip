@@ -33,3 +33,8 @@ func (a *MultiTokenPoolAdapter) ValidateDeployMultiTokenPool(e cldf.Environment,
 func (a *MultiTokenPoolAdapter) DeployMultiTokenPool() *cldf_ops.Sequence[tokens.DeployMultiTokenPoolInput, sequence_utils.OnChainOutput, cldf_chain.BlockChains] {
 	return sequences.DeployMultiTokenPool
 }
+
+// AuthorizeMultiTokenPool returns the EVM store-authorization sequence.
+func (a *MultiTokenPoolAdapter) AuthorizeMultiTokenPool() *cldf_ops.Sequence[tokens.DeployMultiTokenPoolInput, sequence_utils.OnChainOutput, cldf_chain.BlockChains] {
+	return sequences.AuthorizeMultiTokenPool
+}

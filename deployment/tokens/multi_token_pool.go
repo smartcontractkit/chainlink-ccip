@@ -27,6 +27,9 @@ type DeployMultiTokenPoolInput struct {
 	// string format. When empty, the changeset uses the selected MCMS timelock when available;
 	// otherwise the chain adapter may use its deployer.
 	Admin string `json:"admin,omitempty" yaml:"admin,omitempty"`
+	// SelectedTimelockAddress is the MCMS timelock selected by the changeset, even when Admin
+	// is explicitly set. It is populated by the changeset and is not user input.
+	SelectedTimelockAddress string `json:"-" yaml:"-"`
 	// ExistingDataStore is populated by the changeset and is not user input.
 	ExistingDataStore datastore.DataStore `json:"-" yaml:"-"`
 }
@@ -43,6 +46,9 @@ type MultiTokenPoolAdapter interface {
 	// PoolType, PoolVersion, and PoolQualifier. Implementations must resolve well-known addresses
 	// from ExistingDataStore, use native address strings in inputs, and emit only missing writes.
 	DeployMultiTokenPool() *cldf_ops.Sequence[DeployMultiTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
+	// AuthorizeMultiTokenPool returns a sequence that authorizes the PoolConfigManager on the
+	// policy stores. ExistingDataStore includes both existing and newly deployed stack refs.
+	AuthorizeMultiTokenPool() *cldf_ops.Sequence[DeployMultiTokenPoolInput, sequences.OnChainOutput, cldf_chain.BlockChains]
 }
 
 // MultiTokenPoolAdapterRegistry maintains MultiTokenPoolAdapters by chain family and pool version.

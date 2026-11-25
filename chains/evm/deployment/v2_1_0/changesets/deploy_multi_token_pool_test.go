@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/operations/contract"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -108,6 +109,27 @@ func applyMultiTokenPoolDeployment(t *testing.T, e *cldf.Environment, admin stri
 	return out
 }
 
+func installMultiTokenPoolDataStore(t *testing.T, e *cldf.Environment, refs []datastore.AddressRef) {
+	t.Helper()
+	ds := datastore.NewMemoryDataStore()
+	for _, ref := range refs {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	e.DataStore = ds.Seal()
+	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
+}
+
+func multiTokenPoolSequenceInput(e *cldf.Environment, admin string) tokens.DeployMultiTokenPoolInput {
+	return tokens.DeployMultiTokenPoolInput{
+		ChainSelector:     multiTokenPoolEVMTestChainSel,
+		PoolType:          string(burn_mint_multi_token_pool.ContractType),
+		PoolVersion:       burn_mint_multi_token_pool.Version,
+		PoolQualifier:     "customer-a",
+		Admin:             admin,
+		ExistingDataStore: e.DataStore,
+	}
+}
+
 func TestDeployMultiTokenPoolsApply(t *testing.T) {
 	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
 	require.NoError(t, err)
@@ -139,7 +161,7 @@ func TestDeployMultiTokenPoolsApply(t *testing.T) {
 	callOpts := &bind.CallOpts{Context: t.Context()}
 	poolTypeAndVersion, err := pool.TypeAndVersion(callOpts)
 	require.NoError(t, err)
-	require.Equal(t, "BurnMintMultiTokenPool 2.1.0-dev", poolTypeAndVersion, "datastore refs intentionally use the non-prerelease 2.1.0 alias")
+	require.Equal(t, "BurnMintMultiTokenPool 2.1.0", poolTypeAndVersion)
 	gotManager, err := pool.GetPoolConfigManager(callOpts)
 	require.NoError(t, err)
 	require.Equal(t, managerRef.Address, gotManager.Hex())
@@ -154,7 +176,7 @@ func TestDeployMultiTokenPoolsApply(t *testing.T) {
 	require.NoError(t, err)
 	managerTypeAndVersion, err := manager.TypeAndVersion(callOpts)
 	require.NoError(t, err)
-	require.Equal(t, "PoolConfigManager 2.1.0-dev", managerTypeAndVersion)
+	require.Equal(t, "PoolConfigManager 2.1.0", managerTypeAndVersion)
 	staticConfig, err := manager.GetStaticConfig(callOpts)
 	require.NoError(t, err)
 	require.Equal(t, tokenAdminRegistryRef.Address, staticConfig.TokenAdminRegistry.Hex())
@@ -210,6 +232,220 @@ func TestDeployMultiTokenPoolsApplyIsIdempotent(t *testing.T) {
 	require.Empty(t, secondOut.MCMSTimelockProposals)
 }
 
+func TestDeployMultiTokenPoolsSameReporterReplaysDeploymentAndRechecksAuthorization(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+	require.NoError(t, err)
+	prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+	chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+	firstOut := applyMultiTokenPoolDeployment(t, e, chain.DeployerKey.From.Hex())
+	firstRefs, err := firstOut.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	managerAddress := common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, pool_config_manager.ContractType).Address)
+	connectionStore, err := connection_policy_store_bindings.NewConnectionPolicyStore(
+		common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, connection_policy_store.ContractType).Address), chain.Client)
+	require.NoError(t, err)
+
+	// Change authorization out of band, then rerun with the same reporter. Deployment must replay
+	// its original report while the separately keyed authorization sequence restores the caller.
+	removeTx, err := connectionStore.ApplyAuthorizedCallerUpdates(chain.DeployerKey, connection_policy_store_bindings.AuthorizedCallersAuthorizedCallerArgs{
+		RemovedCallers: []common.Address{managerAddress},
+	})
+	require.NoError(t, err)
+	_, err = chain.Confirm(removeTx)
+	require.NoError(t, err)
+	ds := datastore.NewMemoryDataStore()
+	for _, ref := range append(prerequisites, firstRefs...) {
+		require.NoError(t, ds.Addresses().Add(ref))
+	}
+	e.DataStore = ds.Seal()
+
+	nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+	secondOut := applyMultiTokenPoolDeployment(t, e, chain.DeployerKey.From.Hex())
+	nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+	require.Equal(t, nonceBefore+1, nonceAfter, "only the missing authorization should execute")
+	authorizedCallers, err := connectionStore.GetAllAuthorizedCallers(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.Contains(t, authorizedCallers, managerAddress)
+
+	var firstDeploymentReportID, secondDeploymentReportID string
+	var firstAuthorizationKey, secondAuthorizationKey string
+	for _, report := range firstOut.Reports {
+		switch report.Def.ID {
+		case "deploy-multi-token-pool":
+			firstDeploymentReportID = report.ID
+		case "authorize-multi-token-pool":
+			firstAuthorizationKey = report.IdempotencyKey
+		}
+	}
+	for _, report := range secondOut.Reports {
+		switch report.Def.ID {
+		case "deploy-multi-token-pool":
+			secondDeploymentReportID = report.ID
+		case "authorize-multi-token-pool":
+			secondAuthorizationKey = report.IdempotencyKey
+		}
+	}
+	require.NotEmpty(t, firstDeploymentReportID)
+	require.Equal(t, firstDeploymentReportID, secondDeploymentReportID, "deployment must be replayed from the same report")
+	require.NotEmpty(t, firstAuthorizationKey)
+	require.NotEmpty(t, secondAuthorizationKey)
+	require.NotEqual(t, firstAuthorizationKey, secondAuthorizationKey, "authorization must not be replayed")
+}
+
+func TestDeployMultiTokenPoolRejectsInvalidReusedPoolConfigManager(t *testing.T) {
+	tests := []struct {
+		name        string
+		mutate      func(t *testing.T, chain evm.Chain, refs []datastore.AddressRef)
+		expectedErr string
+	}{
+		{
+			name: "miswired recorded store",
+			mutate: func(t *testing.T, _ evm.Chain, refs []datastore.AddressRef) {
+				t.Helper()
+				for i := range refs {
+					if refs[i].Type == datastore.ContractType(connection_policy_store.ContractType) {
+						refs[i].Address = common.HexToAddress("0xdead").Hex()
+						return
+					}
+				}
+				require.Fail(t, "missing ConnectionPolicyStore ref")
+			},
+			expectedErr: "static config ConnectionStore",
+		},
+		{
+			name: "recorded manager is an EOA",
+			mutate: func(t *testing.T, chain evm.Chain, refs []datastore.AddressRef) {
+				t.Helper()
+				for i := range refs {
+					if refs[i].Type == datastore.ContractType(pool_config_manager.ContractType) {
+						refs[i].Address = chain.DeployerKey.From.Hex()
+						return
+					}
+				}
+				require.Fail(t, "missing PoolConfigManager ref")
+			},
+			expectedErr: "failed to read static config of reused PoolConfigManager",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+			require.NoError(t, err)
+			prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+			chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+			firstOut := applyMultiTokenPoolDeployment(t, e, chain.DeployerKey.From.Hex())
+			firstRefs, err := firstOut.DataStore.Addresses().Fetch()
+			require.NoError(t, err)
+			test.mutate(t, chain, firstRefs)
+			installMultiTokenPoolDataStore(t, e, append(prerequisites, firstRefs...))
+
+			nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+			require.NoError(t, err)
+			_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployMultiTokenPool, e.BlockChains, multiTokenPoolSequenceInput(e, chain.DeployerKey.From.Hex()))
+			require.ErrorContains(t, err, test.expectedErr)
+			nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+			require.NoError(t, err)
+			require.Equal(t, nonceBefore, nonceAfter)
+		})
+	}
+}
+
+func TestDeployMultiTokenPoolRejectsRetiredManagerOnReusedPool(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+	require.NoError(t, err)
+	prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+	chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+	firstOut := applyMultiTokenPoolDeployment(t, e, chain.DeployerKey.From.Hex())
+	firstRefs, err := firstOut.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+
+	// Deploy a replacement PCM with the same valid static config, but leave the reused pool
+	// pointing at the original PCM. The retry must not authorize the retired recorded manager.
+	replacementQualifier := "replacement-pcm"
+	replacementRef, err := contract.MaybeDeployContract(e.OperationsBundle, pool_config_manager.Deploy, chain, contract.DeployInput[pool_config_manager.ConstructorArgs]{
+		ChainSelector:  multiTokenPoolEVMTestChainSel,
+		TypeAndVersion: cldf.NewTypeAndVersion(pool_config_manager.ContractType, *pool_config_manager.Version),
+		Args: pool_config_manager.ConstructorArgs{
+			TokenAdminRegistry: common.HexToAddress(findMultiTokenPoolRef(t, prerequisites, token_admin_registry.ContractType).Address),
+			ConnectionStore:    common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, connection_policy_store.ContractType).Address),
+			FeeStore:           common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, fee_policy_store.ContractType).Address),
+			SecurityStore:      common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, security_policy_store.ContractType).Address),
+			Admin:              chain.DeployerKey.From,
+		},
+		Qualifier: &replacementQualifier,
+	}, nil)
+	require.NoError(t, err)
+	replacementRef.Qualifier = "customer-a"
+	for i := range firstRefs {
+		if firstRefs[i].Type == datastore.ContractType(pool_config_manager.ContractType) {
+			firstRefs[i] = replacementRef
+		}
+	}
+	installMultiTokenPoolDataStore(t, e, append(prerequisites, firstRefs...))
+
+	nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.AuthorizeMultiTokenPool, e.BlockChains, multiTokenPoolSequenceInput(e, chain.DeployerKey.From.Hex()))
+	require.ErrorContains(t, err, "refusing to authorize a retired manager")
+	nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+	require.Equal(t, nonceBefore, nonceAfter)
+
+	connectionStore, err := connection_policy_store_bindings.NewConnectionPolicyStore(
+		common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, connection_policy_store.ContractType).Address), chain.Client)
+	require.NoError(t, err)
+	authorizedCallers, err := connectionStore.GetAllAuthorizedCallers(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.NotContains(t, authorizedCallers, common.HexToAddress(replacementRef.Address))
+}
+
+func TestDeployMultiTokenPoolZkSyncRequiresFullyReusedStack(t *testing.T) {
+	t.Run("missing deployment is rejected during preflight", func(t *testing.T) {
+		e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+		require.NoError(t, err)
+		deployMultiTokenPoolPrerequisites(t, e)
+		chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+		chain.IsZkSyncVM = true
+		zkSyncChains := cldf_chain.NewBlockChains(map[uint64]cldf_chain.BlockChain{multiTokenPoolEVMTestChainSel: chain})
+
+		nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+		require.NoError(t, err)
+		_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployMultiTokenPool, zkSyncChains, multiTokenPoolSequenceInput(e, chain.DeployerKey.From.Hex()))
+		require.ErrorContains(t, err, "zkSync VM")
+		require.ErrorContains(t, err, "only EVM bytecode")
+		nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+		require.NoError(t, err)
+		require.Equal(t, nonceBefore, nonceAfter)
+	})
+
+	t.Run("fully reused stack is allowed", func(t *testing.T) {
+		e, err := environment.New(t.Context(), environment.WithEVMSimulated(t, []uint64{multiTokenPoolEVMTestChainSel}))
+		require.NoError(t, err)
+		prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+		chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+		firstOut := applyMultiTokenPoolDeployment(t, e, chain.DeployerKey.From.Hex())
+		firstRefs, err := firstOut.DataStore.Addresses().Fetch()
+		require.NoError(t, err)
+		installMultiTokenPoolDataStore(t, e, append(prerequisites, firstRefs...))
+		chain.IsZkSyncVM = true
+		zkSyncChains := cldf_chain.NewBlockChains(map[uint64]cldf_chain.BlockChain{multiTokenPoolEVMTestChainSel: chain})
+
+		nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+		require.NoError(t, err)
+		report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployMultiTokenPool, zkSyncChains, multiTokenPoolSequenceInput(e, chain.DeployerKey.From.Hex()))
+		require.NoError(t, err)
+		require.Empty(t, report.Output.BatchOps)
+		authorizationReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.AuthorizeMultiTokenPool, zkSyncChains, multiTokenPoolSequenceInput(e, chain.DeployerKey.From.Hex()))
+		require.NoError(t, err)
+		require.Empty(t, authorizationReport.Output.BatchOps)
+		nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+		require.NoError(t, err)
+		require.Equal(t, nonceBefore, nonceAfter)
+	})
+}
+
 func TestDeployMultiTokenPoolPreparesStoreAuthorizationForNonDeployerOwner(t *testing.T) {
 	e, err := environment.New(t.Context(), environment.WithEVMSimulatedWithConfig(t, []uint64{multiTokenPoolEVMTestChainSel}, onchain.EVMSimLoaderConfig{NumAdditionalAccounts: 1}))
 	require.NoError(t, err)
@@ -263,13 +499,14 @@ func TestDeployMultiTokenPoolPreparesStoreAuthorizationForNonDeployerOwner(t *te
 	}
 	e.DataStore = ds.Seal()
 	e.OperationsBundle = testsetup.BundleWithFreshReporter(e.OperationsBundle)
-	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.DeployMultiTokenPool, e.BlockChains, tokens.DeployMultiTokenPoolInput{
-		ChainSelector:     multiTokenPoolEVMTestChainSel,
-		PoolType:          string(burn_mint_multi_token_pool.ContractType),
-		PoolVersion:       burn_mint_multi_token_pool.Version,
-		PoolQualifier:     "customer-a",
-		Admin:             chain.DeployerKey.From.Hex(),
-		ExistingDataStore: e.DataStore,
+	report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.AuthorizeMultiTokenPool, e.BlockChains, tokens.DeployMultiTokenPoolInput{
+		ChainSelector:           multiTokenPoolEVMTestChainSel,
+		PoolType:                string(burn_mint_multi_token_pool.ContractType),
+		PoolVersion:             burn_mint_multi_token_pool.Version,
+		PoolQualifier:           "customer-a",
+		Admin:                   chain.DeployerKey.From.Hex(),
+		SelectedTimelockAddress: newOwner.From.Hex(),
+		ExistingDataStore:       e.DataStore,
 	})
 	require.NoError(t, err)
 	require.Len(t, report.Output.BatchOps, 1)
@@ -287,6 +524,51 @@ func TestDeployMultiTokenPoolPreparesStoreAuthorizationForNonDeployerOwner(t *te
 	authorizedCallers, err := connectionStore.GetAllAuthorizedCallers(&bind.CallOpts{Context: t.Context()})
 	require.NoError(t, err)
 	require.NotContains(t, authorizedCallers, managerAddress, "the prepared write must not execute directly")
+}
+
+func TestDeployMultiTokenPoolRejectsWrongSelectedTimelockForPreparedAuthorization(t *testing.T) {
+	e, err := environment.New(t.Context(), environment.WithEVMSimulatedWithConfig(t, []uint64{multiTokenPoolEVMTestChainSel}, onchain.EVMSimLoaderConfig{NumAdditionalAccounts: 1}))
+	require.NoError(t, err)
+	prerequisites := deployMultiTokenPoolPrerequisites(t, e)
+	chain := e.BlockChains.EVMChains()[multiTokenPoolEVMTestChainSel]
+	firstOut := applyMultiTokenPoolDeployment(t, e, chain.DeployerKey.From.Hex())
+	firstRefs, err := firstOut.DataStore.Addresses().Fetch()
+	require.NoError(t, err)
+	managerAddress := common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, pool_config_manager.ContractType).Address)
+	connectionStoreAddress := common.HexToAddress(findMultiTokenPoolRef(t, firstRefs, connection_policy_store.ContractType).Address)
+	connectionStore, err := connection_policy_store_bindings.NewConnectionPolicyStore(connectionStoreAddress, chain.Client)
+	require.NoError(t, err)
+
+	removeTx, err := connectionStore.ApplyAuthorizedCallerUpdates(chain.DeployerKey, connection_policy_store_bindings.AuthorizedCallersAuthorizedCallerArgs{
+		RemovedCallers: []common.Address{managerAddress},
+	})
+	require.NoError(t, err)
+	_, err = chain.Confirm(removeTx)
+	require.NoError(t, err)
+	actualOwner := chain.Users[0]
+	transferTx, err := connectionStore.TransferOwnership(chain.DeployerKey, actualOwner.From)
+	require.NoError(t, err)
+	_, err = chain.Confirm(transferTx)
+	require.NoError(t, err)
+	acceptTx, err := connectionStore.AcceptOwnership(actualOwner)
+	require.NoError(t, err)
+	_, err = chain.Confirm(acceptTx)
+	require.NoError(t, err)
+	installMultiTokenPoolDataStore(t, e, append(prerequisites, firstRefs...))
+
+	input := multiTokenPoolSequenceInput(e, chain.DeployerKey.From.Hex())
+	input.SelectedTimelockAddress = common.HexToAddress("0xdead").Hex()
+	nonceBefore, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+	_, err = cldf_ops.ExecuteSequence(e.OperationsBundle, sequences.AuthorizeMultiTokenPool, e.BlockChains, input)
+	require.ErrorContains(t, err, "not the selected timelock")
+	require.ErrorContains(t, err, actualOwner.From.Hex())
+	nonceAfter, err := chain.Client.PendingNonceAt(t.Context(), chain.DeployerKey.From)
+	require.NoError(t, err)
+	require.Equal(t, nonceBefore, nonceAfter)
+	authorizedCallers, err := connectionStore.GetAllAuthorizedCallers(&bind.CallOpts{Context: t.Context()})
+	require.NoError(t, err)
+	require.NotContains(t, authorizedCallers, managerAddress)
 }
 
 func TestDeployMultiTokenPoolDefaultsAdminToDeployer(t *testing.T) {
@@ -520,6 +802,38 @@ func TestDeployMultiTokenPoolVerifyOnlyChecksNewestRampVersion(t *testing.T) {
 			return []datastore.AddressRef{deployTestOnRampV160(t, e, tar), deployTestOnRampV200(t, e, wrongTAR)}
 		})
 		require.ErrorContains(t, err, "OnRamp 2.0.0")
+	})
+}
+
+func TestDeployMultiTokenPoolVerifySelectsNewestRecordedRampBeforeReaderCompatibility(t *testing.T) {
+	wrongTAR := common.HexToAddress("0xdead")
+	t.Run("newer minor uses a compatible same-major reader and ignores retired ramps", func(t *testing.T) {
+		err := verifyWithRamps(t, func(e *cldf.Environment, tar common.Address) []datastore.AddressRef {
+			retired := deployTestOnRampV160(t, e, wrongTAR)
+			newest := deployTestOnRampV200(t, e, tar)
+			newest.Version = semver.MustParse("2.1.0")
+			return []datastore.AddressRef{retired, newest}
+		})
+		require.NoError(t, err)
+	})
+	t.Run("unknown newer major is rejected", func(t *testing.T) {
+		err := verifyWithRamps(t, func(e *cldf.Environment, tar common.Address) []datastore.AddressRef {
+			newest := deployTestOnRampV200(t, e, tar)
+			newest.Version = semver.MustParse("3.0.0")
+			return []datastore.AddressRef{newest}
+		})
+		require.ErrorContains(t, err, "unsupported newest recorded ramp OnRamp 3.0.0")
+		require.ErrorContains(t, err, "no compatible static-config reader")
+	})
+	t.Run("malformed address at the newest version is rejected", func(t *testing.T) {
+		err := verifyWithRamps(t, func(e *cldf.Environment, tar common.Address) []datastore.AddressRef {
+			newest := deployTestOnRampV200(t, e, tar)
+			newest.Version = semver.MustParse("2.1.0")
+			newest.Address = "not-an-address"
+			return []datastore.AddressRef{newest}
+		})
+		require.ErrorContains(t, err, "newest recorded ramp OnRamp 2.1.0")
+		require.ErrorContains(t, err, "invalid address")
 	})
 }
 

@@ -24,12 +24,6 @@ type rampReader struct {
 	read         func(b cldf_ops.Bundle, chain evm.Chain, address common.Address) (common.Address, error)
 }
 
-func (r rampReader) name() string { return fmt.Sprintf("%s %s", r.contractType, r.version) }
-
-func (r rampReader) matches(ref datastore.AddressRef) bool {
-	return string(ref.Type) == r.contractType && ref.Version != nil && ref.Version.Equal(r.version)
-}
-
 // newRampReader adapts a ramp's getStaticConfig read. The read bypasses the operations cache.
 func newRampReader[CFG any](
 	contractType string,
@@ -78,50 +72,76 @@ func checkTokenAdminRegistryMatchesRamps(
 	tokenAdminRegistry common.Address,
 ) error {
 	for _, contractType := range rampContractTypes {
-		reader, ok := newestRecordedRampReader(contractType, existing)
-		if !ok {
+		newestVersion, err := newestRecordedRampVersion(contractType, existing)
+		if err != nil {
+			return fmt.Errorf("cannot determine the newest recorded ramp on chain %d: %w", chain.Selector, err)
+		}
+		if newestVersion == nil {
 			continue
+		}
+		rampName := fmt.Sprintf("%s %s", contractType, newestVersion)
+		reader, err := compatibleRampReader(contractType, newestVersion)
+		if err != nil {
+			return fmt.Errorf("unsupported newest recorded ramp %s on chain %d: %w", rampName, chain.Selector, err)
 		}
 		if b.GetContext == nil {
 			return errors.New("an operations bundle is required to read the ramps' TokenAdminRegistry")
 		}
 		for _, ref := range existing {
-			if !reader.matches(ref) || !common.IsHexAddress(ref.Address) {
+			if string(ref.Type) != contractType || ref.Version == nil || !ref.Version.Equal(newestVersion) {
 				continue
+			}
+			if !common.IsHexAddress(ref.Address) {
+				return fmt.Errorf("newest recorded ramp %s on chain %d has invalid address %q", rampName, chain.Selector, ref.Address)
 			}
 			rampTAR, err := reader.read(b, chain, common.HexToAddress(ref.Address))
 			if err != nil {
-				return fmt.Errorf("failed to read the TokenAdminRegistry of %s at %s on chain %d: %w", reader.name(), ref.Address, chain.Selector, err)
+				return fmt.Errorf("failed to read the TokenAdminRegistry of %s at %s on chain %d: %w", rampName, ref.Address, chain.Selector, err)
 			}
 			if rampTAR != tokenAdminRegistry {
 				return fmt.Errorf(
 					"%s at %s on chain %d uses TokenAdminRegistry %s but the datastore TokenAdminRegistry is %s; the PoolConfigManager must use the ramps' TokenAdminRegistry",
-					reader.name(), ref.Address, chain.Selector, rampTAR, tokenAdminRegistry)
+					rampName, ref.Address, chain.Selector, rampTAR, tokenAdminRegistry)
 			}
 		}
 	}
 	return nil
 }
 
-// newestRecordedRampReader returns the reader for the highest version of contractType that has
-// a ref in existing.
-func newestRecordedRampReader(contractType string, existing []datastore.AddressRef) (rampReader, bool) {
-	var newest rampReader
-	found := false
-	for _, reader := range rampReaders {
-		if reader.contractType != contractType {
+// newestRecordedRampVersion considers every recorded ref, including versions without an exact
+// registered reader. A nil version is malformed and prevents a safe newest-version decision.
+func newestRecordedRampVersion(contractType string, existing []datastore.AddressRef) (*semver.Version, error) {
+	var newest *semver.Version
+	for _, ref := range existing {
+		if string(ref.Type) != contractType {
 			continue
 		}
-		recorded := false
-		for _, ref := range existing {
-			if reader.matches(ref) {
-				recorded = true
-				break
-			}
+		if ref.Version == nil {
+			return nil, fmt.Errorf("recorded %s at %q has no version", contractType, ref.Address)
 		}
-		if recorded && (!found || reader.version.GreaterThan(newest.version)) {
-			newest, found = reader, true
+		if newest == nil || ref.Version.GreaterThan(newest) {
+			newest = ref.Version
 		}
 	}
-	return newest, found
+	return newest, nil
+}
+
+// compatibleRampReader uses the newest registered reader from the same major version. The
+// static-config ABI used to read the TAR is compatible across minor and patch releases.
+func compatibleRampReader(contractType string, version *semver.Version) (rampReader, error) {
+	var compatible rampReader
+	found := false
+	for _, reader := range rampReaders {
+		if reader.contractType != contractType || reader.version.Major() != version.Major() {
+			continue
+		}
+		if !found || reader.version.GreaterThan(compatible.version) {
+			compatible = reader
+			found = true
+		}
+	}
+	if !found {
+		return rampReader{}, fmt.Errorf("no compatible static-config reader is registered for %s %s", contractType, version)
+	}
+	return compatible, nil
 }

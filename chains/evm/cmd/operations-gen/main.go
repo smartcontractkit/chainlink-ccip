@@ -630,7 +630,10 @@ func prepareTemplateData(info *ContractInfo) TemplateData {
 
 	for _, name := range info.FunctionOrder {
 		funcInfo := info.Functions[name]
-		data.ContractMethods = append(data.ContractMethods, prepareContractMethod(funcInfo, funcInfo.IsWrite))
+		// The template always includes Owner, so avoid duplicating it for an owner read operation.
+		if funcInfo.Name != "Owner" {
+			data.ContractMethods = append(data.ContractMethods, prepareContractMethod(funcInfo, funcInfo.IsWrite))
+		}
 
 		// Add to unified operations list
 		if funcInfo.IsWrite {

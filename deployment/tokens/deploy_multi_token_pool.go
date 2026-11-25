@@ -7,7 +7,9 @@ import (
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/google/uuid"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -72,16 +74,18 @@ func makeVerifyDeployMultiTokenPools(registry *MultiTokenPoolAdapterRegistry, mc
 			if err != nil {
 				return err
 			}
-			admin, err := resolveMultiTokenPoolAdmin(e, mcmsRegistry, selector, family, chainCfg.Admin, mcmsInput)
+			admin, selectedTimelockAddress, err := resolveMultiTokenPoolAdmin(e, mcmsRegistry, selector, family, chainCfg.Admin, mcmsInput)
 			if err != nil {
 				return err
 			}
 			if err := adapter.ValidateDeployMultiTokenPool(e, DeployMultiTokenPoolInput{
-				ChainSelector: selector,
-				PoolType:      chainCfg.PoolType,
-				PoolVersion:   chainCfg.PoolVersion,
-				PoolQualifier: chainCfg.PoolQualifier,
-				Admin:         admin,
+				ChainSelector:           selector,
+				PoolType:                chainCfg.PoolType,
+				PoolVersion:             chainCfg.PoolVersion,
+				PoolQualifier:           chainCfg.PoolQualifier,
+				Admin:                   admin,
+				SelectedTimelockAddress: selectedTimelockAddress,
+				ExistingDataStore:       e.DataStore,
 			}); err != nil {
 				return fmt.Errorf("invalid multi-token pool config for chain selector %d: %w", selector, err)
 			}
@@ -95,81 +99,118 @@ func makeApplyDeployMultiTokenPools(registry *MultiTokenPoolAdapterRegistry, mcm
 		ds := datastore.NewMemoryDataStore()
 		batchOps := make([]mcms_types.BatchOperation, 0)
 		reports := make([]cldf_ops.Report[any, any], 0)
+		partialOutput := func() cldf.ChangesetOutput {
+			return cldf.ChangesetOutput{DataStore: ds, Reports: reports}
+		}
 
 		for _, selector := range slices.Sorted(maps.Keys(cfg.Chains)) {
 			chainCfg := cfg.Chains[selector]
 			adapter, family, err := resolveMultiTokenPoolAdapter(registry, selector, chainCfg.PoolVersion)
 			if err != nil {
-				return cldf.ChangesetOutput{}, err
+				return partialOutput(), err
 			}
 
-			admin, err := resolveMultiTokenPoolAdmin(e, mcmsRegistry, selector, family, chainCfg.Admin, cfg.MCMS)
+			admin, selectedTimelockAddress, err := resolveMultiTokenPoolAdmin(e, mcmsRegistry, selector, family, chainCfg.Admin, cfg.MCMS)
 			if err != nil {
-				return cldf.ChangesetOutput{}, err
+				return partialOutput(), err
 			}
 
 			if admin == "" {
 				e.Logger.Warnf("no timelock found for chain selector %d; PoolConfigManager admin will fall back to the deployer", selector)
 			}
 
-			report, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.DeployMultiTokenPool(), e.BlockChains, DeployMultiTokenPoolInput{
-				ChainSelector:     selector,
-				PoolType:          chainCfg.PoolType,
-				PoolVersion:       chainCfg.PoolVersion,
-				PoolQualifier:     chainCfg.PoolQualifier,
-				Admin:             admin,
-				ExistingDataStore: e.DataStore,
-			})
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy multi-token pool on chain selector %d: %w", selector, err)
+			input := DeployMultiTokenPoolInput{
+				ChainSelector:           selector,
+				PoolType:                chainCfg.PoolType,
+				PoolVersion:             chainCfg.PoolVersion,
+				PoolQualifier:           chainCfg.PoolQualifier,
+				Admin:                   admin,
+				SelectedTimelockAddress: selectedTimelockAddress,
+				ExistingDataStore:       e.DataStore,
 			}
-			for _, ref := range report.Output.Addresses {
+			deployReport, err := cldf_ops.ExecuteSequence(e.OperationsBundle, adapter.DeployMultiTokenPool(), e.BlockChains, input)
+			reports = append(reports, deployReport.ExecutionReports...)
+			if err != nil {
+				return partialOutput(), fmt.Errorf("failed to deploy multi-token pool on chain selector %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, deployReport.Output.BatchOps...)
+			for _, ref := range deployReport.Output.Addresses {
 				// Skip refs already in the datastore; re-emitting them would collide on merge.
 				existing, err := e.DataStore.Addresses().Get(ref.Key())
 				switch {
 				case err == nil:
 					if existing.Address != ref.Address {
-						return cldf.ChangesetOutput{}, fmt.Errorf("%s on chain selector %d conflicts with the existing datastore address %s", datastore_utils.SprintRef(ref), selector, existing.Address)
+						return partialOutput(), fmt.Errorf("%s on chain selector %d conflicts with the existing datastore address %s", datastore_utils.SprintRef(ref), selector, existing.Address)
 					}
 					continue
 				case !errors.Is(err, datastore.ErrAddressRefNotFound):
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to look up %s on chain selector %d in the existing datastore: %w", datastore_utils.SprintRef(ref), selector, err)
+					return partialOutput(), fmt.Errorf("failed to look up %s on chain selector %d in the existing datastore: %w", datastore_utils.SprintRef(ref), selector, err)
 				}
 				if err := ds.Addresses().Add(ref); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to add %s on chain selector %d to the output datastore: %w", datastore_utils.SprintRef(ref), selector, err)
+					return partialOutput(), fmt.Errorf("failed to add %s on chain selector %d to the output datastore: %w", datastore_utils.SprintRef(ref), selector, err)
 				}
 			}
-			batchOps = append(batchOps, report.Output.BatchOps...)
-			reports = append(reports, report.ExecutionReports...)
+
+			authorizationDataStore := datastore.NewMemoryDataStore()
+			if err := authorizationDataStore.Merge(e.DataStore); err != nil {
+				return partialOutput(), fmt.Errorf("failed to merge the existing datastore for multi-token pool authorization on chain selector %d: %w", selector, err)
+			}
+			if err := authorizationDataStore.Merge(ds.Seal()); err != nil {
+				return partialOutput(), fmt.Errorf("failed to merge new deployment refs for multi-token pool authorization on chain selector %d: %w", selector, err)
+			}
+			authorizationInput := input
+			authorizationInput.ExistingDataStore = authorizationDataStore.Seal()
+			authorizationReport, err := cldf_ops.ExecuteSequence(
+				e.OperationsBundle,
+				adapter.AuthorizeMultiTokenPool(),
+				e.BlockChains,
+				authorizationInput,
+				cldf_ops.WithSequenceIdempotencyKey[DeployMultiTokenPoolInput, cldf_chain.BlockChains](uuid.NewString()),
+			)
+			reports = append(reports, authorizationReport.ExecutionReports...)
+			if err != nil {
+				return partialOutput(), fmt.Errorf("failed to authorize multi-token pool on chain selector %d: %w", selector, err)
+			}
+			batchOps = append(batchOps, authorizationReport.Output.BatchOps...)
 		}
 
-		return changesets.NewOutputBuilder(e, mcmsRegistry).
+		out, err := changesets.NewOutputBuilder(e, mcmsRegistry).
 			WithReports(reports).
 			WithSingleBatchOpPerChain(batchOps).
 			WithDataStore(ds).
 			Build(cfg.MCMS)
+		if err != nil {
+			return partialOutput(), err
+		}
+		return out, nil
 	}
 }
 
-func resolveMultiTokenPoolAdmin(e cldf.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, selector uint64, family, admin string, mcmsInput mcms.Input) (string, error) {
-	if admin != "" {
-		return admin, nil
-	}
+func resolveMultiTokenPoolAdmin(e cldf.Environment, mcmsRegistry *changesets.MCMSReaderRegistry, selector uint64, family, admin string, mcmsInput mcms.Input) (string, string, error) {
 	mcmsReader, ok := mcmsRegistry.GetMCMSReader(family)
 	if !ok {
-		return "", fmt.Errorf("no MCMS reader registered for chain family %q", family)
+		if admin == "" && mcmsInput.Qualifier != "" {
+			return "", "", fmt.Errorf("MCMS qualifier %q was provided but no timelock was found for chain selector %d; refusing to fall back to the deployer as PoolConfigManager admin", mcmsInput.Qualifier, selector)
+		}
+		return admin, "", nil
 	}
 	timelockRef, err := mcmsReader.GetTimelockRef(e, selector, mcmsInput)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve timelock for chain selector %d: %w", selector, err)
+		return "", "", fmt.Errorf("failed to resolve timelock for chain selector %d: %w", selector, err)
 	}
 	if datastore_utils.IsAddressRefEmpty(timelockRef) {
-		if mcmsInput.Qualifier != "" {
-			return "", fmt.Errorf("MCMS qualifier %q was provided but no timelock was found for chain selector %d; refusing to fall back to the deployer as PoolConfigManager admin", mcmsInput.Qualifier, selector)
+		if admin == "" && mcmsInput.Qualifier != "" {
+			return "", "", fmt.Errorf("MCMS qualifier %q was provided but no timelock was found for chain selector %d; refusing to fall back to the deployer as PoolConfigManager admin", mcmsInput.Qualifier, selector)
 		}
-		return "", nil
+		return admin, "", nil
 	}
-	return timelockRef.Address, nil
+	if timelockRef.Address == "" {
+		return "", "", fmt.Errorf("resolved timelock %s for chain selector %d has an empty address", datastore_utils.SprintRef(timelockRef), selector)
+	}
+	if admin == "" {
+		admin = timelockRef.Address
+	}
+	return admin, timelockRef.Address, nil
 }
 
 func resolveMultiTokenPoolAdapter(registry *MultiTokenPoolAdapterRegistry, selector uint64, version *semver.Version) (MultiTokenPoolAdapter, string, error) {

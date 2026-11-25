@@ -675,6 +675,52 @@ contracts:
       - name: getPath
         access: public
 
+  - contract_name: ConnectionPolicyStore
+    version: "2.1.0"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: owner
+        access: public
+
+  - contract_name: FeePolicyStore
+    version: "2.1.0"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: owner
+        access: public
+
+  - contract_name: SecurityPolicyStore
+    version: "2.1.0"
+    functions:
+      - name: applyAuthorizedCallerUpdates
+        access: owner
+      - name: getAllAuthorizedCallers
+        access: public
+      - name: owner
+        access: public
+
+  - contract_name: PoolConfigManager
+    version: "2.1.0"
+    functions:
+      - name: getStaticConfig
+        access: public
+
+  - contract_name: BurnMintMultiTokenPool
+    version: "2.1.0"
+    functions:
+      - name: getPoolConfigManager
+        access: public
+
+  - contract_name: RegistryModuleExternalAccessControl
+    version: "2.1.0"
+    functions: []
+
   - contract_name: TokenPoolFactory
     version: "2.0.0"
     functions:
