@@ -29,7 +29,7 @@ func SignCommitReport(ctx [2][32]byte, report ccip_offramp.CommitInput, baseSign
 	copy(signers, baseSigners)
 
 	// randomize signers
-	rand.Shuffle(len(signers), func(i, j int) {
+	rand.Shuffle(len(signers), func(i, j int) { //nolint:gosec // picks which test signers sign; not security sensitive
 		signers[i], signers[j] = signers[j], signers[i]
 	})
 
