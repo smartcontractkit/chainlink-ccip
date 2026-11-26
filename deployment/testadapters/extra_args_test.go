@@ -158,6 +158,11 @@ func TestParseGasLimitAndOOOExtraArgs(t *testing.T) {
 		require.ErrorContains(t, err, "expected *big.Int")
 	})
 
+	t.Run("nil gas limit", func(t *testing.T) {
+		_, _, err := ParseGasLimitAndOOOExtraArgs(defaultGas, true, NewGasLimitExtraArg(nil))
+		require.ErrorContains(t, err, "must not be nil")
+	})
+
 	t.Run("wrong OOO type", func(t *testing.T) {
 		_, _, err := ParseGasLimitAndOOOExtraArgs(defaultGas, true, ExtraArgOpt{Name: ExtraArgOOO, Value: "false"})
 		require.ErrorContains(t, err, "expected bool")

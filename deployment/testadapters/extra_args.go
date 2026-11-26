@@ -98,6 +98,11 @@ func ParseGasLimitAndOOOExtraArgs(gasLimit *big.Int, allowOOO bool, opts ...Extr
 			if !ok {
 				return nil, false, fmt.Errorf("extra arg %q: expected *big.Int, got %T", opt.Name, opt.Value)
 			}
+			// A typed nil passes the assertion. Reject it here because ABI and Borsh encodings have no absent
+			// gas limit, and encoders would fail or panic on it.
+			if v == nil {
+				return nil, false, fmt.Errorf("extra arg %q: must not be nil", opt.Name)
+			}
 			gasLimit = v
 		case ExtraArgOOO:
 			v, ok := opt.Value.(bool)
