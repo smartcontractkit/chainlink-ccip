@@ -12,7 +12,7 @@ contract FeePolicyStore_constructor is FeePolicyStoreSetup {
     emit AuthorizedCallers.AuthorizedCallerAdded(s_poolConfigManager);
     FeePolicyStore feeStore = new FeePolicyStore(_arrayOf(s_poolConfigManager));
 
-    assertEq("FeePolicyStore 2.1.0-dev", feeStore.typeAndVersion());
+    assertEq("FeePolicyStore 2.1.0", feeStore.typeAndVersion());
     assertEq(OWNER, feeStore.owner());
     assertEq(_arrayOf(s_poolConfigManager), feeStore.getAllAuthorizedCallers());
   }

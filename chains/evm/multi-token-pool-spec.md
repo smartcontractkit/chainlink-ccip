@@ -29,6 +29,7 @@ Main sections:
 - [Token pool migration](#token-pool-migration) and
   [moving a migrated token to policies](#move-a-migrated-token-to-policies)
 - [Response to a compromised remote pool](#incident-a-compromised-remote-pool)
+- [Operation failure modes](#operation-failure-modes)
 
 ## Contracts
 
@@ -579,10 +580,10 @@ set it. Zero means no provider. A non-zero address must contain code, or the upd
 
 | Path | Behavior |
 | --- | --- |
-| Send long data with a provider | The store calls the provider with the token, requested finality, and token args. The pool data includes its response. |
+| Send long data with a provider | The store calls `getAdditionalPoolData(localToken, remoteChainSelector, requestedFinalityConfig, tokenArgs)` with the source token and destination chain selector. The pool data includes its response. |
 | Send long data without a provider | The additional data is empty. |
 | Send legacy data | The store does not call the provider. There is no additional data. |
-| Receive with a provider | The store passes the additional data and requested finality to the provider. Empty or 32-byte pool data supplies empty additional data. A `false` response fails the message. |
+| Receive with a provider | The store calls `isAdditionalPoolDataValid(localToken, remoteChainSelector, requestedFinalityConfig, additionalPoolData)` with the destination token and source chain selector. Empty or 32-byte pool data supplies empty additional data. A `false` response fails the message. |
 | Receive without a provider | The store ignores the additional data. |
 
 Provider calls are views and cannot change state. A revert, missing code, or response that cannot decode stops the
@@ -892,10 +893,15 @@ The budget must cover the MTTP receive path, including:
 - The lane's hook, where configured.
 - Copying a changed policy configuration into an inbound bucket.
 
-The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The value is used to price execution, and the
-executor must supply enough transaction gas.
+The v2 OffRamp does not use `destGasOverhead` as a pool call limit. The OnRamp prices the value and adds it to the
+message's `executionGasLimit`. The default executor sets its transaction gas from that field. A low value can give the
+first execution too little gas, and the message then needs a retry with enough gas.
 
-With these stores, a lane's first message uses approximately 102,000 to 195,000 gas. Enabled rate limits, an empty
+For `destGasOverhead`, measure MTTP receive gas in `OffRamp.executeSingleMessage`. Count the full `releaseOrMint` call, both
+`TAR.getPool` lookups, ERC-165 checks, `getRequiredCCVs`, and the token's `balanceOf` before verification and again
+after `releaseOrMint` if the token receiver differs from the pool. Exclude separately priced base, verifier and callback gas.
+In simulation with the destination TAR selecting the MTTP, measure each format the lane will use (legacy or long) from
+the same first-transfer state with representative provider data. Use the highest applicable cost. Enabled rate limits, an empty
 receiver balance, providers, policy pool trust, hooks, and larger pool lists can increase the cost.
 
 Every source that prices transfers of the token to this chain needs a budget covering the measured cost plus a
@@ -1368,9 +1374,9 @@ correct local token. A legacy pool must list a remote MTTP only when its token m
 
 Before a chain switches a token to an MTTP:
 
-1. **Tooling:** measure the MTTP receive cost with that token's configuration.
+1. **Tooling:** measure the [MTTP receive cost](#destination-gas-budget) with that token's configuration.
 2. Set every source configuration that prices transfers of that token to this chain to the measured cost plus a
-   margin, for example 300,000 gas. This also applies to lanes sending only 32 bytes. The signer and configuration
+   margin. This also applies to lanes sending only 32 bytes. The signer and configuration
    depend on the source pool:
 
    | Source pool | Signer | Configuration to update |
@@ -1477,11 +1483,27 @@ contract does not check that those messages have completed.
 To add an external blocklist to a token that uses `MultiTokenPoolHooks`:
 
 1. **Deployer:** deploy `MultiTokenPoolHooksExternalBlocklist` with the intended non-zero blocklist, and with the old
-   hook's `getAllowList()` and `getPolicyEngine()`.
+   hook's `getAllowList()` and `getPolicyEngine()`. If `getAllowListEnabled()` is true and the list is empty,
+   pass `[address(0)]` to keep the allowlist enabled with no members. Passing `[]` disables it.
 2. **Hook owner:** authorize every pool that serves a token using the new hook.
-3. **Policy engine admin:** give the new hook the old hook's policies with `addPolicy`, and the same target default
-   with `setTargetDefaultPolicyAllow`. The engine keys policies by hook address.
-4. **`CONFIG_ROLE`:** point the affected security records to the new hook.
+3. **Policy engine admin:** if configured, copy the old hook's policies with `addPolicy`. In a complete history of
+   `TargetDefaultPolicyAllowSet` from engine deployment through cutover, the old hook's last event gives its override
+   and no event means inheritance. Copy an override with `setTargetDefaultPolicyAllow`. For inheritance leave the new
+   target unset, using a fresh hook if already overridden.
+
+   Just before switching, test both hooks on a local fork of the chain. If the old hook's event history is incomplete,
+   this test shows whether it follows the engine default. Choose a function selector with no policies on either hook
+   to test each hook's default. Set the engine default to allow and call `PolicyEngine.check` from each hook address.
+   Then set the default to deny and repeat both calls. If a call succeeds, the engine allowed it. If it reverts, count
+   it as a denial only when the error is `PolicyRunRejected` and the policy address is zero.
+   A constant decision identifies an override. With complete or incomplete history, require both hooks to agree at each setting.
+4. **`CONFIG_ROLE`:** verify the allowlist as described below, then point the affected security records to the new hook.
+
+Use step 1's constructor rule for pool upgrades too. Just before a hook or TAR switch, require matching
+`getAllowListEnabled()` flags and `getAllowList()` member sets on the enforcing pools or hooks. A delegating pool with
+no hook has a disabled list. Then check one sender that is in neither list. On a hook, call `checkAllowList(sender)`.
+On a pool older than 2.0, simulate `lockOrBurn` with that `originalSender`. Only a `SenderNotAllowed` revert means
+deny. A `CursedByRMN` or `InvalidToken` revert gives no result. Require the same decision from the old and new contracts.
 
 Authorization is also required when reusing `AdvancedPoolHooks` or `MultiTokenPoolHooks` with a new pool. Authorize the
 new pool before it handles transfers.
@@ -1810,7 +1832,7 @@ on both chains and wait for all in-flight messages before removing any connectio
 | Legacy pool owner | Upgrade every 1.5.0 pool to 1.5.1 or later before phase 2, including chains that will remain legacy. See [the upgrade procedure](#upgrade-pools-older-than-151). |
 | `CONFIG_ROLE` | Use no additional pool data provider, or one that accepts empty data. This remains a permanent requirement. |
 | Issuer | Before phase 1, choose fees for each token on every lane, including lanes to legacy pools. Fees can be zero. |
-| Hook owner | For each legacy hook with a non-zero `getThresholdAmount`, move `thresholdOutboundCCVs` and `thresholdInboundCCVs` into `outboundCCVs` and `inboundCCVs` with `applyCCVConfigUpdates`. Then call `setThresholdAmount(0)`. MTTP has no threshold amount, so these CCVs then apply to every amount. |
+| Hook owner | For legacy hooks with a non-zero `getThresholdAmount`, use `applyCCVConfigUpdates` to move threshold CCVs into the base lists. Update outbound lists first so new messages request every CCV the destination will require. Wait for earlier messages to execute before updating the inbound list on that lane. Call `setThresholdAmount(0)` after updating every affected lane on the hook. |
 
 See [destination gas budgets](#destination-gas-budget), [source byte allowances](#source-byte-allowance), and
 [empty data compatibility](#empty-data-and-migration).
@@ -1821,11 +1843,11 @@ The TAR still points to the legacy pools, so this phase does not change traffic.
 
 1. **Deployer and `DEFAULT_ADMIN_ROLE`:** deploy the five contracts, authorize the PCM, transfer ownership, and grant roles
    as in [chain expansion](#chain-expansion). For each legacy pool older than 2.0 with `getAllowListEnabled()` true,
-   also deploy a `MultiTokenPoolHooks` with the pool's `getAllowList()`. Pools with the same allowlist can share one
+   also deploy a `MultiTokenPoolHooks` with the pool's `getAllowList()`, using `[address(0)]` if the list is empty. Pools with the same allowlist can share one
    hook.
 2. **`CONFIG_ROLE`:** create policy defaults:
    - Fee: the issuer's chosen fees.
-   - Destination overhead: the measured MTTP receive gas and 32 bytes. The byte limit prevents long-format sends
+   - Destination overhead: the [gas budget](#destination-gas-budget) and 32 bytes. The byte limit prevents long-format sends
      while the destination is still legacy.
    - Security: a policy whose default record has empty CCV lists and no hook. Also create one policy for each hook
      below. Its default record has the hook and empty CCV lists. For an `AdvancedPoolHooks`, add a chain record with
@@ -1913,13 +1935,15 @@ ends of these lanes must continue to use the same decimals.
 
 For a 1.5.0 pool on chain C:
 
-1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's `getAllowList()`. For each
-   remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
+1. **Legacy pool owner on C:** deploy a pool of version 1.5.1 or later with the old pool's allowlist settings. Preserve both
+   `getAllowListEnabled()` and `getAllowList()`. Pass `[address(0)]` for an enabled empty list. For a 2.0 replacement,
+   use its hook for the allowlist.
+   For each remote chain, trust the pools listed by the old pool. Also trust that chain's replacement pool if it is upgrading.
 2. **Legacy pool owner on each remote chain already using 1.5.1 or later:** call
    `addRemotePool(chainC, abi.encode(newPool))` before C's TAR switch.
 3. Upgrade any remote 1.5.0 pool too. Its replacement must trust both C's old and new pools.
 4. **Role admin of the token on C:** grant the new pool mint and burn roles before the TAR switch.
-5. **Token admin on C:** call `TAR.setPool(token, newPool)`.
+5. **Token admin on C:** [verify the allowlist](#changing-hooks-and-inbound-ccvs), then call `TAR.setPool(token, newPool)`.
    A new-pool message can arrive before the remote upgrade switches and fail on that chain's 1.5.0 pool. Tooling
    must list these messages and retry them through `OffRamp.execute` after the remote switch.
 6. **Role admin of the token on C:** revoke the 1.5.0 pool's mint and burn roles after the switch.
@@ -2002,7 +2026,7 @@ Then verify the following:
 | Source fee configurations | Gas estimates cover measured receive cost with a margin, including legacy sources priced through the pool or FeeQuoter. |
 | MTTP Router | Includes every OffRamp with pending messages for the token's remote chains. |
 | `getLaneVerificationBatch` | Matches the legacy pool's `getRequiredCCVs`. For a pool without `IPoolV2` support, empty lists select default CCVs. |
-| Hook from `getLaneVerificationBatch` | The legacy 2.0 pool's `getAdvancedPoolHooks()`, or the step 1 hook with the legacy pool's `getAllowList()`. Zero if the legacy pool has neither. |
+| Hook from `getLaneVerificationBatch` | For 2.0, the legacy pool's `getAdvancedPoolHooks()`. For older pools, [verify the allowlist](#changing-hooks-and-inbound-ccvs) with the step 1 hook if enabled or with no hook if disabled. |
 | Additional pool data provider | Not configured, or accepts empty data from every relevant remote chain |
 | Second chain's switch batch | Sets inline overhead toward the first chain to 192 bytes plus padded provider data. |
 | TARs and old 1.5.0 pools | No TAR selects a 1.5.0 pool for the token; replaced 1.5.0 pools have no mint or burn role. |
@@ -2145,8 +2169,6 @@ Every unpause must wait for all checks in step 5.
    - Removal deletes all remote pools for X and blocks inbound messages too.
    - Re-add X before retrying those messages; any party can retry afterward.
 
-   Until these legacy limits or removals take effect, only an RMN curse of X stops those sends.
-
 #### Contain the incident on chain X
 
 8. **Role admin of each token served by P:** revoke P's mint and burn roles. Each token requires two calls. Until then,
@@ -2196,3 +2218,144 @@ Every unpause must wait for all checks in step 5.
 - Fee-on-transfer and rebasing tokens.
 - USDC with CCTP, and other tokens requiring a special bridge protocol.
 - Token TAR registry modules, such as `RegistryModuleExternalAccessControl`.
+
+## Operation failure modes
+
+This section lists mistakes by an authorized operator on `BurnMintMultiTokenPool`, its PCM, and its stores on v2 ramps.
+The rows do not claim that an unprivileged user can change configuration.
+
+| Column | Meaning |
+| --- | --- |
+| Impact | The level and the affected scope. A row with several outcomes uses the most serious stated outcome. |
+| Guard | The protection against the stated mistake. Role checks still apply. |
+| Same in `TokenPool` | A comparison with the 2.0 `TokenPool` family and `AdvancedPoolHooks`, unless a version is named. |
+
+| Impact level | Meaning |
+| --- | --- |
+| High | A wrong or unbacked mint, a loss without assured recovery, or completed transfers that bypass required asset, sender, or verifier checks |
+| Medium | Changed fees or exposure limits, missed incident controls, or failures that need coordinated repair |
+| Low | A rejected operation or an intended restriction with a direct local configuration repair |
+
+The levels describe the consequence of the mistake. They are not vulnerability severities.
+
+These rules and terms apply to every row:
+
+- A failed source transaction rolls back the token movement. A failed destination execution does not undo the source
+  burn.
+- A retry is a new `OffRamp.execute` call. It needs valid execution data, and all current checks must pass. See
+  [message execution and retries](#message-execution-and-retries).
+- Restoring configuration does not undo a completed transfer.
+- A manual refund does not cancel a pending message. Track any later retry to avoid paying twice.
+- Multi-token pool data is the pool data format that contains the source token. The [formats](#formats) table calls
+  it the long format.
+- To drain messages is to wait until every pending message has executed, including failed messages.
+- Before signing a configuration batch, simulate the complete batch. Compare the resolved state for all affected tokens
+  and lanes, using the views in [checks before opening a lane](#checks-before-opening-a-lane). Record-level checks
+  prove presence, not asset identity, remote readiness, hook behavior, or mint authority.
+
+### Inline record removal
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Remove an inline connection | The connection policy takes over if it serves the lane. Otherwise the lane closes. An unset or failing remote token address provider blocks sends and inbound messages with multi-token pool data. A later remote token address provider change can select another remote token. | Low · one token, one lane | Restore the inline record or fix the remote token address provider, then retry failed messages. | Removal rejects a different valid remote token response from the remote token address provider and malformed return data. | Simulate removal. Check the remote token address provider response and the resulting remote token. | No |
+| Remove an inline remote pool record | Removal drops the inline remote pool list and its `allowLegacyPoolDataOnReceive` flags. Pending messages with legacy pool data can fail even when the remote pool policy lists the same remote pool. | Low · one token, one lane | Restore the required remote pools and `allowLegacyPoolDataOnReceive` flags, then retry. | `LegacyRemotePoolRecord` blocks removal while `useLegacyPoolDataOnSend` is on. | Confirm the destination pool accepts multi-token pool data before clearing `useLegacyPoolDataOnSend`. Drain inbound messages with legacy pool data before removal. | No |
+| Remove an inline destination overhead record | A larger `destBytesOverhead` in the destination overhead policy removes the second check against multi-token pool data sends to a legacy pool. Removal alone does not change the pool data format. | Low · one token, one lane | Restore `destBytesOverhead = 32`. Already-sent messages with multi-token pool data need a compatible destination pool. | `useLegacyPoolDataOnSend` still selects legacy pool data (32 bytes) while enabled. | Keep `destBytesOverhead = 32` and `useLegacyPoolDataOnSend` enabled until the destination pool can receive multi-token pool data. | No |
+| Remove an inline fee record | The fee policy record takes effect. It can be zero. Without a fee policy record, sends fail with `LaneFeeNotFound`. Network fees still apply. | Medium · one token, one lane | Restore the inline fee record. Completed fee changes require a separate refund if one is due. | Missing fee records block sends. | Compare both the fee record values and the network quote after the simulated removal. | No |
+| Remove an inline rate limit record | The rate limit policy record takes effect. A disabled rate limit policy record can remove the limit. Smaller capacity can block inbound messages. Removal deletes all four inline rate limit buckets; enabled policy buckets start full. | Medium · one token, one lane | Restore suitable inline rate limits and retry. Traffic already passed cannot be recalled. | A missing rate limit record blocks transfers. | Compare all four rate limit buckets and their available amounts after removal, including the refill. | No |
+| Remove an inline security record | The security policy record's hook and CCVs take effect. Required hook checks can disappear. Changed inbound CCVs can block pending messages. | High · one token, one lane | Restore the required checks and retry failures. Completed transfers cannot be undone. | A missing security record blocks transfers. | Compare the resolved hook and CCVs. Preserve every required check. | No |
+
+### Policy records and assignments
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Edit a policy default record (chain 0) | The change reaches lanes with no inline record and no policy chain record. It can change fees, rate limits, hooks or CCVs, including on chains enabled later. | High · all lanes that select that policy default record | Restore the record for future traffic. Completed effects remain. | Inline and chain records take precedence. | List affected lanes and compare every resolved field. Include rate limit bucket refills when limits change. | No |
+| Add a policy chain record | The new record replaces the whole policy default record for lanes without an inline record. Unset hook, CCV or rate-limit fields do not inherit values from the policy default record. | High · lanes selecting that policy on this chain | Correct or remove the new record. Completed transfers are unchanged. | Field validation does not compare the new record with the policy default record. | Start from the current resolved record, change only intended fields, and compare the result. | No |
+| Remove a policy chain record still in use | Affected lanes fall back to the policy default record, if that policy has one. Checks or fees can change. A missing required record blocks transfers. Connection and remote pool policies have no policy default record. | High · lanes that use the removed record or its trusted remote pools | Restore the record and retry failures. Completed effects remain. | Token-count protection applies to whole-policy removal, not record removal. | Compare the resolved state before removal, including inline remote pool records with `trustPolicyRemotePools`. | No |
+| Change a token policy assignment | Non-inline lanes select the new rate limit, fee, destination overhead or security policy. Required checks can disappear. Clearing an assignment without an inline record blocks affected transfers. | High · one token, lanes without an inline record of that type | Restore the assignment and retry failures. Completed effects remain. | The new policy must exist. The rate limit policy's `localDecimals` must match the token. | Compare all affected lanes, including hooks, CCVs, fees and available rate limit bucket amounts. | No |
+| Clear a policy assignment or record with no fallback | Missing fee or destination overhead records block sends. Missing security or rate limit records block both directions. Clearing an assignment does not select another policy. | Low · affected token lanes or tokens assigned to the policy | Restore the required records, then retry. | Missing-record checks stop transfers. | Simulate the complete change and check the record level of all six record types (`getLaneRecordLevelBatch`) before signing. Check resolved values too. | No |
+
+### Connections and remote tokens
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Open a connection policy to all assigned tokens | `onlySubsetTokens = false` on a connection policy record enables the lane for every token assigned to the connection policy without an inline connection. Once the remote pool, fee, destination overhead, rate limit and security records are ready, sends can burn for an incorrect or unprepared destination token. | High · all tokens assigned to that connection policy on the chain | Only if the destination can serve the intended asset at the address already in the message. | No lane or remote token check across the connection policy's tokens. | Check every affected remote token, remote pool and lane record. Use `onlySubsetTokens = true` and the subset list for staged rollout. | No |
+| Assign a connection policy to a token | Every connection policy record with `onlySubsetTokens = false` can open a lane for the token. Records with `onlySubsetTokens = true` need the token in the subset list. A wrong remote token address can leave sent tokens unrecoverable. | High · one token, lanes newly opened by the connection policy | Only if the destination can serve the intended asset at the address already in the message. | No lane check on assignment. Inline connections still take precedence. | Check all newly opened lanes before assignment, including remote asset identity and readiness. | No |
+| Switch a connection policy from all tokens to a subset | Tokens missing from the subset list lose connection policy lanes when `onlySubsetTokens` is enabled. Inline connections still take precedence. | Low · excluded policy tokens on that chain | Add the intended members or set `onlySubsetTokens` back to false. | Subset list entries can be added while `onlySubsetTokens` is false. | Read the subset list. Add intended members and remove unintended members before enabling `onlySubsetTokens`. | No |
+| Remove a connection policy record or subset list member | Connection policy lanes close for affected tokens without inline connections. Pending inbound messages fail too. Removing the record clears its subset list. | Low · affected policy tokens on one chain | Restore the record and intended subset list members, then retry. | `ConnectionRecordNotFound` or `SubsetTokenNotFound` at execution. | Stop affected sends and drain inbound messages first. Preserve the subset list when preparing a replacement. | No |
+| Set the wrong inline remote token | A valid-looking remote token address can select the wrong token. Legacy pool data can mint it if that token's pool trusts this MTTP. Multi-token pool data rejects the mismatch when the destination's remote token mapping is correct. | High · one token, one lane | A source correction does not change sent messages. Wrong mints have no automatic reversal. | The `remoteToken` checks (not empty, not all zero) do not prove token identity. | Verify the remote token and its pool in the remote TAR. Use the chain-specific encoding; use ABI-encoded addresses for EVM remote chains. | Partly · wrong addresses also strand `TokenPool` transfers |
+| Change a remote token address provider or its responses | New sends use the new remote token address. Wrong mappings can strand messages or mint another token through legacy pool data. Pending inbound messages with multi-token pool data can fail the source token check (`SourceTokenMismatch`). | High · tokens and lanes that resolve through the remote token address provider | Rolling back the remote token address provider can unblock pending inbound messages. Sent messages keep their destination token address; completed wrong mints need issuer action. | A configured remote token address provider must have code. Remote token identity is not checked. | Check each affected remote token and lane. Review who can change the remote token address provider's responses. Drain pending messages before changing mappings. | No |
+| Change a remote token mapping with inbound messages pending | Inbound messages with multi-token pool data from the old remote token fail with `SourceTokenMismatch`. Legacy pool data has no source token check. | Low · lanes using the changed mapping | Restore the old mapping to retry those inbound messages. New messages may need separate handling. | Source token check on multi-token pool data. | Stop affected sends and drain inbound messages before changing the remote token. | No |
+| Adopt a remote token address provider while still sending legacy pool data | After the inline connection is removed, later remote token address provider responses choose the remote token. Inbound messages with legacy pool data cannot check the source token, so another trusted asset can be minted. | High · lanes using the remote token address provider while sending legacy pool data | Restore correct mappings for future sends. Completed wrong mints require issuer action. | The inline connection removal check compares only the remote token address provider response at removal time. | Prefer inline connections until `useLegacyPoolDataOnSend` is off. If using a remote token address provider, verify remote token identity and who controls its later responses. | No |
+| Send while paused, with disallowed finality, or with no remote token address provider | Sends revert. An unset remote token address provider also blocks inbound messages with multi-token pool data. `allowedFinalityConfig` is separate from FTF rate limit bucket selection. | Low · affected tokens and lanes | Correct the intended setting, then retry. Do not remove an intentional pause to force a send. | Pause, finality and remote-token checks. | Check the active pause, token profile's `allowedFinalityConfig` and resolved remote token. | Partly · finality checks; remote token address providers and PCM pauses are MTTP-specific |
+
+### Remote pools and pool data
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Enable `trustPolicyRemotePools` | Every remote pool in the token's remote pool policy record for that chain becomes trusted. A hostile trusted remote pool can claim the expected source token and cause an unbacked mint. | High · one token on each affected chain | Remove the incorrect remote pools to stop future inbound messages. Completed mints require issuer action. | Remote pools trusted only through the remote pool policy cannot send legacy pool data. Source-token bytes do not prove an honest burn. | Verify the code, control and token support of every added remote pool. Review future remote pool policy updates too. | Partly · pool trust risk also exists in `TokenPool` |
+| Remove a trusted remote pool before messages drain | Replacing the full remote pool list can omit an old remote pool. Its pending messages then fail with `InvalidSourcePoolAddress`. | Low · lanes that no longer trust the remote pool | Restore the remote pool and any required `allowLegacyPoolDataOnReceive` flag, then retry. | No pending-message check. | Preserve every still-needed remote pool and `allowLegacyPoolDataOnReceive` flag. Drain messages before removing an honest old remote pool. | Yes · remote pool removal |
+| Select a missing or empty remote pool record | A missing resolved remote pool record blocks both directions. An existing record with no trusted remote pools still permits sends but rejects inbound messages. | Low · one token, affected lanes | Restore the intended remote pool records and retry. | `RemotePoolRecordNotFound` or `InvalidSourcePoolAddress` at execution. | Compare the complete trusted remote pool set after reassignment, including `trustPolicyRemotePools`. | Partly · empty pool sets also affect `TokenPool` |
+| Remove a remote pool policy record | Lanes without an inline remote pool record lose the required remote pool record. Lanes with an inline remote pool record keep their own remote pools, but lose remote pools trusted only through `trustPolicyRemotePools`. | Low · tokens using the remote pool policy, and inline records with `trustPolicyRemotePools` | Restore the required record and remote pools, then retry. | Missing records or untrusted remote pools fail at execution. | Inspect both tokens assigned to the remote pool policy and inline records with `trustPolicyRemotePools`. Drain messages from remote pools being removed. | No |
+| Send multi-token pool data to an incompatible destination pool | Clearing `useLegacyPoolDataOnSend`, or selecting a remote pool policy record, can send multi-token pool data. Destination pools that require legacy pool data reject the inbound message after the source burn. | Medium · affected inline remote pool lane or remote pool policy lanes | Requires a destination pool that accepts the existing message, with correct remote pool trust, token mint role and token configuration. | `destBytesOverhead = 32` blocks multi-token pool data sends on the source. | Verify the destination pool supports multi-token pool data before clearing `useLegacyPoolDataOnSend` or raising `destBytesOverhead`. | No |
+| Keep `useLegacyPoolDataOnSend` enabled after the remote MTTP rejects legacy pool data | The remote MTTP rejects the message with legacy pool data unless its inline remote pool record sets `allowLegacyPoolDataOnReceive` for this pool. | Medium · one token, one lane | Set `allowLegacyPoolDataOnReceive` for this pool in the remote MTTP's inline remote pool record, then retry. Coordinate the switch to multi-token pool data. | `LegacyPoolDataNotAllowed`. Remote pools trusted only through the remote pool policy cannot get `allowLegacyPoolDataOnReceive`. | Agree the pool data format on both sides before changing `useLegacyPoolDataOnSend` or `allowLegacyPoolDataOnReceive`. | No |
+| Keep `allowLegacyPoolDataOnReceive` enabled for a migrated remote MTTP | Legacy pool data does not identify the source token. A bad remote token mapping on the remote MTTP can mint the wrong token while the shared remote MTTP remains trusted. | High · one token, one lane | Disable `allowLegacyPoolDataOnReceive` for future inbound messages. Completed wrong mints need issuer action. | `allowLegacyPoolDataOnReceive` has no expiry. | Disable `allowLegacyPoolDataOnReceive` for the remote MTTP after its messages with legacy pool data drain. Keep required legacy single-token pools separate. | No |
+| Accept empty pool data with different token decimals | Empty pool data uses local decimals. With source 18 and destination 6 decimals, the receiver gets 10^12 times too many tokens. The reverse pays 10^12 times too few. | High · one token, one lane | No automatic correction after execution. The issuer must reconcile the supply and balances. | A rate limit can reject the amount; it does not fix the conversion. | Require equal decimals for remote pools that send empty pool data. Follow the [migration prerequisite](#migration-prerequisites) to replace 1.5.0 pools. | Yes · empty-data decimal fallback |
+| Enable or change the additional pool data provider | `FactoryTokenWithUIDPoolDataProvider` rejects empty additional pool data from messages with legacy pool data or sent before it was enabled. An additional pool data provider change can also reject additional pool data from remote pools still using the previous provider's format. | Medium · one token, all affected inbound lanes | Use an approved compatible additional pool data provider, then retry. Accepting empty additional pool data skips UID verification for those messages. | The additional pool data provider must have code; `FactoryTokenWithUIDPoolDataProvider` requires a valid 32-byte UID. | Check the additional pool data format of pending messages and remote pools. Coordinate remote pools before enabling stricter validation. | No |
+
+### Rate limits, fees, and transfer budgets
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Switch rate limit policies repeatedly | Switching to a rate limit policy with a different config refills the lane's rate limit buckets on next use. Repeated changes followed by transfers can pass several capacities in one block. Identical configs preserve the buckets. | Medium · one token, affected lanes and buckets | Stop further changes. Transfers already completed cannot be recalled. | Requires `CONFIG_ROLE`, `TOKEN_MANAGER_ROLE` or `RATE_LIMIT_ROLE`; those roles can also change inline rate limits. | Treat rate limit policy assignments as rate limit changes. Review and monitor both. | Partly · 2.0 writes refill even unchanged configs |
+| Lower inbound capacity below a pending amount | A message above capacity cannot pass, even after the inbound rate limit bucket refills. It fails with `TokenMaxCapacityExceeded`. | Low · lanes using the changed limit | Raise capacity enough for the message, then retry when capacity is available. | The rate limiter rejects the full amount. | Check pending amounts in local decimals. Compare remote outbound capacity for each finality, but do not treat that as sufficient. | Yes · token bucket capacity |
+| Raise token transfer fees (bps) before a pending send executes | The send uses the fee at source execution. The native send format has no minimum received amount. A transfer fee of 9,999 bps can retain 99.99% of the amount. | Medium · sends using the changed fee record | The issuer can arrange a fee refund. Completed messages and their amounts are unchanged. | Transfer fee must be below 10,000 bps. | Use a review delay or notice for transfer fee increases. Compare the quoted and proposed token amounts. | Yes · 2.0 token transfer fees |
+| Set `destGasOverhead` too low | On v2 ramps, `destGasOverhead` affects the fee quote and the message's `executionGasLimit`, not a fixed gas cap on the `releaseOrMint` call. An executor that supplies too little gas can fail execution. | Medium · lanes priced by the changed destination overhead record | Retry with enough gas. Correct `destGasOverhead` for new sends. | No check against the actual receive cost. | Measure the configured receive path and add a margin. Recheck after hook or additional pool data provider changes. | Yes · 2.0 on v2 ramps |
+| Set `destBytesOverhead` too low or omit fee/destination overhead records | Sends revert when pool data exceeds `destBytesOverhead` or a required fee or destination overhead record is missing. The source token movement is rolled back. | Low · affected send lanes | Supply the correct records and `destBytesOverhead`, then send again. | `PoolDataTooLarge` or missing-record checks. | For multi-token pool data, set `destBytesOverhead` to at least 192 bytes plus the additional pool data rounded up to a multiple of 32 bytes. Keep 32 bytes for legacy destination pools. | Partly · byte budgets; policy record lookup is MTTP-specific |
+
+### Hooks and CCVs
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Set custom CCVs without the default marker | A non-empty CCV list in the security record without `address(0)` does not add the ramps' default CCVs automatically. Sender or receiver CCV requirements can still add them. New inbound requirements can block pending messages. | High · lanes using that security record | Restore compatible requirements and retry failures. Completed verification cannot be changed. | An empty CCV list selects the default CCVs. Lane-mandated CCVs still apply. | Include `address(0)` when the default CCVs are required. Check the full resolved CCV set in both directions. | Yes · 2.0 ramp and pool CCV rules |
+| Make threshold CCVs mandatory during migration | Adding threshold CCVs to the security record's `inboundCCVs` can reject small messages sent without them, including new messages from remote pools still using an amount threshold. | Medium · inbound lanes from unprepared remote pools | Restore compatible inbound requirements or supply valid proofs if the verifiers support it. Coordinate the transition. | `RequiredCCVMissing` rejects executions without the required verifier data. | First make remote pools require the extra outbound CCVs for every amount. Drain older messages, then change `inboundCCVs`. | Partly · 2.0 hook CCV changes; migration makes flattening necessary |
+| Select a hook that has not authorized the MTTP | Hook caller validation rejects sends and inbound messages. A shared hook can stop every token using that MTTP through the hook. | Low · the MTTP and all tokens using the hook | Authorize the MTTP on the hook, then retry. | `UnauthorizedCaller` rejects hook calls. | Authorize the MTTP before changing security records. Test both `preflightCheck` and `postflightCheck`. | Yes · `AdvancedPoolHooks` |
+| Set a security record hook to an address that is not the intended hook | An EOA or incompatible contract can block transfers. A contract with an accepting fallback can return successfully without applying the intended checks. | High · lanes using that hook address | Set the correct hook and authorize the MTTP on it. Transfers completed without checks cannot be undone. | Successful calls and `typeAndVersion` do not prove that checks ran. | Verify the deployed code and configuration. Test allowed and rejected cases through the MTTP. | Partly · a 2.0 `TokenPool` also calls `getRequiredCCVs` on its hook; a fallback that returns no data blocks transfers |
+| Authorize an extra caller on a hook | The caller can submit invented hook inputs. A stateful ACE policy (such as `VolumeRatePolicy`) can consume another account's volume without a token transfer. | Medium · all accounts and tokens sharing the affected ACE policy | Remove the caller. Used volume remains until reset by the ACE policy or the period ends. | Hook owner approval; hook inputs are trusted after caller validation. | Authorize only intended pools. Check the full authorized caller list after updates. | Yes · `AdvancedPoolHooks` |
+| Attach a rejecting or reverting ACE policy engine | An ACE policy engine can reject sends or inbound messages on every token using the hook. A reverting attach blocks `setPolicyEngine`. A reverting detach of the old engine blocks `setPolicyEngine`. | Medium · tokens and lanes using that hook | Restore the approved ACE policy engine. Use `setPolicyEngineAllowFailedDetach` only for a failing old detach. | A failed attach reverts the whole change. | Test the engine on both `preflightCheck` and `postflightCheck`, including rejection cases. Check the ACE extractors, ACE policies and engine default permissions. | Yes · `AdvancedPoolHooks` |
+| Share an ACE `VolumeRatePolicy` across tokens | One `VolumeRatePolicy` instance shares an account counter across tokens and hooks. It counts raw units. Different decimals distort the limit, and one token can exhaust another token's allowance. | Medium · all users and tokens sharing that `VolumeRatePolicy` instance | Use a separate hook and `VolumeRatePolicy` instance per token, or correct token-aware accounting. Existing volume remains until its period ends. | No token key in the `VolumeRatePolicy` counter. | Use a separate hook and `VolumeRatePolicy` instance per token, or a token-aware ACE policy. Verify the ACE amount and account parameter mappings. | Yes · shared ACE policy instances |
+| Remove a sender from the hook allowlist | That sender can no longer send any token through the hook. The allowlist does not block inbound messages. | Low · one sender, all tokens using the hook | Restore membership if the removal was a mistake. | `SenderNotAllowed` on the outbound path. | Confirm the intended sender and all tokens that share the hook. | Yes · hook allowlists |
+| Copy an allowlist into a new hook | An enabled but empty allowlist blocks every sender. Passing that empty list to the new hook disables its allowlist permanently. A stale copy can also restore removed senders. | High · every token using the new hook | Deploy a correctly configured hook and switch to it. Completed sends cannot be undone. | No check that the old and new hooks' `getAllowListEnabled` values match. | Copy `getAllowListEnabled` and the allowlist members. For enabled-empty, deploy with `[address(0)]`. Recheck both at cutover. | Yes · `AdvancedPoolHooks` and 1.6.1 allowlist pools |
+| Block an address on the hook's external blocklist with messages pending | The block applies to pending inbound messages as well as new transfers. Source tokens can already be burned. There is no automatic refund. | Medium · that address across all affected tokens and lanes | If permitted, unblock and retry. Manual compensation does not cancel the original message. | The inbound blocklist check is intentional. | Review pending messages and the recovery process. Unblocking one address can release all its messages, not just one. | Partly · `AdvancedPoolHooks` has no external blocklist; an ACE `RejectPolicy` on a shared hook has the same effect |
+| Unblock an address or remove the external blocklist to release a failed message | Other pending messages blocked by the same blocklist can become executable too. Anyone with valid execution data can retry. Restoring the blocklist does not undo completed mints. | High · every message and token freed by the change | No automatic reversal of completed mints. | Other CCV, pause and token checks still apply. | Review all affected pending messages. Prefer unblocking only the approved address; even that can release several messages. | Partly · same retry behavior; `AdvancedPoolHooks` has no external blocklist |
+
+### Token roles and burn flavors
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Revoke the MTTP's token mint role too early | Pending inbound messages still need the MTTP to mint. They fail after its mint role is removed. | Low · one token, all inbound lanes | Restore the mint role for the MTTP, then retry. | The token rejects unauthorized mint calls. | Stop new inbound sends and drain pending inbound messages before revoking the MTTP's mint role. | Yes |
+| Use an incompatible burn flavor or revoke burn access | A missing burn function or token burn role can block sends. The `Lock` flavor is unsupported by `BurnMintMultiTokenPool` and also blocks inbound messages. | Low · one token, affected directions | Select the correct flavor and restore the required token mint/burn roles. | `UnsupportedLockOrBurnFlavor` and token-call reverts. | Validate the actual token implementation. Test send and receive with its configured flavor. | Partly · burn compatibility; `TokenPool` uses separate variants |
+| Use a recoverable `BurnToAddress` target | Another pool or a controlled address can return the source tokens to circulation after the destination mints. Another MTTP can withdraw them with `withdrawFeeTokens`. | High · one token, all its send lanes | Fix the target for future sends. Existing supply errors require issuer action. | `BurnMintMultiTokenPool` rejects its own address, but accepts other targets. | Use a token-compatible burn target whose tokens cannot return to circulation. | Yes · `BurnToAddressMintTokenPool`; it has no self-address check |
+| Use zero as the `BurnToAddress` target | A token that rejects transfers to zero blocks sends. A token that permits them can complete the send. This depends on the token implementation. | Low · one token, all send lanes | Use a supported burn method and target for this token. | MTTP accepts zero. OpenZeppelin ERC20 rejects the transfer. | Verify the token's zero-transfer and supply behavior. Do not assume all tokens behave alike. | Yes · `BurnToAddressMintTokenPool` |
+
+### Pool, PCM, store, and Router changes
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Select the MTTP in the TAR before it is ready | A registered token can pass the TAR support check while its mint role, lane records, hook authorized caller entry or remote pools' trust of the MTTP is missing. Transfers then fail. | Medium · one token, affected lanes | Complete the missing setup and retry. Roll back only to a compatible, ready pool. | TAR checks `isSupportedToken`, not full transfer readiness. | Validate token mint/burn roles, lane records, hook authorized callers, Router OffRamps and remote pools' trust of the MTTP before the TAR switch. | Yes · TAR support check |
+| Roll the TAR back to a legacy pool | Pending messages with multi-token pool data fail on the legacy pool. New ones continue to arrive unless remote pools enable `useLegacyPoolDataOnSend`. The legacy pool may also have lost its token mint/burn roles. | Medium · one token, all inbound lanes | Restore a fully configured compatible pool and retry. Recheck remote pool trust, hooks and token mint/burn roles. | `TAR.setPool` checks token support, not pending-message compatibility. | Enable `useLegacyPoolDataOnSend` on every remote pool, restore the legacy pool prerequisites, then drain messages with multi-token pool data before switching. | Partly · pool rollback risk; MTTP adds multi-token pool data |
+| Replace the MTTP without updating remote trust | The new MTTP sends from a new source pool address. Remote pools that trust only the old MTTP reject its messages, even when the local PCM and stores are unchanged. | Medium · moved tokens and unprepared remote lanes | Add the new MTTP as a trusted remote pool on each remote chain, with the required `allowLegacyPoolDataOnReceive` flags, then retry. | Remote source-pool validation. | Update remote pool trust and hook authorized callers before each TAR switch. Keep the old MTTP trusted until its messages drain. | Yes · every source pool replacement needs remote trust |
+| Switch to a PCM with new stores | Missing records block transfers. After records are copied, uncopied pauses are lost and new `SecurityPolicyStore` rate limit buckets start full. A message held by a pause or rate limit can execute. | Medium · tokens served through the replaced stores | Apply missing pauses and configuration on the new PCM. Completed transfers cannot be undone. | No automatic state copy. | Stage the new PCM paused. Copy records and token/chain pauses. Preserve the old global pause at cutover. Update operator tools. | No |
+| Select a PCM whose TAR maps tokens to another pool | PCM validation checks its own TAR. If that TAR does not select the calling pool for a token, sends and inbound messages fail with `CallerIsNotTokenPool`. | Low · tokens with mismatched pool mappings | Restore the intended PCM or TAR pool mapping, then retry. | `CallerIsNotTokenPool` blocks validation. | Check the intended TAR address and every relevant token-to-pool mapping before switching. | No |
+| Deauthorize the current PCM on a policy store | `SecurityPolicyStore`: transfers stop. `ConnectionPolicyStore`: transfers continue, but pauses and its config writes fail. `FeePolicyStore`: transfers continue, but fee and destination overhead writes fail. Each removal also blocks token profile updates. | Medium · tokens and controls using that store | Reauthorize the intended PCM. Verify transfers and emergency pause access. | Store caller checks protect writes; `ConnectionPolicyStore` and `FeePolicyStore` reads used by transfers are public views. | Authorize the replacement before switching. Remove the old PCM only after its last pool has moved. | No |
+| Authorize an extra caller on a policy store | The caller can write that store directly, bypassing PCM roles. `ConnectionPolicyStore` writes can trust hostile remote pools; `SecurityPolicyStore` writes can weaken checks or consume rate limit buckets. Old PCMs retain their own role holders. | High · every token using the affected store | Revoke access and repair state. Completed mints or transfers require separate recovery. | Store owner approval; no PCM role check on direct store writes. | Authorize only intended PCMs. Remove an old PCM after no pool needs it. Keep ownership under issuer control. | No |
+| Transfer the PCM default admin with zero delay | The constructor sets the admin delay to zero. The new default admin can accept once the block timestamp is greater than the transfer schedule. | Low · administration of the PCM | Cancel before acceptance. After acceptance, the new default admin must cooperate, or the pool owner and store owners must replace the PCM. | Two-step acceptance; no configured waiting period at deployment. | Verify the recipient. If an admin delay is required, configure it and wait for it to take effect before starting transfer. | Partly · `TokenPool` has two-step ownership, not this admin API |
+| Remove an OffRamp or select a Router without it | Inbound messages through that OffRamp fail the MTTP's current Router check, including messages sent before the change. | Low · tokens using that Router and OffRamp | Restore the required OffRamp authorization, then retry. | `CallerIsNotARampOnRouter` rejects the caller. | Retain every honest OffRamp with pending messages until those messages execute. | Yes · Router-based ramp checks |
+
+### Pauses and incident response
+
+| Operation | Failure | Impact | Recovery | Guard | Before the change | Same in `TokenPool` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pause inbound transfers | The pause blocks pending inbound messages too. A global pause stops both directions; token and chain pauses can select a direction. | Low · selected token, chain, or every token on the `ConnectionPolicyStore` | Unpause when safe, then retry. | Intentional pause checks. | Use an outbound-only token or chain pause when inbound execution should continue. | No · `TokenPool` has no PCM pause flags |
+| Send incident commands to the old PCM | After stores are replaced, writes through the old PCM can succeed against its old policy stores. Their pause and rate limit state no longer controls the MTTP. Stores still shared with the new PCM are still live. | Medium · tokens moved to the new stores | Apply the intended control through the active PCM. Completed transfers remain. | No automatic forwarding to the current PCM. | Resolve `pool.getPoolConfigManager` at operation time. Update tools before cutover and retire old access after its last user moves. | No |
+| Lower rate limits to contain an incident | A changed rate limit bucket config refills to its new capacity. Lowering capacity from 1,000 to 500 after 900 was used can allow another 500 immediately. | Medium · buckets whose selected config changes | Pause, or set the relevant rate limit buckets to enabled with zero capacity and rate. Transfers already completed cannot be recalled. | Inline rate limit changes refill at write; rate limit policy changes refill on next use if values differ. | Use a pause or enabled zero-capacity limits for an immediate stop. Include the default finality and FTF buckets in use. | Yes · 2.0 refills; 1.6.1 preserves balance up to the new capacity |
+| Apply an incident control only to a policy record | Lanes with an inline record of that type do not use the policy change, except for remote pools trusted through `trustPolicyRemotePools`. A policy default record edit also misses lanes with a policy chain record. | Medium · lanes covered by a higher-priority record | Use the active PCM to pause the intended scope or update the records those lanes actually use. | Record precedence is intentional. | Read all affected record levels. Use token or chain pauses when the control must cover every override. | No |

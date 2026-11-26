@@ -25,7 +25,7 @@ contract RegistryModuleExternalAccessControl is ITypeAndVersion {
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
 
-  string public constant override typeAndVersion = "RegistryModuleExternalAccessControl 2.1.0-dev";
+  string public constant override typeAndVersion = "RegistryModuleExternalAccessControl 2.1.0";
   /// @notice The holder of this role can register itself as the pending admin of the token.
   /// @dev Registration requires this role's admin to be DEFAULT_ADMIN_ROLE as defined by the AccessControl contract.
   /// This role can front-run a DEFAULT_ADMIN_ROLE's pending registration and accept the admin role first.

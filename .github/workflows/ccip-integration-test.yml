@@ -3,27 +3,39 @@ name: "Run CCIP OCR3 Integration Test"
 on:
   pull_request:
     branches-ignore:
-      - 'develop'
+      - "develop"
   merge_group:
     branches-ignore:
-      - 'develop'
+      - "develop"
   push:
     branches:
       - "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run per ref: a new push supersedes the queued/running PR run.
+  # Never cancel for merge_group (would drop queue entries) or main pushes.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       e2e_should_run: ${{ steps.changes.outputs.e2e_should_run }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Detect changes
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: changes
         with:
           list-files: "shell"
@@ -34,13 +46,72 @@ jobs:
               - 'chains/evm/gobindings/generated/!(latest/**)/**'
               - '.github/workflows/ccip-integration-test.yml'
 
-  integration-test-matrix:
+  resolve-chainlink-ref:
+    name: Resolve Chainlink ref
     needs: [changes]
+    if: ${{ needs.changes.outputs.e2e_should_run == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      core-ref: ${{ steps.refs.outputs.core-ref || steps.merge-ref.outputs.core-ref || steps.default-ref.outputs.core-ref }}
+    steps:
+      - name: Resolve and verify PR body refs
+        id: refs
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        uses: smartcontractkit/.github/actions/get-refs-from-pr-body@get-refs-from-pr-body/v1
+        with:
+          sigscanner-url: ${{ secrets.SIGSCANNER_URL }}
+          sigscanner-api-key: ${{ secrets.SIGSCANNER_API_KEY }}
+      - name: Resolve and verify merge-group PR body core ref
+        id: merge-ref
+        if: github.event_name == 'merge_group'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          SIGSCANNER_URL: ${{ secrets.SIGSCANNER_URL }}
+          SIGSCANNER_API_KEY: ${{ secrets.SIGSCANNER_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$MERGE_GROUP_HEAD_REF" =~ pr-([0-9]+)-[a-fA-F0-9]+ ]]; then
+            echo "::error::Could not determine the PR number from merge-group ref: $MERGE_GROUP_HEAD_REF"
+            exit 1
+          fi
+          pr_number="${BASH_REMATCH[1]}"
+          pr_body="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.body // ""')"
+          # The pre-merge-queue workflow accepted full commit SHAs only. Keep
+          # that contract here, but verify the SHA before it reaches checkout.
+          core_ref="$(printf '%s\n' "$pr_body" | grep -ioE 'core ref:[[:space:]]*[a-f0-9]{40}' | awk '{print $NF}' | head -n 1 || true)"
+          if [ -z "$core_ref" ]; then
+            echo "core-ref=develop" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          core_ref="$(printf '%s' "$core_ref" | tr '[:upper:]' '[:lower:]')"
+          verification="$(curl -fsS --max-time 300 --get "$SIGSCANNER_URL" \
+            --data-urlencode "commit=${core_ref}" \
+            --data-urlencode "repository=smartcontractkit/chainlink" \
+            --data-urlencode "disable_gpg=true" \
+            -H "X-SIGSCANNER-SECRET: ${SIGSCANNER_API_KEY}")"
+          if [ "$(printf '%s' "$verification" | jq -r '.verified == true')" != "true" ]; then
+            echo "::error::SigScanner did not verify Chainlink commit $core_ref"
+            exit 1
+          fi
+          echo "core-ref=$core_ref" >> "$GITHUB_OUTPUT"
+      - name: Use the trusted default for fork pull requests
+        id: default-ref
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: echo "core-ref=develop" | tee -a "$GITHUB_OUTPUT"
+
+  integration-test-matrix:
+    needs: [changes, resolve-chainlink-ref]
     if: ${{ needs.changes.outputs.e2e_should_run == 'true' }}
     env:
       # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
       # when they should not be using it, while still allowing us to DRY up the setup
       DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
+      GOTESTSUM_VERSION: v1.13.0
 
     strategy:
       fail-fast: false
@@ -105,114 +176,47 @@ jobs:
 
     name: Integration Tests (${{ matrix.type.name }})
     runs-on: ubuntu-latest
+    # Longest matrix row is 35m of tests; this bounds a hung job's cost.
+    timeout-minutes: 60
     steps:
       - name: Free Disk Space
         uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
       - name: Checkout the chainlink-ccip repo
-        uses: actions/checkout@v4
-      - name: Fetch latest pull request data
-        id: fetch_pr_data
-        uses: actions/github-script@v6
-        # only run this step if the event is a pull request or merge_group
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        uses: actions/checkout@v7
         with:
-          script: |
-            let pull_number;
-            console.log(`Current eventName: ${context.eventName}`);
-            if (context.eventName === 'pull_request') {
-              pull_number = context.issue.number;
-              console.log(`Event is pull_request, PR number: ${pull_number}`);
-            } else if (context.eventName === 'merge_group') {
-              console.log('Event is merge_group. Attempting to get PR number.');
-              if (context.payload.pull_request && typeof context.payload.pull_request.number === 'number') {
-                pull_number = context.payload.pull_request.number;
-                console.log(`Found PR number via context.payload.pull_request.number: ${pull_number}`);
-              } else {
-                console.warn('context.payload.pull_request.number is not available or not a number.');
-                if (context.payload.merge_group && context.payload.merge_group.head_ref) {
-                  const headRef = context.payload.merge_group.head_ref;
-                  console.log(`Attempting to parse PR number from merge_group.head_ref: ${headRef}`);
-                  // Example head_ref: "gh-readonly-queue/main/pr-123-abcdef1234567890" or "pr-123-abcdef" part of a larger string
-                  const match = headRef.match(/pr-(\d+)-[a-fA-F0-9]+/);
-                  if (match && match[1]) {
-                    pull_number = parseInt(match[1], 10);
-                    console.log(`Successfully extracted PR number from head_ref: ${pull_number}`);
-                  } else {
-                    console.error(`Could not extract PR number from head_ref: ${headRef}. Regex match failed.`);
-                  }
-                } else {
-                  console.error('context.payload.merge_group.head_ref is not available for parsing.');
-                }
-              }
-
-              if (typeof pull_number !== 'number') {
-                 console.error(`Failed to determine PR number for merge_group event. pull_number is: ${pull_number}`);
-                 // Optionally, you could throw an error here to make the failure explicit:
-                 // throw new Error('Failed to determine PR number for merge_group event.');
-              }
-            }
-
-            if (typeof pull_number === 'number') {
-              console.log(`Fetching PR data for PR #${pull_number}`);
-              const pr = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pull_number
-              });
-              return pr.data.body;
-            } else {
-              console.log('No valid pull request number determined. Skipping PR data fetch, returning empty string.');
-              return '';
-            }
-      - name: Get the chainlink commit sha from PR description, if applicable
-        id: get_chainlink_sha
-        run: |
-          default="develop"
-          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "merge_group" ]; then
-          comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
-          ${{ steps.fetch_pr_data.outputs.result }}
-          GREAT_PR_DESCRIPTION_HERE
-          )
-            echo "$comment"
-            core_ref=$(echo "$comment" | grep -oE 'core ref:\s*[a-f0-9]{40}' | awk '{print $NF}' || true)
-            if [ -n "$core_ref" ]; then
-              echo "Overriding chainlink repository commit hash with: $core_ref"
-              echo "::set-output name=ref::$core_ref"
-            else
-              echo "Using default chainlink repository branch: $default"
-              echo "::set-output name=ref::$default"
-            fi
-          else
-            echo "::set-output name=ref::$default"
-          fi
+          persist-credentials: false
       - name: Clone Chainlink repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: smartcontractkit/chainlink
-          ref: ${{ steps.get_chainlink_sha.outputs.ref }}
+          ref: ${{ needs.resolve-chainlink-ref.outputs.core-ref }}
           path: chainlink
+          persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        uses: actions/setup-go@v7
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: '**/go.sum'
+          # Use the Chainlink clone's go.mod: setup-go v6+ exports GOTOOLCHAIN=local,
+          # so the installed toolchain must already satisfy Chainlink's go directive.
+          go-version-file: "chainlink/go.mod"
+          cache-dependency-path: "**/go.sum"
       - name: Display Go version
         run: go version
       - name: Get the correct chainlink-ccip commit SHA via GitHub API
         id: get_sha
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+            COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
           elif [ "${{ github.event_name }}" == "merge_group" ]; then
-            COMMIT_SHA=${{ github.event.merge_group.head_sha }}
+            COMMIT_SHA="${{ github.event.merge_group.head_sha }}"
           else
-            COMMIT_SHA=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            COMMIT_SHA=$(curl -fsS -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.ref }}" | jq -r .sha)
           fi
-          echo "::set-output name=sha::$COMMIT_SHA"
+          echo "sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
       - name: Update chainlink-ccip dependency in chainlink
         run: |
-          export GOPRIVATE=github.com/smartcontractkit/*
+          export GOPRIVATE="github.com/smartcontractkit/chainlink-ccip"
           ccip_sha="${{ steps.get_sha.outputs.sha }}"
           ccip_modules=(
             github.com/smartcontractkit/chainlink-ccip
@@ -227,7 +231,18 @@ jobs:
 
           cd "$GITHUB_WORKSPACE/chainlink"
           update_ccip_modules
-          make gomodtidy
+          # `make gomodtidy` runs `gomods tidy` over all 45 modules in the Chainlink
+          # repo, the biggest source of module downloads in this job. Tidy only the
+          # module we changed, then refresh the plugin refs like the make target does.
+          for i in 1 2 3; do
+            go mod tidy && go run ./tools/plugout --update && break
+            if [ "$i" -eq 3 ]; then
+              echo "go mod tidy and plugin update failed after 3 attempts"
+              exit 1
+            fi
+            echo "retry $i - go mod tidy and plugin update failed, sleeping 10s"
+            sleep 10
+          done
 
           cd "$GITHUB_WORKSPACE/chainlink/integration-tests"
           update_ccip_modules
@@ -236,13 +251,13 @@ jobs:
         uses: ./.github/actions/setup-postgres
       - name: Download Go vendor packages
         run: |
-          cd $GITHUB_WORKSPACE/chainlink
+          cd "$GITHUB_WORKSPACE/chainlink"
           go mod download
-          cd $GITHUB_WORKSPACE/chainlink/integration-tests
+          cd "$GITHUB_WORKSPACE/chainlink/integration-tests"
           go mod download
       - name: Build binary
         run: |
-          cd $GITHUB_WORKSPACE/chainlink
+          cd "$GITHUB_WORKSPACE/chainlink"
           go build -o ccip.test .
       - name: Get LOOP plugin info
         if: matrix.type.installLoopPlugins
@@ -252,59 +267,160 @@ jobs:
           file=$GITHUB_WORKSPACE/chainlink/plugins/plugins.public.yaml
           ref=$(yq ".plugins.${plugin}[0].gitRef" "$file")
           binary=$(basename "$(yq ".plugins.${plugin}[0].installPath" "$file")")
-          echo "ref=$ref" >> $GITHUB_OUTPUT
-          echo "binary=$binary" >> $GITHUB_OUTPUT
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "binary=$binary" >> "$GITHUB_OUTPUT"
       - name: Cache LOOP plugin binary
         if: matrix.type.installLoopPlugins
         id: cache_loop_plugin
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/go/bin/${{ steps.loop_plugin_ref.outputs.binary }}
           key: ${{ runner.os }}-loop-plugin-${{ matrix.type.installLoopPlugins }}-${{ steps.loop_plugin_ref.outputs.ref }}
       - name: Install LOOP plugins
         if: matrix.type.installLoopPlugins && steps.cache_loop_plugin.outputs.cache-hit != 'true'
         run: |
-          yq -i '.plugins = {"${{ matrix.type.installLoopPlugins }}": .plugins.${{ matrix.type.installLoopPlugins }}}' $GITHUB_WORKSPACE/chainlink/plugins/plugins.public.yaml
-          cd $GITHUB_WORKSPACE/chainlink
+          yq -i '.plugins = {"${{ matrix.type.installLoopPlugins }}": .plugins.${{ matrix.type.installLoopPlugins }}}' "$GITHUB_WORKSPACE/chainlink/plugins/plugins.public.yaml"
+          cd "$GITHUB_WORKSPACE/chainlink"
           make install-plugins-public
       - name: Setup DB
         shell: bash
         run: |
-          go -C $GITHUB_WORKSPACE/chainlink run ./core/store/cmd/preparetest
+          go -C "$GITHUB_WORKSPACE/chainlink" run ./core/store/cmd/preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Install gotestsum
-        run: go install gotest.tools/gotestsum@latest
+        run: go install gotest.tools/gotestsum@${{ env.GOTESTSUM_VERSION }}
       - name: ${{ matrix.type.name }}
         id: run-tests
         continue-on-error: true
         run: |
-          cd $GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip
+          cd "$GITHUB_WORKSPACE/chainlink/integration-tests/smoke/ccip"
           run="${{ matrix.type.run }}"
-          if ! go test -list "$run" . | grep -q '^Test'; then
-            echo "No tests matched -run '$run'"
-            exit 1
-          fi
           parallel_flag=""
           if [ -n "${{ matrix.type.go_parallel }}" ]; then
             parallel_flag="-parallel=${{ matrix.type.go_parallel }}"
           fi
           echo "gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run '${run}'"
-          gotestsum --junitfile=test-results.xml --format=github-actions -- . -timeout ${{ matrix.type.timeout }} ${parallel_flag} -run "$run"
+          gotestsum \
+            --junitfile=test-results.xml \
+            --format=github-actions \
+            --post-run-command="bash -c 'if [[ \$TESTS_TOTAL -eq 0 && \$TESTS_ERRORS -eq 0 ]]; then echo \"::error::No tests matched -run $run\" >&2; exit 1; fi'" \
+            -- . -timeout "${{ matrix.type.timeout }}" ${parallel_flag} -run "$run"
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
+      - name: Prepare test result artifact
+        id: prepare-results
+        if: always() && (steps.run-tests.outcome == 'success' || steps.run-tests.outcome == 'failure')
+        shell: bash
+        env:
+          TEST_OUTCOME: ${{ steps.run-tests.outcome }}
+          TEST_JOB_URL: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+          TEST_RESULTS_DIR: ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip
+        run: |
+          if [ ! -f "$TEST_RESULTS_DIR/test-results.xml" ]; then
+            echo "::error::The test step finished without producing a JUnit report."
+            exit 1
+          fi
+          printf '%s\n' "$TEST_OUTCOME" > "$TEST_RESULTS_DIR/test-outcome.txt"
+          printf '%s\n' "$TEST_JOB_URL" > "$TEST_RESULTS_DIR/test-job-url.txt"
+      - name: Upload test result artifact
+        id: upload-results
+        if: always() && steps.prepare-results.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ccip-integration-test-results-${{ strategy.job-index }}
+          path: |
+            ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/test-results.xml
+            ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/test-outcome.txt
+            ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/test-job-url.txt
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1
+
+  upload-test-results:
+    name: Upload Test Results (${{ matrix.type.name }})
+    needs: [integration-test-matrix, resolve-chainlink-ref]
+    if: always() && !cancelled() && needs.integration-test-matrix.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The upload action reads PR metadata with the default token.
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      # Keep names and order aligned with integration-test-matrix; job-index links each result artifact.
+      matrix:
+        type:
+          - name: "Fees Test"
+          - name: "Token Transfer Test"
+          - name: "USDC Test"
+          - name: "OOO Execution Test"
+          - name: "Messaging Test Test_CCIPMessaging_EVM2EVM"
+          - name: "Messaging Test Test_CCIPMessaging_EVM2Solana"
+          - name: "Messaging Test Test_CCIPMessaging_Solana2EVM"
+          - name: "Messaging Test Test_CCIPMessaging_MultiExecReports_EVM2Solana"
+          - name: "Batching Test Test_CCIPBatching_MaxBatchSizeEVM"
+          - name: "Batching Test Test_CCIPBatching_MultiSource"
+          - name: "Batching Test Test_CCIPBatching_MultiSource_MultiRoot"
+          - name: "Batching Test Test_CCIPBatching_SingleSource"
+          - name: "Batching Test Test_CCIPBatching_SingleSource_MultiRoot"
+          - name: "Gas Price Updates Test"
+          - name: "CCIPReader Test"
+          - name: "Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest"
+    steps:
+      - name: Checkout Chainlink test sources
+        uses: actions/checkout@v7
+        with:
+          repository: smartcontractkit/chainlink
+          ref: ${{ needs.resolve-chainlink-ref.outputs.core-ref }}
+          path: chainlink
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          # The upload action shells out to junit-enhancer, which `go install`
+          # writes to $GOPATH/bin. Only setup-go puts that directory on PATH.
+          go-version-file: chainlink/go.mod
+          cache-dependency-path: "**/go.sum"
+      - name: Download test result artifact
+        id: download-results
+        uses: actions/download-artifact@v8
+        with:
+          name: ccip-integration-test-results-${{ strategy.job-index }}
+          path: test-results
+      - name: Read test outcome
+        id: test-results
+        if: steps.download-results.outcome == 'success'
+        shell: bash
+        run: |
+          outcome="$(cat test-results/test-outcome.txt)"
+          if [[ "$outcome" != "success" && "$outcome" != "failure" ]]; then
+            echo "::error::Invalid test outcome in result artifact."
+            exit 1
+          fi
+          test_job_url="$(cat test-results/test-job-url.txt)"
+          expected_job_url_prefix="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/job/"
+          test_job_url_suffix="${test_job_url#"$expected_job_url_prefix"}"
+          if [[ "$test_job_url" != "$expected_job_url_prefix"* || ! "$test_job_url_suffix" =~ ^[0-9]+/attempts/[0-9]+$ ]]; then
+            echo "::error::Invalid test job URL in result artifact."
+            exit 1
+          fi
+          echo "outcome=$outcome" | tee -a "$GITHUB_OUTPUT"
+          echo "test-job-url=$test_job_url" | tee -a "$GITHUB_OUTPUT"
       - name: Analyze and upload test results
+        if: steps.test-results.outcome == 'success'
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/v1
         with:
-          junit-file-path: ${{ github.workspace }}/chainlink/integration-tests/smoke/ccip/test-results.xml
+          junit-file-path: ${{ github.workspace }}/test-results/test-results.xml
           trunk-org-slug: chainlink
-          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
+          trunk-previous-step-outcome: ${{ steps.test-results.outputs.outcome }}
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
-          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/job/{2}/attempts/{3}', github.repository, github.run_id, job.check_run_id, github.run_attempt) }}
+          trunk-job-url: ${{ steps.test-results.outputs.test-job-url }}
+          artifact-name: ccip-integration-test-logs-${{ strategy.job-index }}-${{ github.run_attempt }}
 
   integration-test-ccip-ocr3:
-    if: always()
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     needs: [integration-test-matrix]
     steps:

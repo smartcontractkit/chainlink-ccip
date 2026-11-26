@@ -5,6 +5,6 @@ import {RegistryModuleExternalAccessControlSetup} from "./RegistryModuleExternal
 
 contract RegistryModuleExternalAccessControl_typeAndVersion is RegistryModuleExternalAccessControlSetup {
   function test_typeAndVersion() public view {
-    assertEq("RegistryModuleExternalAccessControl 2.1.0-dev", s_registryModuleExternalAccessControl.typeAndVersion());
+    assertEq("RegistryModuleExternalAccessControl 2.1.0", s_registryModuleExternalAccessControl.typeAndVersion());
   }
 }

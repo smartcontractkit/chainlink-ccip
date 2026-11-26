@@ -21,7 +21,7 @@ contract MultiTokenPoolHooksExternalBlocklist_constructor is MultiTokenPoolHooks
     MultiTokenPoolHooksExternalBlocklist hooks =
       new MultiTokenPoolHooksExternalBlocklist(_arrayOf(s_sender), s_policyEngine, s_blocklist, _arrayOf(s_pool));
 
-    assertEq("MultiTokenPoolHooksExternalBlocklist 2.1.0-dev", hooks.typeAndVersion());
+    assertEq("MultiTokenPoolHooksExternalBlocklist 2.1.0", hooks.typeAndVersion());
     assertEq(address(s_blocklist), address(hooks.getBlocklist()));
     assertEq(_arrayOf(s_sender), hooks.getAllowList());
     assertEq(address(s_policyEngine), address(hooks.getPolicyEngine()));

@@ -36,7 +36,7 @@ contract FactoryTokenWithUIDPoolDataProvider is IAdditionalPoolDataProvider, ITy
   }
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "FactoryTokenWithUIDPoolDataProvider 2.1.0-dev";
+    return "FactoryTokenWithUIDPoolDataProvider 2.1.0";
   }
 
   /// @inheritdoc IAdditionalPoolDataProvider

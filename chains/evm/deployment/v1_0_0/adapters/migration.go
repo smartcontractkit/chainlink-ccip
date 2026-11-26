@@ -26,7 +26,7 @@ func (a *EVMTokenBase) ValidateLockReleaseMigrationPoolPair(b cldf_ops.Bundle, c
 	}
 	if !a.IsLegacyLockReleasePoolType(string(oldTV.Type)) {
 		return type_and_version.TypeAndVersion{}, type_and_version.TypeAndVersion{}, fmt.Errorf(
-			"old pool %s is a %s %s, not a lock-release pool; the migration source must be a LockReleaseTokenPool, SiloedLockReleaseTokenPool, or LockReleaseTokenPoolAndProxy",
+			"old pool %s is a %s %s, not a lock-release pool; the migration source must be a LockReleaseTokenPool, SiloedLockReleaseTokenPool, SiloedWithUnsiloedXERC20GroupTokenPool, or LockReleaseTokenPoolAndProxy",
 			oldPool, oldTV.Type, oldTV.Version)
 	}
 	if !oldTV.Version.LessThan(newTV.Version) {
@@ -42,7 +42,7 @@ func (a *EVMTokenBase) ValidateLockReleaseMigrationPoolPair(b cldf_ops.Bundle, c
 	// Siloed liquidity can only land in a siloed pool and vice versa: the sink funds per-silo
 	// lockboxes for a siloed pool and a single lockbox otherwise. Checked here, before the source
 	// emits any write, so a mismatched pair cannot strand extracted liquidity in the timelock.
-	oldSiloed := string(oldTV.Type) == cciputils.SiloedLockReleaseTokenPool.String()
+	oldSiloed := cciputils.IsSiloedLockReleasePoolType(string(oldTV.Type))
 	newSiloed := string(newTV.Type) == cciputils.SiloedLockReleaseTokenPool.String()
 	if oldSiloed != newSiloed {
 		return type_and_version.TypeAndVersion{}, type_and_version.TypeAndVersion{}, fmt.Errorf(

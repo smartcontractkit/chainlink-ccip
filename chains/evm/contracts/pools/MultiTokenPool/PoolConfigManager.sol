@@ -79,7 +79,7 @@ contract PoolConfigManager is IPoolConfigManager, ITypeAndVersion, AccessControl
   SecurityPolicyStore private immutable i_securityStore;
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "PoolConfigManager 2.1.0-dev";
+    return "PoolConfigManager 2.1.0";
   }
 
   constructor(

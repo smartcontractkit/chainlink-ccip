@@ -23,6 +23,7 @@ import (
 	linkops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/link"
 	wethops "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_0_0/operations/weth"
 	evmseqs "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/sequences"
+	evmtestadapter "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_6_0/testadapter"
 	feequoter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/devenv/blockchainutils"
 
@@ -49,8 +50,18 @@ type CCIP16EVM struct {
 	e            *deployment.Environment
 	chainDetails chainsel.ChainDetails
 	ethClients   map[uint64]*ethclient.Client
-	testadapters.TestAdapter
+	// The concrete adapter is embedded rather than testadapters.TestAdapter so that its optional interfaces
+	// (e.g. the extra-args ones used by testadapters.BuildExtraArgs) are promoted to CCIP16EVM.
+	*evmtestadapter.EVMAdapter
 }
+
+// Embedding testadapters.TestAdapter instead would still compile but silently send every lane through the
+// GetExtraArgs fallback.
+var (
+	_ testadapters.ExtraArgsDataSource = (*CCIP16EVM)(nil)
+	_ testadapters.EVMExtraArgsV2      = (*CCIP16EVM)(nil)
+	_ testadapters.SVMExtraArgsV1      = (*CCIP16EVM)(nil)
+)
 
 func NewEmptyCCIP16EVM(chainDetails chainsel.ChainDetails) *CCIP16EVM {
 	return &CCIP16EVM{
@@ -73,7 +84,12 @@ func (m *CCIP16EVM) SetCLDF(e *deployment.Environment) {
 	if !found {
 		panic(fmt.Sprintf("failed to find testadapter factory for %s", chainsel.FamilyEVM))
 	}
-	m.TestAdapter = factory(e, m.chainDetails.ChainSelector)
+	adapter := factory(e, m.chainDetails.ChainSelector)
+	evmAdapter, ok := adapter.(*evmtestadapter.EVMAdapter)
+	if !ok {
+		panic(fmt.Sprintf("unexpected %s testadapter type %T", chainsel.FamilyEVM, adapter))
+	}
+	m.EVMAdapter = evmAdapter
 }
 
 func (m *CCIP16EVM) ChainSelector() uint64 {

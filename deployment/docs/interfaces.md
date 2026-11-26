@@ -142,6 +142,7 @@ Manages callers on any contract that inherits `AuthorizedCallers.sol`. It is key
 |---|---|---|
 | `TestAdapter` | `testadapters.GetTestAdapterRegistry().RegisterTestAdapter(family, version, factory)` | Send and validate CCIP messages in integration tests. Registered as `func(*cldf.Environment, uint64) TestAdapter` |
 | `TestAdapterForFamily` / `ForkCCIPSendTestAdapter` | `RegisterTestAdapterForFamily` / `RegisterForkCCIPSendTestAdapter` | Narrow subsets of `TestAdapter` for fork smoke tests that don't need a live client |
+| `ExtraArgsDataSource` / `EVMExtraArgsV2` / `SVMExtraArgsV1` | None: optional methods on the test adapters, combined by `testadapters.BuildExtraArgs(src ExtraArgsSource, dest, receiver, opts...)` | Extra args split as in chainlink-ccv: the destination adapter returns destination-shaped data with its defaults (`ExtraArgsData`), the source adapter encodes it in its own format (`BuildEVMExtraArgsV2`, `BuildSVMExtraArgsV1`). Falls back to `GetExtraArgs` when either side does not implement its part |
 | `MessageExecutor` | `testadapters.GetMessageExecutorRegistry().Register` | Execute a sent message manually on dest (optional post-send step) |
 | `ContractVerification` | `hooks.GetContractVerificationRegistry().Register` | Block-explorer verification pre/post hooks |
 | `ContractOwnership` | `hooks.GetContractOwnershipRegistry().Register` | "Contracts must be owned by the timelock" pre-hook |

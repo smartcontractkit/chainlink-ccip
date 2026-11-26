@@ -406,77 +406,74 @@ func (a *SVMAdapter) NativeFeeToken() string {
 	return solana.SolMint.String()
 }
 
-func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
+var _ testadapters.ExtraArgsDataSource = (*SVMAdapter)(nil)
+
+const defaultSVMDestComputeUnits = 100_000
+
+// TODO: implement the source side too (testadapters.EVMExtraArgsV2 / SVMExtraArgsV1); until then messages
+// from Solana go through the destination's GetExtraArgs.
+func (a *SVMAdapter) ExtraArgsData(receiver []byte, opts ...testadapters.ExtraArgOpt) (testadapters.ExtraArgsDataProvider, error) {
 	receiverProgram := solana.PublicKeyFromBytes(receiver)
 	receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
 	receiverExternalExecutionConfigPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, receiverProgram)
-	accounts := [][32]byte{
-		receiverExternalExecutionConfigPDA,
-		receiverTargetAccountPDA,
-		solana.SystemProgramID,
+
+	unitsBig, allowOOO, err := testadapters.ParseGasLimitAndOOOExtraArgs(big.NewInt(defaultSVMDestComputeUnits), true, opts...)
+	if err != nil {
+		return nil, err
 	}
+	if !unitsBig.IsUint64() {
+		return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
+	}
+	units := unitsBig.Uint64()
+	if units > math.MaxUint32 {
+		return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
+	}
+
+	return testadapters.SVMExtraArgsV1Data{
+		ComputeUnits:             uint32(units),
+		AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
+		AllowOutOfOrderExecution: allowOOO,
+		TokenReceiver:            receiverProgram,
+		Accounts: [][32]byte{
+			receiverExternalExecutionConfigPDA,
+			receiverTargetAccountPDA,
+			solana.SystemProgramID,
+		},
+	}, nil
+}
+
+// GetExtraArgs is kept for callers that have not moved to testadapters.BuildExtraArgs yet, and as its fallback.
+func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...testadapters.ExtraArgOpt) ([]byte, error) {
+	if sourceFamily == chain_selectors.FamilySolana {
+		panic("unimplemented GetExtraArgs(solana->solana)")
+	}
+	provider, err := a.ExtraArgsData(receiver, opts...)
+	if err != nil {
+		return nil, err
+	}
+	data := provider.(testadapters.SVMExtraArgsV1Data)
 
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
-		extraArgs := extraargs.ClientSVMExtraArgsV1{
-			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
-			Accounts:                 accounts,
-			TokenReceiver:            receiverProgram,
-			ComputeUnits:             100_000,
-			AllowOutOfOrderExecution: true,
-		}
-		for _, opt := range opts {
-			switch opt.Name {
-			case testadapters.ExtraArgGasLimit:
-				unitsBig := opt.Value.(*big.Int)
-				if !unitsBig.IsUint64() {
-					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
-				}
-				units := unitsBig.Uint64()
-				if units > math.MaxUint32 {
-					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
-				}
-				extraArgs.ComputeUnits = uint32(units)
-			case testadapters.ExtraArgOOO:
-				extraArgs.AllowOutOfOrderExecution = opt.Value.(bool)
-			default:
-				// unsupported arg
-			}
-		}
-		return extraargs.SerializeClientSVMExtraArgsV1(extraArgs)
-	case chain_selectors.FamilySolana:
-		panic("unimplemented GetExtraArgs(solana->solana)")
+		return extraargs.SerializeClientSVMExtraArgsV1(extraargs.ClientSVMExtraArgsV1{
+			ComputeUnits:             data.ComputeUnits,
+			AccountIsWritableBitmap:  data.AccountIsWritableBitmap,
+			AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+			TokenReceiver:            data.TokenReceiver,
+			Accounts:                 data.Accounts,
+		})
 	case chain_selectors.FamilyTon:
 		// TON->Solana: TON fee quoter expects TLB-encoded SVMExtraArgsV1 for SVM destinations
-		computeUnits := uint32(100_000)
-		ooo := true
-		for _, opt := range opts {
-			switch opt.Name {
-			case testadapters.ExtraArgGasLimit:
-				unitsBig := opt.Value.(*big.Int)
-				if !unitsBig.IsUint64() {
-					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
-				}
-				units := unitsBig.Uint64()
-				if units > math.MaxUint32 {
-					return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
-				}
-				computeUnits = uint32(units)
-			case testadapters.ExtraArgOOO:
-				ooo = opt.Value.(bool)
-			default:
-				// unsupported arg
-			}
-		}
-		tonAccounts := make(ton_onramp_common.SnakedCell[ton_onramp.Account256], len(accounts))
-		for i, acc := range accounts {
+		// TODO[NONEVM-6985]: remove once chainlink-ton's adapter implements testadapters.SVMExtraArgsV1
+		tonAccounts := make(ton_onramp_common.SnakedCell[ton_onramp.Account256], len(data.Accounts))
+		for i, acc := range data.Accounts {
 			tonAccounts[i] = ton_onramp.Account256{Value: acc[:]}
 		}
 		extraArgs := ton_onramp.SVMExtraArgsV1{
-			ComputeUnits:             computeUnits,
-			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
-			AllowOutOfOrderExecution: ooo,
-			TokenReceiver:            receiverProgram[:],
+			ComputeUnits:             data.ComputeUnits,
+			AccountIsWritableBitmap:  data.AccountIsWritableBitmap,
+			AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
+			TokenReceiver:            data.TokenReceiver[:],
 			Accounts:                 tonAccounts,
 		}
 		extraArgsCell, err := tlb.ToCell(extraArgs)
