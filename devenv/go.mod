@@ -47,8 +47,8 @@ require (
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260915165527-3701875605f4
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.8
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.53.0
-	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20261125235038-e92e2dc3cd48
-	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20261125235038-e92e2dc3cd48
+	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20261126173228-c2670e35632a
+	github.com/smartcontractkit/chainlink-ton/devenv v0.0.0-20261126173228-c2670e35632a
 	github.com/smartcontractkit/libocr v0.0.0-20260810200708-618b5bf7f342
 	github.com/smartcontractkit/mcms v0.55.3-0.20260923132316-546232c547a2
 	github.com/spf13/cobra v1.10.2
@@ -392,7 +392,7 @@ require (
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
-	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20261125235038-e92e2dc3cd48 // indirect
+	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20261126173228-c2670e35632a // indirect
 	github.com/smartcontractkit/chainlink-ton/cciplib v0.1.1-0.20261120192314-cbcce0c797bc // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20260408092456-3c6369888d4a // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
