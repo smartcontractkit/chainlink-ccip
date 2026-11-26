@@ -21,10 +21,6 @@ import (
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"github.com/xssnick/tonutils-go/tlb"
-
-	ton_onramp_common "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/common"
-	ton_onramp "github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/onramp"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -462,25 +458,6 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 			TokenReceiver:            data.TokenReceiver,
 			Accounts:                 data.Accounts,
 		})
-	case chain_selectors.FamilyTon:
-		// TON->Solana: TON fee quoter expects TLB-encoded SVMExtraArgsV1 for SVM destinations
-		// TODO[NONEVM-6985]: remove once chainlink-ton's adapter implements testadapters.SVMExtraArgsV1
-		tonAccounts := make(ton_onramp_common.SnakedCell[ton_onramp.Account256], len(data.Accounts))
-		for i, acc := range data.Accounts {
-			tonAccounts[i] = ton_onramp.Account256{Value: acc[:]}
-		}
-		extraArgs := ton_onramp.SVMExtraArgsV1{
-			ComputeUnits:             data.ComputeUnits,
-			AccountIsWritableBitmap:  data.AccountIsWritableBitmap,
-			AllowOutOfOrderExecution: data.AllowOutOfOrderExecution,
-			TokenReceiver:            data.TokenReceiver[:],
-			Accounts:                 tonAccounts,
-		}
-		extraArgsCell, err := tlb.ToCell(extraArgs)
-		if err != nil {
-			return nil, err
-		}
-		return extraArgsCell.ToBOC(), nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)

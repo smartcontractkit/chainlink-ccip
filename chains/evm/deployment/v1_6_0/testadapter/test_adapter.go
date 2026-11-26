@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"github.com/xssnick/tonutils-go/tvm/cell"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -360,36 +359,6 @@ func (a *EVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 		// EVM allows empty extraArgs.
 		// TODO: send real extra args once the Solana adapter implements testadapters.EVMExtraArgsV2.
 		return nil, nil
-	case chain_selectors.FamilyTon:
-		// Hand-encode TON GenericExtraArgsV2 so this module does not depend on
-		// chainlink-ton binding types (which change across chainlink-ton versions).
-		// TL-B: #181dcf10 gasLimit:(Maybe uint256) allowOutOfOrderExecution:Bool
-		// TODO[NONEVM-6985]: Delegate TON extra-args encoding in the EVM test adapter to chainlink-ton
-		gasLimit := big.NewInt(1000000)
-		for _, opt := range opts {
-			switch opt.Name {
-			case testadapters.ExtraArgGasLimit:
-				gasLimit = opt.Value.(*big.Int)
-			default:
-				// unsupported arg
-			}
-		}
-		b := cell.BeginCell()
-		if err := b.StoreUInt(0x181dcf10, 32); err != nil {
-			return nil, err
-		}
-		if err := b.StoreBoolBit(gasLimit != nil); err != nil {
-			return nil, err
-		}
-		if gasLimit != nil {
-			if err := b.StoreBigUInt(gasLimit, 256); err != nil {
-				return nil, err
-			}
-		}
-		if err := b.StoreBoolBit(true); err != nil { // AllowOutOfOrderExecution
-			return nil, err
-		}
-		return b.EndCell().ToBOC(), nil
 	default:
 		// TODO: add support for other families
 		return nil, fmt.Errorf("unsupported source family: %s", sourceFamily)
