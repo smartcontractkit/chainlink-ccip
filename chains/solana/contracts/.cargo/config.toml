@@ -1,0 +1,8 @@
+# sBPFv3 builds only (`cargo build-sbf --arch v3`); `anchor build` is not affected.
+#
+# The platform-tools compiler accepts nightly features, so ahash 0.8.5 (pinned by
+# solana-frozen-abi 1.17) turns on `stdsimd`, a feature that newer compilers removed.
+# Listing the allowed features makes ahash's build script leave it off. The three
+# listed are the ones solana-program, solana-frozen-abi and ahash 0.7 need.
+[target.'cfg(all(target_os = "solana", target_feature = "static-syscalls"))']
+rustflags = ["-Zallow-features=specialization,min_specialization,proc_macro_hygiene"]

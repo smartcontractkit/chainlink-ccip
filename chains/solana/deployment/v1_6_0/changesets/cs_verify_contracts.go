@@ -54,6 +54,17 @@ type VerifyBuildConfig struct {
 	MCMS             *cldfproposalutils.TimelockConfig
 }
 
+// solana-verify must rebuild the program the same way the release was built, or the
+// hashes do not match. Releases are built for sBPFv3 by contracts/scripts/verify_build.sh;
+// keep these two values equal to the ones in that script.
+const (
+	verifySBFArch   = "v3"
+	verifyBaseImage = "solanafoundation/solana-verifiable-build:4.3.0"
+)
+
+// verifyBuildArgs are the solana-verify arguments that select how the program is built.
+var verifyBuildArgs = []string{"--arch", verifySBFArch, "--base-image", verifyBaseImage}
+
 func runSolanaVerifyMCMS(e cldf.Environment,
 	cfg VerifyBuildConfig,
 	chain cldf_solana.Chain,
@@ -91,6 +102,7 @@ func runSolanaVerifyMCMS(e cldf.Environment,
 		"--mount-path", mountPath,
 		"--uploader", timelockSignerPDA.String(),
 	}
+	cmdArgs = append(cmdArgs, verifyBuildArgs...)
 	e.Logger.Infow("export-pda-tx cmdArgs", "cmdArgs", cmdArgs)
 	output, err := RunCommand("solana-verify", cmdArgs, ".")
 	e.Logger.Infow("export-pda-tx output", "output", output)
@@ -138,6 +150,7 @@ func runSolanaVerifyWithoutMCMS(e cldf.Environment,
 		"--mount-path", mountPath,
 		"--skip-prompt",
 	}
+	cmdArgs = append(cmdArgs, verifyBuildArgs...)
 
 	output, err := RunCommand("solana-verify", cmdArgs, ".")
 	e.Logger.Infow("verify-from-repo output", "output", output)
@@ -175,6 +188,8 @@ func runSolanaVerify(e cldf.Environment,
 		"Lib Name":     libraryName,
 		"Commit Hash":  cfg.GitCommitSha,
 		"Mount Path":   mountPath,
+		"SBF Arch":     verifySBFArch,
+		"Base Image":   verifyBaseImage,
 	}
 	log, err := json.MarshalIndent(params, "", "")
 	if err != nil {

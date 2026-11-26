@@ -78,8 +78,10 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		"--faucet-port", faucetPort,
 		"--gossip-port", gossipPort,
 		"--ledger", t.TempDir(),
-		// Configurations to make the local cluster faster
-		"--ticks-per-slot", "8", // value in mainnet: 64
+		// Run on Alpenglow consensus, which finalizes blocks right away. Do not add
+		// --ticks-per-slot to speed the cluster up: combined with --alpenglow the
+		// validator stops producing blocks.
+		"--alpenglow",
 		// account data direct mapping feature is disabled on mainnet,
 		// so we disable it here to make the local cluster more similar to mainnet
 		"--deactivate-feature", "EenyoWx9UMXYKpR8mW5Jmfmy2fRjzUtM7NduYMY8bx33",

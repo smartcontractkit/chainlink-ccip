@@ -15,6 +15,7 @@
 ## Components
 
 - x2 Anvil chains
+- Solana validator
 - JobDistributor
 - NodeSet (4 nodes)
 
@@ -23,8 +24,11 @@ All build command are run using [Justfile](https://github.com/casey/just?tab=rea
 ```
 brew install just # click the link above if you are not on OS X
 just build-jd-docker
+just build-solana-validator-docker
 just cli
 ```
+
+`build-solana-validator-docker` builds the Solana validator image (`images/solana-validator/Dockerfile` --> `solana-validator:agave-<version>`). Agave no longer publishes Docker images and only ships x86_64 Linux binaries, so on Apple Silicon the image is compiled from source. The first build takes a while.
 
 Enter `ccip` shell and follow auto-completion hints
 ```
