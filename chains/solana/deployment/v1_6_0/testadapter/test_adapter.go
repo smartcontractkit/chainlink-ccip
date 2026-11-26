@@ -409,20 +409,24 @@ const defaultSVMDestComputeUnits = 100_000
 // TODO: implement the source side too (testadapters.EVMExtraArgsV2 / SVMExtraArgsV1); until then messages
 // from Solana go through the destination's GetExtraArgs.
 func (a *SVMAdapter) ExtraArgsData(receiver []byte, opts ...testadapters.ExtraArgOpt) (testadapters.ExtraArgsDataProvider, error) {
+	return a.extraArgsData(receiver, opts...)
+}
+
+func (a *SVMAdapter) extraArgsData(receiver []byte, opts ...testadapters.ExtraArgOpt) (testadapters.SVMExtraArgsV1Data, error) {
 	receiverProgram := solana.PublicKeyFromBytes(receiver)
 	receiverTargetAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, receiverProgram)
 	receiverExternalExecutionConfigPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, receiverProgram)
 
 	unitsBig, allowOOO, err := testadapters.ParseGasLimitAndOOOExtraArgs(big.NewInt(defaultSVMDestComputeUnits), true, opts...)
 	if err != nil {
-		return nil, err
+		return testadapters.SVMExtraArgsV1Data{}, err
 	}
 	if !unitsBig.IsUint64() {
-		return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
+		return testadapters.SVMExtraArgsV1Data{}, fmt.Errorf("ComputeUnits is larger than uint32: %d", unitsBig)
 	}
 	units := unitsBig.Uint64()
 	if units > math.MaxUint32 {
-		return nil, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
+		return testadapters.SVMExtraArgsV1Data{}, fmt.Errorf("ComputeUnits is larger than uint32: %d", units)
 	}
 
 	return testadapters.SVMExtraArgsV1Data{
@@ -443,11 +447,10 @@ func (a *SVMAdapter) GetExtraArgs(receiver []byte, sourceFamily string, opts ...
 	if sourceFamily == chain_selectors.FamilySolana {
 		panic("unimplemented GetExtraArgs(solana->solana)")
 	}
-	provider, err := a.ExtraArgsData(receiver, opts...)
+	data, err := a.extraArgsData(receiver, opts...)
 	if err != nil {
 		return nil, err
 	}
-	data := provider.(testadapters.SVMExtraArgsV1Data)
 
 	switch sourceFamily {
 	case chain_selectors.FamilyEVM:
