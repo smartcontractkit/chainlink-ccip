@@ -41,7 +41,7 @@ jobs:
         path: |
           chains/solana/contracts/target/deploy/*.so
           chains/solana/contracts/target/executable-hashes.txt
-        key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('chains/solana/contracts/**/*.rs', 'chains/solana/contracts/**/Cargo.lock', 'chains/solana/contracts/**/Cargo.toml', 'chains/solana/contracts/scripts/*.sh', '.github/workflows/solana-verified-build.yml') }}
+        key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('chains/solana/contracts/**/*.rs', 'chains/solana/contracts/**/Cargo.lock', 'chains/solana/contracts/**/Cargo.toml', 'chains/solana/contracts/.cargo/config.toml', 'chains/solana/contracts/scripts/*.sh', '.github/workflows/solana-verified-build.yml') }}
     - name: Build Verified Artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
       run: |
