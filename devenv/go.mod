@@ -379,6 +379,7 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260430175646-295a7f9a1500 // indirect
 	github.com/smartcontractkit/chainlink-canton/authentication v1.0.0 // indirect
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.0 // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/governance v0.0.0-00010101000000-000000000000 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20260724142814-45996a1bcb72 // indirect
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260915165527-3701875605f4 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260723212800-b2f21d31b1d2 // indirect
@@ -526,3 +527,5 @@ replace (
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/prometheus/common => github.com/prometheus/common v0.66.1
 )
+
+replace github.com/smartcontractkit/chainlink-ccip/chains/solana/governance => ../chains/solana/governance

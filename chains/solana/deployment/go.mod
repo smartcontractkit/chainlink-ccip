@@ -170,6 +170,7 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260430175646-295a7f9a1500 // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/governance v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20260724142814-45996a1bcb72 // indirect
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260804200254-c1accce563a8 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0 // indirect
@@ -233,3 +234,5 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/smartcontractkit/chainlink-ccip/chains/solana/governance => ../governance
