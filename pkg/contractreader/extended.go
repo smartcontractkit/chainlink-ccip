@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -19,10 +22,13 @@ import (
 )
 
 var (
-	ErrFinalityViolated = errors.New("finality violated")
-	ErrTooManyBindings  = errors.New("too many bindings")
-	ErrNoBindings       = errors.New("no bindings found")
+	ErrFinalityViolated      = errors.New("finality violated")
+	ErrTooManyBindings       = errors.New("too many bindings")
+	ErrNoBindings            = errors.New("no bindings found")
+	ErrDuplicatesExceedLimit = errors.New("duplicate sequences exceed query limit")
 )
+
+const maxDedupRequeries = 3
 
 // Extended version of a ContractReader.
 type Extended interface {
@@ -73,25 +79,43 @@ type ExtendedBoundContract struct {
 // extendedContractReader is an extended version of the contract reader.
 type extendedContractReader struct {
 	reader                 ContractReaderFacade
+	lggr                   logger.Logger
 	contractBindingsByName map[string][]ExtendedBoundContract
 	// contract names that allow multiple bindings
 	multiBindAllowed map[string]bool
 	mu               *sync.RWMutex
 }
 
-func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended {
+// ExtendedOption configures an extended contract reader.
+type ExtendedOption func(*extendedContractReader)
+
+// WithLogger sets the logger used by the extended contract reader.
+func WithLogger(lggr logger.Logger) ExtendedOption {
+	return func(e *extendedContractReader) { e.lggr = lggr }
+}
+
+func NewExtendedContractReader(baseContractReader ContractReaderFacade, opts ...ExtendedOption) Extended {
 	// avoid double wrapping
 	if ecr, ok := baseContractReader.(Extended); ok {
 		return ecr
 	}
-	return &extendedContractReader{
+	lggr := logger.Nop()
+	if observed, ok := baseContractReader.(*Observed); ok {
+		lggr = observed.lggr
+	}
+	e := &extendedContractReader{
 		reader:                 baseContractReader,
+		lggr:                   lggr,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),
 		// so far this is the only contract that allows multiple bindings
 		// if more contracts are added, this should be moved to a config
 		multiBindAllowed: map[string]bool{consts.ContractNamePriceAggregator: true},
 		mu:               &sync.RWMutex{},
 	}
+	for _, opt := range opts {
+		opt(e)
+	}
+	return e
 }
 
 func (e *extendedContractReader) getOneBinding(contractName string) (ExtendedBoundContract, error) {
@@ -115,7 +139,7 @@ func (e *extendedContractReader) QueryKey(
 	limitAndSort query.LimitAndSort,
 	sequenceDataType any,
 ) ([]types.Sequence, error) {
-	result, err := e.reader.QueryKey(
+	result, err := e.queryKeyDeduped(
 		ctx,
 		contract,
 		filter,
@@ -129,6 +153,73 @@ func (e *extendedContractReader) QueryKey(
 	}
 
 	return result, err
+}
+
+// queryKeyDeduped drops duplicate sequences. The limit is applied before dedup, so a full page
+// with duplicates is re-queried with a doubled limit.
+func (e *extendedContractReader) queryKeyDeduped(
+	ctx context.Context,
+	contract types.BoundContract,
+	filter query.KeyFilter,
+	limitAndSort query.LimitAndSort,
+	sequenceDataType any,
+) ([]types.Sequence, error) {
+	requested := limitAndSort.Limit.Count
+	for attempt := 0; ; attempt++ {
+		result, err := e.reader.QueryKey(ctx, contract, filter, limitAndSort, sequenceDataType)
+		if err != nil {
+			return result, err
+		}
+
+		unique := dedupSequences(result)
+		if len(unique) == len(result) && attempt == 0 {
+			return result, nil
+		}
+		allRowsReturned := requested == 0 || uint64(len(result)) < limitAndSort.Limit.Count
+		if allRowsReturned || uint64(len(unique)) >= requested {
+			if len(unique) < len(result) {
+				e.lggr.Warnw("dropped duplicate sequences",
+					"contract", contract.Name,
+					"address", contract.Address,
+					"key", filter.Key,
+					"limit", limitAndSort.Limit.Count,
+					"requeries", attempt,
+					"numSequences", len(result),
+					"numDuplicates", len(result)-len(unique),
+				)
+			}
+			if requested > 0 && uint64(len(unique)) > requested {
+				unique = unique[:requested]
+			}
+			return unique, nil
+		}
+
+		if attempt == maxDedupRequeries {
+			return nil, fmt.Errorf("%w: contract=%s key=%s requested=%d limit=%d distinct=%d",
+				ErrDuplicatesExceedLimit, contract.Name, filter.Key, requested, limitAndSort.Limit.Count, len(unique))
+		}
+		limitAndSort.Limit.Count *= 2
+	}
+}
+
+// dedupSequences keeps the first of sequences with the same tx hash, block hash and data.
+// The cursor is ignored: it holds the log index, which some RPCs report differently for the same log.
+func dedupSequences(seqs []types.Sequence) []types.Sequence {
+	type txInBlock struct{ txHash, blockHash string }
+
+	seen := make(map[txInBlock][]any, len(seqs))
+	unique := make([]types.Sequence, 0, len(seqs))
+	for _, seq := range seqs {
+		if len(seq.TxHash) > 0 {
+			key := txInBlock{txHash: string(seq.TxHash), blockHash: string(seq.Hash)}
+			if slices.ContainsFunc(seen[key], func(data any) bool { return reflect.DeepEqual(data, seq.Data) }) {
+				continue
+			}
+			seen[key] = append(seen[key], seq.Data)
+		}
+		unique = append(unique, seq)
+	}
+	return unique
 }
 
 func (e *extendedContractReader) ExtendedQueryKey(
