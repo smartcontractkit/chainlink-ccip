@@ -205,6 +205,7 @@ Constructors and inputs. Follow the source link for the config type. Each config
 | Disable lane | `lanes.DisableLane(laneReg, mcmsReg)` | Disable both directions ([disable_lane.go](../lanes/disable_lane.go)) |
 | PingPong | `lanes.ConfigurePingPongForLanes(e, reg, version, sel, remotes)` | Helper function (not a changeset) |
 | Token expansion | `tokens.TokenExpansion()` | Deploy token + pool, configure remotes, hand ownership to timelock ([token_expansion.go](../tokens/token_expansion.go)) |
+| Deploy multi-token pools | `tokens.DeployMultiTokenPools(mttpReg, mcmsReg)` | Deploy the MTTP policy stores, PoolConfigManager, and pool; authorize the manager on its stores. Does not register tokens or configure lanes ([deploy_multi_token_pool.go](../tokens/deploy_multi_token_pool.go)) |
 | Configure tokens for transfers | `tokens.ConfigureTokensForTransfers(tokReg, mcmsReg)` | Register and configure existing pools. Can auto-migrate from an active legacy pool ([configure_tokens_for_transfers.go](../tokens/configure_tokens_for_transfers.go)) |
 | Configure token pool | `tokens.ConfigureTokenPool()` | Pool-level settings: fees, finality, router/admins ([configure_token_pool.go](../tokens/configure_token_pool.go)) |
 | Manual registration | `tokens.ManualRegistration()` | Register a customer-deployed token ([manual_registration.go](../tokens/manual_registration.go)) |
