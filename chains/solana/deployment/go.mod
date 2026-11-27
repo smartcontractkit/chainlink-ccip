@@ -30,7 +30,6 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260811072549-2a0dec67e6be
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260810185617-74b886ae36a1
 	github.com/smartcontractkit/chainlink-deployments-framework v0.120.1-0.20260828145648-3e1bcd2ac1da
-	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260713162202-124316cd10ff
 	github.com/smartcontractkit/cld-changesets v0.9.0
 	github.com/smartcontractkit/mcms v0.54.1-0.20260901163225-bef7af6e18f9
 	github.com/stretchr/testify v1.12.1
@@ -61,6 +60,7 @@ require (
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260710181111-6417709a55ee // indirect
 	github.com/smartcontractkit/chainlink-protos/metering/go v0.0.0-20260710151514-27b5a126dabe // indirect
 	github.com/smartcontractkit/chainlink-stellar/bindings v0.0.0-20260828132741-4eb62ddc67fb // indirect
+	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260713162202-124316cd10ff // indirect
 	github.com/smartcontractkit/chainlink-ton/cciplib v0.1.0 // indirect
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19 // indirect
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
