@@ -1,10 +1,12 @@
 package changesets
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
@@ -1055,6 +1057,9 @@ func generateUpgradeTxns(
 		if err := chain.Confirm([]solana.Instruction{extendIxn}); err != nil {
 			return txns, fmt.Errorf("failed to confirm instructions: %w", err)
 		}
+		if err := waitPastDeploySlot(e.GetContext(), chain.Client, programID); err != nil {
+			return txns, err
+		}
 	}
 
 	// if we're not upgrading via timelock, execute the raw ixns
@@ -1075,6 +1080,52 @@ func generateUpgradeTxns(
 	}
 	txns = append(txns, *upgradeTx, *closeTx)
 	return txns, nil
+}
+
+// waitPastDeploySlot blocks until the finalized slot is past the slot a program was last deployed
+// or extended in. The loader rejects an Upgrade sent in that same slot ("Program was
+// deployed in this block already").
+func waitPastDeploySlot(ctx context.Context, client *solRpc.Client, programID solana.PublicKey) error {
+	// deploySlot reads at confirmed: a finalized read would not yet see the extend.
+	lastDeploySlot, err := deploySlot(ctx, client, programID)
+	if err != nil {
+		return err
+	}
+	for {
+		slot, err := client.GetSlot(ctx, solRpc.CommitmentFinalized)
+		if err != nil {
+			return fmt.Errorf("get current slot: %w", err)
+		}
+		if slot > lastDeploySlot {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(slotPollInterval):
+		}
+	}
+}
+
+const slotPollInterval = 200 * time.Millisecond
+
+// deploySlot returns the slot a program was last deployed, upgraded or extended in.
+func deploySlot(ctx context.Context, client *solRpc.Client, programID solana.PublicKey) (uint64, error) {
+	programDataAccount, _, _ := solana.FindProgramAddress([][]byte{programID.Bytes()}, solana.BPFLoaderUpgradeableProgramID)
+	acct, err := client.GetAccountInfoWithOpts(ctx, programDataAccount,
+		&solRpc.GetAccountInfoOpts{Commitment: solRpc.CommitmentConfirmed})
+	if err != nil {
+		return 0, fmt.Errorf("read program data account: %w", err)
+	}
+	if acct == nil || acct.Value == nil {
+		return 0, fmt.Errorf("program data account does not exist: %s", programDataAccount)
+	}
+	raw := acct.Value.Data.GetBinary()
+	if len(raw) < 12 {
+		return 0, fmt.Errorf("program data account too short: %d bytes", len(raw))
+	}
+	// layout: u32 enum tag, u64 slot, Option<Pubkey> authority
+	return binary.LittleEndian.Uint64(raw[4:12]), nil
 }
 
 func generateUpgradeIxn(
@@ -1108,6 +1159,19 @@ func generateUpgradeIxn(
 	return instruction, nil
 }
 
+// minExtendProgramBytes is the smallest extension the upgradeable loader accepts. A
+// smaller one fails with "ExtendProgram requires a minimum of 10240 additional bytes".
+const minExtendProgramBytes = 10_240
+
+// extendHeadroomBytes is extra room added to every extension, on top of what the new
+// program needs.
+const extendHeadroomBytes = 4096
+
+// programDataHeaderBytes is the header of a program data account. An Upgrade needs the
+// program data account to be larger than the buffer account by this much; with equal
+// sizes it fails.
+const programDataHeaderBytes = 45
+
 func generateExtendIxn(
 	e *cldf.Environment,
 	chain cldf_solana.Chain,
@@ -1124,18 +1188,22 @@ func generateExtendIxn(
 	}
 	e.Logger.Debugw("Program data size", "programDataSize", programDataSize)
 
-	e.Logger.Debugw("New program size", "newProgramSize", newProgramSize)
-	if newProgramSize <= programDataSize {
-		e.Logger.Debugf("Buffer account size %d is less than program account size %d", newProgramSize, programDataSize)
+	// newProgramSize is the size of the buffer account
+	requiredSize := newProgramSize + programDataHeaderBytes
+	e.Logger.Debugw("Required program data size", "requiredSize", requiredSize)
+	if requiredSize <= programDataSize {
+		e.Logger.Debugf("Program data account of %d bytes already fits the %d bytes required", programDataSize, requiredSize)
 		return nil, nil
 	}
-	extraBytes := newProgramSize - programDataSize
-	if extraBytes > math.MaxUint32-1024 {
-		return nil, fmt.Errorf("extra bytes %d exceeds maximum value %d", extraBytes, math.MaxUint32-1024)
+	// Extend by what the new program needs plus some headroom, and by no less than the
+	// loader accepts.
+	extraBytes := max(requiredSize-programDataSize, minExtendProgramBytes-extendHeadroomBytes) + extendHeadroomBytes
+	if extraBytes > math.MaxUint32 {
+		return nil, fmt.Errorf("extra bytes %d exceeds maximum value %d", extraBytes, uint32(math.MaxUint32))
 	}
 	// https://github.com/solana-labs/solana/blob/7700cb3128c1f19820de67b81aa45d18f73d2ac0/sdk/program/src/loader_upgradeable_instruction.rs#L146
-	data := binary.LittleEndian.AppendUint32([]byte{}, 6)                  // 4-byte Extend instruction identifier
-	data = binary.LittleEndian.AppendUint32(data, uint32(extraBytes+1024)) //nolint:gosec // G115: guard above covers the 1024 bytes of padding
+	data := binary.LittleEndian.AppendUint32([]byte{}, 6)             // 4-byte Extend instruction identifier
+	data = binary.LittleEndian.AppendUint32(data, uint32(extraBytes)) //nolint:gosec // G115: guarded above
 
 	keys := solana.AccountMetaSlice{
 		solana.NewAccountMeta(programDataAccount, true, false),      // Program data account (writable)

@@ -31,6 +31,34 @@ build-jd-docker:
     fi
     echo "Done!"
 
+# Agave version of the Solana validator image. Keep it equal to the image tag in env.toml.
+agave_version := "4.4.1"
+
+# Agave no longer publishes Docker images, and only ships x86_64 Linux binaries: on
+# arm64 the image is compiled from source, which takes a while the first time. The
+# build is always native, because Agave needs io_uring and Rosetta does not support it.
+
+# Build the Solana validator Docker image
+build-solana-validator-docker:
+    #!/usr/bin/env bash
+    set -e
+    IMAGE_NAME="solana-validator:agave-{{agave_version}}"
+    if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "Docker image $IMAGE_NAME already exists, skipping build..."
+        exit 0
+    fi
+    case "$(uname -m)" in
+        arm64|aarch64) ARCH=arm64; TARGET=source ;;
+        *)             ARCH=amd64; TARGET=release ;;
+    esac
+    docker build -f images/solana-validator/Dockerfile \
+        --platform "linux/$ARCH" \
+        --target "$TARGET" \
+        --build-arg AGAVE_VERSION={{agave_version}} \
+        -t "$IMAGE_NAME" \
+        images/solana-validator
+    echo "Done!"
+
 # Rebuild CLI
 cli:
     pushd cmd/ccip > /dev/null && go install -ldflags="-X main.Version=1.0.0" . && popd > /dev/null

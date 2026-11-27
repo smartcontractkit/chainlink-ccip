@@ -5,6 +5,11 @@ members = [
   "crates/*",
 ]
 
+# Selects the pinned build image of solana-verify. Keep it equal to the image tag in
+# scripts/verify_build.sh and to SBF_BUILD_IMAGE in ../Makefile.
+[workspace.metadata.cli]
+solana = "4.3.0"
+
 [profile.dev]
 overflow-checks = true
 

@@ -161,8 +161,12 @@ jobs:
       - name: Install gotestloghelper
         run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
       - name: Install Solana CLI
+        # Pinned: the tests need a solana-test-validator from Agave 4.2 or later, to load
+        # the sBPFv3 programs and to run with --alpenglow. The "stable" channel gives no
+        # such guarantee and changes without notice. 4.3.2 is the version the suite was
+        # verified with.
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
+          sh -c "$(curl -sSfL https://release.anza.xyz/v4.3.2/install)"
           echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
       - name: build + test
         run: |
@@ -174,6 +178,9 @@ jobs:
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
           anchor build"
+          # Anchor 0.29 only builds sBPFv0. Rebuild the programs for sBPFv3, with the
+          # image the release build uses, so the tests run what gets deployed.
+          make docker-build-contracts-sbfv3
           make go-tests
 
   lint:

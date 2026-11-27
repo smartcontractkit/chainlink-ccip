@@ -241,13 +241,16 @@ func FundSolanaAccounts(
 				return errors.New("Status response value is nil")
 			}
 
-			unfinalizedCount := 0
+			// An airdrop is done once it is confirmed. A finalized one counts too: clusters with
+			// fast finality (Alpenglow) can report it as finalized without ever reporting confirmed.
+			pendingCount := 0
 			for _, res := range statusRes.Value {
-				if res == nil || res.ConfirmationStatus == rpc.ConfirmationStatusFinalized {
-					unfinalizedCount++
+				if res == nil || (res.ConfirmationStatus != rpc.ConfirmationStatusConfirmed &&
+					res.ConfirmationStatus != rpc.ConfirmationStatusFinalized) {
+					pendingCount++
 				}
 			}
-			remaining = unfinalizedCount
+			remaining = pendingCount
 		}
 	}
 	return nil

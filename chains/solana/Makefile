@@ -6,6 +6,9 @@ export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
 export ANCHOR_BUILD_ARGS ?=
 # Allow overriding the output directory for docker builds
 TARGET_DIR ?= $(PWD)/contracts/target
+# Image that rebuilds the programs for sBPFv3. Keep the tag equal to the solana version in
+# contracts/Cargo.toml ([workspace.metadata.cli]) and to contracts/scripts/verify_build.sh.
+export SBF_BUILD_IMAGE ?= solanafoundation/solana-verifiable-build:4.3.0
 
 .PHONY: projectserum_version
 anchor_version:
@@ -64,6 +67,16 @@ test-token-pool-contracts-go-tests:
 build-contracts:
 	cd ./contracts && anchor build
 
+# Rebuilds target/deploy for sBPFv3, which `anchor build` cannot target on Anchor 0.29.
+# Run it after build-contracts. See contracts/scripts/build_sbfv3.sh for the toolchain.
+.PHONY: build-contracts-sbfv3
+build-contracts-sbfv3:
+	./contracts/scripts/build_sbfv3.sh
+
+# The deployment changesets run this target to build the programs they deploy
+# (deployment/v1_6_0/changesets/cs_build_solana.go), so it has to leave sBPFv3 binaries
+# in target/deploy: `anchor build` for the IDLs and keypairs, then the sBPFv3 rebuild.
+#
 # Note on CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 # Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download
 .PHONY: docker-build-contracts
@@ -74,6 +87,19 @@ docker-build-contracts:
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
 		${ANCHOR_IMAGE} anchor build ${ANCHOR_BUILD_ARGS}
+	$(MAKE) docker-build-contracts-sbfv3
+
+# Same as build-contracts-sbfv3, in the image the release build uses. The image only
+# exists for amd64.
+.PHONY: docker-build-contracts-sbfv3
+docker-build-contracts-sbfv3:
+	docker run --rm --platform linux/amd64 \
+		-v $(shell pwd)/contracts:/workdir \
+		-v ${TARGET_DIR}:/workdir/target \
+		-w /workdir \
+		-e CARGO_TARGET_DIR=/workdir/target \
+		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+		${SBF_BUILD_IMAGE} bash scripts/build_sbfv3.sh
 
 .PHONY: docker-update-contracts
 docker-update-contracts:
