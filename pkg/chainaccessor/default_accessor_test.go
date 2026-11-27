@@ -511,6 +511,25 @@ func TestMsgsBetweenSeqNums(t *testing.T) {
 			},
 		},
 		{
+			name:              "Messages sorted by sequence number",
+			seqNumRange:       cciptypes.NewSeqNumRange(696, 698),
+			destChainSelector: chainB,
+			sequences: []types.Sequence{
+				{Cursor: "100-4-0xaaa", TxHash: []byte{0x01}, Data: createValidSendRequestedEvent(696)},
+				{Cursor: "100-6-0xccc", TxHash: []byte{0x03}, Data: createValidSendRequestedEvent(698)},
+				{Cursor: "100-10-0xbbb", TxHash: []byte{0x02}, Data: createValidSendRequestedEvent(697)},
+			},
+			expectedError:    false,
+			expectedMsgCount: 3,
+			validateTxHash: func(t *testing.T, msgs []cciptypes.Message) {
+				require.Len(t, msgs, 3)
+				for i, want := range []cciptypes.SeqNum{696, 697, 698} {
+					assert.Equal(t, want, msgs[i].Header.SequenceNumber)
+				}
+				assert.Equal(t, "0x02", msgs[1].Header.TxHash)
+			},
+		},
+		{
 			name:              "Wrong data type in sequence",
 			seqNumRange:       cciptypes.NewSeqNumRange(1, 2),
 			destChainSelector: chainB,
