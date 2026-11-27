@@ -1,6 +1,7 @@
 package chainaccessor
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -385,6 +386,11 @@ func (l *DefaultAccessor) MsgsBetweenSeqNums(
 
 		msgs = append(msgs, msg.Message)
 	}
+
+	// Ensure messages are ordered by seqNum, even if duplicate or shifted log indexes reorder the logs.
+	slices.SortStableFunc(msgs, func(a, b cciptypes.Message) int {
+		return cmp.Compare(a.Header.SequenceNumber, b.Header.SequenceNumber)
+	})
 
 	msgsWithoutDataField := make([]cciptypes.Message, len(msgs))
 	for i, msg := range msgs {

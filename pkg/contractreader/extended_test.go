@@ -241,8 +241,11 @@ func TestExtendedContractReader_QueryKeyDedup(t *testing.T) {
 			expWarn:    true,
 		},
 		{
-			name:       "result is cut to the requested limit",
-			rows:       twice(697, 700),
+			name: "result is cut to the requested limit",
+			rows: []types.Sequence{
+				row(1, 0, 1, 697), row(1, 4, 1, 697),
+				row(1, 1, 2, 698), row(1, 2, 3, 699), row(1, 3, 4, 700), row(1, 5, 5, 701),
+			},
 			limit:      3,
 			expSeqNums: []uint64{697, 698, 699},
 			expLimits:  []uint64{3, 6},
