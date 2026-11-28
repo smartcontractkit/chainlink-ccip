@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	cldf_deployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/1_5_0/burn_mint_erc20_with_drip"
 )
 
 var ContractType cldf_deployment.ContractType = "BurnMintERC20WithDripToken"
@@ -25,10 +25,10 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ConstructorArgs]{
 	Name:             "burn_mint_erc20_with_drip:deploy",
 	Version:          utils.Version_1_0_0,
 	Description:      "Deploys the BurnMintERC20 Token contract with drip function (for testing)",
-	ContractMetadata: burn_mint_erc20_with_drip.BurnMintERC20MetaData,
+	ContractMetadata: burn_mint_erc20_with_drip.BurnMintERC20WithDripMetaData,
 	BytecodeByTypeAndVersion: map[string]contract.Bytecode{
 		cldf_deployment.NewTypeAndVersion(ContractType, *utils.Version_1_0_0).String(): {
-			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20Bin),
+			EVM: common.FromHex(burn_mint_erc20_with_drip.BurnMintERC20WithDripBin),
 		},
 	},
 	Validate: func(args ConstructorArgs) error { return nil },
